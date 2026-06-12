@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-worker
+  namespace: suspensionlab-prod
+  labels:
+    app: suspensionlab
+    component: worker
+spec:
+  # Replicas managed by KEDA ScaledObject
+  selector:
+    matchLabels:
+      app: suspensionlab
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: suspensionlab
+        component: worker
+    spec:
+      containers:
+      - name: worker
+        image: "{{ .Values.workers.image.repository }}:{{ .Values.workers.image.tag }}"
+        command: ["rq", "worker", "--with-scheduler", "--max-jobs", "3"]
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1001
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+        envFrom:
+        - configMapRef:
+            name: {{ .Release.Name }}-config
+        - secretRef:
+            name: {{ .Release.Name }}-secrets
+        resources:
+{{ toYaml .Values.workers.resources | indent 10 }}

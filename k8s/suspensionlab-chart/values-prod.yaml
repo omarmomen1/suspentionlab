@@ -1,0 +1,83 @@
+# SuspensionLab PRO Production Values
+
+environment: production
+
+api:
+  replicaCount: 3
+  image:
+    repository: <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/suspensionlab/backend
+    tag: "1.0.0"  # Override in CI/CD: --set api.image.tag=$(git rev-parse --short HEAD)
+    imagePullPolicy: IfNotPresent  # Use cached image; only pull on tag change
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 70
+
+ui:
+  replicaCount: 3
+  image:
+    repository: <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/suspensionlab/frontend
+    tag: "1.0.0"
+    imagePullPolicy: IfNotPresent  # Use cached image; only pull on tag change
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetMemoryUtilizationPercentage: 75
+
+workers:
+  image:
+    repository: <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/suspensionlab/worker
+    tag: "1.0.0"
+    imagePullPolicy: IfNotPresent  # Use cached image; only pull on tag change
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
+  keda:
+    enabled: true
+    minReplicaCount: 0
+    maxReplicaCount: 50
+    queueLengthTarget: 5
+
+ingress:
+  enabled: true
+  className: nginx
+  host: app.suspensionlab.pro
+  tls:
+    - secretName: suspensionlab-tls
+      hosts:
+        - app.suspensionlab.com
+
+# Subcharts
+redis:
+  enabled: true
+postgresql:
+  enabled: true
+
+secrets:
+  # Override via --set secrets.databaseUrl=<value> or use external-secrets operator
+  # NEVER commit real values to this file
+  databaseUrl: ""
+  redisUrl: ""
+  redisPassword: ""
+  apiKey: ""
+  stripeWebhookSecret: ""

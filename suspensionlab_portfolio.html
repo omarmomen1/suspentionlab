@@ -1,0 +1,286 @@
+```html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SuspensionLab PRO - Engineering Case Study</title>
+    <style>
+        /* Import Google Fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=JetBrains+Mono:wght@400;700&display=swap');
+
+        /* Root Variables */
+        :root {
+            --bg-dark: #0f1115;
+            --bg-panel: #1a1d24;
+            --text-main: #e2e8f0;
+            --text-muted: #94a3b8;
+            --accent: #ff2a2a; /* Motorsport Red */
+            --border: #334155;
+            --font-sans: 'Inter', sans-serif;
+            --font-mono: 'JetBrains Mono', monospace;
+        }
+
+        /* Global Styles */
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        h1, h2, h3 {
+            margin-top: 0;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            text-transform: uppercase;
+            border-bottom: 2px solid var(--accent);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            color: var(--accent);
+            margin-top: 30px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        h2::before {
+            content: ">>";
+            font-family: var(--font-mono);
+            margin-right: 10px;
+            font-size: 1.2rem;
+            opacity: 0.7;
+        }
+
+        h3 {
+            font-size: 1.1rem;
+            color: var(--text-main);
+            margin-bottom: 5px;
+        }
+
+        p {
+            font-size: 0.95rem;
+            color: var(--text-muted);
+            margin-bottom: 15px;
+        }
+
+        ul {
+            padding-left: 20px;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        li {
+            margin-bottom: 8px;
+        }
+
+        strong {
+            color: var(--text-main);
+        }
+
+        .code-inline {
+            font-family: var(--font-mono);
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-size: 0.85rem;
+            color: #38bdf8;
+        }
+
+        /* Layout / Container */
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            padding: 20mm;
+            background-color: var(--bg-dark);
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+            box-sizing: border-box;
+            position: relative;
+        }
+
+        .header-meta {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-align: right;
+            margin-bottom: 30px;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 10px;
+        }
+
+        /* Grid Configurations */
+        .grid-2 {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .grid-3-1 {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 20px;
+        }
+
+        /* Placeholder Styles */
+        .visual-placeholder {
+            background-color: var(--bg-panel);
+            border: 1px dashed var(--border);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-muted);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            text-align: center;
+            width: 100%;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .visual-placeholder::after {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+        }
+
+        /* Print Specifics */
+        @media print {
+            body {
+                background-color: #111; /* Force dark background in some PDF generators */
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .page {
+                box-shadow: none;
+                margin: 0;
+                padding: 15mm;
+                width: 100%;
+                height: 100%;
+                page-break-after: always;
+            }
+            /* Prevent awkward breaks */
+            h2, h3, .visual-placeholder {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- PAGE 1 -->
+    <div class="page">
+        <div class="header-meta">
+            SYS.ARCHITECTURE.REVIEW // SUSPENSIONLAB PRO // AUTHOR: LEAD ENGINEER
+        </div>
+
+        <h1>SuspensionLab PRO: Distributed Optimization Engine</h1>
+        
+        <p style="font-size: 1.1rem; color: var(--text-main); font-weight: 300;">
+            Bridging the gap between classical theoretical vehicle dynamics and modern, horizontally scaling cloud infrastructure. A production-grade SaaS architecture engineered for high-fidelity ride frequency and damping optimization.
+        </p>
+
+        <h2>Executive Summary</h2>
+        <p>
+            I architected, developed, and deployed a highly concurrent, cloud-native simulation platform. Moving beyond local, single-threaded MATLAB scripts, I engineered a system that evaluates non-linear state-space models via distributed compute clusters. SuspensionLab PRO enables race engineers to iteratively optimize suspension parameters against complex transient road profiles at scale. I utilized a decoupled <strong>Redis/RQ compute plane</strong>, protected by strict <strong>TOCTOU concurrency constraints</strong>, ensuring absolute mathematical fidelity under massive HTTP load.
+        </p>
+
+        <div class="grid-2">
+            <div>
+                <h2>The Physics Engine</h2>
+                <h3>State-Space Integration & Non-Linear Solvers</h3>
+                <ul>
+                    <li><strong>2-DOF Linear Quarter Car Model with 4-Dimensional State Vector:</strong> Developed a quarter-car simulation evaluating sprung (m_s) and unsprung (m_u) mass dynamics. The model state vector [z_s, ż_s, z_u, ż_u] captures displacement and velocity for both masses across aggressive transient profiles.</li>
+                    <li><strong>L-BFGS-B Optimization:</strong> Implemented the SciPy <span class="code-inline">L-BFGS-B</span> solver to navigate complex, non-linear design spaces, isolating optimal spring rates (K<sub>s</sub>) and damping coefficients (C<sub>s</sub>). Implemented via SciPy's L-BFGS-B gradient-based solver with bounded line search across the full spring-damper design space, evaluating the complete physics simulation at each iteration (n_freq=600, full road profile duration) to achieve mathematically rigorous convergence within 150–300 function evaluations.</li>
+                    <li><strong>Multi-Objective Target Isolation:</strong> Engineered composite cost functions targeting specific race outcomes: <em>Comfort</em> (minimizing sprung mass acceleration), <em>Grip</em> (minimizing tire load variation), and a weighted <em>Balanced</em> hybrid.</li>
+                    <li><strong>Domain-Specific Failure Routing:</strong> Built resilient mathematical boundaries that catch non-convergent matrices and division-by-zero states, explicitly throwing a custom <span class="code-inline">NonRetryableJobError</span> to prevent catastrophic infinite solver loops across the worker nodes.</li>
+                </ul>
+            </div>
+            
+            <div style="display: flex; flex-direction: column;">
+                <h2>The Engineering Interface</h2>
+                <!-- VISUAL 1 PLACEHOLDER -->
+                <div class="visual-placeholder" style="height: 300px; margin-top: 10px;">
+                    [Insert Streamlit UI Screenshot Here - 800x600]<br>
+                    Showcasing Dark Mode Dashboards, Plotly Graphs, & Sidebar Metrics
+                </div>
+                <p style="font-size: 0.8rem; margin-top: 10px; font-family: var(--font-mono);">
+                    FIG 1: Non-blocking Streamlit presentation layer utilizing exponential backoff polling.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAGE 2 -->
+    <div class="page">
+        <div class="header-meta">
+            SYS.ARCHITECTURE.REVIEW // SUSPENSIONLAB PRO // PAGE 2
+        </div>
+
+        <h2>The SaaS Architecture</h2>
+        <div class="grid-3-1">
+            <div>
+                <p>
+                    I engineered the architecture to guarantee complete isolation between the API routing layer and the heavy computational load. Theoretical physics engines fail in production when they block web threads.
+                </p>
+                <ul>
+                    <li><strong>Strict Execution Isolation:</strong> Decoupled the FastAPI control plane from the SciPy compute plane using a Redis-backed RQ message broker. The HTTP layer remains strictly non-blocking.</li>
+                    <li><strong>Event-Driven Kubernetes Autoscaling:</strong> Translated the stack into a production Kubernetes deployment. Implemented a <strong>KEDA ScaledObject</strong> (Horizontal Pod Autoscaler) that monitors the <span class="code-inline">rq:queue:default</span> list length, dynamically scaling the SciPy worker pods from 1 to 10 based entirely on active solver backlog.</li>
+                    <li><strong>Contract-Driven Boundaries:</strong> Enforced absolute data boundaries between frontend, API, and worker nodes using strict Pydantic schemas, entirely eliminating unverified payload injections.</li>
+                </ul>
+            </div>
+            <div>
+                <!-- VISUAL 2 PLACEHOLDER -->
+                <div class="visual-placeholder" style="height: 200px;">
+                    [Insert System Architecture Diagram Here]<br>
+                    Streamlit -> FastAPI -> Redis -> K8s RQ Workers
+                </div>
+            </div>
+        </div>
+
+        <h2>Site Reliability Engineering (SRE) & Hardening</h2>
+        <p>
+            I aggressively tested and patched the system against massive concurrency, infrastructure death, and malicious mathematical inputs.
+        </p>
+
+        <div class="grid-2">
+            <div>
+                <ul>
+                    <li><strong>TOCTOU Race Condition Mitigation:</strong> I implemented distributed Redis locks (<span class="code-inline">redis.lock</span>) wrapping critical database transactions. This guarantees atomic evaluation when enforcing per-user concurrent job limits, outright blocking zombie traffic spikes.</li>
+                    <li><strong>Orphan Recovery & Idempotency:</strong> Engineered a background CronJob sweeper to recover dead lock states if a worker container OOMs. Designed Stripe webhook listeners with database-level primary key constraints to block subscription tier inflation via duplicate network deliveries.</li>
+                    <li><strong>Distributed Tracing (OpenTelemetry):</strong> Integrated OpenTelemetry across the network partition. I manually rehydrated trace contexts inside the isolated RQ worker processes to build complete, cross-container execution waterfalls from UI click to SciPy completion.</li>
+                </ul>
+            </div>
+            <div>
+                <!-- VISUAL 3 PLACEHOLDER -->
+                <div class="visual-placeholder" style="height: 200px;">
+                    [Insert Terminal / Locust Stress Test Screenshot Here]<br>
+                    Showcasing 500 users, 429 Backpressure handling, and Cron outputs
+                </div>
+                <p style="font-size: 0.8rem; margin-top: 10px; font-family: var(--font-mono);">
+                    FIG 2: Locust headless load testing proving zero downtime under massive spike pressure.
+                </p>
+            </div>
+        </div>
+        
+        <div style="margin-top: 50px; text-align: center; border-top: 1px solid var(--border); padding-top: 20px;">
+            <p style="font-family: var(--font-mono); color: var(--accent); letter-spacing: 2px;">END OF REPORT // SYSTEM PRODUCTION READY</p>
+        </div>
+    </div>
+
+</body>
+</html>
+```

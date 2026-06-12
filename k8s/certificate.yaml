@@ -1,0 +1,12 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: suspensionlab-tls
+  namespace: suspensionlab-prod
+spec:
+  secretName: suspensionlab-tls
+  dnsNames:
+  - app.suspensionlab.com
+  issuerRef:
+    name: letsencrypt-prod
+    kind: ClusterIssuer

@@ -1,0 +1,16 @@
+apiVersion: v2
+name: suspensionlab-chart
+description: High-performance Formula 1 Telemetry Platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+
+dependencies:
+  - name: redis-ha
+    version: "4.x.x"
+    repository: "https://dandydeveloper.github.io/charts/"
+    condition: redis.enabled
+  - name: postgresql-ha
+    version: "11.x.x"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled

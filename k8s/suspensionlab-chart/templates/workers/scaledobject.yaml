@@ -1,0 +1,25 @@
+{{- if .Values.workers.keda.enabled }}
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ .Release.Name }}-worker-scaler
+  namespace: suspensionlab-prod
+  labels:
+    app: suspensionlab
+spec:
+  scaleTargetRef:
+    name: {{ .Release.Name }}-worker
+  minReplicaCount: {{ .Values.workers.keda.minReplicaCount }}
+  maxReplicaCount: {{ .Values.workers.keda.maxReplicaCount }}
+  cooldownPeriod: 600
+  pollingInterval: 15
+  triggers:
+  - type: redis
+    metadata:
+      # Scales up when there are pending jobs per worker pod
+      listName: "rq:queue:default"
+      listLength: "{{ .Values.workers.keda.queueLengthTarget }}"
+      address: "{{ .Release.Name }}-redis-master.suspensionlab-data.svc.cluster.local:6379"
+    authenticationRef:
+      name: {{ .Release.Name }}-keda-redis-auth
+{{- end }}

@@ -1,0 +1,63 @@
+# Default values for suspensionlab-chart.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+global:
+  domain: suspensionlab.pro
+
+api:
+  replicaCount: 1
+  image:
+    repository: suspensionlab/backend
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+ui:
+  replicaCount: 1
+  image:
+    repository: suspensionlab/frontend
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+workers:
+  replicaCount: 1
+  image:
+    repository: suspensionlab/backend
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1024Mi
+
+ingress:
+  enabled: true
+  className: "nginx"
+  host: app.suspensionlab.pro
+  tls:
+    - secretName: suspensionlab-tls
+      hosts:
+        - app.suspensionlab.pro

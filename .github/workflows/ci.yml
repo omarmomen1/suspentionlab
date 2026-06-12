@@ -1,0 +1,56 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install uv
+          cd backend
+          uv pip install --system -r requirements.txt
+          uv pip install --system pytest httpx aiosqlite pytest-asyncio
+      - name: Run Pytest
+        run: |
+          cd backend
+          pytest tests/ -v
+
+  frontend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: |
+          cd frontend2
+          npm ci
+      - name: Install Playwright Browsers
+        run: |
+          cd frontend2
+          npx playwright install --with-deps
+      - name: Run Playwright tests
+        run: |
+          cd frontend2
+          npx playwright test
+
+  docker-build:
+    needs: [backend-test, frontend-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Docker Compose
+        run: docker-compose build

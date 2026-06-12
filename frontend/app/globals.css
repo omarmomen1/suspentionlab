@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --color-ansys-yellow: #f2a900;
+  --color-ansys-dark: #1e1e1e;
+  --color-ansys-surface: #252526;
+  --color-ansys-border: #333333;
+}
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 0 0% 10%;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --background: 0 0% 9%;
+      --foreground: 0 0% 95%;
+    }
+  }
+
+  body {
+    background-color: var(--color-ansys-dark);
+    color: #e0e0e0;
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* Custom Scrollbar for professional feel */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-ansys-dark); 
+}
+
+::-webkit-scrollbar-thumb {
+  background: #555; 
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #777; 
+}
+
+/* .custom-scrollbar — used throughout the app on panels and plot areas.
+   Without this class the elements fall back to browser defaults. */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #444 transparent;
+}
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #3a3a3a;
+  border-radius: 9999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+@media print {
+  /* Hide the navbar and parameter sidebars for clean PDF export */
+  nav, .shrink-0 {
+    display: none !important;
+  }
+  
+  /* Reset backgrounds to white for printing */
+  body, .bg-ansys-dark, .bg-ansys-surface, .bg-black {
+    background-color: white !important;
+    color: black !important;
+  }
+  
+  /* Remove borders and shadows */
+  .border, .border-ansys-border {
+    border-color: #ddd !important;
+  }
+  
+  /* Ensure charts print properly */
+  .h-full {
+    height: auto !important;
+  }
+  
+  /* Set text to black */
+  h1, h2, h3, h4, p, span, div {
+    color: black !important;
+  }
+}

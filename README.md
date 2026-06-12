@@ -1,24 +1,47 @@
-# 🏎️ SuspensionLab PRO — Quarter Car Simulation
+# 🏎️ SuspensionLab PRO
 
-A professional-grade 2-DOF quarter-car suspension dynamics dashboard. This tool simulates ride comfort, handling, and NVH (Noise, Vibration, and Harshness) metrics using both time-domain and frequency-domain numerical methods.
+An enterprise-grade, professional vehicle dynamics platform. This tool simulates ride comfort, handling, kinematics, and NVH (Noise, Vibration, and Harshness) metrics using both time-domain and frequency-domain numerical methods.
 
 ## Engineering Features
 
-* **Physics Engine:** 2-DOF linear quarter-car model utilizing SciPy's `solve_ivp` (RK45) for time-domain integration.
-* **Frequency Response:** Exact analytical impedance matrix inversion for Bode plots and transmissibility analysis.
-* **ISO 2631-1 Comfort Metrics:** Automatic calculation of unweighted RMS sprung body acceleration.
-* **Engineering Diagnostics:** Automated detection of critically underdamped states, wheel hop risks, and suspension travel limit violations.
-* **Interactive Telemetry:** Formula 1 pit-wall inspired visualization layer built with Plotly.
+* **Physics Engine:** Core dynamic models including 2-DOF Quarter Car, 4-DOF Half Car, and 7-DOF Full Car utilizing SciPy's `solve_ivp` (RK45) for time-domain integration.
+* **Kinematics & Handling:** Pacejka Magic Formula tire models with real-time 3D React Three Fiber visualizations.
+* **NVH Analytics:** Structural transmissibility and A-Weighting impedance matrix solvers.
+* **Modern Stack:** React/Next.js frontend with an ultra-fast FastAPI backend and SQLite persistence.
 
 ## Repository Structure
 
-* `ui/pages/` — Streamlit dashboard and user interface logic.
-* `physics/` — Core mathematical models, state-space formulation, and ODE solver.
-* `visualization/` — Plotly trace generation and aesthetic theme enforcement.
+* `frontend/` — Next.js 15 App Router frontend featuring Plotly graphs and 3D telemetry.
+* `src/suspensionlab/backend/` — FastAPI REST server and SQLAlchemy database models.
+* `src/suspensionlab/physics/` — Core mathematical models, state-space formulation, and ODE solvers.
 
-## Installation & Usage
+## Installation & Usage (Docker)
 
-Ensure you have Python installed, then install the required dependencies:
+The fastest way to run SuspensionLab PRO is via Docker Compose:
 
 ```bash
-pip install streamlit scipy numpy pandas plotly
+docker-compose up --build
+```
+
+- **Frontend UI:** `http://localhost:3000`
+- **Backend API Docs:** `http://localhost:8000/docs`
+
+## Manual Development
+
+To run locally without Docker:
+
+**Terminal 1 (Backend):**
+```bash
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements-backend.txt
+set PYTHONPATH=src
+uvicorn suspensionlab.backend.api.main:app --port 8000 --reload
+```
+
+**Terminal 2 (Frontend):**
+```bash
+cd frontend
+npm install
+npm run dev
+```

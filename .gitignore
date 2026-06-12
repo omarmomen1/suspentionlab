@@ -1,19 +1,26 @@
-# Python bytecode
+# Database files
+data/
+*.db
+*.sqlite3
+
+# Environment and secrets
+.env
+.env.local
+.env.*.local
+.env.railway
+*.pem
+*.key
+
+# Python
 __pycache__/
-*.py[cod]
-*$py.class
-
-# Virtual environments
-venv/
-env/
+*.pyc
+*.pyo
 .venv/
-Pipfile.lock
+venv/
+dist/
+*.egg-info/
 
-# Streamlit
-.streamlit/
-
-# IDE and OS files
-.vscode/
-.idea/
-.DS_Store
-Thumbs.db
+# Node
+node_modules/
+.next/
+frontend/.next/

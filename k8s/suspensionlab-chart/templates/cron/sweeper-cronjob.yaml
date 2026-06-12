@@ -1,0 +1,19 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Release.Name }}-sweeper
+  namespace: suspensionlab-prod
+spec:
+  schedule: "* * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+          - name: sweeper
+            image: "{{ .Values.workers.image.repository }}:{{ .Values.workers.image.tag }}"
+            command: ["python", "-m", "suspensionlab.backend.workers.sweeper"]
+            envFrom:
+            - configMapRef:
+                name: {{ .Release.Name }}-config
+          restartPolicy: OnFailure

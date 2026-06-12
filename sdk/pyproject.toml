@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "suspensionlab-sdk"
+version = "0.1.0"
+description = "Python Headless SDK for SuspensionLab PRO"
+authors = [
+    { name = "SuspensionLab Team" }
+]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "requests>=2.25.0",
+    "pydantic>=2.0.0"
+]
+
+[project.urls]
+Homepage = "https://suspensionlab.io"

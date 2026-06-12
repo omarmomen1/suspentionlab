@@ -1,0 +1,10 @@
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: {{ .Release.Name }}-keda-redis-auth
+  namespace: suspensionlab-prod
+spec:
+  secretTargetRef:
+  - parameter: password
+    name: {{ .Release.Name }}-secrets
+    key: REDIS_PASSWORD

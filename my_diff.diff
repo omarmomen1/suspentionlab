@@ -1,0 +1,128 @@
+--- telemetry_plots.py
++++ telemetry_plots.py
+@@ -541,10 +541,10 @@
+       Row 2 : Body acceleration  [m/s²]
+     """
+     t      = result.time
+-    z_s_mm = result.z_s    * 1e3    # → mm
+-    z_u_mm = result.z_u    * 1e3
+-    z_r_mm = result.z_r    * 1e3
+-    ddz_s  = result.ddz_s       # m/s²
++    z_s_mm = np.asarray(result.z_s)    * 1e3    # → mm
++    z_u_mm = np.asarray(result.z_u)    * 1e3
++    z_r_mm = np.asarray(result.z_r)    * 1e3
++    ddz_s  = np.asarray(result.ddz_s)       # m/s²
+ 
+     fig = make_subplots(
+         rows             = 3 if baseline else 2,
+@@ -706,7 +706,7 @@
+                 f"<b>TIME DOMAIN — DISPLACEMENT & ACCELERATION RESPONSE</b>"
+                 f"<span style='font-size:9px;color:{_TEXT_SEC}'>"
+                 f"  |  RMS ẍs = {rms_a:.4f} m/s²"
+-                f"  |  PROFILE: {result.z_r.max()*1e3:.1f} mm"
++                f"  |  PROFILE: {float(np.max(result.z_r))*1e3:.1f} mm"
+                 f"</span>"
+             ),
+             font    = dict(family=_FONT_MONO, size=11, color=_TEXT_PRI),
+@@ -735,7 +735,7 @@
+     Exceeding travel limits causes bump-stop contact → step change in spring rate.
+     """
+     t          = result.time
+-    travel_mm  = result.susp_travel * 1e3    # → mm
++    travel_mm  = np.asarray(result.susp_travel) * 1e3    # → mm
+     rms_mm     = result.rms_susp_travel * 1e3
+     peak_mm    = result.peak_susp_travel * 1e3
+ 
+@@ -850,7 +850,7 @@
+     Static load is estimated as m_s·g/4 (quarter-car static loading).
+     """
+     t        = result.time
+-    delta_fz = result.tire_load_var # dynamic component [N]
++    delta_fz = np.asarray(result.tire_load_var) # dynamic component [N]
+     rms_fz   = result.rms_tire_load          # [N]
+ 
+     # Static tire load: inferred from wheel rate and mean tire deflection.
+@@ -980,7 +980,7 @@
+     lift_threshold = -static_load
+ 
+     # 1. Add Shaded Danger Region (Below the threshold)
+-    y_min_plot = min(result.tire_load_var.min() * 1.1, lift_threshold * 1.2)
++    y_min_plot = min(float(np.min(result.tire_load_var)) * 1.1, lift_threshold * 1.2)
+     
+     fig.add_hrect(
+         y0=y_min_plot, 
+@@ -996,9 +996,9 @@
+     )
+ 
+     # 2. Add Conditional Telemetry Annotation
+-    if result.tire_load_var.min() <= lift_threshold:
++    if float(np.min(result.tire_load_var)) <= lift_threshold:
+         # Find the first timestamp where lift occurs
+-        lift_indices = np.where(result.tire_load_var <= lift_threshold)[0]
++        lift_indices = np.where(np.asarray(result.tire_load_var) <= lift_threshold)[0]
+         first_lift_idx = lift_indices[0]
+         
+         fig.add_annotation(
+@@ -1031,7 +1031,7 @@
+     Useful for assessing NVH (noise-vibration-harshness) character.
+     """
+     t     = result.time
+-    ddz_s = result.ddz_s
++    ddz_s = np.asarray(result.ddz_s)
+ 
+     # Envelope via Hilbert transform approximation (running RMS over 0.1s window)
+     dt = (t[1] - t[0]) if len(t) > 1 else 0.002
+@@ -1175,28 +1175,28 @@
+     # ── [1,0] Displacement ────────────────────────────────────────────────
+     t = result.time
+     fig.add_trace(go.Scatter(
+-        x=t, y=result.z_r*1e3,
++        x=t, y=np.asarray(result.z_r)*1e3,
+         name="ROAD zr", mode="lines",
+         line=dict(color=_AMBER, width=0.9, dash="dot"), opacity=0.7,
+         hovertemplate="t: %{x:.2f}s<br>zr: %{y:.2f}mm<extra></extra>",
+     ), row=2, col=1)
+ 
+     fig.add_trace(go.Scatter(
+-        x=t, y=result.z_u*1e3,
++        x=t, y=np.asarray(result.z_u)*1e3,
+         name="WHEEL zu", mode="lines",
+         line=dict(color=_PURPLE, width=1.2), opacity=0.75,
+         hovertemplate="t: %{x:.2f}s<br>zu: %{y:.3f}mm<extra></extra>",
+     ), row=2, col=1)
+ 
+     fig.add_trace(go.Scatter(
+-        x=t, y=result.z_s*1e3,
++        x=t, y=np.asarray(result.z_s)*1e3,
+         name="BODY zs", mode="lines",
+         line=dict(color=_CYAN, width=1.8),
+         hovertemplate="t: %{x:.2f}s<br>zs: %{y:.3f}mm<extra></extra>",
+     ), row=2, col=1)
+ 
+     # ── [1,1] Suspension Travel ───────────────────────────────────────────
+-    travel_mm = result.susp_travel * 1e3
++    travel_mm = np.asarray(result.susp_travel) * 1e3
+     rms_mm    = result.rms_susp_travel * 1e3
+ 
+     fig.add_trace(go.Scatter(
+@@ -1253,17 +1253,17 @@
+ def create_half_car_heave_plot(result: HalfCarResult) -> go.Figure:
+     fig = go.Figure()
+     fig.add_trace(go.Scatter(
+-        x=result.time, y=result.z_s*1000, 
++        x=result.time, y=np.asarray(result.z_s)*1000, 
+         name="Heave (CG)", mode="lines",
+         line=dict(color=_CYAN, width=2.0)
+     ))
+     fig.add_trace(go.Scatter(
+-        x=result.time, y=result.z_rf*1000, 
++        x=result.time, y=np.asarray(result.z_rf)*1000, 
+         name="Front Road", mode="lines",
+         line=dict(color="#334155", dash="dash", width=1.5)
+     ))
+     fig.add_trace(go.Scatter(
+-        x=result.time, y=result.z_rr*1000, 
++        x=result.time, y=np.asarray(result.z_rr)*1000, 
+         name="Rear Road", mode="lines",
+         line=dict(color="#94A3B8", dash="dot", width=1.5)
+     ))

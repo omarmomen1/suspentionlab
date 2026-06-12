@@ -1,0 +1,27 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-db-migration
+  namespace: suspensionlab-prod
+  labels:
+    app: suspensionlab
+    component: db-migration
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
+spec:
+  template:
+    metadata:
+      name: {{ .Release.Name }}-db-migration
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: db-migration
+        image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+        command: ["alembic", "upgrade", "head"]
+        envFrom:
+        - configMapRef:
+            name: {{ .Release.Name }}-config
+        - secretRef:
+            name: suspensionlab-secrets
