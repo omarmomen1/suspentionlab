@@ -64,6 +64,7 @@ async def lifespan(app: FastAPI):
     from suspensionlab.backend.database.models.billing import LemonEvent  # noqa: F401
     from suspensionlab.backend.database.models.user import User  # noqa: F401
     from suspensionlab.backend.database.models.profile import VehicleProfile # noqa: F401
+    from suspensionlab.backend.database.models.shared_report import SharedReport  # noqa: F401
     
     async with engine.begin() as conn:
         # Tables are managed by Alembic in production.
@@ -300,6 +301,16 @@ app.include_router(checkout.router, dependencies=[Depends(RateLimiter("rate_limi
 
 # User settings route
 app.include_router(users.router, dependencies=[Depends(RateLimiter("rate_limit_login"))])
+
+# ── Revolutionary Features ────────────────────────────────────────────────────
+from suspensionlab.backend.api.routes.ai_engineer_routes import router as ai_router
+app.include_router(ai_router, dependencies=[Depends(verify_api_key)])
+
+from suspensionlab.backend.api.routes.share_routes import router as share_router
+app.include_router(share_router)  # GET /reports/{token} is public; POST requires auth via frontend
+
+from suspensionlab.backend.api.routes.durability_routes import router as durability_router
+app.include_router(durability_router, dependencies=[Depends(verify_api_key), Depends(RateLimiter("rate_limit_simulate"))])
 
 @app.get("/")
 async def root():

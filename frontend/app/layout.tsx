@@ -45,6 +45,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                   <NavItem href="/digital-twin" label="Digital Twin" />
                   <NavItem href="/sensitivity" label="Sensitivity" />
                   <NavItem href="/nvh"         label="NVH"         />
+                  <NavItem href="/durability"  label="Durability"  />
+                  <NavItem href="/ai-engineer" label="✦ AI Engineer" />
                   <NavItem href="/garage"      label="Garage"      />
                   <NavItem href="/pricing"     label="Pricing"     />
                   <NavItem href="/docs"        label="Docs"        />
