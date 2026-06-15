@@ -12,7 +12,7 @@ export default function TeamSettings() {
 
   const fetchTeam = async () => {
     if (!token) return;
-    const res = await fetch(`${API_BASE}/api/v1/teams/`, {
+    const res = await fetch(`${API_BASE}/teams/`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (res.ok) {
@@ -24,7 +24,7 @@ export default function TeamSettings() {
   };
 
   const fetchAnalytics = async () => {
-    const res = await fetch(`${API_BASE}/api/v1/teams/analytics`, {
+    const res = await fetch(`${API_BASE}/teams/analytics`, {
       headers: { Authorization: `Bearer ${token}` }
     });
     if (res.ok) {
@@ -37,7 +37,7 @@ export default function TeamSettings() {
   }, [token]);
 
   const handleCreate = async () => {
-    await fetch(`${API_BASE}/api/v1/teams/`, {
+    await fetch(`${API_BASE}/teams/`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ name: teamName })
@@ -46,7 +46,7 @@ export default function TeamSettings() {
   };
 
   const handleInvite = async () => {
-    await fetch(`${API_BASE}/api/v1/teams/invite`, {
+    await fetch(`${API_BASE}/teams/invite`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ email: inviteEmail })

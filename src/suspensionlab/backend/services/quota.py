@@ -48,7 +48,7 @@ async def assert_can_run_job(user: dict, db: AsyncSession):
         return
 
     # 2. Enforce tier limits
-    tier = user.get("tier", PlanTier.FREE)
+    tier = user.get("plan", PlanTier.FREE)
     limit = TIER_LIMITS.get(tier, 1)
     active = await get_active_job_count(db, user["user_id"])
 

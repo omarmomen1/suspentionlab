@@ -74,7 +74,7 @@ async def create_key(
     user: dict = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db_dependency),
 ):
-    plan  = user.get("tier", PlanTier.FREE)
+    plan  = user.get("plan", PlanTier.FREE)
     limit = PLAN_LIMITS.get(plan, 0)
     if limit == 0:
         raise HTTPException(status_code=403, detail="API key access requires PRO or ENTERPRISE plan.")

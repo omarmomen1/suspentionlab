@@ -23,7 +23,6 @@ def upgrade() -> None:
             'id',
             postgresql.UUID(as_uuid=True),
             primary_key=True,
-            server_default=sa.text('gen_random_uuid()'),
             nullable=False,
         ),
         sa.Column('token', sa.String(36), unique=True, nullable=False, index=True),

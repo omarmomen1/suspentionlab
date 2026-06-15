@@ -14,7 +14,7 @@ def create_bundle(output_file="suspensionlab_bundle.txt"):
     root_files = [
         "pyproject.toml", "package.json", "frontend/package.json",
         "Dockerfile.backend", "Dockerfile.frontend", "docker-compose.yml",
-        "railway.toml", ".env.railway", "README.md", "alembic.ini"
+        "railway.toml", ".env.railway.example", "README.md", "alembic.ini"
     ]
     
     with open(output_file, "w", encoding="utf-8") as outfile:

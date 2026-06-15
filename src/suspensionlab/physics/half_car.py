@@ -63,7 +63,7 @@ class HalfCarParams:
         # Validate wheelbase consistency instead of silently overwriting L.
         # If L != a + b the user has provided contradictory geometry.
         expected_L = self.a + self.b
-        if abs(self.L - expected_L) > 1e-4:
+        if abs(self.L - expected_L) > 1e-3:
             raise ValueError(
                 f"Wheelbase L={self.L:.4f} m is inconsistent with "
                 f"a + b = {self.a:.4f} + {self.b:.4f} = {expected_L:.4f} m. "
