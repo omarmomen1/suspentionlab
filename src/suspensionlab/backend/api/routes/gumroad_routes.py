@@ -80,7 +80,7 @@ async def verify_gumroad_license(
         raise HTTPException(status_code=404, detail="User not found.")
 
     # Upgrade to PRO
-    user_model.plan = PlanTier.PRO
+    user_model.plan = PlanTier.PRO.value
     # Save the license key to the user model so we can re-verify it later if needed
     # We will just dump it into metadata for now to avoid schema changes
     if not user_model.metadata_:
