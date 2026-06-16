@@ -13,6 +13,7 @@
     "@react-three/fiber": "^9.6.1",
     "@types/three": "^0.184.1",
     "@vercel/og": "^0.11.1",
+    "framer-motion": "^12.40.0",
     "html2canvas": "^1.4.1",
     "jose": "^6.2.3",
     "jspdf": "^4.2.1",

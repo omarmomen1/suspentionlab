@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { Play, CheckCircle2 } from "lucide-react";
+import { Play, CheckCircle2, Zap, LayoutDashboard, Server, ChevronRight, XCircle } from "lucide-react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -12,9 +13,8 @@ const NVH_DEMO_DATA = (() => {
     for (let i = 0; i < 20; i++) {
         const row = [];
         for (let j = 0; j < 20; j++) {
-            // Simulate a frequency response heatmap with two resonance peaks
-            const f = i * 2.5 + 0.5;   // frequency [Hz]
-            const v = j * 5 + 10;       // speed [km/h]
+            const f = i * 2.5 + 0.5;   
+            const v = j * 5 + 10;      
             const peak1 = 80 * Math.exp(-((f - 8) ** 2 + (v - 40) ** 2) / 100);
             const peak2 = 60 * Math.exp(-((f - 15) ** 2 + (v - 80) ** 2) / 200);
             row.push(peak1 + peak2 + 5);
@@ -26,46 +26,141 @@ const NVH_DEMO_DATA = (() => {
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
-   
   useEffect(() => setMounted(true), []);
 
   return (
-    <div className="w-full bg-black text-white selection:bg-ansys-yellow selection:text-black pb-24">
+    <div className="w-full bg-[#0a0a0a] text-white selection:bg-ansys-yellow selection:text-black min-h-screen overflow-hidden font-sans">
       
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 px-6 max-w-[1024px] mx-auto text-center flex flex-col items-center">
-        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-ansys-yellow/10 blur-[120px] rounded-full pointer-events-none"></div>
-        <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 relative z-10">
-          Stop Guessing. <br/><span className="text-transparent bg-clip-text bg-gradient-to-r from-ansys-yellow to-[#ff9900]">Start Winning.</span>
-        </h1>
-        <p className="text-xl md:text-2xl text-gray-400 max-w-2xl font-light mb-10 relative z-10">
-          The ultimate vehicle dynamics simulation suite. Sub-millisecond precision, 7-post rig capabilities, and AI-driven tuning built for Tier-1 OEMs and elite racing teams.
-        </p>
-        <div className="flex items-center gap-4 relative z-10">
-          <Link href="/pricing" className="px-8 py-4 bg-white text-black font-semibold rounded-full hover:bg-gray-200 transition-transform hover:scale-105 active:scale-95">
-            Get Pro Access — $50
-          </Link>
-          <Link href="/quarter-car" className="px-8 py-4 bg-transparent text-white font-semibold rounded-full border border-white/20 hover:bg-white/5 transition-colors flex items-center gap-2">
-            Try Demo <Play size={16} fill="currentColor" />
-          </Link>
+      {/* Dynamic Hero Section */}
+      <section className="relative pt-32 pb-20 px-6 max-w-[1200px] mx-auto text-center flex flex-col items-center">
+        {/* Glow effect */}
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-ansys-yellow/15 blur-[120px] rounded-full pointer-events-none"></div>
+        
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+          className="relative z-10"
+        >
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/5 border border-white/10 text-sm mb-8 text-gray-300">
+            <span className="w-2 h-2 rounded-full bg-ansys-yellow animate-pulse"></span>
+            The Modern Standard for Vehicle Dynamics
+          </div>
+          
+          <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6">
+            Stop Guessing. <br className="hidden md:block"/>
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-ansys-yellow to-[#ff9900]">Start Winning.</span>
+          </h1>
+          
+          <p className="text-lg md:text-xl text-gray-400 max-w-2xl mx-auto font-light mb-10 leading-relaxed">
+            The ultimate cloud-native vehicle dynamics simulation suite. Sub-millisecond precision, 7-post rig capabilities, and AI-driven tuning built for Tier-1 OEMs and elite racing teams.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link href="/pricing" className="group px-8 py-4 bg-white text-black font-semibold rounded-full hover:bg-gray-200 transition-all hover:scale-105 active:scale-95 flex items-center gap-2 shadow-[0_0_30px_rgba(255,255,255,0.1)]">
+              Get Pro Access — $50 <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
+            </Link>
+            <Link href="/quarter-car" className="px-8 py-4 bg-transparent text-white font-semibold rounded-full border border-white/20 hover:bg-white/10 transition-colors flex items-center gap-2 backdrop-blur-sm">
+              Try Interactive Demo <Play size={16} fill="currentColor" />
+            </Link>
+          </div>
+        </motion.div>
+      </section>
+
+      {/* Ticker Tape */}
+      <section className="border-y border-white/5 bg-black/50 py-6 overflow-hidden">
+        <div className="max-w-[1200px] mx-auto px-6 flex flex-col items-center">
+          <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4">Trusted by engineers from</p>
+          <div className="flex flex-wrap justify-center gap-8 md:gap-16 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
+             <span className="text-xl font-black tracking-tighter">FORMULA 1</span>
+             <span className="text-xl font-bold tracking-tight italic">WEC</span>
+             <span className="text-xl font-mono font-bold">TIER-1 OEM</span>
+             <span className="text-xl font-serif font-bold tracking-widest">HYPERCAR</span>
+          </div>
         </div>
       </section>
 
-      {/* Feature 1: NVH Analyzer (Text Left, Graph Right) */}
-      <section className="py-24 px-6 border-t border-white/10 bg-[#0a0a0a]">
-        <div className="max-w-[1024px] mx-auto flex flex-col md:flex-row items-center gap-16">
+      {/* Feature Showcase: Glassmorphism Cards */}
+      <section className="py-24 px-6 max-w-[1200px] mx-auto">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">Unfair Advantage, Built In.</h2>
+          <p className="text-gray-400 text-lg max-w-2xl mx-auto">Leave legacy software behind with tools designed for modern engineering workflows.</p>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-6">
+          {[
+            { icon: Zap, title: "Lightning Fast", desc: "Solve 10,000 parameter sweeps in the cloud before your competitor's desktop software even boots up." },
+            { icon: LayoutDashboard, title: "Intuitive UI", desc: "No massive 1990s manuals required. Clean, modern interface designed by engineers, for engineers." },
+            { icon: Server, title: "Cloud Native", desc: "Access your setups, telemetry, and 7-post rig simulations from any browser, anywhere in the world." }
+          ].map((feat, i) => (
+            <motion.div 
+              key={i}
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: i * 0.1, duration: 0.5 }}
+              className="bg-[#111111] border border-[#222] rounded-2xl p-8 hover:border-ansys-yellow/30 transition-colors group relative overflow-hidden"
+            >
+              <div className="w-12 h-12 bg-ansys-yellow/10 rounded-xl flex items-center justify-center mb-6 text-ansys-yellow group-hover:scale-110 transition-transform">
+                <feat.icon size={24} />
+              </div>
+              <h3 className="text-xl font-bold mb-3">{feat.title}</h3>
+              <p className="text-gray-400 leading-relaxed">{feat.desc}</p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* The Implicit Comparison Section */}
+      <section className="py-24 px-6 bg-[#050505] border-t border-white/5 relative">
+        <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-ansys-yellow/5 blur-[150px] rounded-full pointer-events-none"></div>
+        <div className="max-w-[1000px] mx-auto">
+          <div className="text-center mb-16 relative z-10">
+            <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">Stop Paying For The 90s.</h2>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">How we stack up against the "industry standard" legacy software.</p>
+          </div>
+
+          <div className="bg-[#111] border border-[#222] rounded-3xl overflow-hidden relative z-10 shadow-2xl">
+            <div className="grid grid-cols-3 border-b border-[#222] bg-[#1a1a1a] p-6">
+              <div className="font-bold text-gray-400 uppercase tracking-wider text-sm">Feature</div>
+              <div className="font-bold text-gray-500 uppercase tracking-wider text-sm text-center">Legacy Software</div>
+              <div className="font-bold text-ansys-yellow uppercase tracking-wider text-sm text-center">SuspensionLab</div>
+            </div>
+            
+            {[
+              { label: "Learning Curve", legacy: "4-Week Training Course", us: "15 Minutes" },
+              { label: "Pricing Model", legacy: "$50,000/seat Perpetual", us: "$50/mo Subscription" },
+              { label: "Compute Engine", legacy: "Local Desktop CPU", us: "Infinite Cloud Servers" },
+              { label: "User Interface", legacy: "Clunky 1990s Menus", us: "Modern, Web-Native" },
+              { label: "Setup Sharing", legacy: "Emailing ZIP files", us: "1-Click Secure Links" },
+            ].map((row, i) => (
+              <div key={i} className={`grid grid-cols-3 p-6 ${i !== 4 ? 'border-b border-[#222]' : ''} hover:bg-white/[0.02] transition-colors`}>
+                <div className="font-medium text-white flex items-center">{row.label}</div>
+                <div className="text-gray-500 flex items-center justify-center text-center text-sm md:text-base">
+                  <XCircle size={16} className="mr-2 text-red-500/50 hidden md:block" /> {row.legacy}
+                </div>
+                <div className="text-white font-semibold flex items-center justify-center text-center text-sm md:text-base">
+                  <CheckCircle2 size={16} className="mr-2 text-ansys-yellow hidden md:block" /> {row.us}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Interactive NVH Demo Section */}
+      <section className="py-24 px-6 border-t border-white/5 bg-black">
+        <div className="max-w-[1200px] mx-auto flex flex-col md:flex-row items-center gap-16">
           <div className="flex-1 space-y-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-wider">
+              NVH Analyzer
+            </div>
             <h2 className="text-3xl md:text-5xl font-bold tracking-tight">Acoustics & NVH. <br/><span className="text-gray-500">Isolate resonance instantly.</span></h2>
             <p className="text-lg text-gray-400 font-light leading-relaxed">
               Don&apos;t rely on blind luck to solve cabin drone. Perform highly optimized Fast Fourier Transforms (FFT) on chassis acceleration data to identify modal frequencies and optimize ride comfort before building a single physical prototype.
             </p>
-            <ul className="space-y-3 pt-4">
-              {["Full-spectrum frequency analysis", "Multi-modal harmonic detection", "Export-ready compliance reports"].map((f, i) => (
-                <li key={i} className="flex items-center gap-3 text-gray-300"><CheckCircle2 size={18} className="text-ansys-yellow"/> {f}</li>
-              ))}
-            </ul>
           </div>
-          <div className="flex-1 w-full aspect-square md:aspect-auto md:h-[400px] bg-black border border-white/10 rounded-2xl overflow-hidden shadow-2xl relative">
+          <div className="flex-1 w-full aspect-square md:aspect-auto md:h-[450px] bg-[#0d0d0d] border border-[#222] rounded-3xl overflow-hidden shadow-2xl relative p-2">
             {mounted && (
               <Plot
                 data={[
@@ -89,116 +184,23 @@ export default function Home() {
                 config={{ displayModeBar: false }}
               />
             )}
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent pointer-events-none"></div>
           </div>
         </div>
       </section>
 
-      {/* Feature 2: Sensitivity Sweep (Graph Left, Text Right) */}
-      <section className="py-24 px-6 border-t border-white/10 bg-black">
-        <div className="max-w-[1024px] mx-auto flex flex-col md:flex-row-reverse items-center gap-16">
-          <div className="flex-1 space-y-6">
-            <h2 className="text-3xl md:text-5xl font-bold tracking-tight">Parametric Sweeps. <br/><span className="text-gray-500">Find the absolute limit.</span></h2>
-            <p className="text-lg text-gray-400 font-light leading-relaxed">
-              Why test one setup when you can test a million? Automate batch runs sweeping through spring rates, damper curves, and anti-roll stiffness. Generate interactive 3D contour maps to visualize the exact boundary of mechanical grip.
-            </p>
-            <ul className="space-y-3 pt-4">
-              {["100x faster than real-world testing", "GPU-accelerated solving", "3D topological limit mapping"].map((f, i) => (
-                <li key={i} className="flex items-center gap-3 text-gray-300"><CheckCircle2 size={18} className="text-[#0071e3]"/> {f}</li>
-              ))}
-            </ul>
-          </div>
-          <div className="flex-1 w-full aspect-square md:aspect-auto md:h-[400px] bg-[#0a0a0a] border border-white/10 rounded-2xl overflow-hidden shadow-2xl relative">
-            {mounted && (
-              <Plot
-                data={[
-                  {
-                    z: [
-                      [8.83,8.89,8.81,8.87,8.9,8.87],
-                      [8.89,8.94,8.85,8.94,8.96,8.92],
-                      [8.84,8.9,8.82,8.92,8.93,8.91],
-                      [8.79,8.85,8.79,8.9,8.94,8.92],
-                      [8.79,8.88,8.81,8.9,8.95,8.92]
-                    ],
-                    type: 'surface',
-                    colorscale: 'Viridis',
-                    showscale: false
-                  }
-                ]}
-                layout={{
-                  autosize: true,
-                  margin: { l: 0, r: 0, t: 0, b: 0 },
-                  paper_bgcolor: 'transparent',
-                  plot_bgcolor: 'transparent',
-                  scene: {
-                    xaxis: { visible: false },
-                    yaxis: { visible: false },
-                    zaxis: { visible: false },
-                    camera: { eye: { x: 1.5, y: 1.5, z: 0.5 } }
-                  }
-                }}
-                useResizeHandler={true}
-                style={{ width: "100%", height: "100%" }}
-                config={{ displayModeBar: false }}
-              />
-            )}
-          </div>
+      {/* CTA Section */}
+      <section className="py-32 px-6 relative overflow-hidden">
+        <div className="absolute inset-0 bg-ansys-yellow/10"></div>
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 mix-blend-overlay"></div>
+        
+        <div className="max-w-4xl mx-auto text-center relative z-10 bg-black/40 backdrop-blur-md border border-white/10 p-12 md:p-20 rounded-3xl shadow-2xl">
+          <h2 className="text-4xl md:text-6xl font-black mb-6">Ready to dominate the track?</h2>
+          <p className="text-xl text-gray-300 mb-10 max-w-2xl mx-auto font-light">Join the engineers who have already made the switch. Set up your first full vehicle model in less than 15 minutes.</p>
+          
+          <Link href="/pricing" className="inline-flex px-10 py-5 bg-ansys-yellow text-black text-lg font-bold rounded-full hover:brightness-110 transition-transform hover:scale-105 active:scale-95 shadow-[0_0_40px_rgba(242,169,0,0.4)]">
+            Start Your Journey Now
+          </Link>
         </div>
-      </section>
-
-      {/* Feature 3: Non-Linear Dynamics */}
-      <section className="py-24 px-6 border-t border-white/10 bg-[#0a0a0a]">
-        <div className="max-w-[1024px] mx-auto flex flex-col md:flex-row items-center gap-16">
-          <div className="flex-1 space-y-6">
-            <h2 className="text-3xl md:text-5xl font-bold tracking-tight">Non-Linear Dynamics. <br/><span className="text-gray-500">True-to-life precision.</span></h2>
-            <p className="text-lg text-gray-400 font-light leading-relaxed">
-              Standard solvers use linear approximations. We don&apos;t. Import direct dynamometer shock curves and aero downforce maps. Our engine computes non-linear hysteresis and progressive spring rates in real-time, just like the real world.
-            </p>
-            <ul className="space-y-3 pt-4">
-              {["CSV Dynamo imports", "Real-time hysteresis mapping", "Progressive aero models"].map((f, i) => (
-                <li key={i} className="flex items-center gap-3 text-gray-300"><CheckCircle2 size={18} className="text-[#ff3b30]"/> {f}</li>
-              ))}
-            </ul>
-          </div>
-          <div className="flex-1 w-full aspect-square md:aspect-auto md:h-[400px] bg-black border border-white/10 rounded-2xl overflow-hidden shadow-2xl p-6 relative flex items-center justify-center">
-            {mounted && (
-               <Plot
-               data={[
-                 {
-                   x: [-50, -30, -10, 0, 10, 30, 50],
-                   y: [-2500, -1200, -300, 0, 500, 1800, 3000],
-                   type: 'scatter',
-                   mode: 'lines+markers',
-                   line: { color: '#ff3b30', shape: 'spline', width: 3 },
-                   marker: { size: 8 }
-                 }
-               ]}
-               layout={{
-                 autosize: true,
-                 margin: { l: 40, r: 20, t: 20, b: 40 },
-                 paper_bgcolor: 'transparent',
-                 plot_bgcolor: 'transparent',
-                 xaxis: { title: { text: 'Velocity (mm/s)' }, color: '#666', gridcolor: '#222' },
-                 yaxis: { title: { text: 'Force (N)' }, color: '#666', gridcolor: '#222' }
-               }}
-               useResizeHandler={true}
-               style={{ width: "100%", height: "100%" }}
-               config={{ displayModeBar: false }}
-             />
-            )}
-          </div>
-        </div>
-      </section>
-
-      {/* Final CTA */}
-      <section className="py-32 px-6 border-t border-white/10 text-center flex flex-col items-center">
-        <h2 className="text-4xl md:text-6xl font-bold tracking-tight mb-8">Ready to dominate?</h2>
-        <p className="text-xl text-gray-400 max-w-xl font-light mb-10">
-          Join the elite teams who have already switched to SuspensionLab Pro. Gain the unfair advantage today.
-        </p>
-        <Link href="/pricing" className="px-10 py-5 bg-white text-black text-lg font-bold rounded-full hover:bg-gray-200 transition-transform hover:scale-105 active:scale-95 shadow-[0_0_40px_rgba(255,255,255,0.2)]">
-          Get SuspensionLab MAX
-        </Link>
       </section>
 
     </div>
