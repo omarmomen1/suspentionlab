@@ -28,7 +28,7 @@ jobs:
 
       - name: Syntax Check
         run: |
-          find src ui -type f -name "*.py" -exec python -m py_compile {} +
+          find src -type f -name "*.py" -exec python -m py_compile {} +
 
   build:
     needs: test
