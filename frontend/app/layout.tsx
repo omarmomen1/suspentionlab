@@ -7,6 +7,7 @@ import NavItem from "../components/NavItem";
 import { AuthProvider } from "../contexts/AuthContext";
 import UserMenu from "../components/UserMenu";
 import ClientOnly from "../components/ClientOnly";
+import CommandPalette from "../components/CommandPalette";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,6 +22,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body suppressHydrationWarning className={`${inter.className} bg-black text-gray-100 antialiased selection:bg-ansys-yellow selection:text-black flex flex-col h-screen overflow-hidden`}>
         <ClientOnly>
           <AuthProvider>
+            <CommandPalette />
             {/* Apple-Style Top Navigation Bar */}
             <nav className="w-full h-[44px] bg-[rgba(13,13,15,0.92)] backdrop-blur-md border-b border-white/8 flex items-center justify-center fixed top-0 z-50">
               <div className="max-w-[1400px] w-full px-5 flex items-center justify-between">

@@ -67,6 +67,10 @@ async def verify_gumroad_license(
     if purchase.get("subscription_failed_at"):
         raise HTTPException(status_code=400, detail="The subscription for this license has failed.")
 
+    # Prevent someone from adding the same key multiple times
+    if data.get("uses", 0) > 1:
+        raise HTTPException(status_code=400, detail="This license key has already been used on another account.")
+
     # License is valid! Upgrade the user.
     user_id = user_data["user_id"]
     result = await db.execute(select(User).where(User.id == user_id))
