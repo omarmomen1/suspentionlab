@@ -23,9 +23,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <AuthProvider>
             {/* Apple-Style Top Navigation Bar */}
             <nav className="w-full h-[44px] bg-[rgba(13,13,15,0.92)] backdrop-blur-md border-b border-white/8 flex items-center justify-center fixed top-0 z-50">
-              <div className="max-w-[1200px] w-full px-5 flex items-center justify-between">
+              <div className="max-w-[1400px] w-full px-5 flex items-center justify-between">
                 {/* Logo */}
-                <Link href="/" className="text-gray-300 hover:text-white transition-colors flex items-center gap-2">
+                <Link href="/" className="text-gray-300 hover:text-white transition-colors flex items-center gap-2 mr-8">
                   <svg viewBox="0 0 24 24" fill="none" height="16" width="16">
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
                       stroke="#f2a900" strokeWidth="2" strokeLinejoin="round" />
@@ -36,7 +36,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 </Link>
 
                 {/* Nav links */}
-                <div className="hidden md:flex items-center space-x-7">
+                <div className="hidden lg:flex items-center space-x-5 flex-1 justify-center">
                   <NavItem href="/quarter-car" label="Quarter Car" />
                   <NavItem href="/half-car"    label="Half Car"    />
                   <NavItem href="/full-car"    label="Full Car"    />

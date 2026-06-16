@@ -19,7 +19,7 @@ export default function NavItem({ href, label }: NavItemProps) {
   return (
     <Link
       href={href}
-      className={`relative text-xs font-normal tracking-wide transition-colors duration-200 group ${
+      className={`relative text-xs font-normal tracking-wide transition-colors duration-200 group whitespace-nowrap ${
         isActive ? "text-white" : "text-gray-500 hover:text-gray-200"
       }`}
     >
