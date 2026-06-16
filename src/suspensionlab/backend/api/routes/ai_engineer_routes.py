@@ -247,3 +247,71 @@ async def ai_health():
         "cost": "free",
         "message": "Ready" if GEMINI_API_KEY else "Set GEMINI_API_KEY to activate AI Engineer"
     }
+
+class OptimizeSetupRequest(BaseModel):
+    goal: str
+    current_params: dict
+
+class OptimizeSetupResponse(BaseModel):
+    m_s: float
+    m_u: float
+    k_s: float
+    c: float
+    k_t: float
+    MR: float
+    c_t: float
+    explanation: str
+
+@router.post("/optimize-setup", response_model=OptimizeSetupResponse)
+async def optimize_setup(req: OptimizeSetupRequest):
+    """
+    Magic Wand endpoint: Takes the current suspension parameters and a user's natural language goal.
+    Returns the exact numerical parameters to achieve that goal in a strict JSON format.
+    """
+    params_str = json.dumps(req.current_params, indent=2)
+    prompt = f"""You are an expert vehicle dynamics optimization AI for SuspensionLab.
+The engineer wants to achieve the following goal:
+"{req.goal}"
+
+Here are the current quarter-car suspension parameters:
+{params_str}
+
+Based on the goal, calculate the mathematically optimal new parameters. 
+You must return your answer as a STRICT JSON object matching exactly this schema, with no markdown formatting, no code blocks, just raw JSON:
+{{
+  "m_s": float,
+  "m_u": float,
+  "k_s": float,
+  "c": float,
+  "k_t": float,
+  "MR": float,
+  "c_t": float,
+  "explanation": "A 1-sentence explanation of why these specific changes satisfy the goal."
+}}
+"""
+    raw_response = await _call_gemini(prompt)
+    
+    cleaned = raw_response.strip()
+    if cleaned.startswith("```json"):
+        cleaned = cleaned[7:]
+    if cleaned.startswith("```"):
+        cleaned = cleaned[3:]
+    if cleaned.endswith("```"):
+        cleaned = cleaned[:-3]
+    cleaned = cleaned.strip()
+
+    try:
+        data = json.loads(cleaned)
+        return OptimizeSetupResponse(
+            m_s=float(data.get("m_s", req.current_params.get("m_s", 300.0))),
+            m_u=float(data.get("m_u", req.current_params.get("m_u", 35.0))),
+            k_s=float(data.get("k_s", req.current_params.get("k_s", 25000.0))),
+            c=float(data.get("c", req.current_params.get("c", 2050.0))),
+            k_t=float(data.get("k_t", req.current_params.get("k_t", 200000.0))),
+            MR=float(data.get("MR", req.current_params.get("MR", 0.85))),
+            c_t=float(data.get("c_t", req.current_params.get("c_t", 0.0))),
+            explanation=data.get("explanation", "Optimized parameters generated.")
+        )
+    except Exception as e:
+        logger.error("Failed to parse Gemini JSON: %s. Raw: %s", e, raw_response)
+        raise HTTPException(status_code=500, detail="AI failed to generate valid numerical parameters.")
