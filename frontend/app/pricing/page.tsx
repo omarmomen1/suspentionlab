@@ -69,7 +69,7 @@ const PLANS = [
       "Volume seat licensing",
     ],
     cta: "Contact Sales",
-    ctaHref: "mailto:suspensionlab.support@gmail.com",
+    ctaHref: "mailto:suspenlabsupp@outlook.com",
     ctaStyle: "bg-[#1e1e20] border border-[#333] text-white hover:bg-[#2a2a2c]",
     icon: Building2,
   },
@@ -178,7 +178,7 @@ export default function PricingPage() {
         <div className="mt-20 text-center bg-[#0d0d0f] border border-[#1e1e1e] rounded-2xl p-12">
           <h2 className="text-3xl font-semibold text-white mb-3">Still have questions?</h2>
           <p className="text-gray-500 mb-8">Our team of engineers is happy to walk you through the right plan for your use case.</p>
-          <Link href="mailto:suspensionlab.support@gmail.com"
+          <Link href="mailto:suspenlabsupp@outlook.com"
             className="inline-flex items-center gap-2 px-6 py-3 bg-ansys-yellow text-black font-bold rounded-xl
               hover:brightness-110 transition-all shadow-[0_0_20px_rgba(242,169,0,0.2)]">
             Talk to an Engineer <ArrowRight size={16} />

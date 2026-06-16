@@ -365,7 +365,7 @@ export default function SettingsPage() {
                       <p className="text-sm font-semibold text-amber-400">Password reset</p>
                       <p className="text-xs text-gray-400 max-w-sm text-center">
                         If you believe this is an error, please contact <br/>
-                        <a href="mailto:suspensionlab.support@gmail.com" className="text-ansys-yellow">suspensionlab.support@gmail.com</a>.
+                        <a href="mailto:suspenlabsupp@outlook.com" className="text-ansys-yellow">suspenlabsupp@outlook.com</a>.
                       </p>
                     </div>
                   </div>

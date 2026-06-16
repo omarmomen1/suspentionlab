@@ -67,9 +67,9 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               </div>
               <footer className="border-t border-[#1a1a1a] py-4 px-6 flex flex-wrap items-center justify-center gap-4 text-[11px] text-gray-600">
                 <span>© {new Date().getFullYear()} SuspensionLab. All rights reserved.</span>
-                <a href="/legal/terms" className="hover:text-gray-400 transition-colors">Terms of Service</a>
+                <Link href="/legal/terms" className="hover:text-gray-400 transition-colors">Terms of Service</Link>
                 <a href="/legal/privacy" className="hover:text-gray-400 transition-colors">Privacy Policy</a>
-                <a href="mailto:suspensionlab.support@gmail.com" className="hover:text-gray-400 transition-colors">Contact</a>
+                <a href="mailto:suspenlabsupp@outlook.com" className="hover:text-gray-400 transition-colors">Contact</a>
               </footer>
             </main>
           </AuthProvider>

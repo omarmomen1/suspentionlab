@@ -52,7 +52,7 @@ export default function DocsPage() {
           </nav>
           <div className="mt-8 p-3 bg-[#111113] border border-[#1e1e1e] rounded-xl">
             <p className="text-[10px] text-gray-600 mb-2">Need more help?</p>
-            <a href="mailto:suspensionlab.support@gmail.com"
+            <a href="mailto:suspenlabsupp@outlook.com"
               className="inline-flex items-center gap-2 px-6 py-3 bg-[#1e1e20] border border-[#333] text-sm font-medium text-white rounded-xl hover:bg-[#252528] transition-colors">
               Contact Support
             </a>
