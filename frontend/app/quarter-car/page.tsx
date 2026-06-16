@@ -292,25 +292,37 @@ function QuarterCarDashboard() {
     finally { setIsSaving(false); }
   };
 
+  const [isMagicModalOpen, setIsMagicModalOpen] = useState(false);
+  const [magicGoal, setMagicGoal] = useState("");
+
   const autoTune = async () => {
+    if (!magicGoal.trim()) return;
     setIsTuning(true);
     try {
-      const res  = await fetch(`${API_BASE}/auto-tune`, {
+      const res  = await fetch(`${API_BASE}/api/v1/ai/optimize-setup`, {
         method:  "POST",
         headers: { "Content-Type": "application/json", ...authHeader() },
-        body:    JSON.stringify(buildPayload()),
+        body:    JSON.stringify({ goal: magicGoal, current_params: params }),
       });
       const data = await res.json();
-      if (data.status === "success") {
-        const ks = Math.round(data.optimal_ks);
-        const c  = Math.round(data.optimal_c);
-        setParams((prev) => ({ ...prev, k_s: ks, c }));
-        showToast(`AI tuned â†’ k_s = ${ks.toLocaleString()} N/m  |  c = ${c.toLocaleString()} NÂ·s/m`, "success");
-        setTimeout(() => document.getElementById("btn-run")?.click(), 400);
+      if (res.ok) {
+        setParams((prev) => ({ 
+          ...prev, 
+          m_s: data.m_s, 
+          m_u: data.m_u, 
+          k_s: data.k_s, 
+          c: data.c, 
+          k_t: data.k_t, 
+          MR: data.MR 
+        }));
+        showToast(`AI Tuned: ${data.explanation}`, "success");
+        setIsMagicModalOpen(false);
+        setMagicGoal("");
+        setTimeout(() => document.getElementById("btn-run")?.click(), 800);
       } else {
-        showToast("Auto-tune did not converge", "error");
+        showToast(data.detail || "Auto-tune failed", "error");
       }
-    } catch { showToast("Failed to reach auto-tune endpoint", "error"); }
+    } catch { showToast("Failed to reach generative optimizer", "error"); }
     finally { setIsTuning(false); }
   };
 
@@ -411,15 +423,44 @@ function QuarterCarDashboard() {
           </button>
 
           <PlanGate required="PRO">
-            <button onClick={autoTune} disabled={isTuning}
+            <button onClick={() => setIsMagicModalOpen(true)} disabled={isTuning}
               className="px-4 py-1.5 bg-[#5e17eb] hover:bg-[#7c3aed] text-white rounded-lg text-xs font-bold
                 flex items-center gap-1.5 transition-colors shadow-[0_0_16px_rgba(94,23,235,0.3)]
                 disabled:opacity-50 disabled:cursor-not-allowed">
-              <Sparkles size={13} /> {isTuning ? "AI Tuning…" : "AI Auto-Tune"}
+              <Sparkles size={13} /> AI Auto-Tune
             </button>
           </PlanGate>
         </div>
       </div>
+
+      {/* Magic Wand Modal */}
+      {isMagicModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-lg bg-[#111113] border border-[#222] rounded-2xl p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-2">
+              <Sparkles className="text-[#5e17eb]" size={20} /> Generative AI Auto-Tuner
+            </h3>
+            <p className="text-sm text-gray-400 mb-4">
+              Describe the vehicle dynamics problem you want to solve in plain English. The AI will mathematically optimize your parameters and re-run the simulation.
+            </p>
+            <textarea 
+              autoFocus
+              className="w-full h-24 bg-[#0d0d0f] border border-[#2a2a2a] rounded-xl p-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#5e17eb] focus:ring-1 focus:ring-[#5e17eb]/30 mb-4"
+              placeholder="e.g., 'Make the ride much softer over this bumpy road without letting the suspension bottom out.'"
+              value={magicGoal}
+              onChange={(e) => setMagicGoal(e.target.value)}
+            />
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setIsMagicModalOpen(false)} className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">
+                Cancel
+              </button>
+              <button onClick={autoTune} disabled={isTuning || !magicGoal.trim()} className="px-5 py-2 bg-[#5e17eb] hover:bg-[#7c3aed] text-white rounded-xl text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-[0_0_15px_rgba(94,23,235,0.4)]">
+                {isTuning ? "Optimizing..." : "Optimize Setup"} <Sparkles size={14} />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Body */}
       <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
