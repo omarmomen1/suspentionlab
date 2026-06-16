@@ -67,19 +67,6 @@ export default function Home() {
         </motion.div>
       </section>
 
-      {/* Ticker Tape */}
-      <section className="border-y border-white/5 bg-black/50 py-6 overflow-hidden">
-        <div className="max-w-[1200px] mx-auto px-6 flex flex-col items-center">
-          <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-4">Trusted by engineers from</p>
-          <div className="flex flex-wrap justify-center gap-8 md:gap-16 opacity-50 grayscale hover:grayscale-0 transition-all duration-500">
-             <span className="text-xl font-black tracking-tighter">FORMULA 1</span>
-             <span className="text-xl font-bold tracking-tight italic">WEC</span>
-             <span className="text-xl font-mono font-bold">TIER-1 OEM</span>
-             <span className="text-xl font-serif font-bold tracking-widest">HYPERCAR</span>
-          </div>
-        </div>
-      </section>
-
       {/* Feature Showcase: Glassmorphism Cards */}
       <section className="py-24 px-6 max-w-[1200px] mx-auto">
         <div className="text-center mb-16">
