@@ -151,8 +151,8 @@ async def register(req: RegisterRequest, response: Response, db: AsyncSession = 
         email=req.email.lower(),
         password_hash=hash_password(req.password),
         name=req.name or req.email.split("@")[0],
-        plan=PlanTier.PRO,           # 14-day Pro trial for all signups
-        trial_ends_at=trial_end,
+        plan=PlanTier.FREE,
+        trial_ends_at=None,
         api_key=f"sk_{secrets.token_urlsafe(32)}",  # legacy single key
         onboarding_complete=False,
     )
