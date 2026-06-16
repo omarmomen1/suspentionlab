@@ -46,7 +46,7 @@ const PLANS = [
       "Priority email support",
     ],
     cta: "Buy on Gumroad",
-    ctaHref: "https://momenator84.gumroad.com/l/zduutu",
+    ctaHref: "https://momenator84.gumroad.com/l/huvcnb",
     ctaStyle: "bg-ansys-yellow text-black font-bold hover:brightness-110 shadow-[0_0_20px_rgba(242,169,0,0.25)]",
     icon: Shield,
   },
