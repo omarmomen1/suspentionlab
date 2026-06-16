@@ -97,16 +97,31 @@ export default function SettingsPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const openBillingPortal = async () => {
-    setPortalLoading(true);
+  const [gumroadKey, setGumroadKey] = useState("");
+  const [activatingLicense, setActivatingLicense] = useState(false);
+  const [licenseMessage, setLicenseMessage] = useState<{type: "error"|"success", text: string} | null>(null);
+
+  const activateLicense = async () => {
+    if (!gumroadKey.trim()) return;
+    setActivatingLicense(true);
+    setLicenseMessage(null);
     try {
-      const r    = await fetch(`${API_BASE}/billing/portal`, { method: "POST", headers: authHeader() });
+      const r = await fetch(`${API_BASE}/api/v1/billing/verify-license`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify({ license_key: gumroadKey.trim() }),
+      });
       const data = await r.json();
-      if (data.portal_url) window.location.href = data.portal_url;
+      if (r.ok) {
+        setLicenseMessage({ type: "success", text: "PRO unlocked successfully! Refreshing..." });
+        setTimeout(() => window.location.reload(), 2000);
+      } else {
+        setLicenseMessage({ type: "error", text: data.detail || "Invalid license key." });
+      }
     } catch (e) {
-      console.error("Failed to open billing portal", e);
+      setLicenseMessage({ type: "error", text: "Failed to contact server." });
     } finally {
-      setPortalLoading(false);
+      setActivatingLicense(false);
     }
   };
 
@@ -204,41 +219,44 @@ export default function SettingsPage() {
                       </Link>
                     )}
                   </div>
-                  {plan !== "FREE" && (
-                    <button onClick={openBillingPortal} disabled={portalLoading}
-                      className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-white transition-colors">
-                      {portalLoading ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
-                      Manage subscription & invoices in Lemon Squeezy
-                    </button>
+                  {plan === "FREE" && (
+                    <div className="mt-4 pt-4 border-t border-[#1e1e1e]">
+                      <p className="text-sm font-semibold text-white mb-2">Activate PRO</p>
+                      <p className="text-xs text-gray-500 mb-4">
+                        Purchased a license on Gumroad? Enter your license key here to unlock PRO features instantly.
+                      </p>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={gumroadKey}
+                          onChange={(e) => setGumroadKey(e.target.value)}
+                          placeholder="e.g. XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX"
+                          className="flex-1 bg-[#0d0d0f] border border-[#252525] rounded-xl px-3 py-2 text-sm text-white placeholder:text-gray-700 focus:outline-none focus:border-ansys-yellow/60 transition-all font-mono"
+                        />
+                        <button
+                          onClick={activateLicense}
+                          disabled={activatingLicense || !gumroadKey.trim()}
+                          className="px-4 py-2 bg-ansys-yellow text-black text-xs font-bold rounded-xl hover:brightness-110 transition-all disabled:opacity-40 flex items-center gap-1.5"
+                        >
+                          {activatingLicense ? <Loader2 size={12} className="animate-spin" /> : <Key size={12} />}
+                          Verify Key
+                        </button>
+                      </div>
+                      {licenseMessage && (
+                        <p className={`mt-2 text-xs ${licenseMessage.type === "error" ? "text-red-400" : "text-emerald-400"}`}>
+                          {licenseMessage.text}
+                        </p>
+                      )}
+                      
+                      <div className="mt-4">
+                        <a href="https://gumroad.com/l/suspensionlab-pro" target="_blank" rel="noreferrer"
+                          className="text-xs text-ansys-yellow hover:underline">
+                          Don't have a license? Buy on Gumroad &rarr;
+                        </a>
+                      </div>
+                    </div>
                   )}
                 </SectionCard>
-
-                {plan === "FREE" && (
-                  <div className="grid grid-cols-2 gap-4">
-                    {[
-                      { plan: "pro", label: "Pro", price: "$49/mo", color: "border-ansys-yellow/30 hover:border-ansys-yellow/60" },
-                      { plan: "enterprise", label: "Enterprise", price: "$300/mo", color: "border-purple-500/30 hover:border-purple-500/60" },
-                    ].map((p) => (
-                      <a key={p.plan} href={`${API_BASE}/billing/checkout`}
-                        onClick={async (e) => {
-                          e.preventDefault();
-                          const r = await fetch(`${API_BASE}/billing/checkout`, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json", ...authHeader() },
-                            body: JSON.stringify({ plan: p.plan }),
-                          });
-                          const d = await r.json();
-                          if (d.checkout_url) window.location.href = d.checkout_url;
-                        }}
-                        className={`bg-[#0d0d0f] border ${p.color} rounded-xl p-4 cursor-pointer
-                          transition-colors block`}>
-                        <p className="text-sm font-bold text-white">{p.label}</p>
-                        <p className="text-xs text-gray-500 mb-3">{p.price}</p>
-                        <p className="text-[10px] text-gray-600">Click to start 14-day trial →</p>
-                      </a>
-                    ))}
-                  </div>
-                )}
               </>
             )}
 

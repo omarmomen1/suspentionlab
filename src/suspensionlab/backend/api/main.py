@@ -253,9 +253,9 @@ app.include_router(
     dependencies=[Depends(RateLimiter("rate_limit_auth"))]
 )
 
-from suspensionlab.backend.api.routes.lemon_squeezy_routes import router as billing_router
+from suspensionlab.backend.api.routes.gumroad_routes import router as billing_router
 from suspensionlab.backend.api.routes.session_routes import router as session_router
-app.include_router(billing_router)  # Webhook is public; checkout/portal require auth
+app.include_router(billing_router, prefix="/api/v1")
 app.include_router(session_router)
 
 from suspensionlab.backend.api.routes.api_key_routes import router as api_key_router

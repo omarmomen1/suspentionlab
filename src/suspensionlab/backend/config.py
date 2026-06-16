@@ -57,24 +57,8 @@ class Settings:
 
     # ── Lemon Squeezy ────────────────────────────────────────────────────────
     @property
-    def lemon_squeezy_api_key(self) -> str:
-        return get_env_or_fail("LEMON_SQUEEZY_API_KEY", "")
-
-    @property
-    def lemon_squeezy_store_id(self) -> str:
-        return get_env_or_fail("LEMON_SQUEEZY_STORE_ID", "")
-
-    @property
-    def lemon_squeezy_webhook_secret(self) -> str:
-        return get_env_or_fail("LEMON_SQUEEZY_WEBHOOK_SECRET", "")
-
-    @property
-    def lemon_pro_variant_id(self) -> str:
-        return get_env_or_fail("LEMON_PRO_VARIANT_ID", "")
-
-    @property
-    def lemon_enterprise_variant_id(self) -> str:
-        return get_env_or_fail("LEMON_ENTERPRISE_VARIANT_ID", "")
+    def gumroad_product_permalink(self) -> str:
+        return os.environ.get("GUMROAD_PRODUCT_PERMALINK", "suspensionlab-pro")
 
     # ── Database ──────────────────────────────────────────────────────────────
     @property
