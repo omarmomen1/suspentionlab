@@ -21,8 +21,7 @@ const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET ?? "");
 
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
-
-  const isStatic =
+  const isStatic = 
     pathname.startsWith("/_next") ||
     pathname.startsWith("/api") ||
     pathname.includes(".") ||
@@ -38,7 +37,7 @@ export default async function proxy(request: NextRequest) {
   let authed = false;
   if (token) {
       try {
-          await jwtVerify(token, JWT_SECRET);
+          await jwtVerify(token as string, JWT_SECRET);
           authed = true;
       } catch (err) {
           console.error("JWT Verify Error in proxy.ts:", err);

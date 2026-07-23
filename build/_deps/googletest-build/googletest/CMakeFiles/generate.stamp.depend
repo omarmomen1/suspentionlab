@@ -1,0 +1,17 @@
+# CMake generation dependency list for this directory.
+C:/Users/omaar/AppData/Local/python/pythoncore-3.14-64/Lib/site-packages/cmake/data/share/cmake-4.4/Modules/BasicConfigVersion-AnyNewerVersion.cmake.in
+C:/Users/omaar/AppData/Local/python/pythoncore-3.14-64/Lib/site-packages/cmake/data/share/cmake-4.4/Modules/CMakePackageConfigHelpers.cmake
+C:/Users/omaar/AppData/Local/python/pythoncore-3.14-64/Lib/site-packages/cmake/data/share/cmake-4.4/Modules/CheckCSourceCompiles.cmake
+C:/Users/omaar/AppData/Local/python/pythoncore-3.14-64/Lib/site-packages/cmake/data/share/cmake-4.4/Modules/CheckIncludeFile.cmake
+C:/Users/omaar/AppData/Local/python/pythoncore-3.14-64/Lib/site-packages/cmake/data/share/cmake-4.4/Modules/CheckLibraryExists.cmake
+C:/Users/omaar/AppData/Local/python/pythoncore-3.14-64/Lib/site-packages/cmake/data/share/cmake-4.4/Modules/FindPackageHandleStandardArgs.cmake
+C:/Users/omaar/AppData/Local/python/pythoncore-3.14-64/Lib/site-packages/cmake/data/share/cmake-4.4/Modules/FindPackageMessage.cmake
+C:/Users/omaar/AppData/Local/python/pythoncore-3.14-64/Lib/site-packages/cmake/data/share/cmake-4.4/Modules/FindPython/Support.cmake
+C:/Users/omaar/AppData/Local/python/pythoncore-3.14-64/Lib/site-packages/cmake/data/share/cmake-4.4/Modules/FindPython3.cmake
+C:/Users/omaar/AppData/Local/python/pythoncore-3.14-64/Lib/site-packages/cmake/data/share/cmake-4.4/Modules/FindThreads.cmake
+C:/Users/omaar/AppData/Local/python/pythoncore-3.14-64/Lib/site-packages/cmake/data/share/cmake-4.4/Modules/WriteBasicConfigVersionFile.cmake
+D:/project/build/_deps/googletest-src/googletest/CMakeLists.txt
+D:/project/build/_deps/googletest-src/googletest/cmake/Config.cmake.in
+D:/project/build/_deps/googletest-src/googletest/cmake/gtest.pc.in
+D:/project/build/_deps/googletest-src/googletest/cmake/gtest_main.pc.in
+D:/project/build/_deps/googletest-src/googletest/cmake/internal_utils.cmake

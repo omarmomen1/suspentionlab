@@ -6,22 +6,69 @@ metadata:
   labels:
     app: suspensionlab
     component: db-migration
+    helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version }}
   annotations:
+    # This Job runs as a Helm pre-install and pre-upgrade hook — BEFORE any
+    # application pods are started or updated. This is the ONLY place that
+    # executes `alembic upgrade head`. The Dockerfile.backend CMD does NOT
+    # run migrations, preventing the race condition where multiple pod replicas
+    # simultaneously attempt concurrent schema migrations on startup.
     "helm.sh/hook": pre-install,pre-upgrade
     "helm.sh/hook-weight": "-5"
     "helm.sh/hook-delete-policy": hook-succeeded,before-hook-creation
 spec:
+  # FIXED: Added failure tolerance and hard deadline.
+  # If the migration fails twice, the deployment is blocked (not silently retried indefinitely).
+  backoffLimit: 2
+  # Hard deadline: if the migration takes longer than 5 minutes, something is wrong.
+  # Block and alert rather than hang indefinitely.
+  activeDeadlineSeconds: 300
   template:
     metadata:
       name: {{ .Release.Name }}-db-migration
+      labels:
+        app: suspensionlab
+        component: db-migration
     spec:
+      serviceAccountName: {{ .Release.Name }}-sa
       restartPolicy: Never
+      # FIXED: Apply the same non-root security context as the main API pods.
+      # Consistent with Dockerfile.backend's USER appuser (UID 1001).
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: db-migration
         image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+        imagePullPolicy: {{ .Values.api.image.imagePullPolicy | default "IfNotPresent" }}
         command: ["alembic", "upgrade", "head"]
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
         envFrom:
         - configMapRef:
             name: {{ .Release.Name }}-config
         - secretRef:
-            name: suspensionlab-secrets
+            name: {{ .Release.Name }}-secrets
+        # Resource limits prevent a runaway migration from starving the node
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        # Writable temp dir for Alembic's working files (needed with readOnlyRootFilesystem)
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}

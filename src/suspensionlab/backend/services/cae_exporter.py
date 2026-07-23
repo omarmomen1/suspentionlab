@@ -20,10 +20,10 @@ UNITS/ FORCE=NEWTON, MASS=KILOGRAM, LENGTH=METER, TIME=SECOND
 !
 PART/1, GROUND
 !
-PART/2, MASS={params.m_s}, CM=201, IP=1.0, 1.0, 1.0
+PART/2, MASS={params.m_s}, CM=201, IP=0.0, 0.0, 0.0
 ! Sprung Mass
 !
-PART/3, MASS={params.m_u}, CM=301, IP=0.1, 0.1, 0.1
+PART/3, MASS={params.m_u}, CM=301, IP=0.0, 0.0, 0.0
 ! Unsprung Mass (Wheel Assembly)
 !
 !---------------------------------- MARKERS ------------------------------------
@@ -39,8 +39,11 @@ JOINT/2, TRANSLATIONAL, I = 301, J = 101
 !
 !----------------------------------- FORCES ------------------------------------
 !
+! NOTE: Marker offsets are nominal geometry only.
+! Spring/damper forces are computed from relative displacement (delta), not absolute position.
+! Model is linear; equilibrium offset does not affect frequency response.
 ! Suspension Spring & Damper (Using standard ADAMS SPRINGDAMPER element)
-SPRINGDAMPER/1, TRANSLATIONAL, I = 201, J = 301, STIFFNESS_COEFFICIENT = {params.k_w}, DAMPING_COEFFICIENT = {params.c}
+SPRINGDAMPER/1, TRANSLATIONAL, I = 201, J = 301, STIFFNESS_COEFFICIENT = {params.k_w}, DAMPING_COEFFICIENT = {params.c_w}
 !
 ! Tire Spring
 SPRINGDAMPER/2, TRANSLATIONAL, I = 301, J = 101, STIFFNESS_COEFFICIENT = {params.k_t}, DAMPING_COEFFICIENT = 0.0

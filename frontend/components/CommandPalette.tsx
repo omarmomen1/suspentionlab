@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Command } from "cmdk";
 import {
-  Search, Calculator, Activity, Settings2, ShieldAlert, BookOpen,
-  LayoutDashboard, LogOut, Code2, Zap, GitBranch
+  Search, Calculator, Activity, Settings2, BookOpen,
+  LayoutDashboard, LogOut, Zap, GitBranch
 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 

@@ -1,7 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useState, Suspense } from "react";
 import dynamic from "next/dynamic";
-import { Play, Settings2, AlertTriangle, Activity, X, Layers } from "lucide-react";
+import {
+  Play, Settings2, AlertTriangle, Activity, Layers
+} from "lucide-react";
+import { useUndoRedo } from "../../hooks/useUndoRedo";
 import { useAuth } from "../../contexts/AuthContext";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
@@ -19,9 +23,6 @@ const DARK_BASE = {
   hoverlabel:    { bgcolor: "#0d0d0f", bordercolor: "#333", font: { color: "#ccc", size: 11 } },
 };
 
-function darkLayout(overrides: Record<string, unknown> = {}) {
-  return { ...DARK_BASE, ...overrides };
-}
 
 function ParamSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -38,12 +39,23 @@ function PlotBox({ children }: { children: React.ReactNode }) {
   return <div className="flex-1 min-w-0 min-h-0 relative">{children}</div>;
 }
 
+interface SensitivityResults {
+  error?: boolean;
+  message?: string;
+  Z?: number[][];
+  X?: number[];
+  Y?: number[];
+  min_x?: number;
+  min_y?: number;
+  min_z?: number;
+}
+
 function SensitivitySweepDashboard() {
   const { authHeader } = useAuth();
   const [isRunning, setIsRunning] = useState(false);
-  const [results, setResults] = useState<Record<string, any> | null>(null);
+  const [results, setResults] = useState<SensitivityResults | null>(null);
 
-  const [params, setParams] = useState({
+  const [params, setParams] = useUndoRedo({
     var_x: "Spring Rate (ks)",
     var_y: "Damping (c)",
     objective: "Balanced (Comfort + Grip)",
@@ -52,18 +64,49 @@ function SensitivitySweepDashboard() {
 
   const runSimulation = async () => {
     if (params.var_x === params.var_y) { alert("Please select different variables for X and Y axes."); return; }
-    setIsRunning(true); setResults(null);
+    setIsRunning(true);
+    setResults(null);
     try {
-      const res = await fetch(`${API_BASE}/simulate/sweep`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify(params) });
+      const res = await fetch(`${API_BASE}/simulate/sweep`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(params)
+      });
       const data = await res.json();
-      if (!res.ok) setResults({ error: true, message: data.message ?? data.detail ?? "Sweep failed" });
-      else setResults(data);
-    } catch (err) { setResults({ error: true, message: String(err) }); }
-    finally { setIsRunning(false); }
+      if (!res.ok) {
+        setResults({ error: true, message: data.message ?? data.detail ?? "Sweep failed" });
+        setIsRunning(false);
+        return;
+      }
+      
+      const jobId = data.job_id;
+      const interval = setInterval(async () => {
+        try {
+          const pollRes = await fetch(`${API_BASE}/jobs/${jobId}`, { headers: authHeader() });
+          const pollData = await pollRes.json();
+          if (pollData.status === "COMPLETED") {
+             clearInterval(interval);
+             setResults(pollData.result);
+             setIsRunning(false);
+          } else if (pollData.status === "FAILED" || pollData.status === "CANCELED") {
+             clearInterval(interval);
+             setResults({ error: true, message: pollData.error || "Sweep failed." });
+             setIsRunning(false);
+          }
+        } catch (e) {
+             clearInterval(interval);
+             setResults({ error: true, message: String(e) });
+             setIsRunning(false);
+        }
+      }, 1000);
+    } catch (err) {
+      setResults({ error: true, message: String(err) });
+      setIsRunning(false);
+    }
   };
 
   const hasResults = results && !results.error;
-  const r = results;
+  const r = results as any;
 
   return (
     <div className="h-full flex flex-col p-5 pt-3 gap-3 min-h-0">
@@ -169,8 +212,8 @@ function SensitivitySweepDashboard() {
                   <PlotBox>
                     <Plot
                       data={[
-                        { z: r.Z, x: r.X, y: r.Y, type: "surface", colorscale: "Viridis", showscale: false },
-                        { x: [r.min_x], y: [r.min_y], z: [r.min_z], mode: "markers+text" as any, type: "scatter3d", marker: { size: 6, color: "#ff2d55", symbol: "diamond" }, text: ["Minimum"], textposition: "top center", textfont: { color: "#ff2d55", size: 10 } }
+                        { z: r.Z, x: r.X, y: r.Y, type: "surface" as any, colorscale: "Viridis", showscale: false },
+                        { x: [r.min_x], y: [r.min_y], z: [r.min_z], mode: "markers+text" as any as any, type: "scatter3d" as any, marker: { size: 6, color: "#ff2d55", symbol: "diamond" }, text: ["Minimum"], textposition: "top center", textfont: { color: "#ff2d55", size: 10 } }
                       ]}
                       layout={{
                         ...DARK_BASE,
@@ -202,3 +245,4 @@ export default function Page() {
     </Suspense>
   );
 }
+

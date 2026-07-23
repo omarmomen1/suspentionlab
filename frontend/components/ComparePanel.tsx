@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState } from "react";
 import { SplitSquareHorizontal, X, TrendingUp, Upload } from "lucide-react";
 import dynamic from "next/dynamic";
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
@@ -74,7 +74,7 @@ export default function ComparePanel({ current }: ComparePanelProps) {
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 z-40 w-[440px] bg-[#0a0a0c] border-l border-[#1e1e1e]
+    <div className="fixed inset-y-0 right-0 z-40 w-full sm:w-[440px] bg-[#0a0a0c] border-l border-[#1e1e1e]
       flex flex-col shadow-2xl">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-[#1e1e1e] shrink-0">
@@ -105,6 +105,10 @@ export default function ComparePanel({ current }: ComparePanelProps) {
               <input type="file" accept=".csv" className="hidden" onChange={(e) => {
                 const file = e.target.files?.[0];
                 if (!file) return;
+                if (file.size > 5 * 1024 * 1024) {
+                  alert("File size exceeds 5MB limit.");
+                  return;
+                }
                 const reader = new FileReader();
                 reader.onload = (event) => {
                   const text = event.target?.result as string;
@@ -112,10 +116,11 @@ export default function ComparePanel({ current }: ComparePanelProps) {
                   const time: number[] = [], ddz_s: number[] = [], freq_hz: number[] = [], tx: number[] = [];
                   lines.forEach((line, i) => {
                     if (i === 0) return;
-                    const parts = line.split(',');
+                    const parts = line.trim().split(/[,\t\s]+/);
                     if (parts.length >= 2) {
+                      if (parts[0] === "" || parts[1] === "") return;
                       time.push(parseFloat(parts[0]));
-                      ddz_s.push(parseFloat(parts[1] || "0"));
+                      ddz_s.push(parseFloat(parts[1]));
                       if (parts[2] && parts[3]) {
                         freq_hz.push(parseFloat(parts[2]));
                         tx.push(parseFloat(parts[3]));

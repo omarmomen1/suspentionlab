@@ -1,0 +1,5 @@
+if(EXISTS "D:/project/build/tests/kinematics_tests_e3b0c442_Release_tests.cmake")
+  include("D:/project/build/tests/kinematics_tests_e3b0c442_Release_tests.cmake")
+else()
+  add_test(kinematics_tests_NOT_BUILT kinematics_tests_NOT_BUILT)
+endif()

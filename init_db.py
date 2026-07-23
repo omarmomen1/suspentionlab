@@ -14,9 +14,14 @@ from suspensionlab.backend.database.core import Base, get_db_dependency
 from suspensionlab.backend.database.models.user import User
 from suspensionlab.backend.database.models.profile import VehicleProfile
 from suspensionlab.backend.database.models.job import JobRecord
-from suspensionlab.backend.database.models.billing import StripeEvent
+from suspensionlab.backend.database.models.user_session import UserSession
+from suspensionlab.backend.database.models.billing import StripeEvent, LemonEvent
+
 from suspensionlab.backend.database.models.team import Team
 from suspensionlab.backend.database.models.user_api_key import UserApiKey
+from suspensionlab.backend.database.models.session import SimSession, SessionComment
+from suspensionlab.backend.database.models.shared_report import SharedReport
+
 
 from suspensionlab.backend.security.jwt_utils import hash_password
 
@@ -45,7 +50,7 @@ async def main():
             password_hash=hash_password("admin123!"),
             name="James Hunt",
             plan="ENTERPRISE",
-            tier="ENTERPRISE",
+            
             onboarding_complete=True,
             api_key=f"sk_{secrets.token_urlsafe(32)}"
         )

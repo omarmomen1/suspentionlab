@@ -40,13 +40,17 @@ class ReportResponse(BaseModel):
     title: str
     notes: str
     created_at: str
-    view_count: str
+    view_count: int
 
+
+import html
+from suspensionlab.backend.security.auth import verify_api_key
 
 @router.post("/share", response_model=ShareResponse)
 async def create_shared_report(
     req: ShareRequest,
     db: AsyncSession = Depends(get_db_dependency),
+    user: dict = Depends(verify_api_key),
 ):
     """Save a simulation result and return a public share link."""
     token = str(uuid.uuid4())
@@ -56,8 +60,8 @@ async def create_shared_report(
         simulation_type=req.simulation_type,
         params=req.params,
         result=req.result,
-        title=req.title or f"Suspension Analysis ({req.simulation_type.replace('_', ' ').title()})",
-        notes=req.notes,
+        title=html.escape(req.title or f"Suspension Analysis ({req.simulation_type.replace('_', ' ').title()})"),
+        notes=html.escape(req.notes),
     )
     db.add(report)
     await db.commit()
@@ -87,9 +91,15 @@ async def get_shared_report(
         raise HTTPException(status_code=403, detail="This report is private.")
 
     # Increment view count
+    from sqlalchemy import update
     try:
-        report.view_count = str(int(report.view_count or "0") + 1)
+        await db.execute(
+            update(SharedReport)
+            .where(SharedReport.token == token)
+            .values(view_count=SharedReport.view_count + 1)
+        )
         await db.commit()
+        await db.refresh(report)
     except Exception:
         await db.rollback()
 

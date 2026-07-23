@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 import { useState, useEffect } from "react";
 import { History, ChevronRight, Clock, X } from "lucide-react";
@@ -60,12 +61,14 @@ export default function SimHistory({ storageKey, onRestore, renderParams }: SimH
 
   useEffect(() => {
     if (!open) return;
-    try {
-      const raw = localStorage.getItem(storageKey);
-      setHistory(raw ? JSON.parse(raw) : []);
-    } catch {
-      setHistory([]);
-    }
+    setTimeout(() => {
+      try {
+        const raw = localStorage.getItem(storageKey);
+        setHistory(raw ? JSON.parse(raw) : []);
+      } catch {
+        setHistory([]);
+      }
+    }, 0);
   }, [open, storageKey]);
 
   const clearHistory = () => {

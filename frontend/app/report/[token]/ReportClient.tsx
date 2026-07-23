@@ -2,6 +2,7 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { Share2, ExternalLink, CheckCircle, BarChart2, Activity, Layers } from "lucide-react";
+import Link from "next/link";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -102,13 +103,13 @@ export default function ReportClient({ report }: { report: ReportData }) {
               {copied ? <CheckCircle size={14} className="text-green-400" /> : <Share2 size={14} />}
               {copied ? "Copied!" : "Copy Link"}
             </button>
-            <a
+            <Link
               href="/"
               className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#f2a900] text-black text-sm font-bold hover:brightness-110 transition-all"
             >
               <ExternalLink size={14} />
               Try SuspensionLab
-            </a>
+            </Link>
           </div>
         </div>
       </div>
@@ -192,19 +193,19 @@ export default function ReportClient({ report }: { report: ReportData }) {
             This analysis used a Spring Rate of {typeof p.k_s === "number" ? p.k_s.toLocaleString() : "..."} N/m and achieved ISO 2631-1 comfort rating: <strong className="text-white">{r.comfort_rating as string || "..."}</strong>.
           </p>
           <div className="flex justify-center gap-4 mt-4">
-            <a
+            <Link
               href="/"
               className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#222] text-white font-bold text-sm hover:bg-[#333] transition-all"
             >
               Start Free
-            </a>
-            <a
-              href={`/${report.simulation_type}?${new URLSearchParams(p as any).toString()}`}
+            </Link>
+            <Link
+              href={`/${report.simulation_type}?${new URLSearchParams(Object.entries(p).map(([k, v]) => [k, String(v)])).toString()}`}
               className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#f2a900] text-black font-bold text-sm hover:brightness-110 transition-all"
             >
               <ExternalLink size={14} />
               Clone This Setup
-            </a>
+            </Link>
           </div>
         </div>
       </div>

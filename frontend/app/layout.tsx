@@ -4,9 +4,9 @@ import { Inter } from "next/font/google";
 import Link from "next/link";
 import { Search } from "lucide-react";
 import NavItem from "../components/NavItem";
+import GlobalSearchTrigger from "../components/GlobalSearchTrigger";
 import { AuthProvider } from "../contexts/AuthContext";
 import UserMenu from "../components/UserMenu";
-import ClientOnly from "../components/ClientOnly";
 import CommandPalette from "../components/CommandPalette";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -20,7 +20,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="en">
       <body suppressHydrationWarning className={`${inter.className} bg-black text-gray-100 antialiased selection:bg-ansys-yellow selection:text-black flex flex-col h-screen overflow-hidden`}>
-        <ClientOnly>
           <AuthProvider>
             <CommandPalette />
             {/* Apple-Style Top Navigation Bar */}
@@ -55,8 +54,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 </div>
 
                 {/* Right side — user menu */}
-                <div className="flex items-center space-x-4 text-gray-400">
-                  <Search size={14} className="hover:text-white cursor-pointer transition-colors" />
+                <div className="flex items-center space-x-3 text-gray-400">
+                  <GlobalSearchTrigger />
                   <UserMenu />
                 </div>
               </div>
@@ -75,7 +74,6 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               </footer>
             </main>
           </AuthProvider>
-        </ClientOnly>
       </body>
     </html>
   );

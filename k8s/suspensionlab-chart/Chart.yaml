@@ -1,16 +1,33 @@
 apiVersion: v2
 name: suspensionlab-chart
-description: High-performance Formula 1 Telemetry Platform
+description: SuspensionLab — Commercial-Grade Vehicle Dynamics Simulation Platform
 type: application
-version: 1.0.0
+version: 1.1.0
 appVersion: "1.0.0"
 
+maintainers:
+  - name: SuspensionLab Platform Team
+    email: platform@suspensionlab.pro
+
 dependencies:
+  # ── High-Availability Redis (disabled in prod — use AWS ElastiCache) ─────────
+  # Enabled in dev/staging via values.yaml. MUST remain disabled in values-prod.yaml.
   - name: redis-ha
     version: "4.x.x"
     repository: "https://dandydeveloper.github.io/charts/"
     condition: redis.enabled
+
+  # ── High-Availability PostgreSQL (disabled in prod — use AWS RDS) ────────────
+  # Enabled in dev/staging via values.yaml. MUST remain disabled in values-prod.yaml.
   - name: postgresql-ha
     version: "11.x.x"
     repository: "https://charts.bitnami.com/bitnami"
     condition: postgresql.enabled
+
+  # ── External Secrets Operator ─────────────────────────────────────────────────
+  # Syncs secrets from AWS Secrets Manager to Kubernetes Secrets.
+  # Must be pre-installed at cluster level (not per-namespace):
+  #   helm install external-secrets external-secrets/external-secrets \
+  #     -n external-secrets --create-namespace
+  # This dependency is optional and listed for documentation purposes;
+  # the ExternalSecret/SecretStore resources in templates/ require ESO CRDs.

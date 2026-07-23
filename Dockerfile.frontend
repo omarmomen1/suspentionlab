@@ -1,23 +1,40 @@
+# ── Builder stage ────────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
 
 WORKDIR /app
 COPY frontend/package*.json ./
-RUN npm install
+# Use ci for reproducible installs (respects package-lock.json exactly)
+RUN npm ci --only=production=false
 
 COPY frontend/ .
-# Since the API is not available at build time, Next.js static generation might fail if it fetches
-# We rely on CSR so build should pass
+# Since the API is not available at build time, Next.js static generation might fail if it fetches.
+# We rely on CSR so build should pass.
 RUN npm run build
 
+# ── Runner stage ─────────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
 WORKDIR /app
 
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 
+# FIXED: Create a non-root user and group.
+# Previously the container ran as root. Node.js applications do not require root.
+# This follows the official Next.js Docker deployment guide for standalone output.
+RUN addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 nextjs
+
+# Copy only the necessary output from the builder stage
 COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next/standalone ./
-COPY --from=builder /app/.next/static ./.next/static
+
+# Set correct ownership so the non-root user can read these files
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 EXPOSE 3000
+
+# FIXED: Drop to non-root user before starting the server.
+# This is consistent with official Next.js standalone Docker documentation.
+USER nextjs
+
 CMD ["node", "server.js"]

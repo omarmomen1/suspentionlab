@@ -49,7 +49,7 @@ async def list_keys(
     db: AsyncSession = Depends(get_db_dependency),
 ):
     try:
-        user_uuid = uuid.UUID(str(user["user_id"]))
+        user_uuid = uuid.UUID(str(user.user_id))
     except (ValueError, KeyError):
         return []
     result = await db.execute(
@@ -79,7 +79,7 @@ async def create_key(
     if limit == 0:
         raise HTTPException(status_code=403, detail="API key access requires PRO or ENTERPRISE plan.")
 
-    user_uuid = uuid.UUID(str(user["user_id"]))
+    user_uuid = uuid.UUID(str(user.user_id))
     existing = await db.execute(
         select(UserApiKey).where(UserApiKey.user_id == user_uuid, UserApiKey.is_active == True)
     )
@@ -96,7 +96,7 @@ async def create_key(
 
     key = UserApiKey(
         id=uuid.uuid4(),
-        user_id=uuid.UUID(str(user["user_id"])),
+        user_id=uuid.UUID(str(user.user_id)),
         name=req.name,
         key_hash=key_hash,
         key_prefix=key_prefix,
@@ -123,7 +123,7 @@ async def revoke_key(
 ):
     try:
         key_uuid  = uuid.UUID(str(key_id))
-        user_uuid = uuid.UUID(str(user["user_id"]))
+        user_uuid = uuid.UUID(str(user.user_id))
     except ValueError:
         raise HTTPException(status_code=404, detail="API key not found.")
     result = await db.execute(

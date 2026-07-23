@@ -198,7 +198,7 @@ def solve_lap(vehicle: LapSimVehicle, segments: List[TrackSegment]) -> LapSimRes
         else:
             v = 20.0 # initial guess
             for _ in range(5):
-                a_lat = vehicle.max_lateral_g(v) * 9.81
+                a_lat = vehicle.max_lateral_g(v)
                 v_new = np.sqrt(a_lat / k)
                 v = 0.5 * v + 0.5 * v_new
             v_apex[i] = v
@@ -208,7 +208,7 @@ def solve_lap(vehicle: LapSimVehicle, segments: List[TrackSegment]) -> LapSimRes
     for i in range(1, n):
         ds = dist[i] - dist[i-1]
         v_current = v_fwd[i-1]
-        a_long = vehicle.max_longitudinal_accel(v_current) * 9.81
+        a_long = vehicle.max_longitudinal_accel(v_current)
         v_next_accel = np.sqrt(v_current**2 + 2 * a_long * ds)
         v_fwd[i] = min(v_fwd[i], v_next_accel)
 
@@ -217,7 +217,7 @@ def solve_lap(vehicle: LapSimVehicle, segments: List[TrackSegment]) -> LapSimRes
     for i in range(n-2, -1, -1):
         ds = dist[i+1] - dist[i]
         v_current = v_bwd[i+1]
-        a_brake = vehicle.max_braking_decel(v_current) * 9.81
+        a_brake = vehicle.max_braking_decel(v_current)
         v_prev_brake = np.sqrt(v_current**2 + 2 * a_brake * ds)
         v_bwd[i] = min(v_bwd[i], v_prev_brake)
         

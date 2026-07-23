@@ -9,8 +9,9 @@ from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from suspensionlab.backend.database.core import get_db_dependency
@@ -24,10 +25,7 @@ router = APIRouter(prefix="/teams", tags=["teams"])
 # ─── Schemas ─────────────────────────────────────────────────────────────────
 
 class CreateTeamRequest(BaseModel):
-    name: str
-
-class InviteMemberRequest(BaseModel):
-    email: str
+    name: str = Field(min_length=1, max_length=64)
 
 class TeamMemberResponse(BaseModel):
     id: str
@@ -50,26 +48,27 @@ async def create_team(
     user: dict = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db_dependency),
 ):
-    if user.get("plan") != PlanTier.ENTERPRISE:
+    if user.plan != PlanTier.ENTERPRISE:
         raise HTTPException(status_code=403, detail="Team creation requires ENTERPRISE plan.")
 
     # Check if user already in team
-    if user.get("team_id"):
+    if user.team_id:
         raise HTTPException(status_code=400, detail="You are already in a team.")
 
     team_id = uuid.uuid4()
     team = Team(
         id=team_id,
         name=req.name,
-        owner_id=uuid.UUID(user["user_id"]),
+        owner_id=uuid.UUID(user.user_id),
         plan=PlanTier.ENTERPRISE,
     )
     db.add(team)
     
     # Update user to be in the team
-    result = await db.execute(select(User).where(User.id == uuid.UUID(user["user_id"])))
+    result = await db.execute(select(User).where(User.id == uuid.UUID(user.user_id)))
     db_user = result.scalar_one()
     db_user.team_id = team_id
+    db_user.team_role = "Owner"
 
     await db.commit()
     await db.refresh(team)
@@ -79,7 +78,7 @@ async def create_team(
         name=team.name,
         owner_id=str(team.owner_id),
         plan=team.plan,
-        members=[TeamMemberResponse(id=str(db_user.id), name=db_user.name or "", email=db_user.email, role="Owner")]
+        members=[TeamMemberResponse(id=str(db_user.id), name=db_user.name or "", email=db_user.email, role=db_user.team_role)]
     )
 
 @router.get("/", response_model=TeamResponse)
@@ -87,16 +86,18 @@ async def get_team(
     user: dict = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db_dependency),
 ):
-    if not user.get("team_id"):
+    if not user.team_id:
         raise HTTPException(status_code=404, detail="You are not in a team.")
 
-    team_result = await db.execute(select(Team).where(Team.id == user["team_id"]))
+    team_result = await db.execute(
+        select(Team)
+        .options(selectinload(Team.members))
+        .where(Team.id == user.team_id)
+    )
     team = team_result.scalar_one_or_none()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found.")
-
-    members_result = await db.execute(select(User).where(User.team_id == team.id))
-    members = members_result.scalars().all()
+    members = team.members
 
     return TeamResponse(
         id=str(team.id),
@@ -108,25 +109,33 @@ async def get_team(
                 id=str(m.id),
                 name=m.name or "",
                 email=m.email,
-                role="Owner" if m.id == team.owner_id else "Member"
+                role=m.team_role or "Viewer"
             ) for m in members
         ]
     )
 
-@router.post("/invite")
+class InviteMemberRequest(BaseModel):
+    email: EmailStr
+    role: str = "Viewer"
+
+@router.post("/{team_id}/invitations")
 async def invite_member(
+    team_id: str,
     req: InviteMemberRequest,
     user: dict = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db_dependency),
 ):
-    if not user.get("team_id"):
-        raise HTTPException(status_code=400, detail="You are not in a team.")
+    if not user.team_id or str(user.team_id) != team_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this team.")
+        
+    # Check inviter role
+    inviter_res = await db.execute(select(User).where(User.id == uuid.UUID(user.user_id)))
+    inviter = inviter_res.scalar_one()
+    if inviter.team_role not in ["Owner", "Admin"]:
+        raise HTTPException(status_code=403, detail="Viewer cannot perform write operations.")
 
-    team_result = await db.execute(select(Team).where(Team.id == user["team_id"]))
+    team_result = await db.execute(select(Team).where(Team.id == user.team_id))
     team = team_result.scalar_one()
-
-    if str(team.owner_id) != user["user_id"]:
-        raise HTTPException(status_code=403, detail="Only team owner can invite members.")
 
     user_result = await db.execute(select(User).where(User.email == req.email.lower()))
     target_user = user_result.scalar_one_or_none()
@@ -137,26 +146,35 @@ async def invite_member(
     if target_user.team_id:
         raise HTTPException(status_code=400, detail="User is already in a team.")
 
+    if req.role not in ["Owner", "Admin", "Viewer"]:
+        raise HTTPException(status_code=400, detail="Invalid role specified.")
+    if req.role == "Owner":
+        raise HTTPException(status_code=400, detail="Cannot invite as Owner.")
+
     target_user.team_id = team.id
-    target_user.plan = PlanTier.ENTERPRISE
+    target_user.team_role = req.role
     await db.commit()
 
     return {"status": "success", "message": f"{target_user.email} added to team."}
 
-@router.delete("/members/{member_id}")
+@router.delete("/{team_id}/members/{member_id}")
 async def remove_member(
+    team_id: str,
     member_id: str,
     user: dict = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db_dependency),
 ):
-    if not user.get("team_id"):
-        raise HTTPException(status_code=400, detail="You are not in a team.")
+    if not user.team_id or str(user.team_id) != team_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this team.")
+        
+    inviter_res = await db.execute(select(User).where(User.id == uuid.UUID(user.user_id)))
+    inviter = inviter_res.scalar_one()
 
-    team_result = await db.execute(select(Team).where(Team.id == user["team_id"]))
+    if inviter.team_role not in ["Owner", "Admin"] and member_id != user.user_id:
+        raise HTTPException(status_code=403, detail="Viewer cannot perform write operations.")
+
+    team_result = await db.execute(select(Team).where(Team.id == user.team_id))
     team = team_result.scalar_one()
-
-    if str(team.owner_id) != user["user_id"] and member_id != user["user_id"]:
-        raise HTTPException(status_code=403, detail="Only team owner can remove others.")
 
     if member_id == str(team.owner_id):
         raise HTTPException(status_code=400, detail="Owner cannot be removed. Transfer ownership first.")
@@ -166,9 +184,13 @@ async def remove_member(
 
     if not target_user:
         raise HTTPException(status_code=404, detail="Member not found in team.")
+        
+    # Admin cannot remove another Admin or Owner
+    if inviter.team_role == "Admin" and target_user.team_role in ["Owner", "Admin"] and member_id != user.user_id:
+        raise HTTPException(status_code=403, detail="Admin cannot remove other Admins or Owners.")
 
     target_user.team_id = None
-    target_user.plan = PlanTier.FREE
+    target_user.team_role = None
     await db.commit()
 
     return {"status": "success", "message": "Member removed from team."}
@@ -178,14 +200,14 @@ async def get_team_analytics(
     user: dict = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db_dependency),
 ):
-    if not user.get("team_id"):
+    if not user.team_id:
         raise HTTPException(status_code=400, detail="You are not in a team.")
 
     from sqlalchemy import func
     from suspensionlab.backend.database.models.job import JobRecord
     
     # Get all team members
-    members_result = await db.execute(select(User.id).where(User.team_id == user["team_id"]))
+    members_result = await db.execute(select(User.id).where(User.team_id == user.team_id))
     member_ids = members_result.scalars().all()
     
     # Aggregate jobs for the team

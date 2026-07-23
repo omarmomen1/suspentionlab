@@ -1,0 +1,55 @@
+{{- if and .Values.monitoring.alertmanager .Values.monitoring.alertmanager.enabled }}
+# AlertmanagerConfig — Defines how Prometheus alerts are routed and grouped.
+# Requires the Prometheus Operator (kube-prometheus-stack) to be installed.
+# We route 'critical' alerts to PagerDuty and all other alerts (e.g. warnings) to Slack.
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: {{ .Release.Name }}-alertmanager
+  namespace: suspensionlab-prod
+  labels:
+    app: suspensionlab
+    component: alertmanager
+    release: kube-prometheus-stack
+spec:
+  route:
+    groupBy: ['alertname', 'team', 'severity']
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 4h
+    receiver: slack-receiver
+    routes:
+      # Route CRITICAL alerts directly to PagerDuty
+      - matchers:
+          - name: severity
+            value: critical
+        receiver: pagerduty-receiver
+        continue: true # Also send to Slack for visibility
+      
+      # Route WARNING alerts to Slack
+      - matchers:
+          - name: severity
+            value: warning
+        receiver: slack-receiver
+
+  receivers:
+    - name: pagerduty-receiver
+      pagerdutyConfigs:
+        - routingKey:
+            name: {{ .Release.Name }}-secrets
+            key: PAGERDUTY_INTEGRATION_KEY # Needs to be synced via ExternalSecrets
+
+    - name: slack-receiver
+      slackConfigs:
+        - apiURL:
+            name: {{ .Release.Name }}-secrets
+            key: SLACK_WEBHOOK_URL # Needs to be synced via ExternalSecrets
+          channel: {{ .Values.monitoring.alertmanager.slackChannel | quote }}
+          title: '[{{ "{{ .Status | toUpper }}" }}] {{ "{{ .GroupLabels.alertname }}" }}'
+          text: >-
+            {{ "{{ range .Alerts }}" }}
+            *Alert:* {{ "{{ .Annotations.summary }}" }}
+            *Description:* {{ "{{ .Annotations.description }}" }}
+            *Runbook:* {{ "{{ .Annotations.runbook_url }}" }}
+            {{ "{{ end }}" }}
+{{- end }}

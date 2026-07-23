@@ -1,6 +1,6 @@
 "use client";
 import { useState, useCallback } from "react";
-import { Upload, FileText, AlertCircle, CheckCircle2, X } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle2, X } from "lucide-react";
 
 interface ParsedProfile {
   time: number[];
@@ -27,8 +27,9 @@ function parseCSV(text: string): { time: number[]; displacement: number[] } {
   const displacement: number[] = [];
 
   for (const line of lines) {
-    const cols = line.split(/[\t,;]+/);
+    const cols = line.split(/[\t,;\s]+/);
     if (cols.length < 2) continue;
+    if (cols[0] === "" || cols[1] === "") continue;
     const t = parseFloat(cols[0]);
     const d = parseFloat(cols[1]);
     if (!isNaN(t) && !isNaN(d)) {
@@ -57,7 +58,7 @@ export default function RoadProfileUpload({ onLoad, onClear, loaded }: RoadProfi
     try {
       const text = await file.text();
       const { time, displacement } = parseCSV(text);
-      const duration   = time[time.length - 1] - time[0];
+      const duration   = Math.max(0.001, time[time.length - 1] - time[0]);
       const sampleRate = time.length / duration;
       onLoad({ time, displacement, duration, sampleRate, pointCount: time.length, fileName: file.name });
     } catch (e) {

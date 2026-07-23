@@ -1,5 +1,7 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, ConfigDict
+import defusedxml.ElementTree as ET
 import gpxpy
 import numpy as np
 
@@ -7,6 +9,13 @@ from suspensionlab.backend.security.auth import verify_api_key
 from suspensionlab.physics.lap_sim import LapSimVehicle, parse_track_from_gps, solve_lap
 
 router = APIRouter(prefix="/lapsim", tags=["Lap Simulation"])
+
+class LapSimVehicleOverride(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+    mass: Optional[float] = None
+    aero_cl: Optional[float] = None
+    aero_cd: Optional[float] = None
+    max_power: Optional[float] = None
 
 @router.post("/run")
 async def run_lap_sim(
@@ -40,13 +49,20 @@ async def run_lap_sim(
     
     # Optional override vehicle params
     if "vehicle" in request_data:
-        v_data = request_data["vehicle"]
-        if "mass" in v_data: vehicle.mass = v_data["mass"]
-        if "aero_cl" in v_data: vehicle.aero_cl = v_data["aero_cl"]
-        if "aero_cd" in v_data: vehicle.aero_cd = v_data["aero_cd"]
-        if "max_power" in v_data: vehicle.max_power = v_data["max_power"]
+        try:
+            v_data = LapSimVehicleOverride(**request_data["vehicle"])
+            if v_data.mass is not None: vehicle.mass = v_data.mass
+            if v_data.aero_cl is not None: vehicle.aero_cl = v_data.aero_cl
+            if v_data.aero_cd is not None: vehicle.aero_cd = v_data.aero_cd
+            if v_data.max_power is not None: vehicle.max_power = v_data.max_power
+        except ValueError as e:
+            raise HTTPException(status_code=422, detail=f"Invalid vehicle overrides: {str(e)}")
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Invalid vehicle override parameters: {e}")
     
-    result = solve_lap(vehicle, segments)
+    import asyncio
+    loop = asyncio.get_running_loop()
+    result = await loop.run_in_executor(None, solve_lap, vehicle, segments)
     
     return {
         "status": "success",
@@ -75,7 +91,12 @@ async def upload_gpx(
         raise HTTPException(status_code=413, detail="File too large. Maximum size is 5MB.")
 
     try:
-        gpx = gpxpy.parse(content)
+        import asyncio
+        loop = asyncio.get_running_loop()
+        # Validate XML structure safely against XXE and Billion Laughs
+        await loop.run_in_executor(None, ET.fromstring, content)
+        
+        gpx = await loop.run_in_executor(None, gpxpy.parse, content)
         lats, lons, elevs = [], [], []
         point_count = 0
         

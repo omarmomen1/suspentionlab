@@ -34,7 +34,7 @@ Produce a detailed, multi-phase GTM strategy document targeting Tier-1 OEMs and 
 ### Commercial Viability
 - [ ] A highly actionable `go_to_market_strategy.md` artifact is created, providing concrete steps for enterprise acquisition.
 
-## Follow-up � 2026-06-09T07:31:57+03:00
+## Follow-up - 2026-06-09T07:31:57+03:00
 
 Complete the remaining due diligence and backend execution tasks for SuspensionLab PRO to finalize the MVP.
 
@@ -60,3 +60,52 @@ Clean up and finalize the Alembic database migrations, ensuring all database sch
 - [ ] Running `alembic upgrade head` succeeds without any schema mismatch or downgrading errors.
 
 CRITICAL USER DIRECTIVE: Ensure all implementations reflect the utmost enterprise quality. The user explicitly stated: "dont forget whats important to me is making this a multi million worth project".
+
+## Follow-up — 2026-07-10T02:57:38Z
+
+# Teamwork Project Prompt — Draft
+
+> Status: Launched
+> Goal: Craft prompt → get user approval → delegate to teamwork_preview
+
+Implement Sprint 2 (API versioning, OpenAPI PDF, RBAC), Sprint 3 (Priority Queue, Audit Log Export, Diff View, Eigenvalue Vis, ISO Heatmap), and remaining Phase 2/3 enterprise features (Worker cancellation, Progress reporting, Webhooks, etc.) for SuspensionLab Pro.
+
+Working directory: D:\project
+Integrity mode: development
+
+## Requirements
+
+### R1. Sprint 2: API Versioning and Documentation
+Add `/api/v1/` prefix consistently to all routes in `main.py` and generate an OpenAPI spec PDF exposed at `/docs/api-reference.pdf`.
+
+### R2. Sprint 2: Team RBAC
+Add Owner, Admin, and Viewer roles to team membership in `teams_routes.py` and models. Gate write operations based on these roles.
+
+### R3. Sprint 3: Enterprise Priority Queue & Audit Logs
+Add a second RQ queue (`priority_queue`) for Enterprise jobs with a dedicated worker. Implement `GET /audit/export` returning CSV/JSON for Enterprise users.
+
+### R4. Sprint 3: Physics Enhancements & Visualization
+- Expose the 7 mode shapes and frequencies from `full_car.py` and animate them in 3D on the frontend.
+- Implement an ISO 8608 road class sensitivity heatmap endpoint that runs a 64-simulation sweep.
+- Add a "Compare with previous" simulation result diff view to the frontend Garage.
+
+### R5. Phase 2 & 3 Core Features
+Implement missing worker cancellation, progress reporting via Redis, Webhooks, and SSO/SCIM prep endpoints as requested in the audit.
+
+## Acceptance Criteria
+
+### API Versioning & Docs
+- [ ] All API routes successfully respond at `/api/v1/...`
+- [ ] `/docs/api-reference.pdf` returns a valid PDF file containing the OpenAPI spec.
+
+### Security & RBAC
+- [ ] `Viewer` role cannot perform write operations in team routes (returns 403).
+- [ ] Audit export endpoint returns correctly formatted CSV/JSON of logged events.
+
+### Physics & Queue
+- [ ] Enterprise jobs are successfully routed to `priority_queue` in Redis.
+- [ ] Full-car eigenvalue endpoint returns exactly 7 mode shapes with frequencies and damping ratios.
+- [ ] ISO 8608 sweep endpoint executes 64 variations and returns a structured heatmap array.
+
+---
+*Please monitor your token usage and stop if it looks like you will consume too much quota.*

@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from "react";
 import dynamic from "next/dynamic";
-import { Zap, RefreshCw, AlertTriangle, TrendingUp, Activity } from "lucide-react";
+import { Zap, AlertTriangle, TrendingUp, Activity } from "lucide-react";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 

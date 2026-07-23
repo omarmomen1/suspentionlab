@@ -1,0 +1,206 @@
+name: Terraform — Plan & Apply
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "terraform/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "terraform/**"
+
+env:
+  AWS_REGION: "us-east-1"
+  TF_VERSION: "1.7.5"
+  TF_WORKING_DIR: "terraform"
+
+# Prevent concurrent Terraform applies from running simultaneously,
+# which would corrupt state even with DynamoDB locking.
+concurrency:
+  group: terraform-${{ github.ref }}
+  cancel-in-progress: false  # Don't cancel — queue instead
+
+permissions:
+  id-token: write    # OIDC-based AWS authentication
+  contents: read
+  pull-requests: write  # Post plan summary as PR comment
+
+jobs:
+  # ── 1. Terraform Validate & Lint (tflint) ───────────────────────────────────
+  validate:
+    name: Terraform Validate + Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init (remote S3 backend)
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -input=false
+
+      - name: Terraform Validate
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform validate
+
+      - name: Setup tflint
+        uses: terraform-linters/setup-tflint@v4
+        with:
+          tflint_version: v0.50.3
+
+      - name: Init tflint plugins
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: tflint --init
+
+      - name: Run tflint
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: tflint --format compact
+
+  # ── 2. Terraform Plan ───────────────────────────────────────────────────────
+  plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    needs: validate
+    outputs:
+      plan-exitcode: ${{ steps.plan.outputs.exitcode }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -input=false
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          terraform plan \
+            -input=false \
+            -out=tfplan \
+            -detailed-exitcode \
+            -var="environment=prod"
+        # Exit codes: 0=no changes, 1=error, 2=changes present
+        continue-on-error: true
+
+      - name: Save plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ github.sha }}
+          path: ${{ env.TF_WORKING_DIR }}/tfplan
+          retention-days: 7
+
+      - name: Post plan summary as PR comment
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { execSync } = require('child_process');
+            const planOutput = execSync(
+              'terraform show -no-color tfplan',
+              { cwd: '${{ env.TF_WORKING_DIR }}', maxBuffer: 1024 * 1024 * 10 }
+            ).toString();
+
+            const body = `## Terraform Plan
+            \`\`\`hcl
+            ${planOutput.substring(0, 60000)}
+            \`\`\`
+            **Exit code:** ${{ steps.plan.outputs.exitcode }} (0=no changes, 2=changes, 1=error)
+            *Plan artifact saved for ${{ github.sha }}*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            });
+
+      - name: Fail if plan errored
+        if: steps.plan.outputs.exitcode == '1'
+        run: exit 1
+
+  # ── 3. Terraform Apply (main branch only) ───────────────────────────────────
+  apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    needs: plan
+    # Only apply on merge to main AND only if there are actual changes (exit code 2)
+    if: |
+      github.ref == 'refs/heads/main' &&
+      github.event_name == 'push' &&
+      needs.plan.outputs.plan-exitcode == '2'
+    environment:
+      name: terraform-production
+      # Requires manual approval in GitHub Environments before apply proceeds
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_TERRAFORM_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform init -input=false
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ github.sha }}
+          path: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Apply (from saved plan)
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform apply -input=false -auto-approve tfplan
+
+      - name: Export outputs to SSM Parameter Store
+        # Store critical Terraform outputs in SSM so the CI/CD deploy job can
+        # retrieve them without hardcoding values or duplicating state reads.
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: |
+          ECR_BACKEND=$(terraform output -raw ecr_backend_url)
+          ECR_FRONTEND=$(terraform output -raw ecr_frontend_url)
+          WAF_ARN=$(terraform output -raw waf_web_acl_arn)
+
+          aws ssm put-parameter \
+            --name "/suspensionlab/ecr/backend-url" \
+            --value "${ECR_BACKEND}" \
+            --type String \
+            --overwrite
+
+          aws ssm put-parameter \
+            --name "/suspensionlab/ecr/frontend-url" \
+            --value "${ECR_FRONTEND}" \
+            --type String \
+            --overwrite
+
+          aws ssm put-parameter \
+            --name "/suspensionlab/waf/acl-arn" \
+            --value "${WAF_ARN}" \
+            --type String \
+            --overwrite

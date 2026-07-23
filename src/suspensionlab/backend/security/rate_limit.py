@@ -40,6 +40,12 @@ def _in_memory_check(redis_key: str, limit_count: int, window_seconds: int) -> i
     cutoff = now - window_seconds
     with _fallback_lock:
         dq = _fallback_store[redis_key]
+        # Prevent memory leak from abandoned keys
+        if len(_fallback_store) > 100000:
+            keys_to_delete = [k for k, v in _fallback_store.items() if not v or v[-1] < cutoff]
+            for k in keys_to_delete:
+                del _fallback_store[k]
+        
         # Remove expired timestamps
         while dq and dq[0] < cutoff:
             dq.popleft()
@@ -55,7 +61,8 @@ class RateLimiter:
         self.limit_config_key = limit_config_key
 
     async def __call__(self, request: Request, response: Response):
-        from suspensionlab.backend.api.routes.optimize import async_redis_conn
+        from suspensionlab.backend.core import redis_client
+        async_redis_conn = redis_client.get_async_redis_conn()
 
         limit_str = getattr(settings, self.limit_config_key, "5/minute")
         limit_count, window_seconds = parse_rate_limit(limit_str)
@@ -80,11 +87,8 @@ class RateLimiter:
                 user_id = api_key
 
         if not user_id:
-            forwarded = request.headers.get("X-Forwarded-For")
-            if forwarded:
-                user_id = forwarded.split(",")[0].strip()
-            else:
-                user_id = request.client.host if request.client else "unknown"
+            # Rely on direct client host to prevent trivial X-Forwarded-For IP spoofing
+            user_id = request.client.host if request.client else "unknown"
 
         now = time.time()
         redis_key = f"rate_limit:{self.limit_config_key}:{user_id}"
@@ -146,3 +150,47 @@ class RateLimiter:
             )
             response.headers["Retry-After"] = str(window_seconds)
             raise
+
+async def record_login_failure(request: Request, email: str):
+    from suspensionlab.backend.core import redis_client
+    async_redis_conn = redis_client.get_async_redis_conn()
+    if not async_redis_conn:
+        return
+    now = time.time()
+    ip = request.client.host if request.client else "unknown"
+    redis_key = f"login_failures:{email.lower()}:{ip}"
+    try:
+        pipeline = async_redis_conn.pipeline(transaction=True)
+        # Keep failures for 1 hour window
+        pipeline.zremrangebyscore(redis_key, 0, now - 3600)
+        import uuid
+        pipeline.zadd(redis_key, {f"{now}:{uuid.uuid4()}": now})
+        pipeline.expire(redis_key, 3600)
+        await pipeline.execute()
+    except Exception:
+        pass
+
+async def check_progressive_penalty(request: Request, email: str):
+    from suspensionlab.backend.core import redis_client
+    async_redis_conn = redis_client.get_async_redis_conn()
+    if not async_redis_conn:
+        return
+    now = time.time()
+    ip = request.client.host if request.client else "unknown"
+    redis_key = f"login_failures:{email.lower()}:{ip}"
+    try:
+        count = await async_redis_conn.zcard(redis_key)
+        if count >= 20:
+            raise RateLimitExceededError("Too many failed attempts. Try again in 1 hour.")
+        elif count >= 10:
+            last = await async_redis_conn.zrange(redis_key, -1, -1, withscores=True)
+            if last and now - last[0][1] < 300:
+                raise RateLimitExceededError("Too many failed attempts. Try again in 5 minutes.")
+        elif count >= 5:
+            last = await async_redis_conn.zrange(redis_key, -1, -1, withscores=True)
+            if last and now - last[0][1] < 30:
+                raise RateLimitExceededError("Too many failed attempts. Try again in 30 seconds.")
+    except RateLimitExceededError:
+        raise
+    except Exception:
+        pass

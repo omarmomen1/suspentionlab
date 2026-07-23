@@ -2,7 +2,8 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from pydantic import BaseModel
+from sqlalchemy import func
+from pydantic import BaseModel, ConfigDict
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
@@ -29,8 +30,7 @@ class ProfileResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 @router.post("/", response_model=ProfileResponse)
@@ -46,8 +46,8 @@ async def create_profile(
         name=profile.name,
         vehicle_type=profile.vehicle_type,
         params=profile.params,
-        user_id=user["user_id"],  
-        team_id=user.get("team_id"),
+        user_id=user.user_id,  
+        team_id=user.team_id,
     )
     db.add(db_profile)
     await db.commit()
@@ -62,10 +62,11 @@ async def list_profiles(
     user: dict = Depends(verify_api_key),
 ):
     """List all profiles belonging to the authenticated user or their team."""
-    if user.get("team_id"):
-        query = select(VehicleProfile).where(VehicleProfile.team_id == user["team_id"])
+    if user.team_id:
+        query = select(VehicleProfile).where(VehicleProfile.team_id == user.team_id)
     else:
-        query = select(VehicleProfile).where(VehicleProfile.user_id == user["user_id"])
+        query = select(VehicleProfile).where(VehicleProfile.user_id == user.user_id)
+    query = query.where(VehicleProfile.deleted_at.is_(None))
     if vehicle_type:
         query = query.where(VehicleProfile.vehicle_type == vehicle_type)
 
@@ -81,15 +82,17 @@ async def get_profile(
     user: dict = Depends(verify_api_key),
 ):
     """Fetch a single profile — validates ownership or team membership."""
-    if user.get("team_id"):
+    if user.team_id:
         query = select(VehicleProfile).where(
             VehicleProfile.id == profile_id,
-            VehicleProfile.team_id == user["team_id"],
+            VehicleProfile.team_id == user.team_id,
+            VehicleProfile.deleted_at.is_(None),
         )
     else:
         query = select(VehicleProfile).where(
             VehicleProfile.id == profile_id,
-            VehicleProfile.user_id == user["user_id"],
+            VehicleProfile.user_id == user.user_id,
+            VehicleProfile.deleted_at.is_(None),
         )
     result = await db.execute(query)
     profile = result.scalar_one_or_none()
@@ -105,21 +108,23 @@ async def delete_profile(
     user: dict = Depends(verify_api_key),
 ):
     """Delete a profile — validates ownership or team membership."""
-    if user.get("team_id"):
+    if user.team_id:
         query = select(VehicleProfile).where(
             VehicleProfile.id == profile_id,
-            VehicleProfile.team_id == user["team_id"],
+            VehicleProfile.team_id == user.team_id,
+            VehicleProfile.deleted_at.is_(None),
         )
     else:
         query = select(VehicleProfile).where(
             VehicleProfile.id == profile_id,
-            VehicleProfile.user_id == user["user_id"],
+            VehicleProfile.user_id == user.user_id,
+            VehicleProfile.deleted_at.is_(None),
         )
     result = await db.execute(query)
     profile = result.scalar_one_or_none()
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
 
-    await db.delete(profile)
+    profile.deleted_at = func.now()
     await db.commit()
     return {"status": "success", "message": "Profile deleted"}

@@ -189,7 +189,7 @@ function analyzeResults(r: QuarterCarResult): Insight[] {
   }
 
   // ── 5. Frequency Separation Check ─────────────────────────────────────────
-  const freqRatio = fn_u / fn_s;
+  const freqRatio = fn_u / Math.max(fn_s, 0.0001);
   if (freqRatio < 3.0) {
     insights.push({
       severity: "warning",
@@ -230,7 +230,7 @@ function analyzeResults(r: QuarterCarResult): Insight[] {
 
   // ── 7. Tire Load Variation ────────────────────────────────────────────────
   const tireLoad = r.rms_tire_load;
-  const staticLoad = r.k_w ? (r.k_w * r.peak_susp_travel) : 0; // Approximate
+  
   if (tireLoad > 1500) {
     insights.push({
       severity: "warning",

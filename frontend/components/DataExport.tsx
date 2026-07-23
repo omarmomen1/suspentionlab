@@ -1,6 +1,6 @@
 "use client";
 import { useState, useCallback } from "react";
-import { Download, Loader2, FileCode2 } from "lucide-react";
+import { Loader2, FileCode2 } from "lucide-react";
 
 interface DataExportProps {
   results: Record<string, unknown> | null;

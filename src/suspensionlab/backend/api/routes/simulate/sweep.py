@@ -58,15 +58,8 @@ def perform_sweep_sync(payload_dict: dict) -> dict:
         "min_x": float(X[min_idx]), "min_y": float(Y[min_idx]), "min_z": float(Z[min_idx])
     }
 
-@router.post("/simulate/sweep", response_model=JobResponse)
+@router.post("/simulate/sweep", response_model=JobResponse, status_code=202)
 async def simulate_sweep(payload: SweepRequest, request: Request, db: AsyncSession = Depends(get_db_dependency)):
-    from suspensionlab.backend.workers.unified_worker import run_job
-    from suspensionlab.backend.workers.queue import job_queue
-    from suspensionlab.backend.core.errors import RedisUnavailableError
-    redis_conn = job_queue.connection
-    from rq import Retry
-    import redis
-    
     user_id = getattr(request.state, "user_id", None)
     if not user_id:
         raise HTTPException(status_code=401, detail="Authentication required.")
@@ -76,44 +69,15 @@ async def simulate_sweep(payload: SweepRequest, request: Request, db: AsyncSessi
     user_dict = {"user_id": user_id, "plan": tier}
     await assert_can_run_job(user_dict, db)
 
-    job_id = str(uuid.uuid4())
-    
-    job_record = JobRecord(
-        id=job_id,
-        user_id=uuid.UUID(user_id),
-        job_type="SWEEP_QUARTER",
-        status="PENDING",
-    )
-    db.add(job_record)
-    await db.commit()
-
-    trace_carrier = {}
-    inject(trace_carrier)
-
-    res_data = {"job_id": job_id, "status": "PENDING", "user_id": user_id, "result": None, "error": None}
-    await asyncio.to_thread(redis_conn.setex, f"job_status:{job_id}", 86400, json.dumps(res_data))
-
+    from suspensionlab.backend.services.simulation_service import SimulationService
     try:
-        job = await asyncio.to_thread(
-            job_queue.enqueue,
-            run_job,
-            args=(job_id, payload.model_dump(), trace_carrier),
-            job_id=job_id,
-            result_ttl=86400,
-            failure_ttl=86400,
-            retry=Retry(max=3, interval=[10, 30, 60])
+        job_id = await SimulationService.enqueue_simulation(
+            user_id=user_id,
+            plan=tier,
+            job_type="SWEEP_QUARTER",
+            payload=payload.model_dump(),
+            db=db
         )
-    except redis.exceptions.ConnectionError:
-        await db.execute(
-            update(JobRecord)
-            .where(JobRecord.id == job_id)
-            .values(status="FAILED", error="Redis enqueue failed. Compute plane unavailable.")
-        )
-        await db.commit()
-        try:
-            redis_conn.delete(f"job_status:{job_id}")
-        except redis.exceptions.ConnectionError:
-            pass
-        raise HTTPException(status_code=503, detail="Queue unavailable.")
-    
-    return JobResponse(job_id=job.id, status="PENDING")
+        return JobResponse(job_id=job_id, status="PENDING")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Internal simulation error.")

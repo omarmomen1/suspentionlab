@@ -1,68 +1,35 @@
-from fastapi import APIRouter, HTTPException
-import numpy as np
-import asyncio
+from fastapi import APIRouter, HTTPException, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
 import logging
-from suspensionlab.physics.exceptions import MathConvergenceError, PhysicsValidationError
 
-logger = logging.getLogger(__name__)
-from suspensionlab.shared.models import FullCarSimulateRequest, FullCarResultSchema
-from suspensionlab.physics.full_car import FullCarParams, run_full_car_analysis, FourCornerRoadProfile
+from suspensionlab.backend.database.core import get_db_dependency
+from suspensionlab.backend.security.auth import verify_api_key
+from suspensionlab.backend.services.simulation_service import SimulationService
+from suspensionlab.shared.models import FullCarSimulateRequest
+from pydantic import BaseModel
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
-@router.post("/simulate/full-car", response_model=FullCarResultSchema)
-async def simulate_full_car(payload: FullCarSimulateRequest):
+class JobResponse(BaseModel):
+    job_id: str
+    status: str
+
+@router.post("/simulate/full-car", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def simulate_full_car(
+    payload: FullCarSimulateRequest,
+    user: dict = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency)
+):
     try:
-        pdump = payload.params.model_dump()
-        asymmetry = pdump.pop("road_asymmetry", 0.3)
-        pdump.pop("damper_curve_v_f", None)
-        pdump.pop("damper_curve_f_f", None)
-        pdump.pop("damper_curve_v_r", None)
-        pdump.pop("damper_curve_f_r", None)
-        
-        params = FullCarParams(**pdump)
-        
-        from suspensionlab.physics.quarter_car import RoadProfile, _road_profile_fn
-        base_profile = RoadProfile(**payload.profile.model_dump())
-        
-        # Generate the discrete arrays from the analytical profile
-        zr_fn, _ = _road_profile_fn(base_profile)
-        dt = 0.002
-        time_array = np.arange(0.0, base_profile.duration, dt)
-        
-        # Front wheels hit bump at t
-        z_road_f = np.array([float(zr_fn(np.array([t]))[0]) for t in time_array])
-        
-        # Rear wheels hit bump delayed by wheelbase / speed
-        t_delay = params.L / params.speed_mps if params.speed_mps > 0 else 0.0
-        z_road_r = np.array([float(zr_fn(np.array([t - t_delay]))[0]) if t - t_delay >= 0 else 0.0 for t in time_array])
-        
-        z_road_fr = z_road_f * asymmetry
-        z_road_rr = z_road_r * asymmetry
-        
-        profile = FourCornerRoadProfile(
-            time=time_array, 
-            z_rfl=z_road_f, 
-            z_rfr=z_road_fr, 
-            z_rrl=z_road_r, 
-            z_rrr=z_road_rr
+        job_id = await SimulationService.enqueue_simulation(
+            user_id=user.user_id,
+            plan=user.plan,
+            job_type="SIMULATE_FULL",
+            payload=payload.model_dump(),
+            db=db
         )
-        
-        result = await asyncio.to_thread(run_full_car_analysis, params, profile)
-        
-        result_dict = result.__dict__.copy()
-        for key, value in result_dict.items():
-            if isinstance(value, np.ndarray):
-                result_dict[key] = value.tolist()
-                
-        return FullCarResultSchema(**result_dict)
-    except (ValueError, PhysicsValidationError) as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except MathConvergenceError as e:
-        raise HTTPException(
-            status_code=422,
-            detail="Solver did not converge. Try reducing amplitude or adjusting damping."
-        )
+        return {"job_id": job_id, "status": "PENDING"}
     except Exception as e:
         logger.exception("Unhandled error in /simulate/full-car: %s", e)
-        raise HTTPException(status_code=500, detail="Internal simulation error. Request ID is in X-Request-ID header.")
+        raise HTTPException(status_code=500, detail="Internal simulation error.")

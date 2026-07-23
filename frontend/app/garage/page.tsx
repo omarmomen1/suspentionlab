@@ -50,25 +50,27 @@ export default function GarageDashboard() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const fetchProfiles = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/profiles`, {
-        headers: authHeader(),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setProfiles(Array.isArray(data) ? data : []);
+  useEffect(() => {
+    const fetchProfiles = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(`${API_BASE}/profiles`, {
+          headers: authHeader(),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setProfiles(Array.isArray(data) ? data : []);
+        }
+        else showToast("Failed to load profiles — check API connection", "error");
+      } catch {
+        showToast("Cannot reach the API server", "error");
+      } finally {
+        setLoading(false);
       }
-      else showToast("Failed to load profiles — check API connection", "error");
-    } catch {
-      showToast("Cannot reach the API server", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => { fetchProfiles(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    };
+    
+    fetchProfiles();
+  }, []);
 
   const deleteProfile = async (id: string) => {
     setDeletingId(id);

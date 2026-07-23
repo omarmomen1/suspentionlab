@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef } from "react";
-import { Upload, X, Check, Activity, BarChart2 } from "lucide-react";
+import { Upload, X, Check, BarChart2 } from "lucide-react";
 
 interface DamperLUTInputProps {
   label: string;
@@ -23,16 +23,17 @@ export default function DamperLUTInput({ label, onApply, onClear, isActive }: Da
       const v: number[] = [];
       const f: number[] = [];
 
-      let hasHeader = false;
+      
       lines.forEach((line, i) => {
-        const parts = line.split(/[,\t]+/).map(p => p.trim());
+        const parts = line.split(/[,\t\s]+/).map(p => p.trim());
         if (parts.length < 2) return;
+        if (parts[0] === "" || parts[1] === "") return;
         
         const vVal = Number(parts[0]);
         const fVal = Number(parts[1]);
 
         if (i === 0 && (isNaN(vVal) || isNaN(fVal))) {
-          hasHeader = true; // Skip header row
+          
           return;
         }
 
@@ -51,14 +52,18 @@ export default function DamperLUTInput({ label, onApply, onClear, isActive }: Da
       onApply(v, f);
       setError("");
       setIsOpen(false);
-    } catch (err: any) {
-      setError(err.message || "Failed to parse CSV.");
+    } catch (err: unknown) {
+      setError((err as Error).message || "Failed to parse CSV.");
     }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File size exceeds 5MB limit.");
+      return;
+    }
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;

@@ -40,7 +40,7 @@ export default function TelemetryUploader({ onParsed, onClear, hasData }: Teleme
       } else {
         setUploadError("Failed to parse Telemetry file. Ensure it is a valid CSV.");
       }
-    } catch (err) {
+    } catch (err: unknown) { void err;
       setUploadError("Network error. Check connection and retry.");
     } finally {
       setIsUploading(false);

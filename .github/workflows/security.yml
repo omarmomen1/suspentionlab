@@ -1,0 +1,167 @@
+name: Security — SAST + Dependency Audit
+
+on:
+  push:
+    branches: [main, staging]
+  pull_request:
+    branches: [main, staging]
+  # Run weekly even without code changes to catch newly published CVEs
+  schedule:
+    - cron: "0 6 * * 1"  # Every Monday at 06:00 UTC
+
+permissions:
+  contents: read
+  security-events: write  # Required to upload SARIF results to GitHub Security tab
+
+jobs:
+  # ── 1. Python SAST — Bandit ─────────────────────────────────────────────────
+  sast-python:
+    name: Python SAST (Bandit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Bandit
+        run: pip install bandit[toml]
+
+      - name: Run Bandit SAST scan
+        run: |
+          bandit -r src/ \
+            --format sarif \
+            --output bandit-results.sarif \
+            --severity-level medium \
+            --confidence-level medium \
+            --exclude src/suspensionlab/backend/tests
+        # Don't fail the job here — upload results for review, block on HIGH in next step
+        continue-on-error: true
+
+      - name: Upload Bandit SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: bandit-results.sarif
+          category: bandit
+
+      - name: Block on HIGH severity findings
+        run: |
+          bandit -r src/ \
+            --severity-level high \
+            --confidence-level high \
+            --exclude src/suspensionlab/backend/tests
+        # This step fails (exit code != 0) if HIGH+HIGH findings exist → blocks PR merge
+
+  # ── 2. Python Dependency Audit — pip-audit ──────────────────────────────────
+  dependency-audit-python:
+    name: Python Dependency Audit (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install pip-audit
+        run: pip install pip-audit
+
+      - name: Audit Python dependencies
+        run: |
+          pip-audit \
+            --requirement requirements-backend.txt \
+            --format json \
+            --output pip-audit-results.json \
+            --desc on
+        continue-on-error: true
+
+      - name: Upload pip-audit results as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pip-audit-results
+          path: pip-audit-results.json
+
+      - name: Block on CRITICAL/HIGH vulnerabilities
+        run: |
+          pip-audit \
+            --requirement requirements-backend.txt \
+            --vulnerability-service osv \
+            --strict
+
+  # ── 3. Node.js Dependency Audit — npm audit ─────────────────────────────────
+  dependency-audit-node:
+    name: Node.js Dependency Audit (npm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run npm audit (fail on high+critical)
+        working-directory: frontend
+        run: npm audit --audit-level=high
+
+  # ── 4. Infrastructure SAST — Checkov ────────────────────────────────────────
+  sast-infrastructure:
+    name: IaC Security Scan (Checkov)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Checkov on Terraform
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: terraform/
+          framework: terraform
+          output_format: sarif
+          output_file_path: checkov-terraform.sarif
+          soft_fail: false
+          skip_check: >-
+            CKV_AWS_116,
+            CKV_AWS_117
+
+      - name: Upload Checkov Terraform SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov-terraform.sarif
+          category: checkov-terraform
+
+      - name: Run Checkov on Kubernetes manifests
+        uses: bridgecrewio/checkov-action@master
+        with:
+          directory: k8s/
+          framework: kubernetes
+          output_format: sarif
+          output_file_path: checkov-k8s.sarif
+          soft_fail: true  # Report findings; don't block on K8s Helm templates (many false positives from templating)
+
+      - name: Upload Checkov K8s SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: checkov-k8s.sarif
+          category: checkov-k8s
+
+  # ── 5. Secret Scanning — Gitleaks ───────────────────────────────────────────
+  secret-scan:
+    name: Secret Scanning (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history required for gitleaks to scan all commits
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

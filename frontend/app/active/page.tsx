@@ -1,9 +1,10 @@
 "use client";
 import { useState, Suspense } from "react";
 import dynamic from "next/dynamic";
-import { Play, Settings2, AlertTriangle, Activity, Save, X, Activity as Pulse, Zap } from "lucide-react";
-import PDFExport from "../../components/PDFExport";
-import DataExport from "../../components/DataExport";
+import {
+  Settings2, Activity, AlertTriangle, Activity as Pulse, Zap
+} from "lucide-react";
+import { useUndoRedo } from "../../hooks/useUndoRedo";
 import { useAuth } from "../../contexts/AuthContext";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
@@ -71,12 +72,24 @@ function PlotBox({ children }: { children: React.ReactNode }) {
   return <div className="flex-1 min-w-0 min-h-0 relative">{children}</div>;
 }
 
+interface ActiveResults {
+  error?: boolean;
+  message?: string;
+  passive_rms_accel?: number;
+  active_rms_accel?: number;
+  time?: number[];
+  active_ddz_s?: number[];
+  passive_ddz_s?: number[];
+  active_susp_travel?: number[];
+  passive_susp_travel?: number[];
+}
+
 function ActiveSuspensionDashboard() {
   const { authHeader } = useAuth();
   const [isRunning, setIsRunning] = useState(false);
-  const [results, setResults] = useState<Record<string, any> | null>(null);
+  const [results, setResults] = useState<ActiveResults | null>(null);
 
-  const [params, setParams] = useState({
+  const [params, setParams] = useUndoRedo({
     c_sky: 4000.0,
     c_min: 500.0,
     m_s: 300.0,
@@ -88,18 +101,49 @@ function ActiveSuspensionDashboard() {
   });
 
   const runSimulation = async () => {
-    setIsRunning(true); setResults(null);
+    setIsRunning(true);
+    setResults(null);
     try {
       const payload = {
         params: { m_s: params.m_s, m_u: params.m_u, k_s: params.k_s, k_t: params.k_t, MR: params.MR, c_sky: params.c_sky, c_min: params.c_min },
         bump_height: params.bump_height
       };
-      const res = await fetch(`${API_BASE}/simulate/active`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify(payload) });
+      const res = await fetch(`${API_BASE}/simulate/active`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(payload)
+      });
       const data = await res.json();
-      if (!res.ok) setResults({ error: true, message: data.message ?? data.detail ?? "Simulation failed" });
-      else setResults(data);
-    } catch (err) { setResults({ error: true, message: String(err) }); }
-    finally { setIsRunning(false); }
+      if (!res.ok) {
+        setResults({ error: true, message: data.message ?? data.detail ?? "Simulation failed" });
+        setIsRunning(false);
+        return;
+      }
+      
+      const jobId = data.job_id;
+      const interval = setInterval(async () => {
+        try {
+          const pollRes = await fetch(`${API_BASE}/jobs/${jobId}`, { headers: authHeader() });
+          const pollData = await pollRes.json();
+          if (pollData.status === "COMPLETED") {
+             clearInterval(interval);
+             setResults(pollData.result);
+             setIsRunning(false);
+          } else if (pollData.status === "FAILED" || pollData.status === "CANCELED") {
+             clearInterval(interval);
+             setResults({ error: true, message: pollData.error || "Simulation failed." });
+             setIsRunning(false);
+          }
+        } catch (e) {
+             clearInterval(interval);
+             setResults({ error: true, message: String(e) });
+             setIsRunning(false);
+        }
+      }, 1000);
+    } catch (err) {
+      setResults({ error: true, message: String(err) });
+      setIsRunning(false);
+    }
   };
 
   let comfort_improvement = 0;
@@ -172,8 +216,8 @@ function ActiveSuspensionDashboard() {
           {hasResults && r && (
             <div id="sim-report" className="flex flex-col gap-3 flex-1 overflow-hidden">
               <div className="grid grid-cols-4 gap-2 shrink-0">
-                <KPICard label="Passive RMS Accel" value={r.passive_rms_accel} unit="m/s²" status="neutral" />
-                <KPICard label="Active RMS Accel" value={r.active_rms_accel} unit="m/s²" status="good" />
+                <KPICard label="Passive RMS Accel" value={r.passive_rms_accel ?? 0} unit="m/s²" status="neutral" />
+                <KPICard label="Active RMS Accel" value={r.active_rms_accel ?? 0} unit="m/s²" status="good" />
                 <KPICard label="Comfort Improvement" value={comfort_improvement} unit="%" status={comfort_improvement > 0 ? "good" : "bad"} />
               </div>
 

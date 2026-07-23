@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, ConfigDict
 from typing import Literal, List, Optional, Any, Dict
 from enum import Enum
 
@@ -10,6 +10,7 @@ class PlanTier(str, Enum):
 
 
 class QuarterCarParamsSchema(BaseModel):
+    model_config = {"allow_inf_nan": False}
     m_s:  float = Field(default=300.0,    gt=10.0,    le=5000.0,  description="Sprung mass [kg]")
     m_u:  float = Field(default=35.0,     gt=1.0,     le=500.0,   description="Unsprung mass [kg]")
     k_s:  float = Field(default=25000.0,  gt=100.0,   le=500000.0, description="Spring rate [N/m]")
@@ -19,6 +20,7 @@ class QuarterCarParamsSchema(BaseModel):
     c_t:  float = Field(default=0.0,      ge=0.0,     le=5000.0,  description="Tire damping [Ns/m]")
     damper_curve_v: Optional[List[float]] = Field(default=None, max_length=1000, description="Damper velocity points [m/s] — max 1000 entries")
     damper_curve_f: Optional[List[float]] = Field(default=None, max_length=1000, description="Damper force points [N] — max 1000 entries")
+    model_config = ConfigDict(allow_inf_nan=False)
 
     @model_validator(mode="after")
     def validate_params(self) -> "QuarterCarParamsSchema":
@@ -35,16 +37,18 @@ class QuarterCarParamsSchema(BaseModel):
 
 
 class RoadProfileSchema(BaseModel):
+    model_config = {"allow_inf_nan": False}
     profile_type: Literal["step", "sine", "pothole", "random", "impulse", "iso8608"] = "step"
     iso_class: Literal["A", "B", "C", "D", "E", "F", "G", "H"] = "A"
     amplitude: float = 0.05
-    frequency: float = Field(2.0, le=1000.0)
-    duration: float = Field(5.0, le=60.0)
+    frequency: float = Field(2.0, gt=0.0, le=1000.0)
+    duration: float = Field(5.0, gt=0.0, le=60.0)
     speed_mps: float = Field(20.0, ge=1.0, le=200.0, description="Vehicle speed for ISO 8608 temporal PSD scaling [m/s]")
 
 
 # ─── HalfCarParamsSchema MUST be defined before HalfCarSimulateRequest ───────
 class HalfCarParamsSchema(BaseModel):
+    model_config = {"allow_inf_nan": False}
     m_s: float = Field(default=1200.0, gt=50.0, le=50000.0)
     I_y: float = Field(default=1800.0, gt=10.0, le=200000.0)
     m_uf: float = Field(default=40.0, gt=1.0, le=1000.0)
@@ -65,6 +69,7 @@ class HalfCarParamsSchema(BaseModel):
     damper_curve_f_f: Optional[List[float]] = None
     damper_curve_v_r: Optional[List[float]] = None
     damper_curve_f_r: Optional[List[float]] = None
+    model_config = ConfigDict(allow_inf_nan=False)
 
     @model_validator(mode="after")
     def mass_ratio_check(self) -> "HalfCarParamsSchema":
@@ -226,6 +231,7 @@ class HalfCarResultSchema(BaseModel):
 
 
 class FullCarParamsSchema(BaseModel):
+    model_config = {"allow_inf_nan": False}
     m_s: float = Field(default=1200.0, gt=50.0, le=50000.0)
     I_x: float = Field(default=400.0, gt=10.0, le=100000.0)
     I_y: float = Field(default=1800.0, gt=10.0, le=200000.0)
@@ -248,6 +254,9 @@ class FullCarParamsSchema(BaseModel):
     c_tf: float = Field(default=0.0, ge=0.0, le=50000.0)
     c_tr: float = Field(default=0.0, ge=0.0, le=50000.0)
     road_asymmetry: float = Field(default=0.3, ge=0.0, le=1.0, description="Fraction of left-side amplitude applied to right side")
+    MR_f: float = Field(default=0.85, gt=0.1, le=1.5)
+    MR_r: float = Field(default=0.85, gt=0.1, le=1.5)
+    model_config = ConfigDict(allow_inf_nan=False)
     damper_curve_v_f: Optional[List[float]] = None
     damper_curve_f_f: Optional[List[float]] = None
     damper_curve_v_r: Optional[List[float]] = None
@@ -268,6 +277,7 @@ class FullCarResultSchema(BaseModel):
     f_n_roll: float
     f_n_uf: float
     f_n_ur: float
+    eigenmodes: Optional[List[Dict[str, Any]]] = None
 
     time: List[float]
 

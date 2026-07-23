@@ -24,6 +24,8 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+let refreshPromise: Promise<string | null> | null = null;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user,    setUser]    = useState<AuthUser | null>(null);
   const [token,   setToken]   = useState<string | null>(null);
@@ -38,18 +40,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const data = await res.json();
         setUser({ ...data, plan: data.plan ?? "FREE" });
       } else {
-        // Token invalid or expired — clear session
         setToken(null);
         setUser(null);
       }
-    } catch {
-      // Network error — keep token, user may be offline
+    } catch (err) {
+      console.warn("Auth check failed (network/offline):", err);
     }
   };
 
   // Restore session from cookie on mount
   useEffect(() => {
-    fetchMe().finally(() => setLoading(false));
+    setTimeout(() => fetchMe().finally(() => setLoading(false)), 0);
   }, []);  
 
   const login = useCallback(async (email: string, password: string) => {
@@ -91,26 +92,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(null);
   }, []);
 
-  // authHeader is kept for backward compatibility if any client components use it, but credentials: include does the heavy lifting.
-  const authHeader = useCallback((): Record<string, string> => {
-    return {};
+  const getCsrfToken = useCallback((): string => {
+    if (typeof document === "undefined") return "";
+    const match = document.cookie.match(new RegExp('(^| )csrf_token=([^;]+)'));
+    return match ? match[2] : "";
   }, []);
 
+  const authHeader = useCallback((): Record<string, string> => {
+    return { "X-CSRF-Token": getCsrfToken() };
+  }, [getCsrfToken]);
+
   const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
-    const res = await fetch(url, { ...options, credentials: "include", headers: { ...options.headers } });
+    const headers = { "X-CSRF-Token": getCsrfToken(), ...options.headers };
+    const res = await fetch(url, { ...options, credentials: "include", headers });
     if (res.status === 401) {
-        // Attempt to refresh token using the HttpOnly cookie
-        const refreshRes = await fetch(`${API_BASE}/auth/refresh`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-            body: JSON.stringify({}),
-        });
-        if (refreshRes.ok) {
-            const { token: newToken } = await refreshRes.json();
+        if (!refreshPromise) {
+            refreshPromise = fetch(`${API_BASE}/auth/refresh`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                credentials: "include",
+                body: JSON.stringify({}),
+            }).then(async refreshRes => {
+                if (refreshRes.ok) {
+                    const { token: newToken } = await refreshRes.json();
+                    return newToken as string;
+                }
+                return null;
+            }).catch(err => {
+                console.error("Token refresh request failed:", err);
+                return null;
+            }).finally(() => {
+                refreshPromise = null;
+            });
+        }
+        
+        const newToken = await refreshPromise;
+        if (newToken) {
             setToken(newToken);
-            // Retry original request
-            return fetch(url, { ...options, credentials: "include", headers: { ...options.headers } });
+            return fetch(url, { ...options, credentials: "include", headers });
         } else {
             logout();
         }

@@ -4,7 +4,7 @@ import { Upload, FileText, Check, X } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 
 interface TirUploaderProps {
-  onParsed: (coeffs: any) => void;
+  onParsed: (coeffs: Record<string, unknown>) => void;
   onClear: () => void;
   hasCoeffs: boolean;
 }
@@ -41,7 +41,7 @@ export default function TirUploader({ onParsed, onClear, hasCoeffs }: TirUploade
       } else {
         setUploadError("Failed to parse .tir file. Ensure it is a valid Pacejka Property File.");
       }
-    } catch (err) {
+    } catch (err: unknown) { void err;
       setUploadError("Network error. Check connection and retry.");
     } finally {
       setIsUploading(false);

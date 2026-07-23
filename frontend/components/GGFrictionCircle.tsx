@@ -1,4 +1,5 @@
-﻿// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 
 "use client";
 
@@ -14,7 +15,7 @@ interface GGFrictionCircleProps {
 
 export default function GGFrictionCircle({ maxG, latG, longG }: GGFrictionCircleProps) {
   // We use Plotly shapes to draw the theoretical max G circle
-  const circleShape = {
+  const circleShape: any = {
     type: "circle" as const,
     x0: -maxG,
     y0: -maxG,
@@ -66,3 +67,4 @@ export default function GGFrictionCircle({ maxG, latG, longG }: GGFrictionCircle
     </div>
   );
 }
+

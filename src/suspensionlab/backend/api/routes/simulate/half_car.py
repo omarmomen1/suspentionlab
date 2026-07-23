@@ -1,38 +1,35 @@
-from fastapi import APIRouter, HTTPException
-import numpy as np
-import asyncio
+from fastapi import APIRouter, HTTPException, Depends, status
+from sqlalchemy.ext.asyncio import AsyncSession
 import logging
-from suspensionlab.physics.exceptions import MathConvergenceError, PhysicsValidationError
 
-logger = logging.getLogger(__name__)
-from suspensionlab.shared.models import HalfCarSimulateRequest, HalfCarResultSchema
-from suspensionlab.physics.half_car import HalfCarParams, run_half_car_analysis
-from suspensionlab.physics.quarter_car import RoadProfile
+from suspensionlab.backend.database.core import get_db_dependency
+from suspensionlab.backend.security.auth import verify_api_key
+from suspensionlab.backend.services.simulation_service import SimulationService
+from suspensionlab.shared.models import HalfCarSimulateRequest
+from pydantic import BaseModel
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
-@router.post("/simulate/half-car", response_model=HalfCarResultSchema)
-async def simulate_half_car(payload: HalfCarSimulateRequest):
+class JobResponse(BaseModel):
+    job_id: str
+    status: str
+
+@router.post("/simulate/half-car", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def simulate_half_car(
+    payload: HalfCarSimulateRequest,
+    user: dict = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency)
+):
     try:
-        params = HalfCarParams(**payload.params.model_dump())
-        profile = RoadProfile(**payload.profile.model_dump())
-        
-        # 8-DOF is heavier, so we definitely run this off the main event loop
-        result = await asyncio.to_thread(run_half_car_analysis, params, profile)
-        
-        result_dict = result.__dict__.copy()
-        for key, value in result_dict.items():
-            if isinstance(value, np.ndarray):
-                result_dict[key] = value.tolist()
-                
-        return HalfCarResultSchema(**result_dict)
-    except (ValueError, PhysicsValidationError) as e:
-        raise HTTPException(status_code=422, detail=str(e))
-    except MathConvergenceError as e:
-        raise HTTPException(
-            status_code=422,
-            detail="Solver did not converge. Try reducing amplitude or adjusting damping."
+        job_id = await SimulationService.enqueue_simulation(
+            user_id=user.user_id,
+            plan=user.plan,
+            job_type="SIMULATE_HALF",
+            payload=payload.model_dump(),
+            db=db
         )
+        return {"job_id": job_id, "status": "PENDING"}
     except Exception as e:
         logger.exception("Unhandled error in /simulate/half-car: %s", e)
-        raise HTTPException(status_code=500, detail="Internal simulation error. Request ID is in X-Request-ID header.")
+        raise HTTPException(status_code=500, detail="Internal simulation error.")

@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function TeamSettings() {
-  const { user, token } = useAuth();
+  const { token } = useAuth();
   const [team, setTeam] = useState<any>(null);
   const [analytics, setAnalytics] = useState<any>(null);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -33,8 +34,8 @@ export default function TeamSettings() {
   };
 
   useEffect(() => {
-    fetchTeam();
-  }, [token]);
+    setTimeout(() => fetchTeam(), 0);
+  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCreate = async () => {
     await fetch(`${API_BASE}/teams/`, {

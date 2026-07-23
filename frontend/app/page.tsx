@@ -26,7 +26,7 @@ const NVH_DEMO_DATA = (() => {
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  useEffect(() => { setTimeout(() => setMounted(true), 0); }, []);
 
   return (
     <div className="w-full bg-[#0a0a0a] text-white selection:bg-ansys-yellow selection:text-black min-h-screen overflow-hidden font-sans">
@@ -104,7 +104,7 @@ export default function Home() {
         <div className="max-w-[1000px] mx-auto">
           <div className="text-center mb-16 relative z-10">
             <h2 className="text-3xl md:text-5xl font-bold tracking-tight mb-4">Stop Paying For The 90s.</h2>
-            <p className="text-gray-400 text-lg max-w-2xl mx-auto">How we stack up against the "industry standard" legacy software.</p>
+            <p className="text-gray-400 text-lg max-w-2xl mx-auto">How we stack up against the &quot;industry standard&quot; legacy software.</p>
           </div>
 
           <div className="bg-[#111] border border-[#222] rounded-3xl overflow-hidden relative z-10 shadow-2xl">

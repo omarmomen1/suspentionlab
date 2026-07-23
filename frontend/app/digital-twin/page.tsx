@@ -1,4 +1,4 @@
-// @ts-nocheck
+// Digital Twin Page
 
 "use client";
 

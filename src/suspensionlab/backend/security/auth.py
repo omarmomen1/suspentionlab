@@ -20,12 +20,22 @@ from suspensionlab.shared.models import PlanTier
 PLAN_LEVELS = {PlanTier.FREE: 0, PlanTier.PRO: 1, PlanTier.ENTERPRISE: 2}
 
 
+from pydantic import BaseModel
+
+class UserContext(BaseModel):
+    user_id: str
+    plan: str
+    email: str
+    name: str
+    onboarding_complete: bool
+    team_id: str | None = None
+
 async def verify_api_key(
     request:  Request,
     api_key:  str | None = Header(alias="X-API-Key",      default=None),
     bearer:   str | None = Header(alias="Authorization",  default=None),
     db:       AsyncSession = Depends(get_db_dependency),
-) -> dict:
+) -> UserContext:
     """
     Authenticate the request via:
       - Bearer JWT token (preferred — from email/password login)
@@ -38,6 +48,12 @@ async def verify_api_key(
     if not bearer:
         sl_token = request.cookies.get("sl_token")
         if sl_token:
+            if request.method not in ("GET", "HEAD", "OPTIONS"):
+                csrf_token_header = request.headers.get("X-CSRF-Token")
+                csrf_token_cookie = request.cookies.get("csrf_token")
+                if not csrf_token_header or not csrf_token_cookie or csrf_token_header != csrf_token_cookie:
+                    from suspensionlab.backend.core.errors import AuthenticationError
+                    raise AuthenticationError("CSRF token missing or mismatch.")
             bearer = f"Bearer {sl_token}"
 
     # ── 1. Bearer JWT (preferred) ─────────────────────────────────────────
@@ -56,65 +72,32 @@ async def verify_api_key(
             except ValueError:
                 from suspensionlab.backend.core.errors import AuthenticationError
                 raise AuthenticationError("Invalid token subject")
-            result  = await db.execute(select(User).where(User.id == user_uuid))
+            from sqlalchemy.orm import joinedload
+            result  = await db.execute(select(User).options(joinedload(User.team)).where(User.id == user_uuid, User.deleted_at == None))
             user: User | None = result.scalar_one_or_none()
             if not user:
                 log_audit_event("LOGIN_FAILURE", ip=ip, metadata={"reason": "JWT user not found"})
                 raise AuthenticationError("User not found.")
             request.state.user_id = str(user.id)
             log_audit_event("LOGIN_SUCCESS", user_id=str(user.id), ip=ip)
-            return {
-                "user_id": str(user.id),
-                "plan":    user.plan,
-                "email":   user.email,
-                "name":    user.name or "",
-                "onboarding_complete": user.onboarding_complete,
-                "team_id": str(user.team_id) if user.team_id else None,
-            }
+
+            effective_plan = user.plan
+            if user.team:
+                effective_plan = user.team.plan
+            return UserContext(
+                user_id=str(user.id),
+                plan=effective_plan,
+                email=user.email,
+                name=user.name or "",
+                onboarding_complete=user.onboarding_complete,
+                team_id=str(user.team_id) if user.team_id else None,
+            )
         # Token present but invalid — do not fall through to API key
         log_audit_event("LOGIN_FAILURE", ip=ip, metadata={"reason": "Invalid Bearer token"})
         raise AuthenticationError("Invalid or expired token.")
 
     # ── 2. X-API-Key header ───────────────────────────────────────────────
     if api_key:
-        # 2a. Master admin key (dev/CI only — warn if used in PROD)
-        from suspensionlab.backend.config import settings
-        import os
-        if settings.admin_api_key and api_key == settings.admin_api_key:
-            if os.getenv("ENVIRONMENT", "DEV") == "PROD":
-                raise AuthenticationError("Master API key is disabled in production.")
-            # Use a deterministic UUID for the admin user so downstream uuid.UUID() calls succeed
-            _ADMIN_UUID = "00000000-0000-0000-0000-000000000001"
-            log_audit_event("LOGIN_SUCCESS", user_id=_ADMIN_UUID, ip=ip)
-            return {
-                "user_id": _ADMIN_UUID,
-                "plan":    PlanTier.ENTERPRISE,
-                "email":   "admin@suspensionlab.io",
-                "name":    "Admin",
-                "onboarding_complete": True,
-                "team_id": None,
-            }
-
-        # 2b. Look up legacy single-key on User table
-        result = await db.execute(select(User).where(User.api_key == api_key))
-        user: User | None = result.scalar_one_or_none()
-
-        if user:
-            if not user.onboarding_complete and request.url.path not in [
-                "/auth/me", "/auth/onboard", "/billing/checkout", "/billing/webhooks/stripe",
-            ]:
-                raise AuthenticationError("Please complete onboarding before using simulation features.")
-            request.state.user_id = str(user.id)
-            log_audit_event("LOGIN_SUCCESS", user_id=str(user.id), ip=ip)
-            return {
-                "user_id": str(user.id),
-                "plan":    user.plan,
-                "email":   user.email,
-                "name":    user.name or "",
-                "onboarding_complete": user.onboarding_complete,
-                "team_id": str(user.team_id) if user.team_id else None,
-            }
-
         # 2c. Look up per-user named API key (O(1) prefix lookup)
         from suspensionlab.backend.database.models.user_api_key import UserApiKey
         from suspensionlab.backend.security.jwt_utils import verify_password
@@ -130,24 +113,27 @@ async def verify_api_key(
                 # Skip expired keys
                 if named_key.expires_at and datetime.now(timezone.utc) > named_key.expires_at:
                     continue
-                if verify_password(api_key, named_key.key_hash):
+                import asyncio
+                is_valid, _ = await asyncio.to_thread(verify_password, api_key, named_key.key_hash)
+                if is_valid:
                     # Update last_used
                     named_key.last_used = datetime.now(timezone.utc)
                     await db.commit()
 
-                    user_result = await db.execute(select(User).where(User.id == named_key.user_id))
+                    from sqlalchemy.orm import joinedload
+                    user_result = await db.execute(select(User).options(joinedload(User.team)).where(User.id == named_key.user_id, User.deleted_at == None))
                     user = user_result.scalar_one_or_none()
                     if user:
                         request.state.user_id = str(user.id)
                         log_audit_event("LOGIN_SUCCESS", user_id=str(user.id), ip=ip)
-                        return {
-                            "user_id": str(user.id),
-                            "plan":    user.plan,
-                            "email":   user.email,
-                            "name":    user.name or "",
-                            "onboarding_complete": user.onboarding_complete,
-                            "team_id": str(user.team_id) if user.team_id else None,
-                        }
+                        return UserContext(
+                            user_id=str(user.id),
+                            plan=user.plan,
+                            email=user.email,
+                            name=user.name or "",
+                            onboarding_complete=user.onboarding_complete,
+                            team_id=str(user.team_id) if user.team_id else None,
+                        )
 
     # ── 3. No credentials found ───────────────────────────────────────────
     log_audit_event("LOGIN_FAILURE", ip=ip, metadata={"reason": "No credentials provided"})
@@ -159,8 +145,8 @@ def require_plan(minimum_plan: str):
     FastAPI dependency factory that enforces a minimum plan tier.
     Usage:  Depends(require_plan(PlanTier.PRO))
     """
-    async def _check(user: dict = Depends(verify_api_key)):
-        user_level = PLAN_LEVELS.get(user.get("plan", PlanTier.FREE), 0)
+    async def _check(user: UserContext = Depends(verify_api_key)):
+        user_level = PLAN_LEVELS.get(user.plan, 0)
         required   = PLAN_LEVELS.get(minimum_plan, 0)
         if user_level < required:
             raise HTTPException(

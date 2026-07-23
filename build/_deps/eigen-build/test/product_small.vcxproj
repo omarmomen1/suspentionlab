@@ -1,0 +1,262 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="18.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{1B0A0D5A-8B4A-385E-9A42-FE30B359A592}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <Platform>x64</Platform>
+    <ProjectName>product_small</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v145</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>D:\project\build\_deps\eigen-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>D:\project\build\_deps\eigen-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>D:\project\build\_deps\eigen-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>D:\project\build\_deps\eigen-src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\project\build\_deps\eigen-src\test\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule D:/project/build/_deps/eigen-src/test/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\bin\cmake.exe -SD:/project/src/kinematics_cpp -BD:/project/build --check-stamp-file D:/project/build/_deps/eigen-build/test/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CMakeFindDependencyMacro.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CMakePushCheckState.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckCSourceCompiles.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckCXXSourceCompiles.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckCXXSymbolExists.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckFortranFunctionExists.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckFunctionExists.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckIncludeFile.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckLanguage.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckLibraryExists.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckSourceCompiles.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckStructHasMember.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindBoost.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindPackageHandleStandardArgs.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindPackageMessage.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindPkgConfig.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindQt4.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindThreads.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\Internal\CheckSourceCompiles.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\MacroAddFileDependencies.cmake;D:\project\build\_deps\eigen-src\cmake\EigenSmokeTestList.cmake;D:\project\build\_deps\eigen-src\cmake\FindBLAS.cmake;D:\project\build\_deps\eigen-src\cmake\FindCHOLMOD.cmake;D:\project\build\_deps\eigen-src\cmake\FindHWLOC.cmake;D:\project\build\_deps\eigen-src\cmake\FindKLU.cmake;D:\project\build\_deps\eigen-src\cmake\FindLAPACK.cmake;D:\project\build\_deps\eigen-src\cmake\FindPASTIX.cmake;D:\project\build\_deps\eigen-src\cmake\FindSPQR.cmake;D:\project\build\_deps\eigen-src\cmake\FindSuperLU.cmake;D:\project\build\_deps\eigen-src\cmake\FindUMFPACK.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">D:\project\build\_deps\eigen-build\test\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule D:/project/build/_deps/eigen-src/test/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\bin\cmake.exe -SD:/project/src/kinematics_cpp -BD:/project/build --check-stamp-file D:/project/build/_deps/eigen-build/test/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CMakeFindDependencyMacro.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CMakePushCheckState.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckCSourceCompiles.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckCXXSourceCompiles.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckCXXSymbolExists.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckFortranFunctionExists.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckFunctionExists.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckIncludeFile.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckLanguage.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckLibraryExists.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckSourceCompiles.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckStructHasMember.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindBoost.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindPackageHandleStandardArgs.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindPackageMessage.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindPkgConfig.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindQt4.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindThreads.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\Internal\CheckSourceCompiles.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\MacroAddFileDependencies.cmake;D:\project\build\_deps\eigen-src\cmake\EigenSmokeTestList.cmake;D:\project\build\_deps\eigen-src\cmake\FindBLAS.cmake;D:\project\build\_deps\eigen-src\cmake\FindCHOLMOD.cmake;D:\project\build\_deps\eigen-src\cmake\FindHWLOC.cmake;D:\project\build\_deps\eigen-src\cmake\FindKLU.cmake;D:\project\build\_deps\eigen-src\cmake\FindLAPACK.cmake;D:\project\build\_deps\eigen-src\cmake\FindPASTIX.cmake;D:\project\build\_deps\eigen-src\cmake\FindSPQR.cmake;D:\project\build\_deps\eigen-src\cmake\FindSuperLU.cmake;D:\project\build\_deps\eigen-src\cmake\FindUMFPACK.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\project\build\_deps\eigen-build\test\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule D:/project/build/_deps/eigen-src/test/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\bin\cmake.exe -SD:/project/src/kinematics_cpp -BD:/project/build --check-stamp-file D:/project/build/_deps/eigen-build/test/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CMakeFindDependencyMacro.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CMakePushCheckState.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckCSourceCompiles.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckCXXSourceCompiles.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckCXXSymbolExists.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckFortranFunctionExists.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckFunctionExists.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckIncludeFile.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckLanguage.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckLibraryExists.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckSourceCompiles.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckStructHasMember.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindBoost.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindPackageHandleStandardArgs.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindPackageMessage.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindPkgConfig.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindQt4.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindThreads.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\Internal\CheckSourceCompiles.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\MacroAddFileDependencies.cmake;D:\project\build\_deps\eigen-src\cmake\EigenSmokeTestList.cmake;D:\project\build\_deps\eigen-src\cmake\FindBLAS.cmake;D:\project\build\_deps\eigen-src\cmake\FindCHOLMOD.cmake;D:\project\build\_deps\eigen-src\cmake\FindHWLOC.cmake;D:\project\build\_deps\eigen-src\cmake\FindKLU.cmake;D:\project\build\_deps\eigen-src\cmake\FindLAPACK.cmake;D:\project\build\_deps\eigen-src\cmake\FindPASTIX.cmake;D:\project\build\_deps\eigen-src\cmake\FindSPQR.cmake;D:\project\build\_deps\eigen-src\cmake\FindSuperLU.cmake;D:\project\build\_deps\eigen-src\cmake\FindUMFPACK.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">D:\project\build\_deps\eigen-build\test\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule D:/project/build/_deps/eigen-src/test/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\bin\cmake.exe -SD:/project/src/kinematics_cpp -BD:/project/build --check-stamp-file D:/project/build/_deps/eigen-build/test/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CMakeFindDependencyMacro.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CMakePushCheckState.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckCSourceCompiles.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckCXXSourceCompiles.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckCXXSymbolExists.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckFortranFunctionExists.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckFunctionExists.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckIncludeFile.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckLanguage.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckLibraryExists.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckSourceCompiles.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\CheckStructHasMember.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindBoost.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindPackageHandleStandardArgs.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindPackageMessage.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindPkgConfig.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindQt4.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\FindThreads.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\Internal\CheckSourceCompiles.cmake;C:\Users\omaar\AppData\Local\python\pythoncore-3.14-64\Lib\site-packages\cmake\data\share\cmake-4.4\Modules\MacroAddFileDependencies.cmake;D:\project\build\_deps\eigen-src\cmake\EigenSmokeTestList.cmake;D:\project\build\_deps\eigen-src\cmake\FindBLAS.cmake;D:\project\build\_deps\eigen-src\cmake\FindCHOLMOD.cmake;D:\project\build\_deps\eigen-src\cmake\FindHWLOC.cmake;D:\project\build\_deps\eigen-src\cmake\FindKLU.cmake;D:\project\build\_deps\eigen-src\cmake\FindLAPACK.cmake;D:\project\build\_deps\eigen-src\cmake\FindPASTIX.cmake;D:\project\build\_deps\eigen-src\cmake\FindSPQR.cmake;D:\project\build\_deps\eigen-src\cmake\FindSuperLU.cmake;D:\project\build\_deps\eigen-src\cmake\FindUMFPACK.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">D:\project\build\_deps\eigen-build\test\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+  </ItemGroup>
+  <ItemGroup />
+  <ItemGroup>
+    <ProjectReference Include="D:\project\build\ZERO_CHECK.vcxproj">
+      <Project>{DC101A4C-7E16-38D9-B27F-1B057A0355FF}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_1.vcxproj">
+      <Project>{38C1E73E-73E5-3EC9-981D-47B7CD125C22}</Project>
+      <Name>product_small_1</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_11.vcxproj">
+      <Project>{88E74184-A685-3A73-BF88-4E63EF1114F7}</Project>
+      <Name>product_small_11</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_12.vcxproj">
+      <Project>{8D2431A7-D6E4-3AE2-9EC8-80774D2AF665}</Project>
+      <Name>product_small_12</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_13.vcxproj">
+      <Project>{8F424A20-2672-3083-A254-BD57F17886E1}</Project>
+      <Name>product_small_13</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_2.vcxproj">
+      <Project>{32A77907-B705-317F-930E-55ED90D8FC59}</Project>
+      <Name>product_small_2</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_21.vcxproj">
+      <Project>{2693DD8B-9442-333E-B6BF-13E3F78AACB1}</Project>
+      <Name>product_small_21</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_22.vcxproj">
+      <Project>{B6A6483C-3211-36D0-903F-EFDA7E36C39A}</Project>
+      <Name>product_small_22</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_23.vcxproj">
+      <Project>{B2B3EE8D-76F8-3A82-88F8-63EBF113E4DB}</Project>
+      <Name>product_small_23</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_3.vcxproj">
+      <Project>{37A62A94-6CD3-3A32-BB6F-A6B9FBB829D8}</Project>
+      <Name>product_small_3</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_31.vcxproj">
+      <Project>{4EEBFC90-5D75-3DEC-AC3A-395434572AAF}</Project>
+      <Name>product_small_31</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_32.vcxproj">
+      <Project>{B30CC8F9-6920-39CF-83E6-7E78B2560218}</Project>
+      <Name>product_small_32</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_33.vcxproj">
+      <Project>{4B2A44AA-A1BE-3405-9D04-54D9A4CB2D36}</Project>
+      <Name>product_small_33</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_4.vcxproj">
+      <Project>{F47C9A23-7186-3200-8281-CE1A02CD9784}</Project>
+      <Name>product_small_4</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_41.vcxproj">
+      <Project>{A1F8F098-1D67-3358-8812-8C7005835F39}</Project>
+      <Name>product_small_41</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_42.vcxproj">
+      <Project>{CB83AC2F-51EC-3E93-A088-6743B8177ECF}</Project>
+      <Name>product_small_42</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_43.vcxproj">
+      <Project>{44A4B81A-F430-3C4B-9F0E-08E12EDE8B0C}</Project>
+      <Name>product_small_43</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_5.vcxproj">
+      <Project>{65B3CBD6-CAE2-3E2D-BB74-CD9DB0631D56}</Project>
+      <Name>product_small_5</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_6.vcxproj">
+      <Project>{03B34C8A-0889-3096-B9BD-687CC4084526}</Project>
+      <Name>product_small_6</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_7.vcxproj">
+      <Project>{3E45AAA9-37D0-33B8-BE9E-78A7C9E7E051}</Project>
+      <Name>product_small_7</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_8.vcxproj">
+      <Project>{AA7539C1-1C21-3EF9-8552-DD0DDDFA4F81}</Project>
+      <Name>product_small_8</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\project\build\_deps\eigen-build\test\product_small_9.vcxproj">
+      <Project>{B633A54F-ED8B-3A5A-906A-7509261AE675}</Project>
+      <Name>product_small_9</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

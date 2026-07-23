@@ -1,0 +1,18 @@
+[build-system]
+requires = ["scikit-build-core>=0.5", "pybind11>=2.11"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "suspensionlab_kinematics"
+version = "0.1.0"
+description = "Native C++ kinematics solver for SuspensionLab"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.24.0"
+]
+
+[tool.scikit-build]
+cmake.version = "CMakeLists.txt"
+cmake.build-type = "Release"
+wheel.packages = ["suspensionlab_kinematics"]

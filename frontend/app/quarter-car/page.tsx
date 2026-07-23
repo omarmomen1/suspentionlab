@@ -11,8 +11,12 @@ import {
 } from "lucide-react";
 import PDFExport from "../../components/PDFExport";
 import DataExport from "../../components/DataExport";
-import ComparePanel from "../../components/ComparePanel";
 import VehiclePresets from "../../components/VehiclePresets";
+import TraceManager, { Trace } from "../../components/TraceManager";
+import {
+  bDisp, bVel, bAccel, bTravel, bTrans, bBodeMag, bBodePhase, bDynLoad,
+  bForces, bFV, bFx, bPower, bPhaseS, bPhaseU, bComfortTravel, bPSD
+} from "../../components/plotHelpers";
 import SimHistory, { saveSimulationToHistory } from "../../components/SimHistory";
 import PlanGate from "../../components/PlanGate";
 import DamperLUTInput from "../../components/DamperLUTInput";
@@ -48,7 +52,11 @@ const TABS = [
   { label: "Sensitivity",       icon: FlaskConical },
 ];
 
-// â”€â”€â”€ Plotly dark-theme base â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ──────── Plotly dark-theme base ───────────
+type SimResult = 
+  | { error: true; message: string; detail?: string }
+  | { error?: false; time: number[]; z_s: number[]; z_u: number[]; dz_s: number[]; dz_u: number[]; f_n_s: number; zeta_s: number; [key: string]: any };
+
 const DARK_BASE = {
   paper_bgcolor: "transparent",
   plot_bgcolor:  "transparent",
@@ -65,11 +73,11 @@ function darkLayout(overrides: Record<string, unknown> = {}) {
   return { ...DARK_BASE, ...overrides };
 }
 
-// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————— Types ————————————————————————————————————————————————————————
 type Status = "good" | "warn" | "bad" | "neutral";
 type Toast  = { msg: string; type: "success" | "error" };
 
-// â”€â”€â”€ KPI helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————— KPI helpers —————————————————————————————————————————————————
 function getDampingStatus(z: number): Status {
   if (z >= 0.25 && z <= 0.6) return "good";
   if (z >= 0.1  && z <= 0.8) return "warn";
@@ -87,7 +95,7 @@ function getTXStatus(tx: number): Status {
   return "bad";
 }
 
-// â”€â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————— Sub-components —————————————————————————————————————————————
 
 function KPICard({
   label, value, unit, sub, status = "neutral",
@@ -119,35 +127,60 @@ function KPICard({
   );
 }
 
-function ParamSection({ title, children }: { title: string; children: React.ReactNode }) {
+function ParamSection({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
   return (
     <div className="space-y-2">
-      <h3 className="text-[9px] font-bold text-gray-700 uppercase tracking-[0.16em] pb-1.5 border-b border-[#1e1e1e]">
+      <h3 
+        onClick={() => setIsOpen(!isOpen)}
+        className="text-[9px] font-bold text-gray-700 uppercase tracking-[0.16em] pb-1.5 border-b border-[#1e1e1e] cursor-pointer hover:text-gray-500 transition-colors flex justify-between items-center"
+      >
         {title}
+        <span className="text-[10px] transform transition-transform duration-200" style={{ rotate: isOpen ? '0deg' : '-90deg' }}>▼</span>
       </h3>
-      {children}
+      {isOpen && children}
     </div>
   );
 }
 
 function ParameterInput({
-  label, val, unit, step = 1, min, onChange,
+  label, val, unit, step = 1, min, onChange, hasError
 }: {
   label: string; val: number; unit: string;
   step?: number; min?: number; onChange: (v: number) => void;
+  hasError?: boolean;
 }) {
+  const [localVal, setLocalVal] = useState(val.toString());
+  const id = label.toLowerCase().replace(/\s+/g, '-');
+
+  useEffect(() => {
+    setLocalVal(val.toString());
+  }, [val]);
+
+  const flush = () => {
+    const parsed = parseFloat(localVal);
+    if (!isNaN(parsed)) {
+      onChange(parsed);
+    } else {
+      setLocalVal(val.toString());
+    }
+  };
+
   return (
     <div className="flex justify-between items-center gap-2">
-      <label className="text-[11px] text-gray-500 flex-1 min-w-0 leading-tight">{label}</label>
+      <label htmlFor={id} className="text-[11px] text-gray-500 flex-1 min-w-0 leading-tight cursor-pointer hover:text-gray-300 transition-colors">{label}</label>
       <div className="relative shrink-0">
         <input
-          type="number" step={step} value={val} min={min}
-          onChange={(e) => onChange(Number(e.target.value))}
-          className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white
-            w-28 text-right pr-9 focus:outline-none focus:border-ansys-yellow/60
-            focus:ring-1 focus:ring-ansys-yellow/15 transition-all"
+          id={id}
+          type="number" step={step} value={localVal} min={min}
+          onChange={(e) => setLocalVal(e.target.value)}
+          onBlur={flush}
+          onKeyDown={(e) => e.key === "Enter" && flush()}
+          className={`bg-[#0d0d0d] border text-[11px] rounded-lg px-2 py-1.5 text-white w-28 text-right pr-9 focus:outline-none transition-all ${
+            hasError ? "border-red-500/50 focus:border-red-500 focus:ring-1 focus:ring-red-500/50 text-red-100" : "border-[#252525] focus:border-ansys-yellow/60 focus:ring-1 focus:ring-ansys-yellow/50"
+          }`}
         />
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-gray-700 pointer-events-none">
+        <span className={`absolute right-2 top-1/2 -translate-y-1/2 text-[9px] pointer-events-none ${hasError ? "text-red-500/70" : "text-gray-700"}`}>
           {unit}
         </span>
       </div>
@@ -155,7 +188,7 @@ function ParameterInput({
   );
 }
 
-// â”€â”€â”€ Plot wrappers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————— Plot wrappers —————————————————————————————————————————————
 function PlotBox({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex-1 min-w-0 min-h-0 relative">
@@ -164,7 +197,7 @@ function PlotBox({ children }: { children: React.ReactNode }) {
   );
 }
 
-// â”€â”€â”€ Main dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ————————————————— Main dashboard —————————————————————————————————————————————
 function QuarterCarDashboard() {
   const searchParams = useSearchParams();
   const { authHeader } = useAuth();
@@ -172,12 +205,15 @@ function QuarterCarDashboard() {
   const [isRunning, setIsRunning] = useState<boolean>(false);
   const [isSaving,  setIsSaving]  = useState<boolean>(false);
   const [isTuning,  setIsTuning]  = useState<boolean>(false);
-  const [results,   setResults]   = useState<Record<string, unknown> | null>(null);
+  const [results,   setResults]   = useState<SimResult | null>(null);
+  const [traces,    setTraces]    = useState<Trace[]>([]);
+  const [deltaMode, setDeltaMode] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<number>(0);
   const [toast,     setToast]     = useState<Toast | null>(null);
   // Snapshot of params used for the LAST successful simulation (MED-07)
   const [simParams, setSimParams] = useState<typeof params | null>(null);
   
+  const [autoRun, setAutoRun] = useState(false);
   const [frameIndex, setFrameIndex] = useState(0);
   
   useEffect(() => {
@@ -236,6 +272,24 @@ function QuarterCarDashboard() {
       .catch(() => showToast("Could not load profile", "error"));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const validateParams = () => {
+    if (params.m_s <= 0) return "Sprung Mass must be strictly positive.";
+    if (params.m_u <= 0) return "Unsprung Mass must be strictly positive.";
+    if (params.k_s <= 0) return "Spring Rate must be strictly positive.";
+    if (params.k_t <= 0) return "Tire Stiffness must be strictly positive.";
+    if (params.c < 0) return "Damping cannot be negative.";
+    return null;
+  };
+
+  useEffect(() => {
+    if (!autoRun) return;
+    if (validateParams()) return;
+    const timer = setTimeout(() => {
+      runSimulation();
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [params, autoRun]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const buildPayload = () => ({
     params: {
       m_s: params.m_s, m_u: params.m_u, k_s: params.k_s, c: params.c,
@@ -253,6 +307,11 @@ function QuarterCarDashboard() {
   });
 
   const runSimulation = async () => {
+    const errorMsg = validateParams();
+    if (errorMsg) {
+      showToast(errorMsg, "error");
+      return;
+    }
     setIsRunning(true);
     setResults(null);
     try {
@@ -422,6 +481,16 @@ function QuarterCarDashboard() {
             )}
           </button>
 
+          <button onClick={() => setAutoRun(!autoRun)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+              autoRun 
+                ? "bg-emerald-950/60 text-emerald-400 border border-emerald-900/50" 
+                : "bg-[#141416] border border-[#252525] hover:bg-[#1e1e20] text-gray-400"
+            }`}>
+            <RefreshCw size={13} className={autoRun ? "animate-spin-slow" : ""} />
+            {autoRun ? "Live Update: ON" : "Live Update"}
+          </button>
+
           <PlanGate required="PRO">
             <button onClick={() => setIsMagicModalOpen(true)} disabled={isTuning}
               className="px-4 py-1.5 bg-[#5e17eb] hover:bg-[#7c3aed] text-white rounded-lg text-xs font-bold
@@ -434,7 +503,7 @@ function QuarterCarDashboard() {
       </div>
 
       {/* Magic Wand Modal */}
-      {isMagicModalOpen && (
+      {isMagicModalOpen ? (
         <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-lg bg-[#111113] border border-[#222] rounded-2xl p-6 shadow-2xl">
             <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-2">
@@ -460,7 +529,7 @@ function QuarterCarDashboard() {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* Body */}
       <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
@@ -475,14 +544,14 @@ function QuarterCarDashboard() {
           <div className="p-4 space-y-5">
             <VehiclePresets onSelect={(p) => setParams(prev => ({ ...prev, ...p.params, road_profile: p.road_profile.profile_type, amplitude: p.road_profile.amplitude, frequency: p.road_profile.frequency, duration: p.road_profile.duration }))} />
             <ParamSection title="Mass">
-              <ParameterInput label="Sprung Mass"   val={params.m_s} unit="kg"    min={1}    onChange={(v) => setParams({ ...params, m_s: v })} />
-              <ParameterInput label="Unsprung Mass" val={params.m_u} unit="kg"    min={1}    onChange={(v) => setParams({ ...params, m_u: v })} />
+              <ParameterInput label="Sprung Mass"   val={params.m_s} unit="kg"    min={1}    hasError={params.m_s <= 0} onChange={(v) => setParams({ ...params, m_s: v })} />
+              <ParameterInput label="Unsprung Mass" val={params.m_u} unit="kg"    min={1}    hasError={params.m_u <= 0} onChange={(v) => setParams({ ...params, m_u: v })} />
             </ParamSection>
             <ParamSection title="Suspension">
-              <ParameterInput label="Spring Rate"    val={params.k_s} unit="N/m"   step={500}  onChange={(v) => setParams({ ...params, k_s: v })} />
-              <ParameterInput label="Damping"        val={params.c}   unit="N·s/m" step={50}   onChange={(v) => setParams({ ...params, c:   v })} />
-              <ParameterInput label="Tire Stiffness" val={params.k_t} unit="N/m"   step={5000} onChange={(v) => setParams({ ...params, k_t: v })} />
-              <ParameterInput label="Motion Ratio"   val={params.MR}  unit="—"     step={0.01} min={0.1} onChange={(v) => setParams({ ...params, MR:  v })} />
+              <ParameterInput label="Spring Rate"    val={params.k_s} unit="N/m"   step={500} hasError={params.k_s <= 0} onChange={(v) => setParams({ ...params, k_s: v })} />
+              <ParameterInput label="Damping"        val={params.c}   unit="N·s/m" step={50}  hasError={params.c < 0} onChange={(v) => setParams({ ...params, c:   v })} />
+              <ParameterInput label="Tire Stiffness" val={params.k_t} unit="N/m"   step={5000} hasError={params.k_t <= 0} onChange={(v) => setParams({ ...params, k_t: v })} />
+              <ParameterInput label="Motion Ratio"   val={params.MR}  unit="—"     step={0.01} min={0.1} hasError={params.MR <= 0} onChange={(v) => setParams({ ...params, MR:  v })} />
               <DamperLUTInput 
                 label="Non-Linear Damper Curve"
                 isActive={params.damper_curve_v !== null}
@@ -571,12 +640,19 @@ function QuarterCarDashboard() {
 
 
           {/* Loading */}
-          {isRunning && (
-            <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl flex flex-col items-center justify-center gap-4">
-              <div className="w-10 h-10 border-2 border-ansys-yellow/20 border-t-ansys-yellow rounded-full animate-spin" />
-              <div className="text-center">
-                <p className="text-sm font-medium text-gray-400 mb-1">Running BDF stiff ODE solver…</p>
-                <p className="text-xs text-gray-700">Computing eigenvalues · FRF · time response · metrics</p>
+          {isRunning && !hasResults && (
+            <div className="flex flex-col gap-3 flex-1 overflow-hidden">
+              <div className="grid grid-cols-5 gap-3 shrink-0">
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="h-16 bg-[#141416] border border-[#1e1e1e] rounded-xl animate-pulse" />
+                ))}
+              </div>
+              <div className="flex-1 min-h-0 bg-[#111113] border border-[#1e1e1e] rounded-xl flex items-center justify-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-b from-[#111113] to-[#0a0a0c] animate-pulse" />
+                <div className="flex flex-col items-center gap-4 z-10">
+                  <div className="w-8 h-8 border-2 border-ansys-yellow/20 border-t-ansys-yellow rounded-full animate-spin" />
+                  <p className="text-xs text-gray-500 font-mono tracking-widest">SOLVING IMPLICIT ODE</p>
+                </div>
               </div>
             </div>
           )}
@@ -599,8 +675,8 @@ function QuarterCarDashboard() {
           {hasResults && r && (
             <div id="sim-report" className="flex flex-col gap-3 flex-1 overflow-hidden">
 
-              {/* Compare panel */}
-              <ComparePanel current={r as any} />
+              {/* Trace manager */}
+              <TraceManager currentResult={r as any} currentParams={params} traces={traces} setTraces={setTraces} deltaMode={deltaMode} setDeltaMode={setDeltaMode} />
 
               {/* KPI Ribbon — 8 cards */}
               <div className="grid grid-cols-8 gap-2 shrink-0">
@@ -686,14 +762,7 @@ function QuarterCarDashboard() {
                     {/* Displacement */}
                     <PlotBox>
                       <Plot
-                        data={[
-                          { x: r.time, y: r.z_s.map(v => v * 1000), type: "scatter", mode: "lines", name: "Body z_s",
-                            line: { color: "#f2a900", width: 2 } },
-                          { x: r.time, y: r.z_u.map(v => v * 1000), type: "scatter", mode: "lines", name: "Wheel z_u",
-                            line: { color: "#00aeff", width: 1.5 } },
-                          { x: r.time, y: r.z_r.map(v => v * 1000), type: "scatter", mode: "lines", name: "Road z_r",
-                            line: { color: "#333", width: 1, dash: "dash" } },
-                        ]}
+                        data={bDisp(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Displacement", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
@@ -707,12 +776,7 @@ function QuarterCarDashboard() {
                     {/* Velocity */}
                     <PlotBox>
                       <Plot
-                        data={[
-                          { x: r.time, y: r.dz_s.map(v => v * 1000), type: "scatter", mode: "lines", name: "Body vel Å¼_s",
-                            line: { color: "#f2a900", width: 2 } },
-                          { x: r.time, y: r.dz_u.map(v => v * 1000), type: "scatter", mode: "lines", name: "Wheel vel Å¼_u",
-                            line: { color: "#00aeff", width: 1.5 } },
-                        ]}
+                        data={bVel(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Velocity", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
@@ -726,10 +790,7 @@ function QuarterCarDashboard() {
                     {/* Acceleration */}
                     <PlotBox>
                       <Plot
-                        data={[
-                          { x: r.time, y: r.ddz_s, type: "scatter", mode: "lines", name: "Body accel zÌˆ_s",
-                            line: { color: "#ff2d55", width: 2 }, fill: "tozeroy", fillcolor: "rgba(255,45,85,0.04)" },
-                        ]}
+                        data={bAccel(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Sprung Acceleration", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
@@ -749,12 +810,7 @@ function QuarterCarDashboard() {
                     {/* Suspension Travel + Tire Deflection */}
                     <PlotBox>
                       <Plot
-                        data={[
-                          { x: r.time, y: r.susp_travel.map(v => v * 1000), type: "scatter", mode: "lines", name: "Susp travel (mm)",
-                            line: { color: "#bf5af2", width: 2 } },
-                          { x: r.time, y: r.tire_defl.map(v => v * 1000), type: "scatter", mode: "lines", name: "Tire deflection (mm)",
-                            line: { color: "#64d2ff", width: 1.5 } },
-                        ]}
+                        data={bTravel(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Suspension & Tire Deflection", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
@@ -773,12 +829,7 @@ function QuarterCarDashboard() {
                     {/* Transmissibility linear */}
                     <PlotBox>
                       <Plot
-                        data={[
-                          { x: r.freq_hz, y: r.transmissibility_body, type: "scatter", mode: "lines", name: "Body |H_s|",
-                            line: { color: "#f2a900", width: 2 }, fill: "tozeroy", fillcolor: "rgba(242,169,0,0.04)" },
-                          { x: r.freq_hz, y: r.transmissibility_wheel, type: "scatter", mode: "lines", name: "Wheel |H_u|",
-                            line: { color: "#00aeff", width: 1.5 } },
-                        ]}
+                        data={bTrans(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Transmissibility |H(jÏ‰)|", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#444", size: 10 } }, type: "log" },
@@ -796,10 +847,7 @@ function QuarterCarDashboard() {
                     {/* Bode Magnitude dB */}
                     <PlotBox>
                       <Plot
-                        data={[
-                          { x: r.freq_hz, y: r.bode_magnitude_db, type: "scatter", mode: "lines", name: "Magnitude (dB)",
-                            line: { color: "#00ff87", width: 2 } },
-                        ]}
+                        data={bBodeMag(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Bode â€” Magnitude", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#444", size: 10 } }, type: "log" },
@@ -816,10 +864,7 @@ function QuarterCarDashboard() {
                     {/* Bode Phase */}
                     <PlotBox>
                       <Plot
-                        data={[
-                          { x: r.freq_hz, y: r.bode_phase_deg, type: "scatter", mode: "lines", name: "Phase (°)",
-                            line: { color: "#ff9f0a", width: 2 } },
-                        ]}
+                        data={bBodePhase(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Bode — Phase", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#444", size: 10 } }, type: "log" },
@@ -849,10 +894,7 @@ function QuarterCarDashboard() {
                     {/* Dynamic Index — tire load variation */}
                     <PlotBox>
                       <Plot
-                        data={[
-                          { x: r.time, y: r.tire_load_var, type: "scatter", mode: "lines", name: "Dynamic tire load ΔF_z",
-                            line: { color: "#ff6b35", width: 2 }, fill: "tozeroy", fillcolor: "rgba(255,107,53,0.05)" },
-                        ]}
+                        data={bDynLoad(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Dynamic Tire Load Variation", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
@@ -874,14 +916,7 @@ function QuarterCarDashboard() {
                     {/* Spring + Damper force */}
                     <PlotBox>
                       <Plot
-                        data={[
-                          { x: r.time, y: forces.F_spring, type: "scatter", mode: "lines", name: "Spring F_k",
-                            line: { color: "#f2a900", width: 1.5 } },
-                          { x: r.time, y: forces.F_damper, type: "scatter", mode: "lines", name: "Damper F_c",
-                            line: { color: "#00aeff", width: 1.5 } },
-                          { x: r.time, y: forces.F_total,  type: "scatter", mode: "lines", name: "Total F_susp",
-                            line: { color: "#fff", width: 2, dash: "dot" } },
-                        ]}
+                        data={bForces(r, params, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Suspension Forces", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
@@ -895,12 +930,7 @@ function QuarterCarDashboard() {
                     {/* Damper F–V diagram */}
                     <PlotBox>
                       <Plot
-                        data={[
-                          { x: forces.relVel.map(v => v * 1000), y: forces.F_damper, type: "scatter", mode: "markers",
-                            name: "Damper F–V", marker: { color: forces.F_damper.map((_, i) => i / forces.F_damper.length),
-                              colorscale: [[0, "#0a1628"], [0.5, "#00aeff"], [1, "#f2a900"]] as [number, string][],
-                              size: 2, opacity: 0.8 } },
-                        ]}
+                        data={bFV(r, params, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Damper Force–Velocity Diagram", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Relative Velocity (mm/s)", font: { color: "#444", size: 10 } } },
@@ -919,10 +949,7 @@ function QuarterCarDashboard() {
                     {/* Spring F–Displacement */}
                     <PlotBox>
                       <Plot
-                        data={[
-                          { x: r.susp_travel.map(v => v * 1000), y: forces.F_spring, type: "scatter", mode: "markers",
-                            name: "Spring F–x", marker: { color: "#f2a900", size: 2, opacity: 0.7 } },
-                        ]}
+                        data={bFx(r, params, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Spring Force–Displacement (Hysteresis)", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Suspension Travel (mm)", font: { color: "#444", size: 10 } } },
@@ -936,11 +963,7 @@ function QuarterCarDashboard() {
                     {/* Instantaneous Power */}
                     <PlotBox>
                       <Plot
-                        data={[
-                          { x: r.time, y: forces.F_damper.map((f, i) => f * (forces.relVel[i] ?? 0)),
-                            type: "scatter", mode: "lines", name: "Damper Power P_c",
-                            line: { color: "#ff2d55", width: 2 }, fill: "tozeroy", fillcolor: "rgba(255,45,85,0.05)" },
-                        ]}
+                        data={bPower(r, params, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Damper Power Dissipation", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
@@ -959,16 +982,7 @@ function QuarterCarDashboard() {
                     {/* Phase portrait: body velocity vs displacement */}
                     <PlotBox>
                       <Plot
-                        data={[
-                          { x: r.z_s.map(v => v * 1000), y: r.dz_s.map(v => v * 1000),
-                            type: "scatter", mode: "lines",
-                            name: "Body phase portrait",
-                            line: { color: "#f2a900", width: 1.5 },
-                            marker: { size: 0 } },
-                          // Start point
-                          { x: [r.z_s[0] * 1000], y: [r.dz_s[0] * 1000], type: "scatter", mode: "markers",
-                            name: "Start", marker: { color: "#00ff87", size: 8, symbol: "circle" } },
-                        ]}
+                        data={bPhaseS(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Phase Portrait — Sprung Mass", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "z_s (mm)", font: { color: "#444", size: 10 } } },
@@ -982,14 +996,7 @@ function QuarterCarDashboard() {
                     {/* Phase portrait: wheel */}
                     <PlotBox>
                       <Plot
-                        data={[
-                          { x: r.z_u.map(v => v * 1000), y: r.dz_u.map(v => v * 1000),
-                            type: "scatter", mode: "lines",
-                            name: "Wheel phase portrait",
-                            line: { color: "#00aeff", width: 1.5 } },
-                          { x: [r.z_u[0] * 1000], y: [r.dz_u[0] * 1000], type: "scatter", mode: "markers",
-                            name: "Start", marker: { color: "#00ff87", size: 8, symbol: "circle" } },
-                        ]}
+                        data={bPhaseU(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Phase Portrait — Unsprung Mass", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "z_u (mm)", font: { color: "#444", size: 10 } } },
@@ -1028,12 +1035,7 @@ function QuarterCarDashboard() {
                     {/* Body accel vs susp travel cross-plot */}
                     <PlotBox>
                       <Plot
-                        data={[
-                          { x: r.susp_travel.map(v => v * 1000), y: r.ddz_s,
-                            type: "scatter", mode: "markers",
-                            name: "Accel vs Travel",
-                            marker: { color: "#bf5af2", size: 2, opacity: 0.6 } },
-                        ]}
+                        data={bComfortTravel(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Comfort–Travel Trade-off Space", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Susp. Travel (mm)", font: { color: "#444", size: 10 } } },
@@ -1052,11 +1054,7 @@ function QuarterCarDashboard() {
                     {/* PSD of body acceleration */}
                     <PlotBox>
                       <Plot
-                        data={[
-                          { x: psdData.freqs, y: psdData.psd, type: "scatter", mode: "lines",
-                            name: "PSD ӓ_s", fill: "tozeroy", fillcolor: "rgba(255,45,85,0.06)",
-                            line: { color: "#ff2d55", width: 2 } },
-                        ]}
+                        data={bPSD(psdData, traces, deltaMode, r)}
                         layout={darkLayout({
                           title: { text: "PSD — Body Acceleration", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#444", size: 10 } }, type: "log", range: [Math.log10(0.1), Math.log10(50)] },
@@ -1117,7 +1115,7 @@ function QuarterCarDashboard() {
                               ? [0.315, 0.63] : range === "0.63â€“1.0"
                               ? [0.63, 1.0] : range === "1.0â€“2.0"
                               ? [1.0, 2.0] : [2.0, 99];
-                            const active = r.rms_body_accel >= limits[0] && r.rms_body_accel < limits[1];
+                            const active = r.rms_body_accel_wk >= limits[0] && r.rms_body_accel_wk < limits[1];
                             return (
                               <div key={range}
                                 className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-mono

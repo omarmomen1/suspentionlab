@@ -18,6 +18,7 @@ spec:
         app: suspensionlab
         component: worker
     spec:
+      serviceAccountName: {{ .Release.Name }}-sa
       containers:
       - name: worker
         image: "{{ .Values.workers.image.repository }}:{{ .Values.workers.image.tag }}"

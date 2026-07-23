@@ -8,13 +8,13 @@ from suspensionlab.backend.database.models.billing import StripeEvent
 from suspensionlab.shared.models import PlanTier
 
 @pytest.mark.asyncio
-async def test_webhook_enterprise_e2e_upgrade_downgrade(client: AsyncClient, db_session):
+async def test_webhook_enterprise_e2e_upgrade_downgrade(client: AsyncClient, db_session, mock_redis):
     customer_id = "cus_ent_123"
     user = User(
         email="enterprise@test.com",
         password_hash="fake",
         plan=PlanTier.FREE,
-        stripe_customer_id=customer_id
+        billing_customer_id=customer_id
     )
     db_session.add(user)
     await db_session.commit()
@@ -43,16 +43,11 @@ async def test_webhook_enterprise_e2e_upgrade_downgrade(client: AsyncClient, db_
     }
 
     with patch("stripe.Webhook.construct_event", return_value=mock_event_upgrade):
-        with patch("suspensionlab.backend.api.routes.optimize.async_redis_conn", new_callable=MagicMock) as mock_redis:
-            mock_redis.get = AsyncMock(return_value=None)
-            mock_redis.set = AsyncMock(return_value=True)
-            mock_redis.setex = AsyncMock(return_value=True)
-            
-            response = await client.post(
-                "/billing/webhooks/stripe",
-                json={"id": "evt_ent_upgrade_123"},
-                headers={"stripe-signature": "test_sig"}
-            )
+        response = await client.post(
+            "/api/v1/billing/webhooks/stripe",
+            json={"id": "evt_ent_upgrade_123"},
+            headers={"stripe-signature": "test_sig"}
+        )
 
     assert response.status_code == 200
     
@@ -61,18 +56,12 @@ async def test_webhook_enterprise_e2e_upgrade_downgrade(client: AsyncClient, db_
     
     # Idempotency Test (Duplicate webhook ID)
     with patch("stripe.Webhook.construct_event", return_value=mock_event_upgrade):
-        with patch("suspensionlab.backend.api.routes.optimize.async_redis_conn", new_callable=MagicMock) as mock_redis:
-            # Emulate redis cache miss, so it tries DB insert and hits IntegrityError
-            mock_redis.get = AsyncMock(return_value=None)
-            mock_redis.set = AsyncMock(return_value=True)
-            mock_redis.setex = AsyncMock(return_value=True)
-            
-            response2 = await client.post(
-                "/billing/webhooks/stripe",
-                json={"id": "evt_ent_upgrade_123"},
-                headers={"stripe-signature": "test_sig"}
-            )
-            
+        response2 = await client.post(
+            "/api/v1/billing/webhooks/stripe",
+            json={"id": "evt_ent_upgrade_123"},
+            headers={"stripe-signature": "test_sig"}
+        )
+
     assert response2.status_code == 200
     assert response2.json() == {"received": True, "message": "Duplicate event ignored"}
 
@@ -89,16 +78,11 @@ async def test_webhook_enterprise_e2e_upgrade_downgrade(client: AsyncClient, db_
     }
 
     with patch("stripe.Webhook.construct_event", return_value=mock_event_downgrade):
-        with patch("suspensionlab.backend.api.routes.optimize.async_redis_conn", new_callable=MagicMock) as mock_redis:
-            mock_redis.get = AsyncMock(return_value=None)
-            mock_redis.set = AsyncMock(return_value=True)
-            mock_redis.setex = AsyncMock(return_value=True)
-            
-            response3 = await client.post(
-                "/billing/webhooks/stripe",
-                json={"id": "evt_ent_downgrade_456"},
-                headers={"stripe-signature": "test_sig"}
-            )
+        response3 = await client.post(
+            "/api/v1/billing/webhooks/stripe",
+            json={"id": "evt_ent_downgrade_456"},
+            headers={"stripe-signature": "test_sig"}
+        )
 
     assert response3.status_code == 200
     await db_session.refresh(user)

@@ -8,6 +8,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [isSuccess, setIsSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -16,15 +17,22 @@ export default function ForgotPasswordPage() {
     
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/api/v1/auth/forgot-password?email=${encodeURIComponent(email)}`, {
+      // FIXED: Send email in POST request body, not as URL query parameter.
+      // Query params leak into server logs, browser history, and proxy/CDN logs as PII.
+      const res = await fetch(`${API_BASE}/api/v1/auth/forgot-password`, {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
       });
       if (res.ok) {
+        setIsSuccess(true);
         setMessage("If an account with that email exists, a reset link has been sent.");
       } else {
+        setIsSuccess(false);
         setMessage("An error occurred. Please try again later.");
       }
-    } catch (err) {
+    } catch {
+      setIsSuccess(false);
       setMessage("A network error occurred. Please try again.");
     } finally {
       setLoading(false);
@@ -36,13 +44,17 @@ export default function ForgotPasswordPage() {
       <div className="text-center">
         <h1 className="text-2xl font-bold text-white tracking-tight">Reset Password</h1>
         <p className="text-sm text-zinc-400 mt-2">
-          Enter your email and we'll send you a reset link.
+          Enter your email and we&apos;ll send you a reset link.
         </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {message && (
-          <div className="p-3 bg-zinc-800/50 border border-zinc-700 rounded-md text-sm text-ansys-yellow text-center">
+          <div className={`p-3 border rounded-md text-sm text-center ${
+            isSuccess
+              ? "bg-emerald-900/30 border-emerald-700/40 text-emerald-300"
+              : "bg-red-900/30 border-red-700/40 text-red-300"
+          }`}>
             {message}
           </div>
         )}

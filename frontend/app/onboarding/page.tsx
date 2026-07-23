@@ -84,7 +84,7 @@ const STEPS = [
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function OnboardingPage() {
-  const { token, authHeader } = useAuth();
+  const { authHeader } = useAuth();
   const router  = useRouter();
   const [step,  setStep]  = useState(0);
   const [loading, setLoading] = useState(false);

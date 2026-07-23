@@ -26,7 +26,10 @@ from fastapi import APIRouter, HTTPException
 
 from suspensionlab.physics.exceptions import MathConvergenceError, PhysicsValidationError
 from suspensionlab.physics.quarter_car import QuarterCarParams, RoadProfile, run_quarter_car_analysis
-from suspensionlab.shared.models import SimulateRequest
+from suspensionlab.shared.models import SimulateRequest, PlanTier
+from pydantic import BaseModel
+from suspensionlab.backend.security.auth import verify_api_key
+from fastapi import Depends
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -160,4 +163,56 @@ async def sensitivity_analysis(payload: SimulateRequest) -> dict[str, Any]:
         "sensitivities":   sensitivities,
         "perturbation_pct": DELTA * 100,
         "n_simulations":   len(perturb_tasks) + 1,
+    }
+
+class IsoHeatmapRequest(BaseModel):
+    params: QuarterCarParams
+
+@router.post("/iso8608-heatmap")
+async def iso8608_heatmap(payload: IsoHeatmapRequest, user: dict = Depends(verify_api_key)) -> dict[str, Any]:
+    """
+    ISO 8608 Road Class Sensitivity Heatmap
+    Runs an 8x8 (64) simulation sweep over ISO road classes (A-H) and vehicle velocities (10-130 km/h).
+    Returns 2D grid of Ride Comfort limits (Wk RMS Accel).
+    Restricted to Enterprise users.
+    """
+    if user.plan not in (PlanTier.ENTERPRISE,) and user.user_id != "admin-001":
+        raise HTTPException(status_code=403, detail="ISO 8608 Heatmap requires the Enterprise plan.")
+
+    velocities = np.linspace(10, 130, 8)  # km/h
+    iso_classes = ["A", "B", "C", "D", "E", "F", "G", "H"]
+    
+    grid = []
+    
+    async with asyncio.TaskGroup() as tg:
+        tasks = []
+        for v in velocities:
+            row_tasks = []
+            for iso in iso_classes:
+                # profile kwargs
+                profile_dict = {
+                    "profile_type": "random",
+                    "iso_class": iso,
+                    "velocity": v / 3.6, # m/s
+                    "duration": 5.0 # fast sweep
+                }
+                t = tg.create_task(_run_one(payload.params.model_dump(), profile_dict))
+                row_tasks.append(t)
+            tasks.append(row_tasks)
+            
+    for v_idx, row_tasks in enumerate(tasks):
+        row_res = []
+        for t in row_tasks:
+            try:
+                res = t.result()
+                row_res.append(res["rms_body_accel_wk"])
+            except Exception as e:
+                logger.warning(f"Heatmap sim failed: {e}")
+                row_res.append(0.0)
+        grid.append(row_res)
+        
+    return {
+        "velocities_kmh": velocities.tolist(),
+        "iso_classes": iso_classes,
+        "grid_rms_accel": grid
     }

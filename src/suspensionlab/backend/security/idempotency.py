@@ -32,8 +32,12 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     media_type="application/json"
                 )
             else:
-                logger.warning("Redis not available, fail-open for compute endpoint")
-                return await call_next(request)
+                logger.error("Redis not available, fail-closed for compute endpoint")
+                return Response(
+                    content=json.dumps({"error": "service_unavailable", "message": "Service temporarily unavailable", "request_id": "unknown"}),
+                    status_code=503,
+                    media_type="application/json"
+                )
             
         api_key = request.headers.get("X-API-Key", "anonymous")
         idempotency_key = None
@@ -41,15 +45,19 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
         # We need the request body to hash it for collision detection and potentially parsing Stripe event ID
         req_body = await request.body()
         
-        # Stripe webhook specific logic
-        if path in ("/billing/webhook", "/billing/webhooks/stripe"):
+        # Webhook specific logic
+        if path in ("/billing/webhook", "/billing/webhooks/stripe", "/api/v1/billing/verify-license"):
             try:
                 payload = json.loads(req_body)
                 idempotency_key = payload.get("id")
             except Exception:
                 pass
             if not idempotency_key:
-                idempotency_key = request.headers.get("Stripe-Signature")
+                idempotency_key = (
+                    request.headers.get("Stripe-Signature") or 
+                    request.headers.get("X-Signature") or 
+                    request.headers.get("Gumroad-Signature")
+                )
         else:
             idempotency_key = request.headers.get("Idempotency-Key")
             

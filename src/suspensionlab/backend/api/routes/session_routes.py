@@ -19,8 +19,8 @@ async def create_session(
 ):
     """Create a new shared simulation session (ENTERPRISE only)."""
     session = SimSession(
-        owner_id=uuid.UUID(user["user_id"]),
-        team_id=uuid.UUID(user["team_id"]) if user.get("team_id") else None,
+        owner_id=uuid.UUID(user.user_id),
+        team_id=uuid.UUID(user.team_id) if user.team_id else None,
         name=name,
         params_snapshot={}
     )
@@ -48,8 +48,8 @@ async def get_session(
         raise HTTPException(status_code=404, detail="Session not found")
         
     # Team members or owner can access
-    user_team = user.get("team_id")
-    if str(session.owner_id) != user["user_id"] and str(session.team_id) != user_team:
+    user_team = user.team_id
+    if str(session.owner_id) != user.user_id and str(session.team_id) != user_team:
         raise HTTPException(status_code=403, detail="Not authorized to view this session")
         
     comments_result = await db.execute(
@@ -92,8 +92,8 @@ async def join_session(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
         
-    user_team = user.get("team_id")
-    if str(session.owner_id) != user["user_id"] and str(session.team_id) != user_team:
+    user_team = user.team_id
+    if str(session.owner_id) != user.user_id and str(session.team_id) != user_team:
         raise HTTPException(status_code=403, detail="Not authorized to join this session")
         
     return {"status": "joined", "session_id": str(session.id)}

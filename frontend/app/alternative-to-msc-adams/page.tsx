@@ -129,7 +129,7 @@ export default function CompareAdamsPage() {
               <Cpu className="text-[#f2a900] mb-4" size={32} />
               <h3 className="text-xl font-bold mb-3">AI Race Engineer</h3>
               <p className="text-gray-400 leading-relaxed">
-                The world's first simulation tool with an integrated AI. Type "the car understeers on corner exit", and our AI runs 20+ physics variations to recommend exactly which spring to change.
+                The world&apos;s first simulation tool with an integrated AI. Type &quot;the car understeers on corner exit&quot;, and our AI runs 20+ physics variations to recommend exactly which spring to change.
               </p>
             </div>
           </div>

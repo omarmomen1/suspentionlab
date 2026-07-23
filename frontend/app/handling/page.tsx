@@ -1,9 +1,13 @@
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Handling Page
 
 "use client";
 import { useState, Suspense } from "react";
 import dynamic from "next/dynamic";
-import { Play, Settings2, AlertTriangle, Activity, Save, X, TrendingUp, Compass, Route } from "lucide-react";
+import {
+  Play, Settings2, AlertTriangle, Activity, Save, X, TrendingUp, Compass, Route, Undo2, Redo2, RotateCcw
+} from "lucide-react";
+import { useUndoRedo } from "../../hooks/useUndoRedo";
 import PDFExport from "../../components/PDFExport";
 import DataExport from "../../components/DataExport";
 import SimHistory, { saveSimulationToHistory } from "../../components/SimHistory";
@@ -83,39 +87,92 @@ function PlotBox({ children }: { children: React.ReactNode }) {
   return <div className="flex-1 min-w-0 min-h-0 relative">{children}</div>;
 }
 
+interface HandlingResults {
+  a_y?: number[];
+  a_x?: number[];
+  yaw_rate?: number[];
+  v_x: number[];
+  v_y: number[];
+  Y: number[];
+  X: number[];
+  time: number[];
+  Psi: number[];
+  [key: string]: any;
+}
+
+type HandlingState = HandlingResults | { error: boolean; message: string; [key: string]: any };
+
+interface TelemetryData {
+  lat_g?: number[];
+  long_g?: number[];
+  [key: string]: any;
+}
+
 function HandlingDashboard() {
   const { authHeader } = useAuth();
   const [isRunning, setIsRunning] = useState(false);
-  const [results, setResults] = useState<Record<string, any> | null>(null);
+  const [results, setResults] = useState<HandlingState | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [toast, setToast] = useState<Toast | null>(null);
   const [isSaving, setIsSaving] = useState(false);
-  const [telemetryData, setTelemetryData] = useState<any | null>(null);
+  const [telemetryData, setTelemetryData] = useState<TelemetryData | null>(null);
 
-  const [params, setParams] = useState({
+  const [params, setParams, { undo, redo, reset, canUndo, canRedo }] = useUndoRedo({
     maneuver_type: "Step Steer (J-Turn)",
     v_init_kph: 100.0,
     m: 1200.0,
     h_cg: 0.4,
     roll_dist: 0.55,
-    tire_coeffs: null as any
+    tire_coeffs: null as Record<string, number> | null
   });
 
   const showToast = (msg: string, type: Toast["type"]) => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
 
   const runSimulation = async () => {
-    setIsRunning(true); setResults(null);
+    setIsRunning(true);
+    setResults(null);
     try {
       const payload = {
         params: { m: params.m, h_cg: params.h_cg, roll_dist: params.roll_dist, tire_coeffs: params.tire_coeffs },
         maneuver_type: params.maneuver_type, v_init_kph: params.v_init_kph
       };
-      const res = await fetch(`${API_BASE}/simulate/handling`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify(payload) });
+      const res = await fetch(`${API_BASE}/simulate/handling`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(payload)
+      });
       const data = await res.json();
-      if (!res.ok) setResults({ error: true, message: data.message ?? data.detail ?? "Simulation failed" });
-      else { setResults(data); saveSimulationToHistory("sl_sim_history_handling", params, data); }
-    } catch (err) { setResults({ error: true, message: String(err) }); }
-    finally { setIsRunning(false); }
+      if (!res.ok) {
+        setResults({ error: true, message: data.message ?? data.detail ?? "Simulation failed" });
+        setIsRunning(false);
+        return;
+      }
+      
+      const jobId = data.job_id;
+      const interval = setInterval(async () => {
+        try {
+          const pollRes = await fetch(`${API_BASE}/jobs/${jobId}`, { headers: authHeader() });
+          const pollData = await pollRes.json();
+          if (pollData.status === "COMPLETED") {
+             clearInterval(interval);
+             setResults(pollData.result);
+             saveSimulationToHistory("sl_sim_history_handling", params, pollData.result);
+             setIsRunning(false);
+          } else if (pollData.status === "FAILED" || pollData.status === "CANCELED") {
+             clearInterval(interval);
+             setResults({ error: true, message: pollData.error || "Simulation failed." });
+             setIsRunning(false);
+          }
+        } catch (e) {
+             clearInterval(interval);
+             setResults({ error: true, message: String(e) });
+             setIsRunning(false);
+        }
+      }, 1000);
+    } catch (err) {
+      setResults({ error: true, message: String(err) });
+      setIsRunning(false);
+    }
   };
 
   const saveProfile = async () => {
@@ -131,7 +188,7 @@ function HandlingDashboard() {
   };
 
   let max_lat_g = 0, max_long_g = 0, max_yaw = 0, final_speed = 0;
-  const trackTraces: any[] = [], ggTraces: any[] = [];
+  const trackTraces: Record<string, unknown>[] = [], ggTraces: Record<string, unknown>[] = [];
   
   if (results && !results.error) {
     max_lat_g = Math.max(...(results.a_y || []).map(Math.abs)) / 9.81;
@@ -165,7 +222,7 @@ function HandlingDashboard() {
   }
 
   const hasResults = results && !results.error;
-  const r = results;
+  const r = results as any;
 
   return (
     <div className="h-full flex flex-col p-5 pt-3 gap-3 min-h-0">
@@ -182,8 +239,23 @@ function HandlingDashboard() {
         </div>
 
         <div className="flex items-center gap-2">
-          <SimHistory storageKey="sl_sim_history_handling" renderParams={(p, m) => [["Speed", p.v_init_kph], ["Mass", p.m], ["RollDist", p.roll_dist], ["Maneuver", p.maneuver_type]]} onRestore={(p) => { setParams(prev => ({ ...prev, ...p })); showToast("Restored from history", "success"); }} />
-          <button onClick={saveProfile} disabled={isSaving} className="px-3 py-1.5 bg-[#141416] border border-[#252525] hover:bg-[#1e1e20] rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40">
+          <SimHistory storageKey="sl_sim_history_handling" renderParams={(p) => [["Speed", p.v_init_kph], ["RollDist", p.roll_dist], ["Maneuver", p.maneuver_type]]} onRestore={(p) => { setParams(prev => ({ ...prev, ...p })); showToast("Restored from history", "success"); }} />
+                    {/* Undo/Redo/Reset Controls */}
+          <div className="flex items-center bg-[#141416] border border-[#252525] rounded-lg overflow-hidden mr-2">
+            <button onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)"
+              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-gray-400 disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+              <Undo2 size={14} />
+            </button>
+            <button onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)"
+              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-gray-400 border-l border-[#252525] disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+              <Redo2 size={14} />
+            </button>
+            <button onClick={reset} title="Reset to Defaults"
+              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-red-400/80 hover:text-red-400 border-l border-[#252525] transition-colors">
+              <RotateCcw size={14} />
+            </button>
+          </div>
+<button onClick={saveProfile} disabled={isSaving} className="px-3 py-1.5 bg-[#141416] border border-[#252525] hover:bg-[#1e1e20] rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40">
             <Save size={13} className="text-ansys-yellow" /> Save Setup
           </button>
           <PDFExport captureId="sim-report" fileName={`Handling_${params.maneuver_type}`} />
@@ -191,7 +263,7 @@ function HandlingDashboard() {
 
           <button onClick={runSimulation} disabled={isRunning}
             className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${isRunning ? "bg-[#222] text-gray-500 cursor-not-allowed" : "bg-ansys-yellow text-black hover:brightness-110 shadow-[0_0_20px_rgba(242,169,0,0.2)]"}`}>
-            {isRunning ? <><div className="w-3 h-3 border border-gray-600 border-t-gray-300 rounded-full animate-spin" />Solvingâ€¦</> : <><Play size={13} fill="currentColor" /> Run Solver</>}
+            {isRunning ? <><div className="w-3 h-3 border border-gray-600 border-t-gray-300 rounded-full animate-spin" />Solving...</> : <><Play size={13} fill="currentColor" /> Run Solver</>}
           </button>
         </div>
       </div>
@@ -218,7 +290,7 @@ function HandlingDashboard() {
               <ParameterInput label="Roll Stiffness Dist" val={params.roll_dist} unit="fr%" step={0.05} onChange={(v) => setParams({ ...params, roll_dist: v })} />
               <TirUploader 
                 hasCoeffs={params.tire_coeffs !== null} 
-                onParsed={(coeffs) => setParams({ ...params, tire_coeffs: coeffs })} 
+                onParsed={(coeffs) => setParams({ ...params, tire_coeffs: coeffs as any })} 
                 onClear={() => setParams({ ...params, tire_coeffs: null })} 
               />
               <TelemetryUploader
@@ -278,10 +350,10 @@ function HandlingDashboard() {
                     <PlotBox>
                       <Plot
                         data={[
-                          { x: r.time, y: r.a_y?.map((a: number) => a / 9.81), type: "scatter" as any, mode: "lines", name: "Lat G (Sim)", line: { color: "#00ff87", width: 2 } },
-                          { x: r.time, y: r.a_x?.map((a: number) => a / 9.81), type: "scatter" as any, mode: "lines", name: "Long G (Sim)", line: { color: "#f2a900", width: 2 } },
-                          ...(telemetryData?.lat_g?.length ? [{ x: telemetryData.time, y: telemetryData.lat_g, type: "scatter" as any, mode: "lines", name: "Lat G (MoTeC)", line: { color: "rgba(0,255,135,0.4)", width: 1, dash: "dot" } }] : []),
-                          ...(telemetryData?.long_g?.length ? [{ x: telemetryData.time, y: telemetryData.long_g, type: "scatter" as any, mode: "lines", name: "Long G (MoTeC)", line: { color: "rgba(242,169,0,0.4)", width: 1, dash: "dot" } }] : [])
+                          { x: r.time, y: r.a_y?.map((a: number) => a / 9.81), type: "scatter" as any as any, mode: "lines" as any as any, name: "Lat G (Sim)", line: { color: "#00ff87", width: 2 } },
+                          { x: r.time, y: r.a_x?.map((a: number) => a / 9.81), type: "scatter" as any as any, mode: "lines" as any as any, name: "Long G (Sim)", line: { color: "#f2a900", width: 2 } },
+                          ...(telemetryData?.lat_g?.length ? [{ x: telemetryData.time, y: telemetryData.lat_g, type: "scatter" as any as any, mode: "lines" as any as any, name: "Lat G (MoTeC)", line: { color: "rgba(0,255,135,0.4)", width: 1, dash: "dot" as any } }] : []),
+                          ...(telemetryData?.long_g?.length ? [{ x: telemetryData.time, y: telemetryData.long_g, type: "scatter" as any as any, mode: "lines" as any as any, name: "Long G (MoTeC)", line: { color: "rgba(242,169,0,0.4)", width: 1, dash: "dot" as any } }] : [])
                         ]}
                         layout={darkLayout({ title: { text: "G-Forces over Time", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Acceleration (G)", font: { color: "#444", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
@@ -290,9 +362,9 @@ function HandlingDashboard() {
                     <PlotBox>
                       <Plot
                         data={[
-                          { x: r.time, y: r.v_x?.map((v: number) => v * 3.6), type: "scatter" as any, mode: "lines", name: "Vx (km/h)", line: { color: "#00aeff", width: 2 } },
-                          { x: r.time, y: r.v_y?.map((v: number) => v * 3.6), type: "scatter" as any, mode: "lines", name: "Vy (km/h)", line: { color: "#ff2d55", width: 2 } },
-                          ...(telemetryData?.speed?.length ? [{ x: telemetryData.time, y: telemetryData.speed, type: "scatter" as any, mode: "lines", name: "Speed (MoTeC)", line: { color: "rgba(0,174,255,0.4)", width: 1, dash: "dot" } }] : [])
+                          { x: r.time, y: r.v_x?.map((v: number) => v * 3.6), type: "scatter" as any as any, mode: "lines" as any as any, name: "Vx (km/h)", line: { color: "#00aeff", width: 2 } },
+                          { x: r.time, y: r.v_y?.map((v: number) => v * 3.6), type: "scatter" as any as any, mode: "lines" as any as any, name: "Vy (km/h)", line: { color: "#ff2d55", width: 2 } },
+                          ...(telemetryData?.speed?.length ? [{ x: telemetryData.time, y: telemetryData.speed, type: "scatter" as any as any, mode: "lines" as any as any, name: "Speed (MoTeC)", line: { color: "rgba(0,174,255,0.4)", width: 1, dash: "dot" as any } }] : [])
                         ]}
                         layout={darkLayout({ title: { text: "Velocities", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Velocity (km/h)", font: { color: "#444", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
@@ -301,8 +373,8 @@ function HandlingDashboard() {
                     <PlotBox>
                       <Plot
                         data={[
-                          { x: r.time, y: r.yaw_rate?.map((y: number) => y * 180 / Math.PI), type: "scatter" as any, mode: "lines", name: "Yaw Rate", line: { color: "#bf5af2", width: 2 }, fill: "tozeroy", fillcolor: "rgba(191,90,242,0.05)" },
-                          ...(telemetryData?.yaw_rate?.length ? [{ x: telemetryData.time, y: telemetryData.yaw_rate, type: "scatter" as any, mode: "lines", name: "Yaw (MoTeC)", line: { color: "rgba(191,90,242,0.4)", width: 1, dash: "dot" } }] : [])
+                          { x: r.time, y: r.yaw_rate?.map((y: number) => y * 180 / Math.PI), type: "scatter" as any as any, mode: "lines" as any as any, name: "Yaw Rate", line: { color: "#bf5af2", width: 2 }, fill: "tozeroy", fillcolor: "rgba(191,90,242,0.05)" },
+                          ...(telemetryData?.yaw_rate?.length ? [{ x: telemetryData.time, y: telemetryData.yaw_rate, type: "scatter" as any as any, mode: "lines" as any as any, name: "Yaw (MoTeC)", line: { color: "rgba(191,90,242,0.4)", width: 1, dash: "dot" as any } }] : [])
                         ]}
                         layout={darkLayout({ title: { text: "Yaw Rate", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Yaw Rate (Â°/s)", font: { color: "#444", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
@@ -310,7 +382,7 @@ function HandlingDashboard() {
                     </PlotBox>
                     <PlotBox>
                       <Plot
-                        data={[ { x: r.time, y: r.slip_angle?.map((s: number) => s * 180 / Math.PI), type: "scatter" as any, mode: "lines", name: "Slip Angle", line: { color: "#ff9f0a", width: 2 }, fill: "tozeroy", fillcolor: "rgba(255,159,10,0.05)" } ]}
+                        data={[ { x: r.time, y: r.slip_angle?.map((s: number) => s * 180 / Math.PI), type: "scatter" as any as any, mode: "lines" as any as any, name: "Slip Angle", line: { color: "#ff9f0a", width: 2 }, fill: "tozeroy", fillcolor: "rgba(255,159,10,0.05)" } ]}
                         layout={darkLayout({ title: { text: "Side Slip Angle", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Slip Angle (Â°)", font: { color: "#444", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
                       />
@@ -341,7 +413,7 @@ function HandlingDashboard() {
                   <div className="grid grid-cols-1 auto-rows-[400px] gap-px bg-[#181818] overflow-y-auto custom-scrollbar h-full">
                     <PlotBox>
                       <Plot
-                        data={[ { x: r.slip_angle?.map((s: number) => s * 180 / Math.PI), y: r.yaw_rate?.map((y: number) => y * 180 / Math.PI), mode: "lines+markers", marker: { size: 3, color: r.time, colorscale: "Plasma" }, line: { width: 1, color: "rgba(255,255,255,0.2)" }, name: "Phase Plane" } as any ]}
+                        data={[ { x: r.slip_angle?.map((s: number) => s * 180 / Math.PI), y: r.yaw_rate?.map((y: number) => y * 180 / Math.PI), mode: "lines+markers", marker: { size: 3, color: r.time, colorscale: "Plasma" }, line: { width: 1, color: "rgba(255,255,255,0.2)" }, name: "Phase Plane" } as const ]}
                         layout={darkLayout({ title: { text: "Stability Phase Plane (Slip Angle vs Yaw Rate)", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Slip Angle (Â°)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Yaw Rate (Â°/s)", font: { color: "#444", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
                       />
@@ -364,3 +436,5 @@ export default function Page() {
     </Suspense>
   );
 }
+
+

@@ -13,32 +13,35 @@ from opentelemetry.propagate import inject
 from suspensionlab.shared.models import OptimizeRequest
 from suspensionlab.backend.core.errors import RedisUnavailableError, RateLimitExceededError, JobNotFoundError
 from suspensionlab.backend.security.auth import verify_api_key
-from suspensionlab.backend.workers.queue import job_queue
+from suspensionlab.backend.workers.task_queue import job_queue
 from suspensionlab.backend.workers.unified_worker import run_job
 from suspensionlab.backend.database.core import get_db_dependency
 from suspensionlab.backend.database.models.job import JobRecord
 
 router = APIRouter(tags=["optimize"])
 
-async_redis_conn: aioredis.Redis | None = None
-
-async def init_async_redis():
-    global async_redis_conn
-    redis_url = os.getenv("REDIS_URL", "")
-    if not redis_url:
-        import logging
-        logging.warning("REDIS_URL not set — async Redis features (job locking) will be unavailable.")
-        return
-    async_redis_conn = aioredis.from_url(redis_url)
-
-async def close_async_redis():
-    global async_redis_conn
-    if async_redis_conn:
-        await async_redis_conn.aclose()
+from suspensionlab.backend.core import redis_client
 
 class JobResponse(BaseModel):
     job_id: str
     status: str
+
+import hashlib
+import json
+
+def generate_idempotency_hash(user_id: str, req: OptimizeRequest) -> str:
+    data_to_hash = {
+        "user_id": user_id,
+        "vehicle_id": getattr(req.profile, 'vehicle_id', 'default'),
+        "params": req.params.model_dump(),
+        "profile": req.profile.model_dump(),
+        "objective_type": req.objective_type,
+        "max_travel": req.max_travel,
+        "solver_version": "1.0",
+        "physics_version": "1.0"
+    }
+    json_str = json.dumps(data_to_hash, sort_keys=True)
+    return hashlib.sha256(json_str.encode('utf-8')).hexdigest()
 
 @router.post("/optimize", response_model=JobResponse)
 async def submit_optimization(
@@ -51,23 +54,32 @@ async def submit_optimization(
     """
     redis_conn = job_queue.connection
     
-    lock_key = f"lock:user_optimize:{user['user_id']}"
+    idem_hash = generate_idempotency_hash(user.user_id, req)
+    idem_key = f"idem:optimize:{idem_hash}"
+    lock_key = f"lock:user_optimize:{user.user_id}"
     
+    async_redis_conn = redis_client.get_async_redis_conn()
     if async_redis_conn is None:
         raise RedisUnavailableError("Redis not initialized")
 
+    # 1. Versioned Idempotency Check
+    existing_job_id = await async_redis_conn.get(idem_key)
+    if existing_job_id:
+        # Return the existing job to prevent redundant work
+        return JobResponse(job_id=existing_job_id.decode('utf-8'), status="PENDING")
+
     try:
-        # 1. Atomic Redis Lock to prevent TOCTOU race conditions
+        # 2. Atomic Redis Lock to prevent TOCTOU race conditions
         async with async_redis_conn.lock(lock_key, timeout=5.0, blocking_timeout=2.0):
-            # 2. Safe Backpressure: Enforce quota inside the atomic lock
+            # 3. Safe Backpressure: Enforce quota inside the atomic lock
             from suspensionlab.backend.services.quota import assert_can_run_job
             await assert_can_run_job(user, db)
 
             # Create Job Record in DB safely inside the lock
             job_id = str(uuid.uuid4())
             new_job = JobRecord(
-                id=job_id,
-                user_id=user["user_id"],
+                id=uuid.UUID(job_id),
+                user_id=uuid.UUID(user.user_id),
                 job_type="OPTIMIZE_QUARTER",
                 status="PENDING",
                 params=req.params.model_dump(),
@@ -75,6 +87,10 @@ async def submit_optimization(
             )
             db.add(new_job)
             await db.commit()
+            
+            # Store idempotency key mapping for 12 hours
+            await async_redis_conn.setex(idem_key, 43200, job_id)
+
     except redis.exceptions.LockError:
         raise RateLimitExceededError("Too many concurrent optimization requests. Please wait.")
     except redis.exceptions.ConnectionError:
@@ -85,7 +101,7 @@ async def submit_optimization(
 
     import asyncio
     # Prime Redis status to guarantee authoritative read-through before enqueue
-    res_data = {"job_id": job_id, "status": "PENDING", "user_id": user["user_id"], "result": None, "error": None}
+    res_data = {"job_id": job_id, "status": "PENDING", "user_id": user.user_id, "result": None, "error": None}
     await asyncio.to_thread(redis_conn.setex, f"job_status:{job_id}", 86400, json.dumps(res_data))
 
     try:
@@ -95,21 +111,27 @@ async def submit_optimization(
             "objective_type": req.objective_type,
             "max_travel": req.max_travel
         }
+        
+        target_queue = job_queue
+        if user.plan == "ENTERPRISE":
+            from suspensionlab.backend.workers.task_queue import priority_job_queue
+            target_queue = priority_job_queue
+            
         # Enqueue job with exponential transient retry (max 3 times)
         job = await asyncio.to_thread(
-            job_queue.enqueue,
+            target_queue.enqueue,
             run_job,
             args=(job_id, payload, trace_carrier),
             job_id=job_id,
             result_ttl=86400,
             failure_ttl=86400,
-            retry=Retry(max=3, interval=[10, 30, 60])
+            retry=Retry(max=5, interval=[10, 30, 60, 120, 300])
         )
     except redis.exceptions.ConnectionError:
         # DB lock already committed. We must explicitly fail the job record, not just rollback.
         await db.execute(
             update(JobRecord)
-            .where(JobRecord.id == job_id)
+            .where(JobRecord.id == uuid.UUID(job_id))
             .values(status="FAILED", error="Redis enqueue failed. Compute plane unavailable.")
         )
         await db.commit()
@@ -120,7 +142,7 @@ async def submit_optimization(
             pass
         raise RedisUnavailableError()
     
-    return JobResponse(job_id=job.id, status="PENDING")
+    return JobResponse(job_id=str(job.id), status="PENDING")
 
 @router.get("/optimize/active")
 async def get_active_job(
@@ -132,7 +154,7 @@ async def get_active_job(
     """
     result = await db.execute(
         select(JobRecord).where(
-            JobRecord.user_id == user["user_id"],
+            JobRecord.user_id == uuid.UUID(user.user_id),
             JobRecord.status.in_(["PENDING", "RUNNING"])
         )
     )
@@ -153,7 +175,7 @@ async def get_job_history(
     from sqlalchemy import select, desc
     result = await db.execute(
         select(JobRecord)
-        .where(JobRecord.user_id == user["user_id"])
+        .where(JobRecord.user_id == uuid.UUID(user.user_id))
         .order_by(desc(JobRecord.started_at))
         .limit(limit)
     )

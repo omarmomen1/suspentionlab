@@ -1,7 +1,7 @@
 from sqlalchemy.ext.asyncio import create_async_engine
 from alembic import context
 from suspensionlab.backend.database.core import Base
-from suspensionlab.backend.database.models import user, job, team, profile, session, billing  # noqa
+from suspensionlab.backend.database.models import user, job, team, profile, session, billing, user_session, user_api_key  # noqa
 from suspensionlab.backend.database.models import shared_report  # noqa — shared_reports table
 import asyncio
 

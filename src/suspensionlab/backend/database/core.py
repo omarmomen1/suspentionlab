@@ -1,6 +1,6 @@
 import os
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 
 from suspensionlab.backend.config import settings
 DATABASE_URL = settings.database_url
@@ -23,6 +23,16 @@ engine = create_async_engine(DATABASE_URL, **engine_args)
 
 SessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine, class_=AsyncSession)
 Base = declarative_base()
+
+def get_worker_session_maker():
+    worker_engine = create_async_engine(
+        DATABASE_URL, 
+        pool_size=5, 
+        max_overflow=10, 
+        pool_timeout=30,
+        pool_pre_ping=True
+    )
+    return async_sessionmaker(autocommit=False, autoflush=False, bind=worker_engine, class_=AsyncSession)
 
 def get_async_db_session():
     """Returns a raw async session. Caller must close it."""

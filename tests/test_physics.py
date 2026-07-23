@@ -21,7 +21,7 @@ class TestQuarterCarParams:
     def test_default_params_valid(self):
         p = QuarterCarParams()
         assert p.m_s == 300.0
-        assert p.k_w == p.k_s * p.MR ** 2
+        assert p.k_w == pytest.approx(p.k_s * (p.MR ** 2))
 
     def test_negative_mass_raises(self):
         with pytest.raises(ValueError, match="positive"):

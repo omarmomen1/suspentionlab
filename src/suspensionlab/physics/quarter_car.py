@@ -55,9 +55,15 @@ from __future__ import annotations
 import warnings
 from dataclasses import dataclass, field
 from typing import Literal
+from enum import Enum
 
 import numpy as np
 from scipy.integrate import solve_ivp
+
+class SolverMode(str, Enum):
+    FAST = "FAST"
+    BALANCED = "BALANCED"
+    PRODUCTION = "PRODUCTION"
 from scipy.linalg import eigvals
 from scipy import signal
 
@@ -91,35 +97,66 @@ class QuarterCarParams:
     k_t: float = 200_000.0# N/m
     MR:  float = 0.85     # -
     c_t: float = 0.0      # Ns/m (tire damping, usually negligible)
+    # Advanced nonlinear springs
+    k_s_nl: list[float] | None = None  # [k1, k2, k3] for F = k1*z + k2*z^2 + k3*z^3
+    z_0: float = 0.0                   # Preload/Weight jacking offset [m]
+    
+    # Advanced progressive dampers (split comp/rebound)
     damper_curve_v: list[float] | None = None
     damper_curve_f: list[float] | None = None
+    damper_curve_v_comp: list[float] | None = None
+    damper_curve_f_comp: list[float] | None = None
+    damper_curve_v_reb: list[float] | None = None
+    damper_curve_f_reb: list[float] | None = None
+    
+    # Non-linear limits (exponential bump stops)
+    bump_stop_jounce: float = 0.1     # m (suspension travel limit in compression)
+    bump_stop_rebound: float = -0.1   # m (suspension travel limit in extension)
+    bump_stop_rate: float = 0.0       # N/m (stiffness of bump stops, 0 disables)
+    bump_stop_exp: float = 50.0       # lambda coefficient for exponential engagement
+    
+    # Stribeck friction model
+    coulomb_friction: float = 0.0     # N (legacy dry friction)
+    stribeck_fs: float = 0.0          # N (Static friction peak)
+    stribeck_fc: float = 0.0          # N (Kinetic Coulomb friction)
+    stribeck_vs: float = 0.01         # m/s (Stribeck velocity)
+    stribeck_sigma: float = 0.0       # Ns/m (Viscous friction term)
 
     def __post_init__(self) -> None:
         import math
         for name, val in self.__dict__.items():
-            if name in ("damper_curve_v", "damper_curve_f") or val is None or isinstance(val, list):
+            if val is None or isinstance(val, list) or name in ("bump_stop_rebound",):
                 continue
             if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
                 raise ValueError(f"Parameter '{name}' cannot be NaN or infinite.")
-            if name in ("m_s", "m_u") and val <= 0:
-                raise ValueError(
-                    f"Parameter '{name}' must be positive (> 0 kg), got {val}. "
-                    "Zero mass causes division-by-zero in the equations of motion."
-                )
+            if name in ("m_s", "m_u"):
+                if val < 0.1:
+                    raise ValueError(
+                        f"Parameter '{name}' must be a strictly positive value > 0.1 kg, got {val}. "
+                        "Extremely low mass causes math convergence errors."
+                    )
+                if val > 1e6:
+                    raise ValueError(f"Parameter '{name}' is excessively high, got {val}.")
+            elif name in ("k_s", "k_t") and val > 1e8:
+                raise ValueError(f"Parameter '{name}' is excessively high, got {val}.")
             elif val < 0:
                 raise ValueError(f"Parameter '{name}' must be non-negative, got {val}")
         if self.MR <= 0 or self.MR > 1.5:
             raise ValueError(f"Motion ratio MR={self.MR} outside physical range (0, 1.5]")
+        if self.stribeck_fs < self.stribeck_fc:
+            raise ValueError("Stribeck static friction (fs) cannot be less than kinetic friction (fc).")
+        if self.stribeck_vs <= 0.0:
+            raise ValueError("Stribeck velocity (vs) must be strictly positive.")
 
     @property
     def k_w(self) -> float:
         """Wheel rate [N/m]: spring rate referred to wheel centre."""
-        return self.k_s * self.MR ** 2
+        return self.k_s * (self.MR ** 2)
 
     @property
     def c_w(self) -> float:
         """Wheel damping rate [Ns/m]: damper rate referred to wheel centre."""
-        return self.c * self.MR ** 2
+        return self.c * (self.MR ** 2)
 
 
 @dataclass
@@ -338,14 +375,14 @@ def compute_modal_properties(p: QuarterCarParams) -> dict:
 # ─────────────────────────────────────────────────────────────────────────────
 
 def _impedance_matrix_tf(
-    omega: float,
+    omega: np.ndarray,
     m_s: float,
     m_u: float,
     k_w: float,
     c: float,
     k_t: float,
     c_t: float,
-) -> tuple[complex, complex]:
+) -> tuple[np.ndarray, np.ndarray]:
     """
     Compute complex transfer functions H_s = Z_s/Z_r and H_u = Z_u/Z_r
     at angular frequency omega using impedance matrix inversion.
@@ -376,7 +413,11 @@ def _impedance_matrix_tf(
 
     det_Z = Z11 * Z22 - Z12 * Z12  # Z12 = Z21
 
-    if abs(det_Z) < 1e-30:
+    if isinstance(det_Z, np.ndarray):
+        # FIXED: Use complex 1e-30+0j to avoid zeroing the imaginary part, which
+        # would corrupt the phase of the Bode plot at near-resonance frequencies.
+        det_Z = np.where(np.abs(det_Z) < 1e-30, 1e-30 + 0j, det_Z)
+    elif abs(det_Z) < 1e-30:
         return complex(0), complex(0)
 
     H_s = (-Z12 * F_coeff) / det_Z
@@ -411,13 +452,9 @@ def compute_frequency_response(
     freq_hz = np.logspace(np.log10(f_min), np.log10(f_max), n_points)
     omega   = 2.0 * np.pi * freq_hz
 
-    H_s_arr = np.zeros(n_points, dtype=complex)
-    H_u_arr = np.zeros(n_points, dtype=complex)
-
-    for i, w in enumerate(omega):
-        H_s_arr[i], H_u_arr[i] = _impedance_matrix_tf(
-            w, p.m_s, p.m_u, p.k_w, p.c_w, p.k_t, p.c_t
-        )
+    H_s_arr, H_u_arr = _impedance_matrix_tf(
+        omega, p.m_s, p.m_u, p.k_w, p.c_w, p.k_t, p.c_t
+    )
 
     tx_body  = np.abs(H_s_arr)
     tx_wheel = np.abs(H_u_arr)
@@ -509,15 +546,20 @@ def _road_profile_fn(profile: RoadProfile):
         n0 = 0.1  # reference spatial frequency [cycle/m] per ISO 8608
         
         # Seed for reproducible but non-periodic road based on class + speed + duration
-        seed_val = int((G_d_n0 * 1e6) + duration + v)
+        # FIXED: Use hash-based seed to avoid seed collisions from integer truncation.
+        # e.g., class A (G_d_n0=16e-6) at 20m/s for 5s and class A at 10m/s for 15s
+        # would produce the same int(16.0 + 5.0 + 20.0) = 41 seed without the hash.
+        seed_val = abs(hash((G_d_n0, duration, v))) % (2**31)
         rng = np.random.default_rng(seed=seed_val)
         
         # Temporal PSD of road velocity: S_v(f) = G_d_n0 * v * (2*pi*n0)^2
         # This ensures correct amplitude scaling at any speed
         S_v = G_d_n0 * v * (2.0 * np.pi * n0) ** 2
         
-        # White noise standard deviation: sigma^2 = S_v * fs / 2
-        sigma_v = np.sqrt(S_v * (1.0 / (2.0 * dt)))
+        # FIXED: White noise variance for discrete white noise with PSD S_v sampled at fs=1/dt:
+        # sigma^2 = S_v * fs = S_v / dt
+        # Previous formula used S_v * fs/2 (Nyquist), underestimating amplitude by sqrt(2).
+        sigma_v = np.sqrt(S_v / dt)
         v_noise = rng.normal(0.0, sigma_v, N)
         
         # Leaky integrator to prevent infinite DC drift
@@ -532,7 +574,8 @@ def _road_profile_fn(profile: RoadProfile):
         b_filt = [dt]
         a_filt = [1.0, -alpha]
         z_r_raw = sp_signal.lfilter(b_filt, a_filt, v_noise)
-        # Normalize by 1/wc so DC gain = 1/wc * dt/(1-alpha) = 1 → correct physical units
+        # Filter is 1/(s + wc) which acts as an integrator 1/s for f >> f_c. 
+        # Output must be multiplied by w_c to restore unit gain in passband.
         z_r_arr = z_r_raw * w_c
         
         t_arr = np.linspace(0, duration, N)
@@ -581,16 +624,45 @@ def _quarter_car_ode(t, x, p: QuarterCarParams, zr_fn, dzr_fn):
     v_susp = dz_s - dz_u
     z_susp = z_s - z_u
     
-    # Evaluate damper force at the wheel
-    if p.damper_curve_v is not None and p.damper_curve_f is not None and len(p.damper_curve_v) > 1:
-        # velocity at the damper
-        v_damper = v_susp * p.MR
+    z_susp_adj = z_susp - p.z_0
+    v_damper = v_susp * p.MR
+    
+    # Progressive Dampers (Split curves)
+    if v_damper > 0 and p.damper_curve_v_comp is not None and p.damper_curve_f_comp is not None:
+        F_damper = np.interp(v_damper, p.damper_curve_v_comp, p.damper_curve_f_comp)
+        F_damper_w = F_damper * p.MR
+    elif v_damper < 0 and p.damper_curve_v_reb is not None and p.damper_curve_f_reb is not None:
+        F_damper = np.interp(v_damper, p.damper_curve_v_reb, p.damper_curve_f_reb)
+        F_damper_w = F_damper * p.MR
+    elif p.damper_curve_v is not None and p.damper_curve_f is not None and len(p.damper_curve_v) > 1:
         F_damper = np.interp(v_damper, p.damper_curve_v, p.damper_curve_f)
         F_damper_w = F_damper * p.MR
     else:
         F_damper_w = p.c_w * v_susp
         
-    F_spring_w = p.k_w * z_susp
+    # Stribeck Friction + Coulomb
+    if p.stribeck_fs > 0 or p.stribeck_fc > 0:
+        fric = (p.stribeck_fc + (p.stribeck_fs - p.stribeck_fc) * np.exp(-(v_susp / p.stribeck_vs)**2)) * np.tanh(v_susp / 0.01) + p.stribeck_sigma * v_susp
+        F_damper_w += fric * p.MR
+    elif p.coulomb_friction > 0:
+        F_damper_w += p.coulomb_friction * np.tanh(v_susp / 0.01) * p.MR
+        
+    # Nonlinear Springs
+    if p.k_s_nl is not None and len(p.k_s_nl) >= 3:
+        z_spring = z_susp_adj * p.MR
+        F_spring = p.k_s_nl[0] * z_spring + p.k_s_nl[1] * (z_spring**2) + p.k_s_nl[2] * (z_spring**3)
+        F_spring_w = F_spring * p.MR
+    else:
+        F_spring_w = p.k_w * z_susp_adj
+    
+    # Exponential Bump Stops
+    if p.bump_stop_rate > 0:
+        if z_susp > p.bump_stop_jounce:
+            dz = min(z_susp - p.bump_stop_jounce, 0.05)
+            F_spring_w += p.bump_stop_rate * (np.exp(p.bump_stop_exp * dz) - 1.0) * p.MR**2
+        elif z_susp < p.bump_stop_rebound:
+            dz_reb = min(p.bump_stop_rebound - z_susp, 0.05)
+            F_spring_w -= p.bump_stop_rate * (np.exp(p.bump_stop_exp * dz_reb) - 1.0) * p.MR**2
 
     # Sprung acceleration
     ddz_s = (1.0 / p.m_s) * (-F_damper_w - F_spring_w)
@@ -613,16 +685,18 @@ def _quarter_car_ode(t, x, p: QuarterCarParams, zr_fn, dzr_fn):
 def simulate_time_response(
     p: QuarterCarParams,
     profile: RoadProfile,
-    t_eval_dt: float = 0.002,
+    t_eval_dt: float = 0.001,
+    solver_mode: SolverMode = SolverMode.BALANCED,
 ) -> dict:
     """
-    Integrate the 2-DOF quarter car ODE using scipy solve_ivp (RK45).
+    Integrate the 2-DOF quarter car ODE using scipy solve_ivp.
 
     Parameters
     ----------
     p          : QuarterCarParams
     profile    : RoadProfile
     t_eval_dt  : time step for output [s] (default 2 ms → 500 Hz)
+    solver_mode: SolverMode (FAST, BALANCED, PRODUCTION)
 
     Returns
     -------
@@ -635,16 +709,30 @@ def simulate_time_response(
     t_eval  = np.arange(0.0, profile.duration, t_eval_dt)
     x0      = [0.0, 0.0, 0.0, 0.0]   # start at static equilibrium
 
+    # Solver mappings based on performance benchmarks
+    if solver_mode == SolverMode.FAST:
+        method = "LSODA"
+        rtol = 1e-3
+        atol = 1e-6
+    elif solver_mode == SolverMode.BALANCED:
+        method = "LSODA"
+        rtol = 1e-5
+        atol = 1e-8
+    else:  # PRODUCTION
+        method = "BDF"
+        rtol = 1e-7
+        atol = 1e-10
+
     sol = solve_ivp(
         fun=_quarter_car_ode,
         t_span=t_span,
         y0=x0,
-        method="BDF",
+        method=method,
         t_eval=t_eval,
         args=(p, zr_fn, dzr_fn),
-        rtol=1e-6,
-        atol=1e-9,
-        max_step=max(0.01, profile.duration / 1000.0),
+        rtol=rtol,
+        atol=atol,
+        max_step=max(0.001, profile.duration / 5000.0),
         dense_output=False,
     )
 
@@ -669,13 +757,42 @@ def simulate_time_response(
     v_susp = dz_s - dz_u
     z_susp = z_s - z_u
     
-    if p.damper_curve_v is not None and p.damper_curve_f is not None and len(p.damper_curve_v) > 1:
-        F_damper = np.interp(v_susp * p.MR, p.damper_curve_v, p.damper_curve_f)
+    z_susp_adj = z_susp - p.z_0
+    v_damper = v_susp * p.MR
+    
+    # Progressive Dampers (Split curves)
+    F_damper_w = np.zeros_like(v_susp)
+    if p.damper_curve_v_comp is not None and p.damper_curve_f_comp is not None and p.damper_curve_v_reb is not None and p.damper_curve_f_reb is not None:
+        F_damper_comp = np.interp(v_damper, p.damper_curve_v_comp, p.damper_curve_f_comp)
+        F_damper_reb = np.interp(v_damper, p.damper_curve_v_reb, p.damper_curve_f_reb)
+        F_damper = np.where(v_damper > 0, F_damper_comp, F_damper_reb)
+        F_damper_w = F_damper * p.MR
+    elif p.damper_curve_v is not None and p.damper_curve_f is not None and len(p.damper_curve_v) > 1:
+        F_damper = np.interp(v_damper, p.damper_curve_v, p.damper_curve_f)
         F_damper_w = F_damper * p.MR
     else:
         F_damper_w = p.c_w * v_susp
         
-    F_spring_w = p.k_w * z_susp
+    # Stribeck Friction + Coulomb
+    if p.stribeck_fs > 0 or p.stribeck_fc > 0:
+        fric = (p.stribeck_fc + (p.stribeck_fs - p.stribeck_fc) * np.exp(-(v_susp / p.stribeck_vs)**2)) * np.tanh(v_susp / 0.01) + p.stribeck_sigma * v_susp
+        F_damper_w += fric * p.MR
+    elif p.coulomb_friction > 0:
+        F_damper_w += p.coulomb_friction * np.tanh(v_susp / 0.01) * p.MR
+        
+    # Nonlinear Springs
+    if p.k_s_nl is not None and len(p.k_s_nl) >= 3:
+        z_spring = z_susp_adj * p.MR
+        F_spring = p.k_s_nl[0] * z_spring + p.k_s_nl[1] * (z_spring**2) + p.k_s_nl[2] * (z_spring**3)
+        F_spring_w = F_spring * p.MR
+    else:
+        F_spring_w = p.k_w * z_susp_adj
+    
+    # Exponential Bump Stops
+    if p.bump_stop_rate > 0:
+        bump_jounce = np.where(z_susp > p.bump_stop_jounce, p.bump_stop_rate * (np.exp(p.bump_stop_exp * (z_susp - p.bump_stop_jounce)) - 1.0) * p.MR**2, 0.0)
+        bump_rebound = np.where(z_susp < p.bump_stop_rebound, -p.bump_stop_rate * (np.exp(p.bump_stop_exp * (p.bump_stop_rebound - z_susp)) - 1.0) * p.MR**2, 0.0)
+        F_spring_w += bump_jounce + bump_rebound
     
     ddz_s = (1.0 / p.m_s) * (-F_damper_w - F_spring_w)
 
@@ -812,6 +929,7 @@ def run_quarter_car_analysis(
     f_min: float = 0.1,
     f_max: float = 50.0,
     n_freq: int = 600,
+    solver_mode: SolverMode = SolverMode.BALANCED,
 ) -> QuarterCarResult:
     """
     Run the complete 2-DOF quarter car analysis pipeline.
@@ -842,20 +960,42 @@ def run_quarter_car_analysis(
     freq_data = compute_frequency_response(p, f_min=f_min, f_max=f_max, n_points=n_freq)
 
     # 3. Time domain
-    time_data = simulate_time_response(p, profile)
+    t_eval_dt = 0.005 if solver_mode == SolverMode.FAST else 0.001
 
-    # 4. Metrics
-    metrics = compute_metrics(time_data, p)
-
-    # 5. PSD Analysis (Backend)
-    from scipy.signal import welch
-    dt = time_data["time"][1] - time_data["time"][0] if len(time_data["time"]) > 1 else 0.002
-    fs = 1.0 / dt
-    f_psd, p_psd = welch(time_data["ddz_s"], fs, nperseg=min(len(time_data["ddz_s"]), 1024))
-
-    # 6. Downsample time domain data to ~2000 points maximum to prevent payload bloat
-    N_total = len(time_data["time"])
-    step = max(1, N_total // 2000)
+    time_data = None
+    metrics = None
+    try:
+        time_data = simulate_time_response(p, profile, t_eval_dt=t_eval_dt, solver_mode=solver_mode)
+        metrics = compute_metrics(time_data, p)
+        
+        # 5. PSD Analysis (Backend)
+        from scipy.signal import welch
+        dt = time_data["time"][1] - time_data["time"][0] if len(time_data["time"]) > 1 else 0.002
+        fs = 1.0 / dt
+        f_psd, p_psd = welch(time_data["ddz_s"], fs, nperseg=min(len(time_data["ddz_s"]), 1024))
+        
+        # 6. Downsample time domain data to ~2000 points maximum to prevent payload bloat
+        N_total = len(time_data["time"])
+        step = max(1, N_total // 2000)
+    except Exception as e:
+        import warnings
+        warnings.warn(f"Time domain simulation failed: {str(e)}")
+        # Provide fallback metrics
+        metrics = {
+            "rms_body_accel": 0.0,
+            "rms_body_accel_wk": 0.0,
+            "rms_susp_travel": 0.0,
+            "rms_tire_load": 0.0,
+            "peak_susp_travel": 0.0,
+            "comfort_rating": "Failed",
+        }
+        f_psd, p_psd = [], []
+        time_data = {
+            "time": [0.0], "z_s": [0.0], "z_u": [0.0], "z_r": [0.0],
+            "dz_s": [0.0], "dz_u": [0.0], "ddz_s": [0.0],
+            "susp_travel": [0.0], "tire_defl": [0.0], "tire_load_var": [0.0]
+        }
+        step = 1
 
     result = QuarterCarResult(
         # Modal

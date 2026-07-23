@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import Link from "next/link";
-import { User, Settings, LogOut, CreditCard, Key, ChevronDown } from "lucide-react";
+import { Settings, LogOut, CreditCard, Key, ChevronDown } from "lucide-react";
 
 const PLAN_STYLES: Record<string, string> = {
   FREE:       "text-gray-500 bg-[#1e1e1e]",

@@ -1,7 +1,10 @@
 "use client";
-import { useState, useMemo, Suspense } from "react";
+import { useMemo, Suspense } from "react";
 import dynamic from "next/dynamic";
-import { Settings2, Activity, Play, Waves, BarChart2 } from "lucide-react";
+import {
+  Settings2, Waves
+} from "lucide-react";
+import { useUndoRedo } from "../../hooks/useUndoRedo";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -68,7 +71,7 @@ function PlotBox({ children }: { children: React.ReactNode }) {
 }
 
 function NVHDashboard() {
-  const [params, setParams] = useState({
+  const [params, setParams] = useUndoRedo({
     m_s: 300.0,
     m_u: 35.0,
     k_s: 25000.0,
@@ -200,7 +203,7 @@ function NVHDashboard() {
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-600 text-sm">Loading environment…</div>}>
+    <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-600 text-sm">Loading environment&hellip;</div>}>
       <NVHDashboard />
     </Suspense>
   );

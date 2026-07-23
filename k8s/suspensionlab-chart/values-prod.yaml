@@ -1,20 +1,38 @@
-# SuspensionLab PRO Production Values
+# SuspensionLab PRO — Production Values
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPLOYMENT: Override image tags at deploy time via CI/CD:
+#   helm upgrade --install suspensionlab ./k8s/suspensionlab-chart \
+#     -f values-prod.yaml \
+#     --set api.image.tag=$(git rev-parse --short HEAD) \
+#     --set ui.image.tag=$(git rev-parse --short HEAD) \
+#     --set workers.image.tag=$(git rev-parse --short HEAD)
+#
+# ECR image URLs are populated from `terraform output ecr_backend_url` etc.
+# ─────────────────────────────────────────────────────────────────────────────
 
 environment: production
+
+rbac:
+  create: true
 
 api:
   replicaCount: 3
   image:
-    repository: <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/suspensionlab/backend
-    tag: "1.0.0"  # Override in CI/CD: --set api.image.tag=$(git rev-parse --short HEAD)
-    imagePullPolicy: IfNotPresent  # Use cached image; only pull on tag change
+    # Populated by CI/CD via: terraform output -raw ecr_backend_url
+    repository: "" # REQUIRED: set via --set api.image.repository=$(terraform output -raw ecr_backend_url)
+    # FIXED: No hardcoded tag. CI/CD injects git SHA: --set api.image.tag=sha-$(git rev-parse --short HEAD)
+    tag: "" # REQUIRED: set via --set api.image.tag=sha-<git-sha>
+    imagePullPolicy: IfNotPresent
   resources:
+    # FIXED: Increased from 512Mi to 2Gi limit.
+    # The original 512Mi limit guaranteed OOMKilled events under realistic SciPy/NumPy
+    # simulation workloads. Python physics engines hold large matrix data in memory.
     requests:
       cpu: 500m
-      memory: 512Mi
-    limits:
-      cpu: 1000m
       memory: 1Gi
+    limits:
+      cpu: 2000m
+      memory: 2Gi
   autoscaling:
     enabled: true
     minReplicas: 3
@@ -24,9 +42,9 @@ api:
 ui:
   replicaCount: 3
   image:
-    repository: <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/suspensionlab/frontend
-    tag: "1.0.0"
-    imagePullPolicy: IfNotPresent  # Use cached image; only pull on tag change
+    repository: "" # REQUIRED: terraform output -raw ecr_frontend_url
+    tag: ""        # REQUIRED: --set ui.image.tag=sha-<git-sha>
+    imagePullPolicy: IfNotPresent
   resources:
     requests:
       cpu: 250m
@@ -42,16 +60,19 @@ ui:
 
 workers:
   image:
-    repository: <AWS_ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/suspensionlab/worker
-    tag: "1.0.0"
-    imagePullPolicy: IfNotPresent  # Use cached image; only pull on tag change
+    repository: "" # REQUIRED: terraform output -raw ecr_backend_url
+    tag: ""        # REQUIRED: --set workers.image.tag=sha-<git-sha>
+    imagePullPolicy: IfNotPresent
   resources:
+    # FIXED: Increased from 1Gi/2Gi to 2Gi/4Gi for physics simulation workers.
+    # Workers run long-running SciPy ODE solvers and Monte Carlo sweeps which
+    # can allocate several GB of NumPy arrays. OOMKilled workers silently drop jobs.
     requests:
       cpu: 1000m
-      memory: 1Gi
-    limits:
-      cpu: 2000m
       memory: 2Gi
+    limits:
+      cpu: 4000m
+      memory: 4Gi
   keda:
     enabled: true
     minReplicaCount: 0
@@ -62,22 +83,77 @@ ingress:
   enabled: true
   className: nginx
   host: app.suspensionlab.pro
+  annotations:
+    # WAF ACL ARN from: terraform output -raw waf_web_acl_arn
+    alb.ingress.kubernetes.io/wafv2-acl-arn: "" # Set via CI/CD
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
   tls:
+    # FIXED: TLS hosts now match the ingress host (app.suspensionlab.pro).
+    # Previously the TLS block listed app.suspensionlab.com while the ingress
+    # host was app.suspensionlab.pro — causing TLS certificate validation failures
+    # for all users.
     - secretName: suspensionlab-tls
       hosts:
-        - app.suspensionlab.com
+        - app.suspensionlab.pro
 
-# Subcharts
+# ── Subcharts ─────────────────────────────────────────────────────────────────
+# FIXED: Both postgresql and redis subcharts are DISABLED for production.
+#
+# CRITICAL: The original config had both enabled, which caused Helm to deploy
+# in-cluster stateful databases alongside the managed AWS RDS and ElastiCache
+# provisioned by Terraform. This created:
+#   1. Two separate, unconnected database instances
+#   2. In-cluster databases losing ALL data on pod eviction (no PersistentVolume)
+#   3. Connection strings pointing to the wrong database instance
+#   4. Data split across two systems with no replication or consistency guarantees
+#
+# Production MUST use ONLY the managed AWS services from Terraform.
 redis:
-  enabled: true
-postgresql:
-  enabled: true
+  enabled: false
 
+postgresql:
+  enabled: false
+
+# ── Secrets ───────────────────────────────────────────────────────────────────
+# FIXED: Secrets are now sourced from AWS Secrets Manager via the
+# External Secrets Operator (ESO), NOT from Helm values or manual injection.
+# ESO syncs secrets at runtime using the IAM role suspensionlab-external-secrets
+# (configured in Terraform with IRSA).
+#
+# External Secrets Operator must be installed in the cluster:
+#   helm repo add external-secrets https://charts.external-secrets.io
+#   helm install external-secrets external-secrets/external-secrets -n external-secrets --create-namespace
+
+externalSecrets:
+  enabled: true
+  # ARN of the AWS Secrets Manager secret (from terraform output)
+  secretArn: "" # REQUIRED: set to the ARN of the suspensionlab/${environment}/app secret
+  # IAM Role ARN for the External Secrets Operator service account (from terraform output)
+  iamRoleArn: "" # REQUIRED: set to the suspensionlab-external-secrets IAM role ARN
+  # Refresh interval for secret sync
+  refreshInterval: "1h"
+
+# Legacy manual secrets — used ONLY when externalSecrets.enabled = false (dev/staging)
+# NEVER commit real values here.
 secrets:
-  # Override via --set secrets.databaseUrl=<value> or use external-secrets operator
-  # NEVER commit real values to this file
   databaseUrl: ""
   redisUrl: ""
   redisPassword: ""
   apiKey: ""
   stripeWebhookSecret: ""
+
+# ── Monitoring ────────────────────────────────────────────────────────────────
+monitoring:
+  # Requires kube-prometheus-stack to be installed in the cluster
+  serviceMonitor:
+    enabled: true
+    interval: "30s"
+    scrapeTimeout: "10s"
+  prometheusRule:
+    enabled: true
+  alertmanager:
+    enabled: true
+    # Routing critical alerts to PagerDuty and warnings to Slack
+    pagerdutyIntegrationKey: "REPLACE_WITH_PAGERDUTY_KEY"
+    slackApiUrl: "REPLACE_WITH_SLACK_WEBHOOK_URL"
+    slackChannel: "#alerts-suspensionlab"

@@ -16,15 +16,22 @@ def _active_quarter_car_ode(t, x, p: ActiveQuarterCarParams, zr_fn, dzr_fn):
     k_w = p.k_w
     v_rel = dz_s - dz_u
     
+    # Scale velocities to damper using Motion Ratio
+    v_damper = v_rel * p.MR
+    dz_s_damper = dz_s * p.MR
+    
     # Ideal Skyhook Control Logic for Semi-Active Damper
     # The damper can only dissipate energy, not add it.
-    if dz_s * v_rel > 0:
-        F_d = p.c_sky * dz_s
+    if dz_s_damper * v_damper > 0:
+        F_damper = p.c_sky * dz_s_damper
     else:
-        F_d = p.c_min * v_rel
+        F_damper = p.c_min * v_damper
 
-    # Clip F_d to simulate damper limits (e.g., max force 5000 N)
-    F_d = np.clip(F_d, -5000.0, 5000.0)
+    # Clip F_damper to simulate damper limits (e.g., max force 5000 N)
+    F_damper = np.clip(F_damper, -5000.0, 5000.0)
+    
+    # Scale damper force back to wheel
+    F_d = F_damper * p.MR
 
     # Sprung acceleration
     ddz_s = (1.0 / p.m_s) * (
@@ -60,9 +67,10 @@ def simulate_active_time_response(
         y0=x0,
         t_eval=t_eval,
         args=(p, zr_fn, dzr_fn),
-        method="RK45",
+        method="BDF",
         rtol=1e-5,
         atol=1e-7,
+        max_step=max(0.001, profile.duration / 5000.0),
     )
 
     time = sol.t
@@ -71,14 +79,24 @@ def simulate_active_time_response(
     z_u = sol.y[2]
     dz_u = sol.y[3]
 
-    # Calculate accelerations and forces
-    ddz_s = np.zeros_like(time)
-    z_r_arr = np.zeros_like(time)
+    # Calculate accelerations and forces vectorized
+    z_r_arr = np.asarray(zr_fn(time)).flatten()
+    dz_r_arr = np.asarray(dzr_fn(time)).flatten()
     
-    for i, t_step in enumerate(time):
-        dx = _active_quarter_car_ode(t_step, sol.y[:, i], p, zr_fn, dzr_fn)
-        ddz_s[i] = dx[1]
-        z_r_arr[i] = float(zr_fn(np.array([t_step]))[0])
+    v_rel = dz_s - dz_u
+    v_damper = v_rel * p.MR
+    dz_s_damper = dz_s * p.MR
+    
+    F_damper = np.where(
+        dz_s_damper * v_damper > 0,
+        p.c_sky * dz_s_damper,
+        p.c_min * v_damper
+    )
+    F_damper = np.clip(F_damper, -5000.0, 5000.0)
+    F_d = F_damper * p.MR
+    
+    ddz_s = (1.0 / p.m_s) * (-F_d - p.k_w * (z_s - z_u))
+    ddz_u = (1.0 / p.m_u) * (F_d + p.k_w * (z_s - z_u) - p.k_t * (z_u - z_r_arr) - p.c_t * (dz_u - dz_r_arr))
 
     susp_travel = z_s - z_u
     tire_defl = z_u - z_r_arr
@@ -86,6 +104,11 @@ def simulate_active_time_response(
 
     # Metrics
     rms_body_accel = float(np.sqrt(np.mean(ddz_s**2)))
+    
+    from .quarter_car import _apply_wk_weighting
+    dt = time[1] - time[0] if len(time) > 1 else 0.002
+    rms_body_accel_wk = float(np.sqrt(np.mean(_apply_wk_weighting(ddz_s, dt)**2)))
+    
     rms_susp_travel = float(np.sqrt(np.mean(susp_travel**2)))
     rms_tire_load = float(np.sqrt(np.mean(tire_load_var**2)))
     peak_susp_travel = float(np.max(susp_travel) - np.min(susp_travel))
@@ -102,6 +125,7 @@ def simulate_active_time_response(
     res.tire_defl = tire_defl
     res.tire_load_var = tire_load_var
     res.rms_body_accel = rms_body_accel
+    res.rms_body_accel_wk = rms_body_accel_wk
     res.rms_susp_travel = rms_susp_travel
     res.rms_tire_load = rms_tire_load
     res.peak_susp_travel = peak_susp_travel

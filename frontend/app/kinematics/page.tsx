@@ -1,7 +1,10 @@
 "use client";
-import { useState, Suspense } from "react";
+import { Suspense } from "react";
 import dynamic from "next/dynamic";
-import { Settings2, Activity, Play, Wrench, BarChart2 } from "lucide-react";
+import {
+  Settings2, Wrench
+} from "lucide-react";
+import { useUndoRedo } from "../../hooks/useUndoRedo";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
@@ -78,7 +81,7 @@ function PlotBox({ children }: { children: React.ReactNode }) {
 }
 
 function KinematicsDashboard() {
-  const [params, setParams] = useState({
+  const [params, setParams] = useUndoRedo({
     lca_in_y: 300.0, lca_in_z: 200.0,
     lca_out_y: 700.0, lca_out_z: 180.0,
     uca_in_y: 350.0, uca_in_z: 450.0,
@@ -100,7 +103,7 @@ function KinematicsDashboard() {
   const ic_dist = IC ? Math.sqrt(Math.pow(IC[0] - params.lca_out_y, 2) + Math.pow(IC[1] - params.lca_out_z, 2)) : 0;
   const camber_gain = IC ? -1 * (1 / ic_dist) * (180 / Math.PI) * 1000 : 0;
 
-  const traces: any[] = [
+  const traces: Record<string, unknown>[] = [
     { x: [0, 0], y: [-100, 800], mode: "lines", line: { color: "rgba(255,255,255,0.1)", dash: "dash", width: 1 }, showlegend: false },
     { x: [-200, 1500], y: [0, 0], mode: "lines", line: { color: "#333", width: 2 }, name: "Ground Point" },
     { x: [LCA_in[0], LCA_out[0]], y: [LCA_in[1], LCA_out[1]], mode: "lines+markers", line: { color: "#00aeff", width: 2.5 }, marker: { size: 6, color: "#fff" }, name: "Lower Wishbone" },
@@ -203,7 +206,7 @@ function KinematicsDashboard() {
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-600 text-sm">Loading environment…</div>}>
+    <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-600 text-sm">Loading environment&hellip;</div>}>
       <KinematicsDashboard />
     </Suspense>
   );

@@ -1,9 +1,10 @@
 "use client";
 import { useState } from "react";
 import {
-  Shield, AlertTriangle, CheckCircle, TrendingDown, Loader2,
-  Car, Gauge, Thermometer, Wrench, BarChart2, ChevronDown
+  Shield, Loader2, Gauge, AlertTriangle, CheckCircle,
+  Car, Thermometer, Wrench, BarChart2, ChevronDown
 } from "lucide-react";
+import { useUndoRedo } from "../../hooks/useUndoRedo";
 import { useAuth } from "../../contexts/AuthContext";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -80,7 +81,7 @@ export default function DurabilityPage() {
   const { token } = useAuth();
   const [roadClass, setRoadClass] = useState("C");
   const [speed, setSpeed] = useState(80);
-  const [params, setParams] = useState({
+  const [params, setParams] = useUndoRedo({
     m_s: 300, m_u: 35, k_s: 25000, c: 2050, k_t: 200000, MR: 0.85
   });
   const [loading, setLoading] = useState(false);

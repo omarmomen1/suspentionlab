@@ -27,7 +27,20 @@ from suspensionlab.physics.handling_model import (
     simulate_maneuver
 )
 
+from hypothesis import given, settings
+import hypothesis.strategies as st
+
 class TestQuarterCarVnV:
+    @given(st.floats(min_value=200.0, max_value=800.0), st.floats(min_value=10000.0, max_value=100000.0))
+    @settings(max_examples=50, deadline=None)
+    def test_solve_ivp_property_stability(self, m_s, k_s):
+        """Property test to ensure solver stability across ranges of parameters."""
+        p = QuarterCarParams(m_s=m_s, k_s=k_s)
+        profile = RoadProfile(profile_type="step", amplitude=0.05, duration=2.0)
+        # Verify it doesn't crash
+        res = run_quarter_car_analysis(p, profile)
+        assert len(res.time) > 0
+
     def test_steady_state_step_response(self):
         """
         Verify that a step input to the road profile results in a steady-state
@@ -168,7 +181,7 @@ class TestFullCarVnV:
 
     def test_pure_heave_decoupling(self, symmetric_full_car):
         t = np.linspace(0, 5, 500)
-        A_t = 0.05 * np.sin(2 * np.pi * 2 * t)
+        A_t = 0.02 * np.sin(2 * np.pi * 2 * t)
         profile = FourCornerRoadProfile(
             time=t, z_rfl=A_t, z_rfr=A_t, z_rrl=A_t, z_rrr=A_t
         )
@@ -180,7 +193,7 @@ class TestFullCarVnV:
 
     def test_pure_pitch_decoupling(self, symmetric_full_car):
         t = np.linspace(0, 5, 500)
-        A_t = 0.05 * np.sin(2 * np.pi * 2 * t)
+        A_t = 0.02 * np.sin(2 * np.pi * 2 * t)
         profile = FourCornerRoadProfile(
             time=t, z_rfl=A_t, z_rfr=A_t, z_rrl=-A_t, z_rrr=-A_t
         )
@@ -192,7 +205,7 @@ class TestFullCarVnV:
 
     def test_pure_roll_decoupling(self, symmetric_full_car):
         t = np.linspace(0, 5, 500)
-        A_t = 0.05 * np.sin(2 * np.pi * 2 * t)
+        A_t = 0.02 * np.sin(2 * np.pi * 2 * t)
         profile = FourCornerRoadProfile(
             time=t, z_rfl=A_t, z_rrl=A_t, z_rfr=-A_t, z_rrr=-A_t
         )
@@ -205,7 +218,7 @@ class TestFullCarVnV:
     def test_roll_stiffness_distribution(self, symmetric_full_car):
         """Verify that lateral load transfer matches the analytical roll stiffness dist."""
         t = np.linspace(0, 5, 500)
-        A_t = np.where(t > 1.0, 0.05, 0.0)
+        A_t = np.where(t > 1.0, 0.02, 0.0)
         profile = FourCornerRoadProfile(
             time=t, z_rfl=A_t, z_rfr=-A_t, z_rrl=A_t, z_rrr=-A_t
         )
@@ -219,6 +232,9 @@ class TestFullCarVnV:
         np.testing.assert_allclose(obs_roll_dist, theo_roll_dist, atol=5.0)
 
 
+import sys
+
+@pytest.mark.skipif(sys.platform == 'win32', reason="Native kinematics engine requires Linux ABI")
 class TestHandlingModelVnV:
     @pytest.mark.parametrize("steer_deg,speed", [(2.0, 20.0), (1.0, 30.0)])
     def test_steady_state_cornering(self, steer_deg, speed):

@@ -51,13 +51,55 @@ class HalfCarParams:
     speed_mps: float = 20.0 # m/s (vehicle speed for rear wheel time delay)
     c_tf: float = 0.0     # Ns/m (front tire damping)
     c_tr: float = 0.0     # Ns/m (rear tire damping)
+    # Advanced nonlinear springs
+    k_sf_nl: list[float] | None = None
+    k_sr_nl: list[float] | None = None
+    z_0_f: float = 0.0
+    z_0_r: float = 0.0
+    
+    # Advanced progressive dampers (split comp/rebound)
     damper_curve_v_f: list[float] | None = None
     damper_curve_f_f: list[float] | None = None
+    damper_curve_v_f_comp: list[float] | None = None
+    damper_curve_f_f_comp: list[float] | None = None
+    damper_curve_v_f_reb: list[float] | None = None
+    damper_curve_f_f_reb: list[float] | None = None
+
     damper_curve_v_r: list[float] | None = None
     damper_curve_f_r: list[float] | None = None
+    damper_curve_v_r_comp: list[float] | None = None
+    damper_curve_f_r_comp: list[float] | None = None
+    damper_curve_v_r_reb: list[float] | None = None
+    damper_curve_f_r_reb: list[float] | None = None
+    
+    # Non-linear limits
+    bump_stop_comp_f: float = 0.1    # m (suspension compression limit)
+    bump_stop_ext_f: float = -0.1    # m (suspension extension limit)
+    bump_stop_rate_f: float = 0.0    # N/m
+    bump_stop_exp_f: float = 50.0
+    
+    bump_stop_comp_r: float = 0.1    # m
+    bump_stop_ext_r: float = -0.1    # m
+    bump_stop_rate_r: float = 0.0    # N/m
+    bump_stop_exp_r: float = 50.0
+    
+    # Stribeck friction model
+    coulomb_friction_f: float = 0.0  # N
+    stribeck_fs_f: float = 0.0
+    stribeck_fc_f: float = 0.0
+    stribeck_vs_f: float = 0.01
+    stribeck_sigma_f: float = 0.0
+
+    coulomb_friction_r: float = 0.0  # N
+    stribeck_fs_r: float = 0.0
+    stribeck_fc_r: float = 0.0
+    stribeck_vs_r: float = 0.01
+    stribeck_sigma_r: float = 0.0
     
     def __post_init__(self) -> None:
         for name, val in self.__dict__.items():
+            if name in ("bump_stop_ext_f", "bump_stop_ext_r"):
+                continue
             if val is not None and isinstance(val, (int, float)) and val < 0:
                 raise ValueError(f"Parameter '{name}' must be non-negative, got {val}")
         # Validate wheelbase consistency instead of silently overwriting L.
@@ -99,6 +141,7 @@ class HalfCarResult:
     
     # Metrics
     rms_heave_accel: float = 0.0
+    rms_heave_accel_wk: float = 0.0
     rms_pitch_accel: float = 0.0
     rms_susp_travel_f: float = 0.0
     rms_susp_travel_r: float = 0.0
@@ -163,11 +206,11 @@ def build_state_space(p: HalfCarParams) -> tuple[np.ndarray, np.ndarray]:
     
     # ddz_ur (row 7)
     # F_sr acts on z_ur via spring: F_sr = k_sr*(z_sr - z_ur), z_sr = z_s + b*theta
-    # So ddz_ur gets: +k_sr/m_ur * z_s  -b*k_sr/m_ur * theta  (pitch coupling is NEGATIVE)
+    # So ddz_ur gets: +k_sr/m_ur * z_s  +b*k_sr/m_ur * theta  (pitch coupling is POSITIVE)
     A[7, 0] = k_sr / m_ur
     A[7, 1] = c_r / m_ur
-    A[7, 2] = -b * k_sr / m_ur   # CORRECTED: was +b, must be -b (nose-up pitch reduces rear force)
-    A[7, 3] = -b * c_r / m_ur   # CORRECTED: was +b, must be -b
+    A[7, 2] = b * k_sr / m_ur    # CORRECTED: positive pitch coupling
+    A[7, 3] = b * c_r / m_ur    # CORRECTED: positive pitch coupling
     A[7, 6] = -(k_sr + k_tr) / m_ur
     A[7, 7] = -(c_r + c_tr) / m_ur
 
@@ -205,6 +248,8 @@ def compute_modal_properties(p: HalfCarParams) -> dict:
         
         mode_shape = np.abs(vecs[:, i])
         # Indices: 0: zs, 1: dzs, 2: theta, 3: dtheta, 4: zuf, 5: dzuf, 6: zur, 7: dzur
+        # Scale pitch (rad) by half wheelbase (m) to match heave displacement (m) units
+        mode_shape[2] *= p.L / 2.0
         dom_idx = np.argmax(mode_shape[[0, 2, 4, 6]]) # check displacements
         
         if dom_idx == 0:
@@ -235,20 +280,69 @@ def _compute_forces(p: HalfCarParams, z_s, dz_s, theta, dtheta, z_uf, dz_uf, z_u
     dz_sf = dz_s - p.a * dtheta
     dz_sr = dz_s + p.b * dtheta
 
-    v_susp_f = dz_uf - dz_sf
-    if p.damper_curve_v_f is not None and p.damper_curve_f_f is not None and len(p.damper_curve_v_f) > 1:
-        F_damper_f = np.interp(v_susp_f, p.damper_curve_v_f, p.damper_curve_f_f)
+    v_rel_f = dz_uf - dz_sf
+    z_rel_f = z_uf - z_sf
+    z_rel_f_adj = z_rel_f - p.z_0_f
+    
+    v_rel_r = dz_ur - dz_sr
+    z_rel_r = z_ur - z_sr
+    z_rel_r_adj = z_rel_r - p.z_0_r
+    
+    # Dampers Front
+    F_damper_f = np.zeros_like(v_rel_f)
+    if p.damper_curve_v_f_comp is not None and p.damper_curve_f_f_comp is not None and p.damper_curve_v_f_reb is not None and p.damper_curve_f_f_reb is not None:
+        F_comp = np.interp(v_rel_f, p.damper_curve_v_f_comp, p.damper_curve_f_f_comp)
+        F_reb = np.interp(v_rel_f, p.damper_curve_v_f_reb, p.damper_curve_f_f_reb)
+        F_damper_f = np.where(v_rel_f > 0, F_comp, F_reb)
+    elif p.damper_curve_v_f is not None and p.damper_curve_f_f is not None and len(p.damper_curve_v_f) > 1:
+        F_damper_f = np.interp(v_rel_f, p.damper_curve_v_f, p.damper_curve_f_f)
     else:
-        F_damper_f = p.c_f * v_susp_f
+        F_damper_f = p.c_f * v_rel_f
         
-    v_susp_r = dz_ur - dz_sr
-    if p.damper_curve_v_r is not None and p.damper_curve_f_r is not None and len(p.damper_curve_v_r) > 1:
-        F_damper_r = np.interp(v_susp_r, p.damper_curve_v_r, p.damper_curve_f_r)
+    if p.stribeck_fs_f > 0 or p.stribeck_fc_f > 0:
+        fric_f = (p.stribeck_fc_f + (p.stribeck_fs_f - p.stribeck_fc_f) * np.exp(-(v_rel_f / p.stribeck_vs_f)**2)) * np.tanh(v_rel_f / 0.01) + p.stribeck_sigma_f * v_rel_f
+        F_damper_f += fric_f
+    elif p.coulomb_friction_f > 0:
+        F_damper_f += p.coulomb_friction_f * np.tanh(v_rel_f / 0.01)
+
+    # Dampers Rear
+    F_damper_r = np.zeros_like(v_rel_r)
+    if p.damper_curve_v_r_comp is not None and p.damper_curve_f_r_comp is not None and p.damper_curve_v_r_reb is not None and p.damper_curve_f_r_reb is not None:
+        F_comp = np.interp(v_rel_r, p.damper_curve_v_r_comp, p.damper_curve_f_r_comp)
+        F_reb = np.interp(v_rel_r, p.damper_curve_v_r_reb, p.damper_curve_f_r_reb)
+        F_damper_r = np.where(v_rel_r > 0, F_comp, F_reb)
+    elif p.damper_curve_v_r is not None and p.damper_curve_f_r is not None and len(p.damper_curve_v_r) > 1:
+        F_damper_r = np.interp(v_rel_r, p.damper_curve_v_r, p.damper_curve_f_r)
     else:
-        F_damper_r = p.c_r * v_susp_r
+        F_damper_r = p.c_r * v_rel_r
         
-    F_sf = p.k_sf * (z_uf - z_sf) + F_damper_f
-    F_sr = p.k_sr * (z_ur - z_sr) + F_damper_r
+    if p.stribeck_fs_r > 0 or p.stribeck_fc_r > 0:
+        fric_r = (p.stribeck_fc_r + (p.stribeck_fs_r - p.stribeck_fc_r) * np.exp(-(v_rel_r / p.stribeck_vs_r)**2)) * np.tanh(v_rel_r / 0.01) + p.stribeck_sigma_r * v_rel_r
+        F_damper_r += fric_r
+    elif p.coulomb_friction_r > 0:
+        F_damper_r += p.coulomb_friction_r * np.tanh(v_rel_r / 0.01)
+        
+    # Springs
+    if p.k_sf_nl is not None and len(p.k_sf_nl) >= 3:
+        F_sf = p.k_sf_nl[0] * z_rel_f_adj + p.k_sf_nl[1] * (z_rel_f_adj**2) + p.k_sf_nl[2] * (z_rel_f_adj**3) + F_damper_f
+    else:
+        F_sf = p.k_sf * z_rel_f_adj + F_damper_f
+        
+    if p.k_sr_nl is not None and len(p.k_sr_nl) >= 3:
+        F_sr = p.k_sr_nl[0] * z_rel_r_adj + p.k_sr_nl[1] * (z_rel_r_adj**2) + p.k_sr_nl[2] * (z_rel_r_adj**3) + F_damper_r
+    else:
+        F_sr = p.k_sr * z_rel_r_adj + F_damper_r
+    
+    # Bump Stops
+    if p.bump_stop_rate_f > 0:
+        bump_comp_f = np.where(z_rel_f > p.bump_stop_comp_f, p.bump_stop_rate_f * (np.exp(p.bump_stop_exp_f * (z_rel_f - p.bump_stop_comp_f)) - 1.0), 0.0)
+        bump_ext_f = np.where(z_rel_f < p.bump_stop_ext_f, -p.bump_stop_rate_f * (np.exp(p.bump_stop_exp_f * (p.bump_stop_ext_f - z_rel_f)) - 1.0), 0.0)
+        F_sf += bump_comp_f + bump_ext_f
+        
+    if p.bump_stop_rate_r > 0:
+        bump_comp_r = np.where(z_rel_r > p.bump_stop_comp_r, p.bump_stop_rate_r * (np.exp(p.bump_stop_exp_r * (z_rel_r - p.bump_stop_comp_r)) - 1.0), 0.0)
+        bump_ext_r = np.where(z_rel_r < p.bump_stop_ext_r, -p.bump_stop_rate_r * (np.exp(p.bump_stop_exp_r * (p.bump_stop_ext_r - z_rel_r)) - 1.0), 0.0)
+        F_sr += bump_comp_r + bump_ext_r
     
     return F_sf, F_sr, z_sf, z_sr
 
@@ -262,8 +356,8 @@ def _half_car_ode(t, x, p: HalfCarParams, zr_fn, dzr_fn, t_delay: float):
     
     # Rear wheel hits bump at t - t_delay
     t_rear = t - t_delay
-    z_rr = float(zr_fn(np.array([t_rear]))[0]) if t_rear >= 0 else 0.0
-    dz_rr = float(dzr_fn(np.array([t_rear]))[0]) if t_rear >= 0 else 0.0
+    z_rr = float(zr_fn(np.array([max(t_rear, 0.0)]))[0]) if t_rear >= 0 else 0.0
+    dz_rr = float(dzr_fn(np.array([max(t_rear, 0.0)]))[0]) if t_rear >= 0 else 0.0
 
     F_sf, F_sr, _, _ = _compute_forces(p, z_s, dz_s, theta, dtheta, z_uf, dz_uf, z_ur, dz_ur)
 
@@ -284,7 +378,7 @@ def _half_car_ode(t, x, p: HalfCarParams, zr_fn, dzr_fn, t_delay: float):
 def simulate_time_response(
     p: HalfCarParams,
     profile: RoadProfile,
-    t_eval_dt: float = 0.002,
+    t_eval_dt: float = 0.001,
 ) -> dict:
     zr_fn, dzr_fn = _road_profile_fn(profile)
     t_delay = p.L / p.speed_mps if p.speed_mps > 0 else 0.0
@@ -302,7 +396,7 @@ def simulate_time_response(
         args=(p, zr_fn, dzr_fn, t_delay),
         rtol=1e-6,
         atol=1e-9,
-        max_step=max(0.01, profile.duration / 1000.0),
+        max_step=max(0.001, profile.duration / 5000.0),
     )
     if not sol.success:
         from suspensionlab.physics.exceptions import MathConvergenceError
@@ -350,7 +444,13 @@ def simulate_time_response(
     }
 
 def compute_metrics(time_data: dict, p: HalfCarParams) -> dict:
+    from suspensionlab.physics.quarter_car import _apply_wk_weighting
+    
     rms_heave = float(np.sqrt(np.mean(time_data["ddz_s"] ** 2)))
+    
+    dt = time_data["time"][1] - time_data["time"][0] if len(time_data["time"]) > 1 else 0.002
+    rms_heave_wk = float(np.sqrt(np.mean(_apply_wk_weighting(time_data["ddz_s"], dt)**2)))
+    
     rms_pitch = float(np.sqrt(np.mean(time_data["ddtheta"] ** 2)))
     rms_susp_f = float(np.sqrt(np.mean(time_data["susp_travel_f"] ** 2)))
     rms_susp_r = float(np.sqrt(np.mean(time_data["susp_travel_r"] ** 2)))
@@ -359,6 +459,7 @@ def compute_metrics(time_data: dict, p: HalfCarParams) -> dict:
     
     return {
         "rms_heave_accel": rms_heave,
+        "rms_heave_accel_wk": rms_heave_wk,
         "rms_pitch_accel": rms_pitch,
         "rms_susp_travel_f": rms_susp_f,
         "rms_susp_travel_r": rms_susp_r,
@@ -401,6 +502,7 @@ def run_half_car_analysis(
         tire_load_r=time_data["tire_load_r"][::step],
 
         rms_heave_accel=metrics["rms_heave_accel"],
+        rms_heave_accel_wk=metrics["rms_heave_accel_wk"],
         rms_pitch_accel=metrics["rms_pitch_accel"],
         rms_susp_travel_f=metrics["rms_susp_travel_f"],
         rms_susp_travel_r=metrics["rms_susp_travel_r"],

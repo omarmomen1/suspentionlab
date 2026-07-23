@@ -43,8 +43,6 @@ export default function SettingsPage() {
   const [copied,    setCopied]       = useState(false);
   const [loadingKeys, setLoadingKeys] = useState(false);
   const [creatingKey, setCreatingKey] = useState(false);
-  const [portalLoading, setPortalLoading] = useState(false);
-
   const plan    = user?.plan ?? "FREE";
   const badge   = PLAN_BADGES[plan] ?? { label: "Unknown", color: "text-gray-500 bg-[#1e1e1e]" };
   const canKeys = plan !== "FREE";
@@ -52,12 +50,14 @@ export default function SettingsPage() {
   // Fetch API keys when tab opens
   useEffect(() => {
     if (activeTab !== "api-keys" || !canKeys) return;
-    setLoadingKeys(true);
-    fetch(`${API_BASE}/api-keys`, { headers: authHeader() })
-      .then((r) => r.json())
-      .then((d) => setApiKeys(Array.isArray(d) ? d : []))
-      .catch((e) => console.error("Failed to load API keys", e))
-      .finally(() => setLoadingKeys(false));
+    setTimeout(() => {
+      setLoadingKeys(true);
+      fetch(`${API_BASE}/api-keys`, { headers: authHeader() })
+        .then((r) => r.json())
+        .then((d) => setApiKeys(Array.isArray(d) ? d : []))
+        .catch((e) => console.error("Failed to load API keys", e))
+        .finally(() => setLoadingKeys(false));
+    }, 0);
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const createKey = async () => {
@@ -118,7 +118,7 @@ export default function SettingsPage() {
       } else {
         setLicenseMessage({ type: "error", text: data.detail || "Invalid license key." });
       }
-    } catch (e) {
+    } catch {
       setLicenseMessage({ type: "error", text: "Failed to contact server." });
     } finally {
       setActivatingLicense(false);
@@ -251,7 +251,7 @@ export default function SettingsPage() {
                       <div className="mt-4">
                         <a href="https://gumroad.com/l/suspensionlab-pro" target="_blank" rel="noreferrer"
                           className="text-xs text-ansys-yellow hover:underline">
-                          Don't have a license? Buy on Gumroad &rarr;
+                          Don&apos;t have a license? Buy on Gumroad &rarr;
                         </a>
                       </div>
                     </div>

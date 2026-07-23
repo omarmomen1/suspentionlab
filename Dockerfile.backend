@@ -25,22 +25,39 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+# FIXED: Create a non-root user and group to run the application.
+# Previously this container ran as root — a compromised container granted full
+# root access within the container boundary, violating enterprise security baselines.
+RUN groupadd --gid 1001 appgroup \
+    && useradd --uid 1001 --gid appgroup --shell /bin/false --no-create-home appuser
+
 # Copy virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Copy application code and migration config
-COPY src/ /app/src/
-COPY alembic/ /app/alembic/
-COPY alembic.ini /app/
+# Set ownership to appuser so the process can read its own files
+COPY --chown=appuser:appgroup src/ /app/src/
+COPY --chown=appuser:appgroup alembic/ /app/alembic/
+COPY --chown=appuser:appgroup alembic.ini /app/
 
 # Environment
 ENV PYTHONPATH="/app/src"
 ENV ENVIRONMENT="PROD"
+# Ensure Python output is not buffered (critical for log streaming in K8s)
+ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
-# Run Alembic migrations then start the server
-CMD alembic upgrade head && \
-    python -m uvicorn suspensionlab.backend.api.main:app \
-    --host 0.0.0.0 --port 8000 --workers 2
+# FIXED: Drop to non-root user before executing the server.
+# The Kubernetes securityContext (runAsNonRoot: true, runAsUser: 1001) in
+# the Helm deployment template is now consistent with the Dockerfile user.
+USER appuser
+
+# FIXED: Removed `alembic upgrade head &&` from CMD.
+# Database migrations are now exclusively managed by the Helm pre-install Job
+# (db-migration-job.yaml). Running migrations in CMD caused a race condition:
+# multiple pod replicas would simultaneously attempt schema migrations on startup,
+# risking table locks and data corruption.
+CMD ["python", "-m", "uvicorn", "suspensionlab.backend.api.main:app", \
+     "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

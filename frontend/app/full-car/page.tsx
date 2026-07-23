@@ -1,20 +1,21 @@
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-explicit-any */
+// Full Car Page
 
 "use client";
-import { useState, useEffect, Suspense, useMemo } from "react";
+import { useState, Suspense, useMemo } from "react";
 import dynamic from "next/dynamic";
-import { useSearchParams } from "next/navigation";
+
 import {
   Play, Settings2, AlertTriangle,
-  Activity, Save, Sparkles, X, TrendingUp, BarChart3,
-  Zap, GitBranch, Crosshair, RefreshCw,
+  Activity, Save, X, TrendingUp, BarChart3,
+  GitBranch, Crosshair, Undo2, Redo2, RotateCcw
 } from "lucide-react";
+import { useUndoRedo } from "../../hooks/useUndoRedo";
 import PDFExport from "../../components/PDFExport";
 import DataExport from "../../components/DataExport";
 import ComparePanel from "../../components/ComparePanel";
 import VehiclePresets from "../../components/VehiclePresets";
 import SimHistory, { saveSimulationToHistory } from "../../components/SimHistory";
-import PlanGate from "../../components/PlanGate";
 import { useAuth } from "../../contexts/AuthContext";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
@@ -92,30 +93,47 @@ function PlotBox({ children }: { children: React.ReactNode }) {
   return <div className="flex-1 min-w-0 min-h-0 relative">{children}</div>;
 }
 
+interface FullCarResults {
+  error?: boolean;
+  message?: string;
+  psd_freqs?: number[];
+  psd_values?: number[];
+  f_n_heave: number;
+  f_n_roll: number;
+  f_n_pitch: number;
+  roll_stiffness_dist: number;
+  rms_heave_accel: number;
+  rms_pitch_accel: number;
+  rms_roll_accel: number;
+  lateral_load_transfer_f: number[];
+  lateral_load_transfer_r: number[];
+  time: number[];
+  z_s: number[];
+  z_ufl: number[];
+  z_url: number[];
+  theta: number[];
+  phi: number[];
+  ddz_s: number[];
+  ddtheta: number[];
+  ddphi: number[];
+  dtheta: number[];
+  dphi: number[];
+  [key: string]: any;
+}
+
+type FullCarState = FullCarResults | { error: boolean; message: string; [key: string]: any };
+
 function FullCarDashboard() {
-  const searchParams = useSearchParams();
   const { authHeader } = useAuth();
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving,  setIsSaving]  = useState(false);
-  const [results,   setResults]   = useState<Record<string, unknown> | null>(null);
+  const [results,   setResults]   = useState<FullCarState | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [toast,     setToast]     = useState<Toast | null>(null);
   
-  const [frameIndex, setFrameIndex] = useState(0);
-  
-  useEffect(() => {
-    if (!results || results.error) return;
-    const times = results.time as number[];
-    if (!times) return;
-    let interval: NodeJS.Timeout;
-    const animate = () => {
-      setFrameIndex(prev => (prev + 1) % times.length);
-    };
-    interval = setInterval(animate, 20); // 50fps
-    return () => clearInterval(interval);
-  }, [results]);
 
-  const [params, setParams] = useState({
+
+  const [params, setParams, { undo, redo, reset, canUndo, canRedo }] = useUndoRedo({
     m_s: 1200.0, I_x: 400.0, I_y: 1800.0, m_uf: 40.0, m_ur: 40.0, k_sf: 30000.0, k_sr: 35000.0,
     c_f: 2500.0, c_r: 3000.0, k_arb_f: 20000.0, k_arb_r: 10000.0, L: 2.6, weight_dist: 50.0,
     tw_f: 1.6, tw_r: 1.6, speed_kph: 72.0, p_amp: 0.05
@@ -133,14 +151,46 @@ function FullCarDashboard() {
   };
 
   const runSimulation = async () => {
-    setIsRunning(true); setResults(null);
+    setIsRunning(true);
+    setResults(null);
     try {
-      const res = await fetch(`${API_BASE}/simulate/full-car`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify(buildPayload()) });
+      const res = await fetch(`${API_BASE}/simulate/full-car`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(buildPayload()),
+      });
       const data = await res.json();
-      if (!res.ok) setResults({ error: true, message: data.message ?? data.detail ?? "Simulation failed" });
-      else { setResults(data); saveSimulationToHistory("sl_sim_history_fcar", params, data); }
-    } catch (err) { setResults({ error: true, message: String(err) }); }
-    finally { setIsRunning(false); }
+      if (!res.ok) {
+        setResults({ error: true, message: data.message ?? data.detail ?? "Simulation failed" });
+        setIsRunning(false);
+        return;
+      }
+      
+      const jobId = data.job_id;
+      const interval = setInterval(async () => {
+        try {
+          const pollRes = await fetch(`${API_BASE}/jobs/${jobId}`, { headers: authHeader() });
+          const pollData = await pollRes.json();
+          if (pollData.status === "COMPLETED") {
+             clearInterval(interval);
+             setResults(pollData.result);
+             saveSimulationToHistory("sl_sim_history_fcar", params, pollData.result);
+             setIsRunning(false);
+          } else if (pollData.status === "FAILED" || pollData.status === "CANCELED") {
+             clearInterval(interval);
+             setResults({ error: true, message: pollData.error || "Simulation failed." });
+             setIsRunning(false);
+          }
+        } catch (e) {
+             clearInterval(interval);
+             setResults({ error: true, message: String(e) });
+             setIsRunning(false);
+        }
+      }, 1000);
+    } catch (err) {
+      setResults({ error: true, message: String(err) });
+      setIsRunning(false);
+    }
   };
 
   const saveProfile = async () => {
@@ -165,7 +215,7 @@ function FullCarDashboard() {
   }, [results]);
 
   const hasResults = results && !results.error;
-  const r = results as Record<string, any> | null;
+  const r = results;
 
   return (
     <div className="h-full flex flex-col p-5 pt-3 gap-3 min-h-0">
@@ -182,8 +232,23 @@ function FullCarDashboard() {
         </div>
 
         <div className="flex items-center gap-2">
-          <SimHistory storageKey="sl_sim_history_fcar" renderParams={(p, m) => [["Mass", p.m_s], ["Ix", p.I_x], ["Iy", p.I_y], ["k_sf", p.k_sf], ["k_sr", p.k_sr], ["Speed", p.speed_kph]]} onRestore={(p) => { setParams(prev => ({ ...prev, ...p })); showToast("Restored from history", "success"); }} />
-          <button onClick={saveProfile} disabled={isSaving} className="px-3 py-1.5 bg-[#141416] border border-[#252525] hover:bg-[#1e1e20] rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40">
+          <SimHistory storageKey="sl_sim_history_fcar" renderParams={(p) => [["Mass", p.m_s], ["Ix", p.I_x], ["Iy", p.I_y], ["k_sf", p.k_sf], ["k_sr", p.k_sr], ["Speed", p.speed_kph]]} onRestore={(p) => { setParams(prev => ({ ...prev, ...p })); showToast("Restored from history", "success"); }} />
+                    {/* Undo/Redo/Reset Controls */}
+          <div className="flex items-center bg-[#141416] border border-[#252525] rounded-lg overflow-hidden mr-2">
+            <button onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)"
+              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-gray-400 disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+              <Undo2 size={14} />
+            </button>
+            <button onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)"
+              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-gray-400 border-l border-[#252525] disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+              <Redo2 size={14} />
+            </button>
+            <button onClick={reset} title="Reset to Defaults"
+              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-red-400/80 hover:text-red-400 border-l border-[#252525] transition-colors">
+              <RotateCcw size={14} />
+            </button>
+          </div>
+<button onClick={saveProfile} disabled={isSaving} className="px-3 py-1.5 bg-[#141416] border border-[#252525] hover:bg-[#1e1e20] rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40">
             <Save size={13} className="text-ansys-yellow" /> Save Setup
           </button>
           <PDFExport captureId="sim-report" fileName={`FCar_${params.m_s}`} />
@@ -253,7 +318,7 @@ function FullCarDashboard() {
 
           {hasResults && r && (
             <div id="sim-report" className="flex flex-col gap-3 flex-1 overflow-hidden">
-              <ComparePanel current={r as any} />
+              <ComparePanel current={r as unknown as React.ComponentProps<typeof ComparePanel>["current"]} />
 
               <div className="grid grid-cols-8 gap-2 shrink-0">
                 <KPICard label="Heave ƒₙ" value={r.f_n_heave} unit="Hz" status={r.f_n_heave >= 1.0 && r.f_n_heave <= 1.5 ? "good" : "warn"} />
@@ -413,3 +478,4 @@ export default function Page() {
     </Suspense>
   );
 }
+

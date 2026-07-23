@@ -1,0 +1,37 @@
+{{- if .Values.monitoring.serviceMonitor.enabled }}
+# ServiceMonitor — tells Prometheus Operator to scrape the /metrics endpoint
+# on all API pods. Requires kube-prometheus-stack to be installed in the cluster.
+#
+# Install kube-prometheus-stack:
+#   helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+#   helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack \
+#     --namespace monitoring --create-namespace
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ .Release.Name }}-api-metrics
+  namespace: suspensionlab-prod
+  labels:
+    app: suspensionlab
+    component: api
+    # This label must match the Prometheus Operator's serviceMonitorSelector
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      app: suspensionlab
+      component: api
+  namespaceSelector:
+    matchNames:
+      - suspensionlab-prod
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: {{ .Values.monitoring.serviceMonitor.interval | default "30s" }}
+      scrapeTimeout: {{ .Values.monitoring.serviceMonitor.scrapeTimeout | default "10s" }}
+      # The /metrics endpoint is protected by API key (verify_api_key dependency)
+      # Prometheus scraping uses a bearer token from a Kubernetes Secret
+      bearerTokenSecret:
+        name: {{ .Release.Name }}-secrets
+        key: API_KEY
+{{- end }}
