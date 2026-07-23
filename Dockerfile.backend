@@ -47,7 +47,7 @@ ENV ENVIRONMENT="PROD"
 # Ensure Python output is not buffered (critical for log streaming in K8s)
 ENV PYTHONUNBUFFERED=1
 
-EXPOSE 8000
+EXPOSE 7860
 
 # FIXED: Drop to non-root user before executing the server.
 # The Kubernetes securityContext (runAsNonRoot: true, runAsUser: 1001) in
@@ -60,4 +60,4 @@ USER appuser
 # multiple pod replicas would simultaneously attempt schema migrations on startup,
 # risking table locks and data corruption.
 CMD ["python", "-m", "uvicorn", "suspensionlab.backend.api.main:app", \
-     "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+     "--host", "0.0.0.0", "--port", "7860", "--workers", "2"]
