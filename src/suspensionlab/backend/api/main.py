@@ -69,7 +69,7 @@ app.add_middleware(
 app.add_middleware(BaseHTTPMiddleware, dispatch=prometheus_middleware)
 app.add_middleware(IdempotencyMiddleware)
 app.add_middleware(BaseHTTPMiddleware, dispatch=logging_middleware)
-app.add_middleware(BaseHTTPMiddleware, dispatch=security_headers_middleware)
+# app.add_middleware(BaseHTTPMiddleware, dispatch=security_headers_middleware)
 app.add_middleware(BaseHTTPMiddleware, dispatch=request_id_middleware)
 
 from suspensionlab.backend.api.exceptions import register_exception_handlers
