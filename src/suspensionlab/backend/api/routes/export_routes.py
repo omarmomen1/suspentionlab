@@ -11,7 +11,11 @@ async def export_simulink(
     user: dict = Depends(require_plan(PlanTier.ENTERPRISE))
 ):
     """
-    Generate a MATLAB (.m) initialization script for Simulink integration.
+    Generate an ADAMS/Simulink-compatible MATLAB (.m) initialization script.
+
+    NOTE (#31): this is a model *template* for Simulink integration — it has
+    not been validated against a reference Simulink installation. Validate the
+    imported model before using results in production decisions.
     """
     params = FullCarParams(**params_schema.model_dump())
     A, B, C_mat, D_mat = build_full_car_state_space(params)
@@ -43,12 +47,16 @@ async def export_adams(
     user: dict = Depends(require_plan(PlanTier.ENTERPRISE))
 ):
     """
-    Generate an MSC ADAMS (.adm) solver dataset.
+    Generate an ADAMS-compatible (.adm) model template.
+
+    NOTE (#31): this is a starting-point dataset template, NOT a validated
+    ADAMS model. It has not been correlated against MSC ADAMS — import, review,
+    and validate in ADAMS/View before trusting any exported-model results.
     """
     p = params_schema
     # Basic ADAMS Solver dataset template for a 7-DOF representation
-    adm = f"""! ADAMS/Solver Dataset - SuspensionLab PRO Export
-! 7-DOF Full Car Vehicle Model
+    adm = f"""! ADAMS-Compatible Model Template - SuspensionLab PRO Export
+! 7-DOF Full Car Vehicle Model (UNVALIDATED TEMPLATE - review in ADAMS/View)
 
 ! --- Units ---
 UNITS/ FORCE = NEWTON, MASS = KILOGRAM, LENGTH = METER, TIME = SECOND

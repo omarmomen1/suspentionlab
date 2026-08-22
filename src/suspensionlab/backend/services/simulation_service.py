@@ -18,14 +18,25 @@ class SimulationService:
     """
 
     @staticmethod
-    async def enqueue_simulation(user_id: str, plan: str, job_type: str, payload: dict, db) -> str:
-        """Enqueues a simulation job and returns the job ID (Phase 2 Queue Rewrite)."""
+    async def enqueue_simulation(user_id: str, plan: str, job_type: str, payload: dict, db,
+                                 team_id: str | None = None) -> str:
+        """Enqueues a simulation job and returns the job ID (Phase 2 Queue Rewrite).
+
+        `team_id` (#22): always propagate the caller's team so team analytics
+        reflect every job the team's members run.
+        (#26): per-plan concurrency cap enforced before accepting the job.
+        """
+        # ── Compute governance (#26) — per-user/per-plan concurrency cap ──
+        from suspensionlab.backend.core.compute_governance import assert_user_concurrency
+        await assert_user_concurrency(db, user_id, plan)
+
         job_id = str(uuid.uuid4())
         
         # Create Job Record in DB
         new_job = JobRecord(
             id=uuid.UUID(job_id),
             user_id=uuid.UUID(user_id),
+            team_id=uuid.UUID(team_id) if team_id else None,
             job_type=job_type,
             status="PENDING",
             params=payload.get("params", {}),
@@ -45,16 +56,20 @@ class SimulationService:
         trace_carrier = {}
         inject(trace_carrier)
 
+        # (#27) Route through the Job Orchestrator — standard/priority/dedicated
+        # queue selection by plan, with queue-depth + enqueue-latency telemetry.
+        from suspensionlab.backend.workers.orchestrator import submit_simulation_job
         try:
-            target_queue = priority_job_queue if plan == "ENTERPRISE" else job_queue
-            await asyncio.to_thread(
-                target_queue.enqueue,
+            await submit_simulation_job(
                 run_job,
-                args=(job_id, payload, trace_carrier),
                 job_id=job_id,
+                payload=payload,
+                trace_carrier=trace_carrier,
+                plan=plan,
+                dedicated=(plan == "ENTERPRISE"),
                 result_ttl=86400,
                 failure_ttl=86400,
-                retry=Retry(max=3, interval=[10, 30, 60])
+                retry=Retry(max=3, interval=[10, 30, 60]),
             )
         except redis.exceptions.ConnectionError:
             await db.execute(

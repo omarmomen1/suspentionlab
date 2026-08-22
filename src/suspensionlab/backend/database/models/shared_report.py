@@ -25,6 +25,17 @@ class SharedReport(Base):
     simulation_type = Column(String(50), nullable=False, default="quarter_car")
     params = Column(JSON_TYPE, nullable=False)
     result = Column(JSON_TYPE, nullable=False)
+
+    # ── Provenance (#24) — enterprise reports must be traceable to a real run ──
+    owner_id        = Column(PG_UUID(as_uuid=True), nullable=True)   # who shared it
+    simulation_id   = Column(PG_UUID(as_uuid=True), nullable=True)   # jobs.id artifact reference
+    params_hash     = Column(String(64), nullable=True)              # SHA-256 of canonical params
+    result_hash     = Column(String(64), nullable=True)              # SHA-256 of canonical result
+    input_hash      = Column(String(64), nullable=True)              # SHA-256 of road/dataset payload
+    software_version= Column(String(32), nullable=True)
+    physics_version = Column(String(32), nullable=True)
+    provenance      = Column(String(20), nullable=False, default="client-asserted")  # verified | client-asserted
+    signature       = Column(String(128), nullable=True)             # HMAC-SHA256 over token+hashes
     deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     view_count = Column(Integer, default=0)

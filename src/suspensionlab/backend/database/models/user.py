@@ -40,6 +40,10 @@ class User(Base):
 
     # Onboarding
     onboarding_complete    = Column(Boolean, default=False)
+
+    # Identity-provider federation (SCIM 2.0 / OIDC)
+    external_id            = Column(String(255), nullable=True, index=True)   # IdP's user identifier
+    auth_provider          = Column(String(32), default="local", nullable=False)  # local | oidc
     
     # Admin status
     is_admin               = Column(Boolean, default=False)

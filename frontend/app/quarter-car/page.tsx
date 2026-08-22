@@ -24,6 +24,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import SuspensionRig3D from "../../components/SuspensionRig3D";
 import SmartInsights from "../../components/SmartInsights";
 import SensitivityTornado from "../../components/SensitivityTornado";
+import ModelValidity, { ValidityReport } from "../../components/ModelValidity";
 import { Brain, FlaskConical } from "lucide-react";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
@@ -206,6 +207,7 @@ function QuarterCarDashboard() {
   const [isSaving,  setIsSaving]  = useState<boolean>(false);
   const [isTuning,  setIsTuning]  = useState<boolean>(false);
   const [results,   setResults]   = useState<SimResult | null>(null);
+  const [validity,  setValidity]  = useState<ValidityReport | null>(null);
   const [traces,    setTraces]    = useState<Trace[]>([]);
   const [deltaMode, setDeltaMode] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<number>(0);
@@ -327,6 +329,18 @@ function QuarterCarDashboard() {
         setResults(data);
         setSimParams({ ...params }); // MED-07: snapshot params at the moment simulation completes
         saveSimulationToHistory("sl_sim_history_qcar", params, data);
+        // Issue 16: fetch MODEL VALIDITY alongside every result (non-blocking)
+        fetch(`${API_BASE}/api/v1/models/validity`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...authHeader() },
+          body: JSON.stringify({
+            model: "quarter_car",
+            params: buildPayload().params,
+          }),
+        })
+          .then((res) => (res.ok ? res.json() : null))
+          .then((v) => setValidity(v))
+          .catch(() => setValidity(null));
       }
     } catch (err) {
       setResults({ error: true, message: String(err) });
@@ -551,7 +565,7 @@ function QuarterCarDashboard() {
               <ParameterInput label="Spring Rate"    val={params.k_s} unit="N/m"   step={500} hasError={params.k_s <= 0} onChange={(v) => setParams({ ...params, k_s: v })} />
               <ParameterInput label="Damping"        val={params.c}   unit="N·s/m" step={50}  hasError={params.c < 0} onChange={(v) => setParams({ ...params, c:   v })} />
               <ParameterInput label="Tire Stiffness" val={params.k_t} unit="N/m"   step={5000} hasError={params.k_t <= 0} onChange={(v) => setParams({ ...params, k_t: v })} />
-              <ParameterInput label="Motion Ratio"   val={params.MR}  unit="—"     step={0.01} min={0.1} hasError={params.MR <= 0} onChange={(v) => setParams({ ...params, MR:  v })} />
+              <ParameterInput label="Motion Ratio (spring/wheel)"   val={params.MR}  unit="—"     step={0.01} min={0.1} hasError={params.MR <= 0} onChange={(v) => setParams({ ...params, MR:  v })} />
               <DamperLUTInput 
                 label="Non-Linear Damper Curve"
                 isActive={params.damper_curve_v !== null}
@@ -606,6 +620,9 @@ function QuarterCarDashboard() {
                 <div className="flex justify-between text-gray-600">
                   <span>Static Defl.</span>
                   <span className="text-gray-400">{((params.m_s * 9.81) / (params.k_s * params.MR * params.MR) * 1000).toFixed(1)} mm</span>
+                </div>
+                <div className="pt-1 border-t border-[#1e1e1e] text-[9px] text-gray-700 leading-tight">
+                  k_w = k_s × MR²&nbsp;&nbsp;|&nbsp;&nbsp;MR = spring travel / wheel travel
                 </div>
               </div>
             </ParamSection>
@@ -674,6 +691,9 @@ function QuarterCarDashboard() {
           {/* Results */}
           {hasResults && r && (
             <div id="sim-report" className="flex flex-col gap-3 flex-1 overflow-hidden">
+
+              {/* Issue 16: MODEL VALIDITY — how much to trust this result */}
+              <ModelValidity report={validity} />
 
               {/* Trace manager */}
               <TraceManager currentResult={r as any} currentParams={params} traces={traces} setTraces={setTraces} deltaMode={deltaMode} setDeltaMode={setDeltaMode} />

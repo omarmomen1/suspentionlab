@@ -13,7 +13,7 @@ Equations of motion (physical coordinates):
   m_s * z_s'' + c*(z_s' - z_u') + k_w*(z_s - z_u) = 0
   m_u * z_u'' + c*(z_u' - z_s') + k_w*(z_u - z_s) + k_t*(z_u - z_r) = 0
 
-where k_w = k_s * MR² is the wheel rate (spring rate referred to wheel centre).
+where k_w = k_s * MR² is the wheel rate. MR = motion ratio = spring travel / wheel travel (typically 0.7–1.0).
 
 State-space formulation
 -----------------------
@@ -34,7 +34,7 @@ For tire damping c_t (optional):
 Engineering assumptions
 -----------------------
 1. Linear spring and damper throughout.
-2. Wheel rate k_w = k_s * MR².  MR = motion ratio (typically 0.7–1.0).
+2. Wheel rate k_w = k_s * MR².  MR = motion ratio = spring travel / wheel travel (typically 0.7–1.0). A value < 1.0 means the spring compresses less than the wheel travels (e.g. pullrod/pushrod), which is typical.
 3. Tire modelled as spring + optional damper (c_t usually small, set 0 by default).
 4. Road displacement z_r enters only through tire; no direct body excitation.
 5. Static equilibrium at z=0; displacements are dynamic perturbations.
@@ -86,8 +86,7 @@ class QuarterCarParams:
     k_s : float  Spring rate (coil spring, at spring seat) [N/m]
     c   : float  Damping coefficient (at damper body) [Ns/m]
     k_t : float  Tire vertical stiffness [N/m]
-    MR  : float  Motion ratio = wheel travel / spring travel [-]
-                 Wheel rate k_w = k_s * MR²
+    MR  : float  Motion ratio = spring travel / wheel travel [-]. Wheel rate k_w = k_s * MR². A value of 0.85 means the spring compresses 85 mm for every 100 mm of wheel travel. Range (0, 1.5].
     c_t : float  Tire damping coefficient [Ns/m] (default 0)
     """
     m_s: float = 300.0    # kg
@@ -142,7 +141,7 @@ class QuarterCarParams:
             elif val < 0:
                 raise ValueError(f"Parameter '{name}' must be non-negative, got {val}")
         if self.MR <= 0 or self.MR > 1.5:
-            raise ValueError(f"Motion ratio MR={self.MR} outside physical range (0, 1.5]")
+            raise ValueError(f"Motion ratio MR={self.MR} outside physical range (0, 1.5]. MR = spring travel / wheel travel. Typical range: 0.6–1.1.")
         if self.stribeck_fs < self.stribeck_fc:
             raise ValueError("Stribeck static friction (fs) cannot be less than kinetic friction (fc).")
         if self.stribeck_vs <= 0.0:
@@ -150,7 +149,11 @@ class QuarterCarParams:
 
     @property
     def k_w(self) -> float:
-        """Wheel rate [N/m]: spring rate referred to wheel centre."""
+        """Wheel rate [N/m]: spring rate referred to wheel centre.
+
+        k_w = k_s * MR²  where MR = spring travel / wheel travel.
+        A lower MR (longer lever arm) reduces the wheel rate for a given spring rate.
+        """
         return self.k_s * (self.MR ** 2)
 
     @property
@@ -266,6 +269,10 @@ class QuarterCarResult:
     rms_tire_load:     float = 0.0
     peak_susp_travel:  float = 0.0
     comfort_rating:    str   = ""
+
+    # Damper model metadata
+    damper_linearisation_note: str = ""  # Description of how damper was treated in freq domain
+    c_eff_used:               float = 0.0  # Effective linearised damping used in freq domain [Ns/m]
 
     # PSD Analysis
     psd_freqs:      np.ndarray = field(default_factory=lambda: np.array([]))
@@ -452,8 +459,25 @@ def compute_frequency_response(
     freq_hz = np.logspace(np.log10(f_min), np.log10(f_max), n_points)
     omega   = 2.0 * np.pi * freq_hz
 
+    # ── Damper linearisation ──────────────────────────────────────────────
+    # If a nonlinear damper curve is present, compute an energy-equivalent
+    # linearised c_eff for the frequency domain. The time domain always uses
+    # the full nonlinear curve. Both analyses now describe the same setup,
+    # but the freq-domain is an approximation noted in the result.
+    has_nonlinear_damper = (
+        (p.damper_curve_v_comp is not None and p.damper_curve_f_comp is not None)
+        or (p.damper_curve_v is not None and p.damper_curve_f is not None)
+    )
+    if has_nonlinear_damper:
+        from suspensionlab.physics.damper_model import linearise_damper_from_params
+        c_eff, damper_note = linearise_damper_from_params(p, v_rms=0.05)
+    else:
+        c_eff = p.c_w
+        damper_note = "Linear damper model (constant c_w). Frequency and time domains are consistent."
+    # ─────────────────────────────────────────────────────────────────────
+
     H_s_arr, H_u_arr = _impedance_matrix_tf(
-        omega, p.m_s, p.m_u, p.k_w, p.c_w, p.k_t, p.c_t
+        omega, p.m_s, p.m_u, p.k_w, c_eff, p.k_t, p.c_t
     )
 
     tx_body  = np.abs(H_s_arr)
@@ -463,13 +487,15 @@ def compute_frequency_response(
 
     peak_idx = np.argmax(tx_body)
     return {
-        "freq_hz":                freq_hz,
-        "transmissibility_body":  tx_body,
-        "transmissibility_wheel": tx_wheel,
-        "bode_magnitude_db":      bode_db,
-        "bode_phase_deg":         bode_ph,
-        "peak_transmissibility":  float(tx_body[peak_idx]),
-        "freq_at_peak_tx":        float(freq_hz[peak_idx]),
+        "freq_hz":                  freq_hz,
+        "transmissibility_body":    tx_body,
+        "transmissibility_wheel":   tx_wheel,
+        "bode_magnitude_db":        bode_db,
+        "bode_phase_deg":           bode_ph,
+        "peak_transmissibility":    float(tx_body[peak_idx]),
+        "freq_at_peak_tx":          float(freq_hz[peak_idx]),
+        "damper_linearisation_note": damper_note,
+        "c_eff_used":               float(c_eff),
     }
 
 
@@ -1016,6 +1042,8 @@ def run_quarter_car_analysis(
         bode_phase_deg         = freq_data["bode_phase_deg"],
         peak_transmissibility  = freq_data["peak_transmissibility"],
         freq_at_peak_tx        = freq_data["freq_at_peak_tx"],
+        damper_linearisation_note = freq_data.get("damper_linearisation_note", ""),
+        c_eff_used               = freq_data.get("c_eff_used", 0.0),
         # Time domain (downsampled)
         time          = time_data["time"][::step],
         z_s           = time_data["z_s"][::step],

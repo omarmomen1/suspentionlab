@@ -55,10 +55,24 @@ async def create_team(
     if user.team_id:
         raise HTTPException(status_code=400, detail="You are already in a team.")
 
+    # BUGFIX (#21): `slug` is NOT NULL + UNIQUE — generate a unique, URL-safe
+    # slug from the team name and verify no collision before insert.
+    import re as _re
+    base_slug = _re.sub(r"[^a-z0-9]+", "-", req.name.lower()).strip("-") or "team"
+    slug = base_slug
+    suffix = 0
+    while True:
+        existing = await db.execute(select(Team).where(Team.slug == slug))
+        if existing.scalar_one_or_none() is None:
+            break
+        suffix += 1
+        slug = f"{base_slug}-{suffix}"
+
     team_id = uuid.uuid4()
     team = Team(
         id=team_id,
         name=req.name,
+        slug=slug,
         owner_id=uuid.UUID(user.user_id),
         plan=PlanTier.ENTERPRISE,
     )

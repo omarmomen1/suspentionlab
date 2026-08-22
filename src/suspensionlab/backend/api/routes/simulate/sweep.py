@@ -76,7 +76,7 @@ async def simulate_sweep(payload: SweepRequest, request: Request, db: AsyncSessi
             plan=tier,
             job_type="SWEEP_QUARTER",
             payload=payload.model_dump(),
-            db=db
+            db=db, team_id=getattr(user, "team_id", None)
         )
         return JobResponse(job_id=job_id, status="PENDING")
     except Exception as e:

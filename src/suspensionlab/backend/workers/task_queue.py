@@ -15,6 +15,7 @@ def _get_redis_conn():
     return _redis_conn
 
 _priority_job_queue = None
+_dedicated_job_queue = None
 
 def _get_job_queue():
     global _job_queue
@@ -27,6 +28,13 @@ def _get_priority_job_queue():
     if _priority_job_queue is None:
         _priority_job_queue = Queue("priority_queue", connection=_get_redis_conn())
     return _priority_job_queue
+
+def _get_dedicated_job_queue():
+    """(#27) Dedicated queue for ENTERPRISE customers with reserved workers."""
+    global _dedicated_job_queue
+    if _dedicated_job_queue is None:
+        _dedicated_job_queue = Queue("dedicated", connection=_get_redis_conn())
+    return _dedicated_job_queue
 
 # Proxy objects so existing code that does `from queue import job_queue` still works
 class _LazyQueue:
@@ -41,6 +49,12 @@ class _LazyPriorityQueue:
     def enqueue(self, *args, **kwargs):
         return _get_priority_job_queue().enqueue(*args, **kwargs)
 
+class _LazyDedicatedQueue:
+    def __getattr__(self, name):
+        return getattr(_get_dedicated_job_queue(), name)
+    def enqueue(self, *args, **kwargs):
+        return _get_dedicated_job_queue().enqueue(*args, **kwargs)
+
 class _LazyRedis:
     @property
     def connection(self):
@@ -50,4 +64,7 @@ class _LazyRedis:
 
 job_queue = _LazyQueue()
 priority_job_queue = _LazyPriorityQueue()
+dedicated_job_queue = _LazyDedicatedQueue()
 redis_conn = _LazyRedis()
+
+QUEUE_NAMES = ("default", "priority_queue", "dedicated")

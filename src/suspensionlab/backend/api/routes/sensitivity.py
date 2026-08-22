@@ -55,13 +55,19 @@ def _perturb_params(base: dict, key: str, delta: float) -> dict:
 
 
 async def _run_one(params_dict: dict, profile_dict: dict) -> dict[str, float]:
-    """Run one simulation and return KPIs. Raises on failure."""
+    """Run one simulation and return KPIs. Raises on failure.
+
+    (#25) Uses the bounded compute pool instead of bare `to_thread`:
+    `wait_for(to_thread(...))` abandons the awaitable on timeout while the
+    thread keeps running — under load that accumulates unbounded threads and
+    saturates the CPU. The bounded pool caps total concurrent computations
+    process-wide, so overload degrades to queueing instead of self-DoS.
+    """
+    from suspensionlab.backend.core.compute_governance import bounded_run
+
     params = QuarterCarParams(**params_dict)
     profile = RoadProfile(**profile_dict)
-    result = await asyncio.wait_for(
-        asyncio.to_thread(run_quarter_car_analysis, params, profile),
-        timeout=60.0,
-    )
+    result = await bounded_run(run_quarter_car_analysis, params, profile, timeout=60.0, model="quarter_car")
     return _extract_kpis(result)
 
 

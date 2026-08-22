@@ -27,7 +27,7 @@ async def simulate_handling(
             plan=user.plan,
             job_type="SIMULATE_HANDLING",
             payload=payload.model_dump(),
-            db=db
+            db=db, team_id=getattr(user, "team_id", None)
         )
         return {"job_id": job_id, "status": "PENDING"}
     except Exception as e:

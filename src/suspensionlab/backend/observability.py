@@ -33,12 +33,63 @@ WORKER_JOB_DURATION = Histogram(
     ["queue"]
 )
 
-# Saturation: Queue Depth
+# Saturation: Queue Depth  (#28 — actually updated by workers/orchestrator.py)
 QUEUE_DEPTH = Gauge(
     "suspensionlab_queue_depth",
     "Current number of pending jobs in queue",
     ["queue"]
 )
+
+# Duration: time spent enqueueing (Redis round-trip + RQ bookkeeping)
+JOB_QUEUE_LATENCY = Histogram(
+    "suspensionlab_job_enqueue_latency_seconds",
+    "Time spent submitting a job to the queue",
+    ["queue"]
+)
+
+# Physics observability: solver outcomes per model
+SOLVER_RUNS_TOTAL = Counter(
+    "suspensionlab_solver_runs_total",
+    "Solver executions by model and outcome",
+    ["model", "outcome"]   # outcome: converged | convergence_failed | validation_failed | error
+)
+
+# Physics observability: model validity scores seen by the validity engine
+MODEL_VALIDITY_SCORE = Gauge(
+    "suspensionlab_model_validity_score",
+    "Latest MODEL VALIDITY score (0-100) assessed per model",
+    ["model"]
+)
+
+# Rate: simulation cancellations (client aborts / timeouts)
+SIMULATION_CANCELLATIONS_TOTAL = Counter(
+    "suspensionlab_simulation_cancellations_total",
+    "Cancelled or timed-out simulations",
+    ["model"]
+)
+
+# Per-customer compute usage (bytes-free label = user id hash prefix)
+CUSTOMER_JOBS_TOTAL = Counter(
+    "suspensionlab_customer_jobs_total",
+    "Jobs submitted per customer",
+    ["plan"]
+)
+
+
+def record_model_validity(model: str, score: float) -> None:
+    """Publish a MODEL VALIDITY score observation. Non-fatal."""
+    try:
+        MODEL_VALIDITY_SCORE.labels(model=model).set(float(score))
+    except Exception:
+        pass
+
+
+def record_solver_outcome(model: str, outcome: str) -> None:
+    """Record a solver run outcome: converged|convergence_failed|validation_failed|error."""
+    try:
+        SOLVER_RUNS_TOTAL.labels(model=model, outcome=outcome).inc()
+    except Exception:
+        pass
 
 # Utilization: DB Pool
 DB_POOL_ACTIVE = Gauge(

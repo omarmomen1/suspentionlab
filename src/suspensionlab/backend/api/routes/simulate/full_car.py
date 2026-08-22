@@ -27,7 +27,7 @@ async def simulate_full_car(
             plan=user.plan,
             job_type="SIMULATE_FULL",
             payload=payload.model_dump(),
-            db=db
+            db=db, team_id=getattr(user, "team_id", None)
         )
         return {"job_id": job_id, "status": "PENDING"}
     except Exception as e:

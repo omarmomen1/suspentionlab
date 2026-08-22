@@ -80,6 +80,7 @@ async def submit_optimization(
             new_job = JobRecord(
                 id=uuid.UUID(job_id),
                 user_id=uuid.UUID(user.user_id),
+                team_id=uuid.UUID(user.team_id) if getattr(user, "team_id", None) else None,  # (#22) team analytics
                 job_type="OPTIMIZE_QUARTER",
                 status="PENDING",
                 params=req.params.model_dump(),

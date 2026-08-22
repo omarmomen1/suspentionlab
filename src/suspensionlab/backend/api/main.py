@@ -45,6 +45,10 @@ from suspensionlab.backend.core.redis_client import init_async_redis, close_asyn
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # SECURITY GATE: refuse to boot in PROD with missing/weak cryptographic secrets.
+    from suspensionlab.backend.config import validate_prod_secrets
+    validate_prod_secrets()
+
     # Database migrations are now handled by Alembic in deployment pipelines (Phase 2 Architecture)
     await init_async_redis()
     yield
@@ -128,6 +132,13 @@ app.include_router(teams_router, prefix="/api/v1", dependencies=protected)
 from suspensionlab.backend.api.routes.lap_sim_routes import router as lap_sim_router
 app.include_router(lap_sim_router, prefix="/api/v1", dependencies=protected)
 
+from suspensionlab.backend.api.routes.kinematics_routes import router as kinematics_router
+app.include_router(kinematics_router, prefix="/api/v1", dependencies=protected)
+
+from suspensionlab.backend.api.routes.vehicle_intelligence_routes import router as intelligence_router
+app.include_router(intelligence_router, prefix="/api/v1", dependencies=protected)
+
+
 from suspensionlab.backend.api.routes.telemetry_routes import router as telemetry_router
 app.include_router(telemetry_router, prefix="/api/v1")  # WebSocket endpoint has its own connection manager
 
@@ -160,6 +171,12 @@ app.include_router(share_router, prefix="/api/v1")  # GET /reports/{token} is pu
 
 from suspensionlab.backend.api.routes.durability_routes import router as durability_router
 app.include_router(durability_router, prefix="/api/v1", dependencies=[Depends(verify_api_key), Depends(RateLimiter("rate_limit_simulate"))])
+
+from suspensionlab.backend.api.routes.model_validity_routes import router as model_validity_router
+app.include_router(model_validity_router, prefix="/api/v1", dependencies=protected)
+
+from suspensionlab.backend.api.routes.vnv_routes import router as vnv_router
+app.include_router(vnv_router, prefix="/api/v1", dependencies=protected)
 
 from suspensionlab.backend.api.routes.scim_routes import router as scim_router
 app.include_router(scim_router, prefix="/api/v1")

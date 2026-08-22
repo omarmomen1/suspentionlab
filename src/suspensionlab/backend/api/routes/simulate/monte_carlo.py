@@ -30,7 +30,7 @@ async def simulate_monte_carlo(payload: MonteCarloRequest, request: Request, db:
             plan=tier,
             job_type="MONTE_CARLO_QUARTER",
             payload=payload.model_dump(),
-            db=db
+            db=db, team_id=getattr(user, "team_id", None)
         )
         return JobResponse(job_id=job_id, status="PENDING")
     except Exception as e:

@@ -43,9 +43,13 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                   <NavItem href="/full-car"    label="Full Car"    />
                   <NavItem href="/active"      label="Active"      />
                   <NavItem href="/handling"    label="Handling"    />
-                  <NavItem href="/digital-twin" label="Digital Twin" />
-                  <NavItem href="/sensitivity" label="Sensitivity" />
-                  <NavItem href="/nvh"         label="NVH"         />
+                  <NavItem href="/kinematics"        label="Kinematics"        />
+                  <NavItem href="/lap-sim"           label="Lap Sim"           />
+                  <NavItem href="/setup-sensitivity" label="Setup Sensitivity" />
+                  <NavItem href="/yaw-dynamics"      label="Yaw / MMM"         />
+                  <NavItem href="/digital-twin"      label="Digital Twin"      />
+                  <NavItem href="/sensitivity"       label="Sensitivity"       />
+                  <NavItem href="/nvh"               label="NVH"               />
                   <NavItem href="/durability"  label="Durability"  />
                   <NavItem href="/ai-engineer" label="✦ AI Engineer" />
                   <NavItem href="/garage"      label="Garage"      />
