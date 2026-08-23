@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
@@ -13,7 +13,7 @@ const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface VehicleConfig {
   // Mass
@@ -73,7 +73,7 @@ interface GpsData {
   n_points: number;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function formatLapTime(s: number): string {
   if (!s || s <= 0) return "--:--.---";
@@ -112,7 +112,7 @@ const PLOTLY_BASE = {
   legend: { font: { color: "#888", size: 10 } },
 };
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// â”€â”€â”€ Sub-components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Section({ title, children, defaultOpen = true }: {
   title: string; children: React.ReactNode; defaultOpen?: boolean;
@@ -179,7 +179,7 @@ function KpiCard({ label, value, unit, icon: Icon, accent = false }: {
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function LapSimPage() {
   const { authHeader } = useAuth();
@@ -296,7 +296,7 @@ export default function LapSimPage() {
   return (
     <div className="flex h-[calc(100vh-44px)] bg-black text-white overflow-hidden">
 
-      {/* ── LEFT PANEL ─────────────────────────────────────────────────────── */}
+      {/* â”€â”€ LEFT PANEL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <aside className="w-[220px] flex-shrink-0 border-r border-[#1a1a1a] overflow-y-auto p-3 space-y-1 custom-scrollbar">
         {/* Header */}
         <div className="mb-4">
@@ -307,7 +307,7 @@ export default function LapSimPage() {
             <span className="text-[11px] font-bold text-white">Lap Simulator</span>
           </div>
           <p className="text-[9px] text-gray-600 leading-relaxed">
-            QSS · 4-wheel LT · Pacejka tires · GGV envelope
+            QSS Â· 4-wheel LT Â· Pacejka tires Â· GGV envelope
           </p>
         </div>
 
@@ -368,11 +368,11 @@ export default function LapSimPage() {
 
         {/* Aerodynamics */}
         <Section title="Aerodynamics">
-          <ParamRow label="CL Base" unit="–" value={cfg.cl_base} onChange={set("cl_base")} min={0} max={5} step={0.05} />
-          <ParamRow label="CD Base" unit="–" value={cfg.cd_base} onChange={set("cd_base")} min={0.1} max={3} step={0.05} />
-          <ParamRow label="Frontal Area" unit="m²" value={cfg.frontal_area} onChange={set("frontal_area")} min={0.5} max={4} step={0.05} />
-          <ParamRow label="CoP from Front" unit="–" value={cfg.cop_fraction} onChange={set("cop_fraction")} min={0.1} max={0.9} step={0.01} />
-          <ParamRow label="RH Sensitivity" unit="ΔCL/mm" value={cfg.cl_rh_sens} onChange={set("cl_rh_sens")} min={0} max={0.1} step={0.001} />
+          <ParamRow label="CL Base" unit="â€“" value={cfg.cl_base} onChange={set("cl_base")} min={0} max={5} step={0.05} />
+          <ParamRow label="CD Base" unit="â€“" value={cfg.cd_base} onChange={set("cd_base")} min={0.1} max={3} step={0.05} />
+          <ParamRow label="Frontal Area" unit="mÂ²" value={cfg.frontal_area} onChange={set("frontal_area")} min={0.5} max={4} step={0.05} />
+          <ParamRow label="CoP from Front" unit="â€“" value={cfg.cop_fraction} onChange={set("cop_fraction")} min={0.1} max={0.9} step={0.01} />
+          <ParamRow label="RH Sensitivity" unit="Î”CL/mm" value={cfg.cl_rh_sens} onChange={set("cl_rh_sens")} min={0} max={0.1} step={0.001} />
         </Section>
 
         {/* Powertrain */}
@@ -380,7 +380,7 @@ export default function LapSimPage() {
           <ParamRow label="Peak Power" unit="kW" value={cfg.max_power_kw} onChange={set("max_power_kw")} min={50} max={1500} step={10} />
           <ParamRow label="Brake Front Bias" unit="%" value={cfg.brake_front_bias} onChange={set("brake_front_bias")} min={40} max={80} step={1} />
           <div className="mt-1 px-2 py-1.5 bg-[#0a0a0a] rounded border border-[#1a1a1a]">
-            <p className="text-[9px] text-gray-700">Drive Layout: RWD · 6-speed sequential</p>
+            <p className="text-[9px] text-gray-700">Drive Layout: RWD Â· 6-speed sequential</p>
           </div>
         </Section>
 
@@ -394,7 +394,7 @@ export default function LapSimPage() {
             disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {running ? (
-            <><Loader2 size={13} className="animate-spin" />Running…</>
+            <><Loader2 size={13} className="animate-spin" />Runningâ€¦</>
           ) : (
             <><Play size={13} />Run Simulation</>
           )}
@@ -408,7 +408,7 @@ export default function LapSimPage() {
         )}
       </aside>
 
-      {/* ── CENTER PANEL ───────────────────────────────────────────────────── */}
+      {/* â”€â”€ CENTER PANEL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
 
         {result ? (
@@ -484,7 +484,7 @@ export default function LapSimPage() {
                       marker: {
                         color: tel.speeds_kmh, colorscale: "Plasma",
                         size: 2.5, opacity: 0.7,
-                        colorbar: { title: "km/h", titlefont: { color: "#666" }, tickfont: { color: "#666" }, thickness: 12 },
+                        colorbar: { title: { text: "km/h", font: { color: "#666" } }, tickfont: { color: "#666" }, thickness: 12 },
                       },
                       name: "GG Points",
                     },
@@ -588,7 +588,7 @@ export default function LapSimPage() {
             </div>
           </>
         ) : (
-          /* ── Empty State ── */
+          /* â”€â”€ Empty State â”€â”€ */
           <div className="flex-1 flex items-center justify-center p-8">
             <div className="max-w-[480px] text-center">
               <div className="w-16 h-16 rounded-2xl bg-[#f2a900]/8 border border-[#f2a900]/15
@@ -604,12 +604,12 @@ export default function LapSimPage() {
                 <p className="text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-3">Model includes</p>
                 <ul className="space-y-1.5">
                   {[
-                    "Individual wheel loads — longitudinal + lateral load transfer",
+                    "Individual wheel loads â€” longitudinal + lateral load transfer",
                     "Per-wheel combined-slip Pacejka tire forces",
-                    "GGV envelope pre-computation (40 speed × 20 ay points)",
-                    "Powertrain — torque curve, 6-speed gear ratios, drivetrain loss",
-                    "Aero map — front/rear balance, ride-height sensitivity",
-                    "Brake bias — per-axle friction check",
+                    "GGV envelope pre-computation (40 speed Ã— 20 ay points)",
+                    "Powertrain â€” torque curve, 6-speed gear ratios, drivetrain loss",
+                    "Aero map â€” front/rear balance, ride-height sensitivity",
+                    "Brake bias â€” per-axle friction check",
                     "Power-limited terminal velocity (no hardcoded speed caps)",
                     "Track banking and elevation gradient",
                   ].map((item, i) => (
@@ -628,7 +628,7 @@ export default function LapSimPage() {
               {running && (
                 <div className="mt-4 flex items-center justify-center gap-2 text-[#f2a900]">
                   <Loader2 size={14} className="animate-spin" />
-                  <span className="text-[11px]">Building GGV envelope and running lap…</span>
+                  <span className="text-[11px]">Building GGV envelope and running lapâ€¦</span>
                 </div>
               )}
             </div>
@@ -636,7 +636,7 @@ export default function LapSimPage() {
         )}
       </main>
 
-      {/* ── RIGHT PANEL ────────────────────────────────────────────────────── */}
+      {/* â”€â”€ RIGHT PANEL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <aside className="w-[180px] flex-shrink-0 border-l border-[#1a1a1a] overflow-y-auto p-3 space-y-3 custom-scrollbar">
         <p className="text-[9px] font-bold text-gray-700 uppercase tracking-[0.16em]">Session Info</p>
 
@@ -717,3 +717,4 @@ export default function LapSimPage() {
     </div>
   );
 }
+

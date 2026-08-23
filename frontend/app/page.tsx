@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import dynamic from "next/dynamic";
@@ -58,7 +58,7 @@ export default function Home() {
           
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link href="/pricing" className="group px-8 py-4 bg-white text-black font-semibold rounded-full hover:bg-gray-200 transition-all hover:scale-105 active:scale-95 flex items-center gap-2 shadow-[0_0_30px_rgba(255,255,255,0.1)]">
-              Get Pro Access — $50 <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
+              Get Pro Access â€” $50 <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </Link>
             <Link href="/quarter-car" className="px-8 py-4 bg-transparent text-white font-semibold rounded-full border border-white/20 hover:bg-white/10 transition-colors flex items-center gap-2 backdrop-blur-sm">
               Try Interactive Demo <Play size={16} fill="currentColor" />
@@ -178,7 +178,7 @@ export default function Home() {
       {/* CTA Section */}
       <section className="py-32 px-6 relative overflow-hidden">
         <div className="absolute inset-0 bg-ansys-yellow/10"></div>
-        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20 mix-blend-overlay"></div>
+        <div className="absolute inset-0 bg-[repeating-linear-gradient(45deg,rgba(255,255,255,0.03)_0px,rgba(255,255,255,0.03)_2px,transparent_2px,transparent_4px)] opacity-20 mix-blend-overlay"></div>
         
         <div className="max-w-4xl mx-auto text-center relative z-10 bg-black/40 backdrop-blur-md border border-white/10 p-12 md:p-20 rounded-3xl shadow-2xl">
           <h2 className="text-4xl md:text-6xl font-black mb-6">Ready to dominate the track?</h2>
@@ -193,3 +193,4 @@ export default function Home() {
     </div>
   );
 }
+

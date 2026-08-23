@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useRef, useEffect } from "react";
 import GGFrictionCircle from "../../components/GGFrictionCircle";
@@ -94,7 +94,7 @@ export default function DigitalTwinPage() {
         {/* Header */}
         <div>
           <h1 className="text-3xl font-light text-white tracking-tight mb-2">Digital Twin</h1>
-          <p className="text-slate-400">Real-time suspension telemetry analysis — upload a session to calibrate your model</p>
+          <p className="text-slate-400">Real-time suspension telemetry analysis â€” upload a session to calibrate your model</p>
         </div>
 
         {/* Tabs */}
@@ -365,10 +365,10 @@ export default function DigitalTwinPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="bg-slate-900/40 p-6 rounded-xl border border-slate-800 flex items-center justify-center backdrop-blur-sm h-96">
-                <GGFrictionCircle latG={telemetry.lat_g} longG={telemetry.long_g} />
+                <GGFrictionCircle maxG={2.5} latG={telemetry.lat_g} longG={telemetry.long_g} />
               </div>
               <div className="bg-slate-900/40 p-6 rounded-xl border border-slate-800 backdrop-blur-sm h-96">
-                <TelemetryGauges telemetry={telemetry} />
+                <TelemetryGauges speedMs={telemetry.speed_ms} divergencePct={0} status="Live" />
               </div>
             </div>
           </div>
@@ -377,3 +377,4 @@ export default function DigitalTwinPage() {
     </div>
   );
 }
+

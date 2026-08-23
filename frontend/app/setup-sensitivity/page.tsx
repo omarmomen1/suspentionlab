@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
@@ -13,7 +13,7 @@ const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface SuspensionSetup {
   k_spring_front: number;   // N/m
@@ -60,7 +60,7 @@ interface SensitivityResult {
   };
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const PLOTLY_BASE = {
   paper_bgcolor: "transparent",
@@ -142,7 +142,7 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function SetupSensitivityPage() {
   const { authHeader } = useAuth();
@@ -176,7 +176,7 @@ export default function SetupSensitivityPage() {
     try {
       const res = await fetch(`${API}/api/v1/lapsim/sensitivity`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader },
+        headers: { "Content-Type": "application/json", ...authHeader() },
         body: JSON.stringify({
           speed_ms:          op.speed_ms,
           lateral_g:         op.lateral_g,
@@ -229,25 +229,25 @@ export default function SetupSensitivityPage() {
   const ab = result?.arb_balance;
   const rh = result?.ride_height_sensitivity;
 
-  // ── Pareto chart: ARB balance vs relative load transfer ───────────────────
+  // â”€â”€ Pareto chart: ARB balance vs relative load transfer â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const arbChartData = ab ? [
     {
       type: "bar" as const,
       name: "Baseline",
-      x: ["Front Δ Load Transfer"],
+      x: ["Front Î” Load Transfer"],
       y: [0],
       marker: { color: "#f2a900" },
     },
     {
       type: "bar" as const,
       name: `+${operatingPoint.delta_arb_front.toLocaleString()} N/m ARB`,
-      x: ["Front Δ Load Transfer"],
+      x: ["Front Î” Load Transfer"],
       y: [ab.delta_lat_transfer_front_n],
       marker: { color: ab.delta_lat_transfer_front_n > 0 ? "#ef4444" : "#22c55e" },
     },
   ] : [];
 
-  // ── Roll stiffness donut data ─────────────────────────────────────────────
+  // â”€â”€ Roll stiffness donut data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const donutData: any[] = si
     ? [({
         type: "pie" as const,
@@ -260,7 +260,7 @@ export default function SetupSensitivityPage() {
       } as any)]
     : [];
 
-  // ── Downforce sensitivity bar ─────────────────────────────────────────────
+  // â”€â”€ Downforce sensitivity bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const dfData = rh
     ? [{
         type: "bar" as const,
@@ -283,7 +283,7 @@ export default function SetupSensitivityPage() {
       }]
     : [];
 
-  // ── UI ────────────────────────────────────────────────────────────────────
+  // â”€â”€ UI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <div className="min-h-screen bg-[#0a0a0b] text-white px-4 py-6">
       <div className="max-w-[1600px] mx-auto">
@@ -296,7 +296,7 @@ export default function SetupSensitivityPage() {
               Setup Sensitivity
             </h1>
             <p className="text-[11px] text-gray-500 mt-0.5">
-              Real-time suspension setup analysis — ARB balance, ride height, aero coupling
+              Real-time suspension setup analysis â€” ARB balance, ride height, aero coupling
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -311,7 +311,7 @@ export default function SetupSensitivityPage() {
 
         <div className="grid grid-cols-[320px_1fr] gap-4">
 
-          {/* ── Left panel: sliders ─────────────────────────────────────── */}
+          {/* â”€â”€ Left panel: sliders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div className="space-y-4">
 
             <Card>
@@ -390,7 +390,7 @@ export default function SetupSensitivityPage() {
             )}
           </div>
 
-          {/* ── Right panel: charts ─────────────────────────────────────── */}
+          {/* â”€â”€ Right panel: charts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div className="space-y-4">
 
             {/* ARB balance + understeer row */}
@@ -418,8 +418,8 @@ export default function SetupSensitivityPage() {
                     </div>
                   </div>
                   <div className="text-[9px] text-gray-500 text-center leading-relaxed">
-                    <span className="text-[#f2a900]">●</span> Front &nbsp;
-                    <span className="text-blue-400">●</span> Rear
+                    <span className="text-[#f2a900]">â—</span> Front &nbsp;
+                    <span className="text-blue-400">â—</span> Rear
                   </div>
                   <div className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
                     (si?.arb_balance_fraction ?? arb_bal_preview) > 0.52
@@ -455,7 +455,7 @@ export default function SetupSensitivityPage() {
                   />
                 ) : (
                   <div className="h-40 flex items-center justify-center text-[10px] text-gray-600">
-                    Loading…
+                    Loadingâ€¦
                   </div>
                 )}
               </Card>
@@ -467,7 +467,7 @@ export default function SetupSensitivityPage() {
                   <>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-gray-500">Front Δ Load Transfer</span>
+                        <span className="text-[10px] text-gray-500">Front Î” Load Transfer</span>
                         <span className={`text-[13px] font-bold font-mono ${
                           ab.delta_lat_transfer_front_n > 0 ? "text-red-400" : "text-emerald-400"
                         }`}>
@@ -477,7 +477,7 @@ export default function SetupSensitivityPage() {
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-gray-500">Rear Δ Load Transfer</span>
+                        <span className="text-[10px] text-gray-500">Rear Î” Load Transfer</span>
                         <span className={`text-[13px] font-bold font-mono ${
                           ab.delta_lat_transfer_rear_n > 0 ? "text-red-400" : "text-emerald-400"
                         }`}>
@@ -495,9 +495,9 @@ export default function SetupSensitivityPage() {
                           : "bg-gray-800/50 text-gray-400 border border-gray-700/30"
                     }`}>
                       {ab.understeer_tendency === "more"
-                        ? "↑ More understeer"
+                        ? "â†‘ More understeer"
                         : ab.understeer_tendency === "less"
-                          ? "↓ Less understeer"
+                          ? "â†“ Less understeer"
                           : "Balanced response"}
                     </div>
                     <div className="text-[9px] text-gray-600">
@@ -506,7 +506,7 @@ export default function SetupSensitivityPage() {
                     </div>
                   </>
                 ) : (
-                  <div className="text-[10px] text-gray-600">Fetching…</div>
+                  <div className="text-[10px] text-gray-600">Fetchingâ€¦</div>
                 )}
               </Card>
             </div>
@@ -514,7 +514,7 @@ export default function SetupSensitivityPage() {
             {/* ARB load transfer bar chart */}
             <Card>
               <SectionTitle>
-                Load Transfer Change — ARB +{(operatingPoint.delta_arb_front/1000).toFixed(0)}k N/m Front
+                Load Transfer Change â€” ARB +{(operatingPoint.delta_arb_front/1000).toFixed(0)}k N/m Front
               </SectionTitle>
               {arbChartData.length > 0 ? (
                 <Plot
@@ -544,7 +544,7 @@ export default function SetupSensitivityPage() {
                   style={{ width: "100%", height: 200 }}
                 />
               ) : (
-                <div className="h-40 flex items-center justify-center text-[10px] text-gray-600">Fetching…</div>
+                <div className="h-40 flex items-center justify-center text-[10px] text-gray-600">Fetchingâ€¦</div>
               )}
             </Card>
 
@@ -552,7 +552,7 @@ export default function SetupSensitivityPage() {
             <div className="grid grid-cols-2 gap-4">
               <Card>
                 <SectionTitle>
-                  Aero Δ — Ride Height {operatingPoint.delta_ride_height > 0 ? "−" : "+"}{Math.abs(operatingPoint.delta_ride_height)}mm
+                  Aero Î” â€” Ride Height {operatingPoint.delta_ride_height > 0 ? "âˆ’" : "+"}{Math.abs(operatingPoint.delta_ride_height)}mm
                 </SectionTitle>
                 {dfData.length > 0 ? (
                   <Plot
@@ -560,13 +560,13 @@ export default function SetupSensitivityPage() {
                     layout={{
                       ...PLOTLY_BASE,
                       height: 200,
-                      yaxis: { ...PLOTLY_BASE.yaxis, title: { text: "ΔDownforce [N]", font: { size: 9, color: "#555" } } },
+                      yaxis: { ...PLOTLY_BASE.yaxis, title: { text: "Î”Downforce [N]", font: { size: 9, color: "#555" } } },
                     }}
                     config={{ displayModeBar: false }}
                     style={{ width: "100%", height: 200 }}
                   />
                 ) : (
-                  <div className="h-40 flex items-center justify-center text-[10px] text-gray-600">Fetching…</div>
+                  <div className="h-40 flex items-center justify-center text-[10px] text-gray-600">Fetchingâ€¦</div>
                 )}
               </Card>
 
@@ -591,7 +591,7 @@ export default function SetupSensitivityPage() {
                     <Badge label="Rear ride height"
                       value={si.ride_height_rear_mm.toFixed(0)} unit=" mm"
                       ok={si.ride_height_rear_mm >= 25} />
-                    <Badge label="Δ Downforce (±5mm RH)"
+                    <Badge label="Î” Downforce (Â±5mm RH)"
                       value={rh.delta_downforce_total_n > 0 ? "+" + rh.delta_downforce_total_n.toFixed(0) : rh.delta_downforce_total_n.toFixed(0)} unit=" N" />
                     <Badge label="Speed (operating point)"
                       value={result!.operating_point.speed_kmh.toFixed(0)} unit=" km/h" />
@@ -599,7 +599,7 @@ export default function SetupSensitivityPage() {
                       value={result!.operating_point.q_dynamic_pa.toFixed(0)} unit=" Pa" />
                   </div>
                 ) : (
-                  <div className="h-40 flex items-center justify-center text-[10px] text-gray-600">Fetching…</div>
+                  <div className="h-40 flex items-center justify-center text-[10px] text-gray-600">Fetchingâ€¦</div>
                 )}
               </Card>
             </div>
@@ -619,3 +619,4 @@ export default function SetupSensitivityPage() {
     </div>
   );
 }
+

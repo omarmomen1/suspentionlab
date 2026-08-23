@@ -2,6 +2,12 @@
 
 import { useEffect } from "react";
 
+/**
+ * Global error boundary (P1-SEC-04): never render raw error.message to the
+ * user — it can leak backend stack traces, connection strings, or internal
+ * API paths. The full error goes to the console (and Sentry when wired);
+ * the user sees a generic message plus the digest for support correlation.
+ */
 export default function ErrorBoundary({
   error,
   reset,
@@ -11,12 +17,20 @@ export default function ErrorBoundary({
 }) {
   useEffect(() => {
     console.error(error);
+    // TODO: forward `error` and `error.digest` to Sentry in production.
   }, [error]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">
       <h2 className="text-2xl font-bold mb-4">Something went wrong!</h2>
-      <p className="text-red-500 mb-4">{error.message}</p>
+      <p className="text-slate-400 mb-2">
+        An unexpected error occurred. Our team has been notified.
+      </p>
+      {error.digest && (
+        <p className="text-xs font-mono text-slate-500 mb-4">
+          Error reference: {error.digest}
+        </p>
+      )}
       <button
         onClick={() => reset()}
         className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
@@ -22,7 +22,7 @@ const PLOTLY_BASE = {
   autosize: true,
 };
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface StabilityMetrics {
   understeer_gradient_deg_per_g: number;
@@ -54,7 +54,7 @@ interface TransientResult {
   delta_steer_deg: number;
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return (
@@ -101,7 +101,7 @@ function ParamInput({ label, value, onChange, min, max, step = 0.1, unit = "" }:
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function YawDynamicsPage() {
   const { authHeader } = useAuth();
@@ -133,7 +133,7 @@ export default function YawDynamicsPage() {
     setLoading(true);
     setError(null);
     try {
-      const h = { "Content-Type": "application/json", ...authHeader };
+      const h = { "Content-Type": "application/json", ...authHeader() }; // P0-SEC-03: call the function, do not spread it
       const body = { params, v_ms: simParams.v_ms, n_beta: 31, n_delta: 13 };
 
       const [yawRes, transRes] = await Promise.all([
@@ -160,12 +160,12 @@ export default function YawDynamicsPage() {
     }
   }, [params, simParams, authHeader]);
 
-  // ── MMM chart data ────────────────────────────────────────────────────────
+  // â”€â”€ MMM chart data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const mmmData = mmmResult
     ? mmmResult.delta_deg.map((delta, j) => ({
         type:  "scatter" as const,
         mode:  "lines" as const,
-        name:  `δ=${delta.toFixed(1)}°`,
+        name:  `Î´=${delta.toFixed(1)}Â°`,
         x:     mmmResult.Fy_total_n.map(row => row[j]),
         y:     mmmResult.Mz_total_nm.map(row => row[j]),
         line:  {
@@ -184,7 +184,7 @@ export default function YawDynamicsPage() {
         .map((beta, i) => ({
           type:      "scatter" as const,
           mode:      "lines" as const,
-          name:      `β=${beta.toFixed(0)}°`,
+          name:      `Î²=${beta.toFixed(0)}Â°`,
           x:         mmmResult.Fy_total_n[i * 4],
           y:         mmmResult.Mz_total_nm[i * 4],
           line:      { color: "#555", width: 1, dash: "dot" as const },
@@ -192,11 +192,11 @@ export default function YawDynamicsPage() {
         }))
     : [];
 
-  // ── Transient chart data ──────────────────────────────────────────────────
+  // â”€â”€ Transient chart data â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const transientData = transient
     ? [
         {
-          type: "scatter" as const, mode: "lines" as const, name: "Sideslip β [deg]",
+          type: "scatter" as const, mode: "lines" as const, name: "Sideslip Î² [deg]",
           x: transient.t, y: transient.beta_deg,
           line: { color: "#f2a900", width: 2 }, yaxis: "y",
         },
@@ -250,18 +250,18 @@ export default function YawDynamicsPage() {
 
         <div className="grid grid-cols-[280px_1fr] gap-4">
 
-          {/* ── Left panel ─────────────────────────────────────────────── */}
+          {/* â”€â”€ Left panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div className="space-y-4">
             <Card>
               <SectionTitle>Vehicle Parameters</SectionTitle>
               <div className="space-y-2.5">
                 <ParamInput label="Mass"            value={params.mass}           onChange={setP("mass")}           unit="kg"    step={10} />
-                <ParamInput label="Yaw inertia Iz"  value={params.Iz}             onChange={setP("Iz")}             unit="kg·m²" step={50} />
+                <ParamInput label="Yaw inertia Iz"  value={params.Iz}             onChange={setP("Iz")}             unit="kgÂ·mÂ²" step={50} />
                 <ParamInput label="Wheelbase"       value={params.wheelbase}      onChange={setP("wheelbase")}      unit="m"     step={0.05} />
                 <ParamInput label="CoG to front"    value={params.cog_dist_front} onChange={setP("cog_dist_front")} unit="m"     step={0.05} />
-                <ParamInput label="Cα front (axle)" value={params.C_alpha_front / 1000}
+                <ParamInput label="CÎ± front (axle)" value={params.C_alpha_front / 1000}
                   onChange={v => setP("C_alpha_front")(v * 1000)} unit="kN/rad" step={5} />
-                <ParamInput label="Cα rear (axle)"  value={params.C_alpha_rear / 1000}
+                <ParamInput label="CÎ± rear (axle)"  value={params.C_alpha_rear / 1000}
                   onChange={v => setP("C_alpha_rear")(v * 1000)} unit="kN/rad" step={5} />
               </div>
             </Card>
@@ -296,13 +296,13 @@ export default function YawDynamicsPage() {
                     highlight={Math.abs(metrics.understeer_gradient_deg_per_g) > 2} />
                   <MetricRow label="Neutral steer speed"
                     value={metrics.neutral_steer_speed_kmh !== null
-                      ? metrics.neutral_steer_speed_kmh.toFixed(0) : "∞"} unit=" km/h" />
+                      ? metrics.neutral_steer_speed_kmh.toFixed(0) : "âˆž"} unit=" km/h" />
                   <MetricRow label="Yaw natural freq"
                     value={metrics.yaw_natural_freq_hz.toFixed(2)} unit=" Hz" />
                   <MetricRow label="Yaw damping ratio"
                     value={metrics.yaw_damping_ratio.toFixed(3)}
                     highlight={metrics.yaw_damping_ratio < 0.3} />
-                  <MetricRow label="Time constant τ"
+                  <MetricRow label="Time constant Ï„"
                     value={metrics.time_constant_s.toFixed(3)} unit=" s" />
                 </div>
               </Card>
@@ -313,10 +313,10 @@ export default function YawDynamicsPage() {
               <Card>
                 <SectionTitle>Transient Response</SectionTitle>
                 <div className="space-y-0">
-                  <MetricRow label="Required steer δ"
-                    value={transient.delta_steer_deg.toFixed(2)} unit=" °" />
+                  <MetricRow label="Required steer Î´"
+                    value={transient.delta_steer_deg.toFixed(2)} unit=" Â°" />
                   <MetricRow label="Steady-state r"
-                    value={(transient.r_steady_state * 180 / Math.PI).toFixed(2)} unit=" °/s" />
+                    value={(transient.r_steady_state * 180 / Math.PI).toFixed(2)} unit=" Â°/s" />
                   <MetricRow label="Settled at t"
                     value={transient.settled_at_t.toFixed(2)} unit=" s"
                     highlight={transient.settled_at_t > 1.0} />
@@ -325,13 +325,13 @@ export default function YawDynamicsPage() {
             )}
           </div>
 
-          {/* ── Right panel: charts ─────────────────────────────────────── */}
+          {/* â”€â”€ Right panel: charts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div className="space-y-4">
 
             {/* MMM diagram */}
             <Card>
               <SectionTitle>
-                Milliken Moment Method Diagram — {simParams.v_ms.toFixed(0)} m/s ({(simParams.v_ms*3.6).toFixed(0)} km/h)
+                Milliken Moment Method Diagram â€” {simParams.v_ms.toFixed(0)} m/s ({(simParams.v_ms*3.6).toFixed(0)} km/h)
               </SectionTitle>
               {mmmData.length > 0 ? (
                 <Plot
@@ -345,7 +345,7 @@ export default function YawDynamicsPage() {
                     },
                     yaxis: {
                       ...PLOTLY_BASE.yaxis,
-                      title: { text: "Total Yaw Moment Mz [N·m]", font: { size: 10, color: "#555" } },
+                      title: { text: "Total Yaw Moment Mz [NÂ·m]", font: { size: 10, color: "#555" } },
                     },
                     legend: { font: { color: "#666", size: 9 }, x: 1.0, y: 1.0 },
                     shapes: [
@@ -369,7 +369,7 @@ export default function YawDynamicsPage() {
             {/* Transient response */}
             <Card>
               <SectionTitle>
-                Transient Yaw Response — R={simParams.radius_m.toFixed(0)}m at {(simParams.v_ms*3.6).toFixed(0)} km/h
+                Transient Yaw Response â€” R={simParams.radius_m.toFixed(0)}m at {(simParams.v_ms*3.6).toFixed(0)} km/h
               </SectionTitle>
               {transientData.length > 0 ? (
                 <Plot
@@ -383,7 +383,7 @@ export default function YawDynamicsPage() {
                     },
                     yaxis: {
                       ...PLOTLY_BASE.yaxis,
-                      title: { text: "Sideslip β [deg]", font: { size: 10, color: "#f2a900" } },
+                      title: { text: "Sideslip Î² [deg]", font: { size: 10, color: "#f2a900" } },
                     },
                     yaxis2: {
                       title: { text: "Yaw rate [deg/s]", font: { size: 10, color: "#3b82f6" } },
@@ -426,3 +426,4 @@ export default function YawDynamicsPage() {
     </div>
   );
 }
+
