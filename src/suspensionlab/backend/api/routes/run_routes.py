@@ -123,6 +123,24 @@ async def diff_runs(
     }
 
 
+@router.get("/{label}/decision")
+async def run_decision(
+    label: str,
+    user: dict = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Layered decision (#36): GOOD/WARNING/CRITICAL verdict + why + evidence.
+    Layer 4 (raw plots) renders client-side from GET /runs/{label}.
+    """
+    from suspensionlab.backend.services.decision_layer import build_decision
+    try:
+        run = await run_artifacts.get_run(db, label, user.user_id, getattr(user, "team_id", None))
+    except LookupError as exc:
+        raise _not_found(exc)
+    return build_decision(run)
+
+
 @router.get("/{a}/what-changed/{b}")
 async def what_changed(
     a: str,
