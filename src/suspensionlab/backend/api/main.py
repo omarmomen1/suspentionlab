@@ -178,6 +178,9 @@ app.include_router(model_validity_router, prefix="/api/v1", dependencies=protect
 from suspensionlab.backend.api.routes.vnv_routes import router as vnv_router
 app.include_router(vnv_router, prefix="/api/v1", dependencies=protected)
 
+from suspensionlab.backend.api.routes.run_routes import router as run_router
+app.include_router(run_router, prefix="/api/v1", dependencies=protected)
+
 from suspensionlab.backend.api.routes.scim_routes import router as scim_router
 app.include_router(scim_router, prefix="/api/v1")
 
