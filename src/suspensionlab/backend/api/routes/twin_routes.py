@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
 from suspensionlab.backend.database.core import get_db_dependency
@@ -121,3 +121,92 @@ async def twin_learnings(
     except LookupError as exc:
         raise _not_found(exc)
     return await digital_twin.get_learnings(db, twin)
+
+
+# ── Setup Proposals (Issue 50) ────────────────────────────────────────────────
+
+class ProposalRequest(BaseModel):
+    problem: str = Field(..., min_length=5, max_length=4000,
+                         description="Engineer's problem statement, e.g. "
+                                     "'Why is the car unstable in T9?'")
+
+
+@router.post("/{twin_id}/propose", status_code=201)
+async def create_proposal(
+    twin_id: str,
+    req: ProposalRequest,
+    user: dict = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    The Issue-50 workflow endpoint: given the twin's CALIBRATED parameters and
+    the engineer's problem, search the feasible setup space (simulate every
+    candidate), validate constraints, and persist an immutable Setup Proposal.
+    Every number is simulation-derived — no generated values.
+    """
+    from suspensionlab.backend.services import setup_proposal as sp
+    try:
+        twin = await digital_twin.get_twin(db, twin_id, user.user_id, getattr(user, "team_id", None))
+    except LookupError as exc:
+        raise _not_found(exc)
+
+    proposal = await sp.generate_proposal(
+        db, twin, req.problem, user.user_id, getattr(user, "team_id", None)
+    )
+    return sp.proposal_to_dict(proposal)
+
+
+@router.get("/{twin_id}/proposals")
+async def list_proposals(
+    twin_id: str,
+    user: dict = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """All proposals for this twin, newest first."""
+    from sqlalchemy import select, desc
+    import uuid as _uuid
+    from suspensionlab.backend.database.models.setup_proposal import SetupProposal
+    from suspensionlab.backend.services import setup_proposal as sp
+
+    try:
+        twin = await digital_twin.get_twin(db, twin_id, user.user_id, getattr(user, "team_id", None))
+    except LookupError as exc:
+        raise _not_found(exc)
+
+    result = await db.execute(
+        select(SetupProposal)
+        .where(SetupProposal.twin_id == twin.id)
+        .order_by(desc(SetupProposal.created_at))
+        .limit(50)
+    )
+    return {"proposals": [sp.proposal_to_dict(p) for p in result.scalars().all()]}
+
+
+@router.post("/proposals/{proposal_id}/status")
+async def set_proposal_status(
+    proposal_id: str,
+    status: str = Query(..., pattern="^(APPROVED|REJECTED|EXPORTED)$"),
+    user: dict = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Engineer decision on a proposal. Only `status` is mutable — the technical
+    content of a proposal is immutable once created.
+    """
+    import uuid as _uuid
+    from sqlalchemy import select
+    from suspensionlab.backend.database.models.setup_proposal import SetupProposal
+
+    conditions = [SetupProposal.id == _uuid.UUID(proposal_id),
+                  SetupProposal.user_id == _uuid.UUID(user.user_id)]
+    if getattr(user, "team_id", None):
+        pass  # team members may act on shared proposals
+
+    result = await db.execute(select(SetupProposal).where(*conditions))
+    proposal = result.scalar_one_or_none()
+    if proposal is None:
+        raise HTTPException(status_code=404, detail="Proposal not found.")
+
+    proposal.status = status
+    await db.commit()
+    return {"id": str(proposal.id), "status": proposal.status}

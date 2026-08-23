@@ -37,6 +37,9 @@ Legend: ✅ DONE · 🔶 PARTIAL · ⬜ TODO
 | 25 | Layered decision UI | ~2 days | High | 🔶 PARTIAL — decision engine + DecisionPanel component; integrate across all result pages |
 | 26 | **Digital Setup Twin** (#40) | ~4 weeks (to full vehicle) | Extreme 🔥🔥🔥 | 🔶 PARTIAL — VehicleTwin model, telemetry-driven parameter identification, calibration history, learning store (`/twins` API) live for the ride domain; extend to tire/aero/kinematics domains |
 | 27 | **Vehicle-specific learning moat** (#41) | ongoing | Extreme 🔥🔥🔥 | 🔶 PARTIAL — CalibrationObservation ledger + aggregated learnings endpoint live; response-surface modelling over accumulated observations pending |
+| 28 | **Setup Proposal workflow** (#50) | ~1 week (to full UX) | Extreme 🔥🔥🔥 | ✅ CORE DONE — twin params → candidate search → simulate → validate → immutable proposal with predicted effects + approve/reject/export lifecycle (`/twins/{id}/propose`) |
+| 26 | **Digital Setup Twin** (#40) | ~4 weeks (to full vehicle) | Extreme 🔥🔥🔥 | 🔶 PARTIAL — VehicleTwin model, telemetry-driven parameter identification, calibration history, learning store (`/twins` API) live for the ride domain; extend to tire/aero/kinematics domains |
+| 27 | **Vehicle-specific learning moat** (#41) | ongoing | Extreme 🔥🔥🔥 | 🔶 PARTIAL — CalibrationObservation ledger + aggregated learnings endpoint live; response-surface modelling over accumulated observations pending |
 
 ## 2. Explicitly NOT building yet
 
@@ -80,8 +83,45 @@ sprawl until the 🔥 items above close.
               Engineering Decision ← layered decision UI 🔶 · run artifacts ✅
 ```
 
-## 4. Immediate next sprint (highest ROI)
 
+
+## 4. Business model & positioning (Issues 47–49)
+
+### Pricing tiers
+
+| Tier | Price | Includes |
+|------|-------|----------|
+| Professional | $100–300/month | Engineers, students, consultants: core simulators, profiles, history |
+| Motorsport Team | $10k–50k/year | Multi-user workspace, telemetry + twin calibration, optimization, API, reports |
+| Enterprise / OEM | $50k–250k+/year | Private deployment, dedicated compute, SSO/SCIM/RBAC, audit, custom models, validation SLA |
+| Custom engineering | $50k–500k/project | Vehicle/tire model calibration, telemetry and data-pipeline integration, solver integration, on-prem |
+
+Deliberately **not** a "$49/month simulator" — that positioning is a race to the bottom.
+
+### Honest pitch (the only one that works)
+
+> SuspensionLab does not replace an F1 team's existing CAE ecosystem. It is a
+> rapid vehicle-dynamics exploration, telemetry-correlation, optimization, and
+> engineering-decision layer that sits on top of it.
+
+What makes an engineer listen: *"Upload your telemetry and vehicle parameters.
+SuspensionLab identifies where the model disagrees with reality, quantifies the
+discrepancy, searches the feasible setup space, and produces a traceable
+engineering recommendation."* — not "we have AI."
+
+## 5. Phased execution status (Issue 51)
+
+| Phase | Scope | Status |
+|-------|-------|--------|
+| **0 — Stop the bleeding** | Motion ratio, damper consistency, secrets, teams, audit, provenance, SSO/SCIM honesty, compute protection | ✅ DONE — trustworthy prototype |
+| **1 — V&V engine** | Framework, regression suite, references, tolerances, versioning, hashes | ~70% — registry+runner+API live; commercial/physical correlation cases pending |
+| **2 — Kinematics engine** | Hardpoints, NR solver, camber/toe/RC/MR, anti-geometry, 3D dynamic geometry | ~60% — C++/Eigen solver live; anti-geometry, jacking, rockers, 3D viz pending |
+| **3 — Telemetry intelligence** | Ingestion, mapping, sync, segmentation, correlation, parameter identification, residuals | ~65% — full pipeline + Digital Twin identification live; residual analysis and multi-domain ID pending |
+| **4 — Vehicle dynamics coupling** | Kinematics+tire+aero+suspension to load transfer to lap sim | ~55% — GGV QSS lap sim with aero+ERS+thermal; transient/diff/bias pending |
+| **5 — Optimization** | DOE, Pareto, constraints, surrogates, uncertainty, robust | ~60% — Pareto + constraint-driven done; DOE/surrogates/UQ pending |
+| **6 — Enterprise** | OIDC done, SCIM done, RBAC partial, audit done, artifacts done; private deploy / SDK / SLOs pending | ~70% |
+
+## 6. Immediate next sprint (highest ROI)
 1. **Close #7** — route remaining inline compute through the orchestrator.
 2. **Kinematics completion (#10)** — anti-geometry, jacking, rockers.
 3. **Decision panel integration (#25)** — mount `DecisionPanel` on every result page.
