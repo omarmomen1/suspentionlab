@@ -87,7 +87,9 @@ interface VehiclePresetsProps {
 
 export default function VehiclePresets({ onSelect }: VehiclePresetsProps) {
   const [open, setOpen] = useState(false);
-  const [hovered, setHovered] = useState<string | null>(null);
+  // P1-PERF-06: hover styling moved to CSS (:hover) — the previous
+  // onMouseEnter/onMouseLeave useState pattern re-rendered the whole list
+  // on every mouse movement.
 
   return (
     <div className="relative">
@@ -117,11 +119,7 @@ export default function VehiclePresets({ onSelect }: VehiclePresetsProps) {
               {VEHICLE_PRESETS.map((preset) => (
                 <button key={preset.name}
                   onClick={() => { onSelect(preset); setOpen(false); }}
-                  onMouseEnter={() => setHovered(preset.name)}
-                  onMouseLeave={() => setHovered(null)}
-                  className={`w-full flex items-center justify-between px-4 py-3 border-b border-[#1a1a1a] last:border-0 transition-colors ${
-                    hovered === preset.name ? "bg-[#161618]" : ""
-                  }`}
+                  className="w-full flex items-center justify-between px-4 py-3 border-b border-[#1a1a1a] last:border-0 transition-colors hover:bg-[#161618]"
                 >
                   <div className="text-left min-w-0 pr-4">
                     <div className="flex items-center gap-2 mb-1">

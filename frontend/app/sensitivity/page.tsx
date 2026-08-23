@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import { useState, Suspense } from "react";
+import { useState, useRef, Suspense, useEffect } from "react";
 import dynamic from "next/dynamic";
 import {
   Play, Settings2, AlertTriangle, Activity, Layers
@@ -52,6 +52,14 @@ interface SensitivityResults {
 
 function SensitivitySweepDashboard() {
   const { authHeader } = useAuth();
+  // P1-PERF-04: track job-polling intervals and clear them on unmount so
+  // navigation away cannot leak intervals or setState on unmounted components.
+  const pollersRef = useRef<Set<ReturnType<typeof setInterval>>>(new Set());
+  useEffect(() => {
+    const s = pollersRef.current;
+    return () => { s.forEach((id) => clearInterval(id)); s.clear(); };
+  }, []);
+
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState<SensitivityResults | null>(null);
 
@@ -85,20 +93,21 @@ function SensitivitySweepDashboard() {
           const pollRes = await fetch(`${API_BASE}/jobs/${jobId}`, { headers: authHeader() });
           const pollData = await pollRes.json();
           if (pollData.status === "COMPLETED") {
-             clearInterval(interval);
+             clearInterval(interval); pollersRef.current.delete(interval);
              setResults(pollData.result);
              setIsRunning(false);
           } else if (pollData.status === "FAILED" || pollData.status === "CANCELED") {
-             clearInterval(interval);
+             clearInterval(interval); pollersRef.current.delete(interval);
              setResults({ error: true, message: pollData.error || "Sweep failed." });
              setIsRunning(false);
           }
         } catch (e) {
-             clearInterval(interval);
+             clearInterval(interval); pollersRef.current.delete(interval);
              setResults({ error: true, message: String(e) });
              setIsRunning(false);
         }
       }, 1000);
+      pollersRef.current.add(interval);
     } catch (err) {
       setResults({ error: true, message: String(err) });
       setIsRunning(false);

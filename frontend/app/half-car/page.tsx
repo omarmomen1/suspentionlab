@@ -2,7 +2,7 @@
 // Half Car Page
 
 "use client";
-import { useState, Suspense, useMemo } from "react";
+import { useState, useRef, Suspense, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 
 import {
@@ -20,6 +20,7 @@ import DamperLUTInput from "../../components/DamperLUTInput";
 import { useAuth } from "../../contexts/AuthContext";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import { computePsd } from "../../lib/fft";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -112,6 +113,14 @@ type HalfCarState = HalfCarResults | { error: boolean; message: string; [key: st
 
 function HalfCarDashboard() {
   const { authHeader } = useAuth();
+  // P1-PERF-04: track job-polling intervals and clear them on unmount so
+  // navigation away cannot leak intervals or setState on unmounted components.
+  const pollersRef = useRef<Set<ReturnType<typeof setInterval>>>(new Set());
+  useEffect(() => {
+    const s = pollersRef.current;
+    return () => { s.forEach((id) => clearInterval(id)); s.clear(); };
+  }, []);
+
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving,  setIsSaving]  = useState(false);
   const [results,   setResults]   = useState<HalfCarState | null>(null);
@@ -158,21 +167,22 @@ function HalfCarDashboard() {
           const pollRes = await fetch(`${API_BASE}/jobs/${jobId}`, { headers: authHeader() });
           const pollData = await pollRes.json();
           if (pollData.status === "COMPLETED") {
-             clearInterval(interval);
+             clearInterval(interval); pollersRef.current.delete(interval);
              setResults(pollData.result);
              saveSimulationToHistory("sl_sim_history_hcar", params, pollData.result);
              setIsRunning(false);
           } else if (pollData.status === "FAILED" || pollData.status === "CANCELED") {
-             clearInterval(interval);
+             clearInterval(interval); pollersRef.current.delete(interval);
              setResults({ error: true, message: pollData.error || "Simulation failed." });
              setIsRunning(false);
           }
         } catch (e) {
-             clearInterval(interval);
+             clearInterval(interval); pollersRef.current.delete(interval);
              setResults({ error: true, message: String(e) });
              setIsRunning(false);
         }
       }, 1000);
+      pollersRef.current.add(interval);
     } catch (err) {
       setResults({ error: true, message: String(err) });
       setIsRunning(false);
@@ -191,25 +201,17 @@ function HalfCarDashboard() {
     finally { setIsSaving(false); }
   };
 
+  // P0-PERF-01: O(N log N) FFT (lib/fft) replaces the O(N^2) DFT that froze
+  // the UI thread on long simulations.
   const psdData = useMemo(() => {
     if (!results || results.error) return null;
     const ddz = results.ddz_s as number[];
     const t = results.time as number[];
     if (!ddz || ddz.length < 64) return null;
-    const n = ddz.length, dt = t[1] - t[0], fs = 1 / dt, N = n, real = new Float64Array(N);
-    for (let i = 0; i < N; i++) real[i] = ddz[i] * 0.5 * (1 - Math.cos(2 * Math.PI * i / (N - 1)));
-    const freqs: number[] = [], psd: number[] = [];
-    const half = Math.floor(N / 2);
-    for (let k = 0; k <= half; k++) {
-      let re = 0, im = 0;
-      for (let n2 = 0; n2 < N; n2++) {
-        const angle = 2 * Math.PI * k * n2 / N;
-        re += real[n2] * Math.cos(angle); im -= real[n2] * Math.sin(angle);
-      }
-      const mag2 = (re * re + im * im) / (N * fs);
-      freqs.push(k * fs / N); psd.push(k > 0 && k < half ? 2 * mag2 : mag2);
-    }
-    return { freqs, psd };
+    const dt = t[1] - t[0], fs = 1 / dt;
+    const { freqs, psd } = computePsd(ddz, fs);
+    const psdOneSided = psd.map((v, k) => (k > 0 && k < psd.length - 1 ? 2 * v : v));
+    return { freqs, psd: psdOneSided };
   }, [results]);
 
   const psdPitch = useMemo(() => {
@@ -217,20 +219,10 @@ function HalfCarDashboard() {
     const ddtheta = results.ddtheta as number[];
     const t = results.time as number[];
     if (!ddtheta || ddtheta.length < 64) return null;
-    const n = ddtheta.length, dt = t[1] - t[0], fs = 1 / dt, N = n, real = new Float64Array(N);
-    for (let i = 0; i < N; i++) real[i] = ddtheta[i] * 0.5 * (1 - Math.cos(2 * Math.PI * i / (N - 1)));
-    const freqs: number[] = [], psd: number[] = [];
-    const half = Math.floor(N / 2);
-    for (let k = 0; k <= half; k++) {
-      let re = 0, im = 0;
-      for (let n2 = 0; n2 < N; n2++) {
-        const angle = 2 * Math.PI * k * n2 / N;
-        re += real[n2] * Math.cos(angle); im -= real[n2] * Math.sin(angle);
-      }
-      const mag2 = (re * re + im * im) / (N * fs);
-      freqs.push(k * fs / N); psd.push(k > 0 && k < half ? 2 * mag2 : mag2);
-    }
-    return { freqs, psd };
+    const dt = t[1] - t[0], fs = 1 / dt;
+    const { freqs, psd } = computePsd(ddtheta, fs);
+    const psdOneSided = psd.map((v, k) => (k > 0 && k < psd.length - 1 ? 2 * v : v));
+    return { freqs, psd: psdOneSided };
   }, [results]);
 
   const hasResults = results && !results.error;

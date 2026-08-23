@@ -10,6 +10,7 @@ import {
 import { useAuth } from "../../contexts/AuthContext";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import { maxAbs } from "../../lib/array";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -490,7 +491,7 @@ export default function LapSimPage() {
                     },
                     // Friction circle reference
                     (() => {
-                      const r = Math.max(...tel.lateral_g.map(Math.abs), ...tel.longitudinal_g.map(Math.abs));
+                      const r = Math.max(maxAbs(tel.lateral_g), maxAbs(tel.longitudinal_g));
                       const theta = Array.from({ length: 100 }, (_, i) => (i / 99) * 2 * Math.PI);
                       return {
                         x: theta.map(t => r * Math.cos(t)), y: theta.map(t => r * Math.sin(t)),

@@ -6,7 +6,6 @@ import { Play, CheckCircle2, Zap, LayoutDashboard, Server, ChevronRight, XCircle
 import Link from "next/link";
 import { motion } from "framer-motion";
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 
 const NVH_DEMO_DATA = (() => {
     const rows = [];
@@ -23,6 +22,22 @@ const NVH_DEMO_DATA = (() => {
     }
     return rows;
 })();
+
+
+// P1-PERF-03: static CSS heatmap colouring (Inferno-like) — replaces the
+// ~3MB react-plotly.js bundle on the landing page.
+function infernoColor(t: number): string {
+  const stops: Array<[number, number, number]> = [
+    [0, 0, 4], [40, 11, 84], [101, 21, 110], [159, 42, 99],
+    [212, 72, 66], [245, 125, 21], [250, 193, 39], [252, 255, 164],
+  ];
+  const c = Math.min(Math.max(t, 0), 1) * (stops.length - 1);
+  const i = Math.floor(c);
+  const f = c - i;
+  const [r0, g0, b0] = stops[i];
+  const [r1, g1, b1] = stops[Math.min(i + 1, stops.length - 1)];
+  return `rgb(${Math.round(r0 + f * (r1 - r0))},${Math.round(g0 + f * (g1 - g0))},${Math.round(b0 + f * (b1 - b0))})`;
+}
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -148,29 +163,17 @@ export default function Home() {
             </p>
           </div>
           <div className="flex-1 w-full aspect-square md:aspect-auto md:h-[450px] bg-[#0d0d0d] border border-[#222] rounded-3xl overflow-hidden shadow-2xl relative p-2">
-            {mounted && (
-              <Plot
-                data={[
-                  {
-                    z: NVH_DEMO_DATA,
-                    type: 'heatmap',
-                    colorscale: 'Inferno',
-                    showscale: false
-                  }
-                ]}
-                layout={{
-                  autosize: true,
-                  margin: { l: 20, r: 20, t: 20, b: 20 },
-                  paper_bgcolor: 'transparent',
-                  plot_bgcolor: 'transparent',
-                  xaxis: { visible: false },
-                  yaxis: { visible: false },
-                }}
-                useResizeHandler={true}
-                style={{ width: "100%", height: "100%" }}
-                config={{ displayModeBar: false }}
-              />
-            )}
+            <div className="w-full h-full grid gap-[2px] p-1" style={{ gridTemplateColumns: `repeat(${NVH_DEMO_DATA[0].length}, 1fr)` }}>
+              {NVH_DEMO_DATA.map((row, i) =>
+                row.map((v, j) => (
+                  <div
+                    key={`${i}-${j}`}
+                    className="rounded-[2px]"
+                    style={{ backgroundColor: infernoColor(v) }}
+                  />
+                ))
+              )}
+            </div>
           </div>
         </div>
       </section>

@@ -2,7 +2,7 @@
 // Full Car Page
 
 "use client";
-import { useState, Suspense, useMemo } from "react";
+import { useState, useRef, Suspense, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
 
 import {
@@ -19,6 +19,7 @@ import SimHistory, { saveSimulationToHistory } from "../../components/SimHistory
 import { useAuth } from "../../contexts/AuthContext";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import { maxOf, minOf } from "../../lib/array";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -125,6 +126,14 @@ type FullCarState = FullCarResults | { error: boolean; message: string; [key: st
 
 function FullCarDashboard() {
   const { authHeader } = useAuth();
+  // P1-PERF-04: track job-polling intervals and clear them on unmount so
+  // navigation away cannot leak intervals or setState on unmounted components.
+  const pollersRef = useRef<Set<ReturnType<typeof setInterval>>>(new Set());
+  useEffect(() => {
+    const s = pollersRef.current;
+    return () => { s.forEach((id) => clearInterval(id)); s.clear(); };
+  }, []);
+
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving,  setIsSaving]  = useState(false);
   const [results,   setResults]   = useState<FullCarState | null>(null);
@@ -172,21 +181,22 @@ function FullCarDashboard() {
           const pollRes = await fetch(`${API_BASE}/jobs/${jobId}`, { headers: authHeader() });
           const pollData = await pollRes.json();
           if (pollData.status === "COMPLETED") {
-             clearInterval(interval);
+             clearInterval(interval); pollersRef.current.delete(interval);
              setResults(pollData.result);
              saveSimulationToHistory("sl_sim_history_fcar", params, pollData.result);
              setIsRunning(false);
           } else if (pollData.status === "FAILED" || pollData.status === "CANCELED") {
-             clearInterval(interval);
+             clearInterval(interval); pollersRef.current.delete(interval);
              setResults({ error: true, message: pollData.error || "Simulation failed." });
              setIsRunning(false);
           }
         } catch (e) {
-             clearInterval(interval);
+             clearInterval(interval); pollersRef.current.delete(interval);
              setResults({ error: true, message: String(e) });
              setIsRunning(false);
         }
       }, 1000);
+      pollersRef.current.add(interval);
     } catch (err) {
       setResults({ error: true, message: String(err) });
       setIsRunning(false);
@@ -328,7 +338,7 @@ function FullCarDashboard() {
                 <KPICard label="RMS Heave" value={r.rms_heave_accel} unit="m/s²" status={r.rms_heave_accel < 0.315 ? "good" : r.rms_heave_accel < 1.0 ? "warn" : "bad"} />
                 <KPICard label="RMS Pitch" value={r.rms_pitch_accel} unit="rad/s²" status="neutral" />
                 <KPICard label="RMS Roll" value={r.rms_roll_accel} unit="rad/s²" status="neutral" />
-                <KPICard label="LLT Front" value={Math.max(...(r.lateral_load_transfer_f as number[]))} unit="N" status="neutral" />
+                <KPICard label="LLT Front" value={maxOf(r.lateral_load_transfer_f as number[])} unit="N" status="neutral" />
               </div>
 
               <div className="flex gap-1.5 shrink-0">
@@ -441,9 +451,9 @@ function FullCarDashboard() {
                       <div className="h-full p-5 flex flex-col justify-center gap-4">
                         <p className="text-[10px] font-bold tracking-widest text-gray-700 uppercase">Load Transfer Summary</p>
                         <div className="space-y-3 font-mono text-xs">
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Max Front LLT</span><span className="text-[#00aeff]">{Math.max(...(r.lateral_load_transfer_f as number[])).toFixed(0)} N</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Max Rear LLT</span><span className="text-[#ff2d55]">{Math.max(...(r.lateral_load_transfer_r as number[])).toFixed(0)} N</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Total Max LLT</span><span className="text-white">{(Math.max(...(r.lateral_load_transfer_f as number[])) + Math.max(...(r.lateral_load_transfer_r as number[]))).toFixed(0)} N</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Max Front LLT</span><span className="text-[#00aeff]">{maxOf(r.lateral_load_transfer_f as number[]).toFixed(0)} N</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Max Rear LLT</span><span className="text-[#ff2d55]">{maxOf(r.lateral_load_transfer_r as number[]).toFixed(0)} N</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Total Max LLT</span><span className="text-white">{(maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[])).toFixed(0)} N</span></div>
                         </div>
                       </div>
                     </PlotBox>

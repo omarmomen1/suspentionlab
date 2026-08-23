@@ -16,6 +16,7 @@ import TelemetryUploader from "../../components/TelemetryUploader";
 import { useAuth } from "../../contexts/AuthContext";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import { maxAbs } from "../../lib/array";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const TABS = [
@@ -191,9 +192,9 @@ function HandlingDashboard() {
   const trackTraces: Record<string, unknown>[] = [], ggTraces: Record<string, unknown>[] = [];
   
   if (results && !results.error) {
-    max_lat_g = Math.max(...(results.a_y || []).map(Math.abs)) / 9.81;
-    max_long_g = Math.max(...(results.a_x || []).map(Math.abs)) / 9.81;
-    max_yaw = Math.max(...(results.yaw_rate || []).map(Math.abs)) * 180 / Math.PI;
+    max_lat_g = maxAbs(results.a_y || []) / 9.81;
+    max_long_g = maxAbs(results.a_x || []) / 9.81;
+    max_yaw = maxAbs(results.yaw_rate || []) * 180 / Math.PI;
     const vx_last = results.v_x[results.v_x.length - 1];
     const vy_last = results.v_y[results.v_y.length - 1];
     final_speed = Math.sqrt(vx_last*vx_last + vy_last*vy_last) * 3.6;

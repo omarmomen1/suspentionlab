@@ -22,12 +22,14 @@ import PlanGate from "../../components/PlanGate";
 import DamperLUTInput from "../../components/DamperLUTInput";
 import { useAuth } from "../../contexts/AuthContext";
 import SuspensionRig3D from "../../components/SuspensionRig3D";
+import Rig3DPlayer from "../../components/Rig3DPlayer";
 import SmartInsights from "../../components/SmartInsights";
 import SensitivityTornado from "../../components/SensitivityTornado";
 import ModelValidity, { ValidityReport } from "../../components/ModelValidity";
 import { Brain, FlaskConical } from "lucide-react";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import { maxOf, minOf } from "../../lib/array";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -216,19 +218,8 @@ function QuarterCarDashboard() {
   const [simParams, setSimParams] = useState<typeof params | null>(null);
   
   const [autoRun, setAutoRun] = useState(false);
-  const [frameIndex, setFrameIndex] = useState(0);
-  
-  useEffect(() => {
-    if (!results || results.error) return;
-    const times = results.time as number[];
-    if (!times) return;
-    let interval: NodeJS.Timeout;
-    const animate = () => {
-      setFrameIndex(prev => (prev + 1) % times.length);
-    };
-    interval = setInterval(animate, 20); // 50fps
-    return () => clearInterval(interval);
-  }, [results]);
+  // P1-PERF-02: frame animation moved into <Rig3DPlayer/> — the parent
+  // dashboard no longer re-renders at 50 fps.
 
   const [params, setParams] = useState({
     m_s:          300.0,
@@ -893,8 +884,8 @@ function QuarterCarDashboard() {
                             ? { yaxis: { ...DARK_BASE.yaxis,
                                 title: { text: "Phase (°)", font: { color: "#444", size: 10 } },
                                 range: [
-                                  Math.min(-10, Math.floor(Math.min(...r.bode_phase_deg) / 10) * 10 - 10),
-                                  Math.max(10, Math.ceil(Math.max(...r.bode_phase_deg) / 10) * 10 + 10),
+                                  Math.min(-10, Math.floor(minOf(r.bode_phase_deg) / 10) * 10 - 10),
+                                  Math.max(10, Math.ceil(maxOf(r.bode_phase_deg) / 10) * 10 + 10),
                                 ] } }
                             : {}),
                           shapes: [
@@ -1223,7 +1214,7 @@ function QuarterCarDashboard() {
                {/* Live Telemetry: Quarter-car has ONE unsprung mass (z_u).
                    All 4 corners receive the same z_u since the model is 2-DOF.
                    This is a symmetric approximation for visualization only. */}
-               <SuspensionRig3D zs={r.z_s[frameIndex] ?? 0} zu_fl={r.z_u[frameIndex] ?? 0} zu_fr={r.z_u[frameIndex] ?? 0} zu_rl={r.z_u[frameIndex] ?? 0} zu_rr={r.z_u[frameIndex] ?? 0} />
+               <Rig3DPlayer z_s={r.z_s as number[]} z_u={r.z_u as number[]} />
             </div>
           )}
         </div>
