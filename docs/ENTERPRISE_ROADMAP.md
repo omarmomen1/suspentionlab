@@ -22,7 +22,7 @@ Legend: ✅ DONE · 🔶 PARTIAL · ⬜ TODO
 | 10 | Kinematics engine | ~2 weeks | Extreme 🔥🔥🔥 | 🔶 PARTIAL — C++ NR solver live (camber/toe/RC/MR/scrub); missing anti-dive/squat, jacking, rocker/ARB geometry |
 | 11 | Dynamic 3D roll center | 2–4 weeks | Very high 🔥🔥 | ⬜ TODO — RC-vs-travel exists; RC-vs-roll + 3D visualisation pending |
 | 12 | Real tire model/calibration | 3–6 weeks | Extreme 🔥🔥🔥 | 🔶 PARTIAL — MF 5.2 + TIR parsing + thermal µ; no fitting/calibration pipeline |
-| 13 | Telemetry ingestion/calibration | ~3 weeks | Extreme 🔥🔥🔥 | 🔶 PARTIAL — parse/QA/segment/compare pipeline live; parameter identification & auto-calibration pending |
+| 13 | Telemetry ingestion/calibration | ~2 weeks | Extreme 🔥🔥🔥 | 🔶 PARTIAL — parse/QA/segment/compare pipeline + **Digital Setup Twin parameter identification live** (Welch PSD → SDOF acceleration-FRF NLLS fit; verified recovering f_n within 2.1% and ζ within 1.4% on noisy synthetic telemetry); multi-parameter/full-vehicle identification pending |
 | 14 | Real lap-time engine | ~3 weeks | Extreme 🔥🔥🔥 | 🔶 PARTIAL — GGV QSS solver w/ aero, ERS, thermal; missing transients, diff, brake bias |
 | 15 | Multiobjective optimization | — | Very high 🔥🔥 | ✅ DONE — Pareto frontier + constraint-driven lap-time optimizer |
 | 16 | Aero map integration | ~2 weeks | Very high 🔥🔥🔥 | 🔶 PARTIAL — ride-height-dependent CL/CD map; no CFD/wind-correlation import |
@@ -35,6 +35,8 @@ Legend: ✅ DONE · 🔶 PARTIAL · ⬜ TODO
 | 23 | Enterprise API/SDK | 2–3 weeks | Very high 🔥🔥 | 🔶 PARTIAL — API keys + OpenAPI docs; official SDK packages pending |
 | 24 | AI engineer grounded in physics | — | Very high 🔥🔥 | ✅ DONE — LLM-as-interface; physics proposes, sim validates, LLM explains |
 | 25 | Layered decision UI | ~2 days | High | 🔶 PARTIAL — decision engine + DecisionPanel component; integrate across all result pages |
+| 26 | **Digital Setup Twin** (#40) | ~4 weeks (to full vehicle) | Extreme 🔥🔥🔥 | 🔶 PARTIAL — VehicleTwin model, telemetry-driven parameter identification, calibration history, learning store (`/twins` API) live for the ride domain; extend to tire/aero/kinematics domains |
+| 27 | **Vehicle-specific learning moat** (#41) | ongoing | Extreme 🔥🔥🔥 | 🔶 PARTIAL — CalibrationObservation ledger + aggregated learnings endpoint live; response-surface modelling over accumulated observations pending |
 
 ## 2. Explicitly NOT building yet
 
