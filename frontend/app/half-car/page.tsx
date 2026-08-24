@@ -20,6 +20,9 @@ import DamperLUTInput from "../../components/DamperLUTInput";
 import { useAuth } from "../../contexts/AuthContext";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import KPICard from "../../../components/sim/KPICard";
+import PlotBox from "../../../components/sim/PlotBox";
+import { darkLayout, DARK_BASE } from "../../../components/sim/theme";
 import { computePsd } from "../../lib/fft";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -40,39 +43,8 @@ const TABS = [
 ];
 
 // ─── Plotly dark-theme base ──────────────────────────────────────────────────
-const DARK_BASE = {
-  paper_bgcolor: "transparent",
-  plot_bgcolor:  "transparent",
-  font:          { color: "#666", size: 11, family: "Inter, monospace" },
-  xaxis:         { color: "#444", gridcolor: "#161618", zerolinecolor: "#2a2a2a", tickfont: { color: "#555", size: 10 } },
-  yaxis:         { color: "#444", gridcolor: "#161618", zerolinecolor: "#2a2a2a", tickfont: { color: "#555", size: 10 } },
-  legend:        { font: { color: "#777", size: 10 }, bgcolor: "rgba(0,0,0,0)", orientation: "h" as const, y: -0.15 },
-  margin:        { l: 58, r: 18, t: 32, b: 55 },
-  autosize:      true,
-  hoverlabel:    { bgcolor: "#0d0d0f", bordercolor: "#333", font: { color: "#ccc", size: 11 } },
-};
-
-function darkLayout(overrides: Record<string, unknown> = {}) {
-  return { ...DARK_BASE, ...overrides };
-}
-
 type Status = "good" | "warn" | "bad" | "neutral";
 type Toast  = { msg: string; type: "success" | "error" };
-
-function KPICard({ label, value, unit, sub, status = "neutral" }: { label: string; value: number | string; unit?: string; sub?: string; status?: Status; }) {
-  const colours: Record<Status, string> = { good: "text-emerald-400", warn: "text-amber-400", bad: "text-red-400", neutral: "text-white" };
-  const borders: Record<Status, string> = { good: "border-emerald-900/40 bg-emerald-950/10", warn: "border-amber-900/40 bg-amber-950/10", bad: "border-red-900/40 bg-red-950/10", neutral: "border-[#252525]" };
-  return (
-    <div className={`bg-[#141416] border ${borders[status]} rounded-xl p-3 flex flex-col gap-0.5`}>
-      <span className="text-[9px] font-bold tracking-[0.16em] text-gray-600 uppercase">{label}</span>
-      <span className={`text-[1.1rem] font-bold font-mono leading-tight ${colours[status]}`}>
-        {typeof value === "number" ? value.toFixed(3) : value}
-        {unit && <span className="text-[11px] font-normal text-gray-600 ml-1">{unit}</span>}
-      </span>
-      {sub && <span className="text-[9px] text-gray-700 leading-tight mt-0.5">{sub}</span>}
-    </div>
-  );
-}
 
 function ParamSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -97,10 +69,6 @@ function ParameterInput({ label, val, unit, step = 1, min, onChange }: { label: 
       </div>
     </div>
   );
-}
-
-function PlotBox({ children }: { children: React.ReactNode }) {
-  return <div className="flex-1 min-w-0 min-h-0 relative">{children}</div>;
 }
 
 interface HalfCarResults {

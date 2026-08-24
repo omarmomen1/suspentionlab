@@ -16,6 +16,9 @@ import TelemetryUploader from "../../components/TelemetryUploader";
 import { useAuth } from "../../contexts/AuthContext";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import KPICard from "../../../components/sim/KPICard";
+import PlotBox from "../../../components/sim/PlotBox";
+import { darkLayout, DARK_BASE } from "../../../components/sim/theme";
 import { maxAbs } from "../../lib/array";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -25,39 +28,8 @@ const TABS = [
   { label: "Stability",   icon: Compass },
 ];
 
-const DARK_BASE = {
-  paper_bgcolor: "transparent",
-  plot_bgcolor:  "transparent",
-  font:          { color: "#666", size: 11, family: "Inter, monospace" },
-  xaxis:         { color: "#444", gridcolor: "#161618", zerolinecolor: "#2a2a2a", tickfont: { color: "#555", size: 10 } },
-  yaxis:         { color: "#444", gridcolor: "#161618", zerolinecolor: "#2a2a2a", tickfont: { color: "#555", size: 10 } },
-  legend:        { font: { color: "#777", size: 10 }, bgcolor: "rgba(0,0,0,0)", orientation: "h" as const, y: -0.15 },
-  margin:        { l: 58, r: 18, t: 32, b: 55 },
-  autosize:      true,
-  hoverlabel:    { bgcolor: "#0d0d0f", bordercolor: "#333", font: { color: "#ccc", size: 11 } },
-};
-
-function darkLayout(overrides: Record<string, unknown> = {}) {
-  return { ...DARK_BASE, ...overrides };
-}
-
 type Status = "good" | "warn" | "bad" | "neutral";
 type Toast  = { msg: string; type: "success" | "error" };
-
-function KPICard({ label, value, unit, sub, status = "neutral" }: { label: string; value: number | string; unit?: string; sub?: string; status?: Status; }) {
-  const colours: Record<Status, string> = { good: "text-emerald-400", warn: "text-amber-400", bad: "text-red-400", neutral: "text-white" };
-  const borders: Record<Status, string> = { good: "border-emerald-900/40 bg-emerald-950/10", warn: "border-amber-900/40 bg-amber-950/10", bad: "border-red-900/40 bg-red-950/10", neutral: "border-[#252525]" };
-  return (
-    <div className={`bg-[#141416] border ${borders[status]} rounded-xl p-3 flex flex-col gap-0.5`}>
-      <span className="text-[9px] font-bold tracking-[0.16em] text-gray-600 uppercase">{label}</span>
-      <span className={`text-[1.1rem] font-bold font-mono leading-tight ${colours[status]}`}>
-        {typeof value === "number" ? value.toFixed(3) : value}
-        {unit && <span className="text-[11px] font-normal text-gray-600 ml-1">{unit}</span>}
-      </span>
-      {sub && <span className="text-[9px] text-gray-700 leading-tight mt-0.5">{sub}</span>}
-    </div>
-  );
-}
 
 function ParamSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -82,10 +54,6 @@ function ParameterInput({ label, val, unit, step = 1, min, onChange }: { label: 
       </div>
     </div>
   );
-}
-
-function PlotBox({ children }: { children: React.ReactNode }) {
-  return <div className="flex-1 min-w-0 min-h-0 relative">{children}</div>;
 }
 
 interface HandlingResults {
@@ -330,7 +298,7 @@ function HandlingDashboard() {
               <div className="grid grid-cols-4 gap-2 shrink-0">
                 <KPICard label="Peak Lat Accel" value={max_lat_g} unit="G" status={max_lat_g > 0.8 ? "good" : "warn"} />
                 <KPICard label="Peak Long Accel" value={max_long_g} unit="G" status="neutral" />
-                <KPICard label="Peak Yaw Rate" value={max_yaw} unit="Â°/s" status={max_yaw < 40 ? "good" : "warn"} />
+                <KPICard label="Peak Yaw Rate" value={max_yaw} unit="°/s" status={max_yaw < 40 ? "good" : "warn"} />
                 <KPICard label="Exit Speed" value={final_speed} unit="km/h" status="neutral" />
               </div>
 
@@ -377,14 +345,14 @@ function HandlingDashboard() {
                           { x: r.time, y: r.yaw_rate?.map((y: number) => y * 180 / Math.PI), type: "scatter" as any as any, mode: "lines" as any as any, name: "Yaw Rate", line: { color: "#bf5af2", width: 2 }, fill: "tozeroy", fillcolor: "rgba(191,90,242,0.05)" },
                           ...(telemetryData?.yaw_rate?.length ? [{ x: telemetryData.time, y: telemetryData.yaw_rate, type: "scatter" as any as any, mode: "lines" as any as any, name: "Yaw (MoTeC)", line: { color: "rgba(191,90,242,0.4)", width: 1, dash: "dot" as any } }] : [])
                         ]}
-                        layout={darkLayout({ title: { text: "Yaw Rate", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Yaw Rate (Â°/s)", font: { color: "#444", size: 10 } } } })}
+                        layout={darkLayout({ title: { text: "Yaw Rate", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Yaw Rate (°/s)", font: { color: "#444", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
                       />
                     </PlotBox>
                     <PlotBox>
                       <Plot
                         data={[ { x: r.time, y: r.slip_angle?.map((s: number) => s * 180 / Math.PI), type: "scatter" as any as any, mode: "lines" as any as any, name: "Slip Angle", line: { color: "#ff9f0a", width: 2 }, fill: "tozeroy", fillcolor: "rgba(255,159,10,0.05)" } ]}
-                        layout={darkLayout({ title: { text: "Side Slip Angle", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Slip Angle (Â°)", font: { color: "#444", size: 10 } } } })}
+                        layout={darkLayout({ title: { text: "Side Slip Angle", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Slip Angle (°)", font: { color: "#444", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
                       />
                     </PlotBox>
@@ -415,7 +383,7 @@ function HandlingDashboard() {
                     <PlotBox>
                       <Plot
                         data={[ { x: r.slip_angle?.map((s: number) => s * 180 / Math.PI), y: r.yaw_rate?.map((y: number) => y * 180 / Math.PI), mode: "lines+markers", marker: { size: 3, color: r.time, colorscale: "Plasma" }, line: { width: 1, color: "rgba(255,255,255,0.2)" }, name: "Phase Plane" } as const ]}
-                        layout={darkLayout({ title: { text: "Stability Phase Plane (Slip Angle vs Yaw Rate)", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Slip Angle (Â°)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Yaw Rate (Â°/s)", font: { color: "#444", size: 10 } } } })}
+                        layout={darkLayout({ title: { text: "Stability Phase Plane (Slip Angle vs Yaw Rate)", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Slip Angle (°)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Yaw Rate (°/s)", font: { color: "#444", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
                       />
                     </PlotBox>
@@ -432,7 +400,7 @@ function HandlingDashboard() {
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-600 text-sm">Loading simulation environmentâ€¦</div>}>
+    <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-600 text-sm">Loading simulation environment…</div>}>
       <HandlingDashboard />
     </Suspense>
   );

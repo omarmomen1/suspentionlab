@@ -29,6 +29,9 @@ import ModelValidity, { ValidityReport } from "../../components/ModelValidity";
 import { Brain, FlaskConical } from "lucide-react";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import KPICard from "../../../components/sim/KPICard";
+import PlotBox from "../../../components/sim/PlotBox";
+import { darkLayout, DARK_BASE } from "../../../components/sim/theme";
 import { maxOf, minOf } from "../../lib/array";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -60,22 +63,6 @@ type SimResult =
   | { error: true; message: string; detail?: string }
   | { error?: false; time: number[]; z_s: number[]; z_u: number[]; dz_s: number[]; dz_u: number[]; f_n_s: number; zeta_s: number; [key: string]: any };
 
-const DARK_BASE = {
-  paper_bgcolor: "transparent",
-  plot_bgcolor:  "transparent",
-  font:          { color: "#666", size: 11, family: "Inter, monospace" },
-  xaxis:         { color: "#444", gridcolor: "#161618", zerolinecolor: "#2a2a2a", tickfont: { color: "#555", size: 10 } },
-  yaxis:         { color: "#444", gridcolor: "#161618", zerolinecolor: "#2a2a2a", tickfont: { color: "#555", size: 10 } },
-  legend:        { font: { color: "#777", size: 10 }, bgcolor: "rgba(0,0,0,0)", orientation: "h" as const, y: -0.15 },
-  margin:        { l: 58, r: 18, t: 32, b: 55 },
-  autosize:      true,
-  hoverlabel:    { bgcolor: "#0d0d0f", bordercolor: "#333", font: { color: "#ccc", size: 11 } },
-};
-
-function darkLayout(overrides: Record<string, unknown> = {}) {
-  return { ...DARK_BASE, ...overrides };
-}
-
 // ————————————————— Types ————————————————————————————————————————————————————————
 type Status = "good" | "warn" | "bad" | "neutral";
 type Toast  = { msg: string; type: "success" | "error" };
@@ -99,36 +86,6 @@ function getTXStatus(tx: number): Status {
 }
 
 // ————————————————— Sub-components —————————————————————————————————————————————
-
-function KPICard({
-  label, value, unit, sub, status = "neutral",
-}: {
-  label: string; value: number | string; unit?: string;
-  sub?: string; status?: Status;
-}) {
-  const colours: Record<Status, string> = {
-    good:    "text-emerald-400",
-    warn:    "text-amber-400",
-    bad:     "text-red-400",
-    neutral: "text-white",
-  };
-  const borders: Record<Status, string> = {
-    good:    "border-emerald-900/40 bg-emerald-950/10",
-    warn:    "border-amber-900/40 bg-amber-950/10",
-    bad:     "border-red-900/40 bg-red-950/10",
-    neutral: "border-[#252525]",
-  };
-  return (
-    <div className={`bg-[#141416] border ${borders[status]} rounded-xl p-3 flex flex-col gap-0.5`}>
-      <span className="text-[9px] font-bold tracking-[0.16em] text-gray-600 uppercase">{label}</span>
-      <span className={`text-[1.1rem] font-bold font-mono leading-tight ${colours[status]}`}>
-        {typeof value === "number" ? value.toFixed(3) : value}
-        {unit && <span className="text-[11px] font-normal text-gray-600 ml-1">{unit}</span>}
-      </span>
-      {sub && <span className="text-[9px] text-gray-700 leading-tight mt-0.5">{sub}</span>}
-    </div>
-  );
-}
 
 function ParamSection({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
@@ -192,14 +149,6 @@ function ParameterInput({
 }
 
 // ————————————————— Plot wrappers —————————————————————————————————————————————
-function PlotBox({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex-1 min-w-0 min-h-0 relative">
-      {children}
-    </div>
-  );
-}
-
 // ————————————————— Main dashboard —————————————————————————————————————————————
 function QuarterCarDashboard() {
   const searchParams = useSearchParams();
@@ -735,7 +684,7 @@ function QuarterCarDashboard() {
                   label="RMS Tire Load"
                   value={r.rms_tire_load}
                   unit="N"
-                  sub={`k_tÂ·Î”z tire`}
+                  sub={`k_t·Î”z tire`}
                   status={r.rms_tire_load < 500 ? "good" : r.rms_tire_load < 1500 ? "warn" : "bad"}
                 />
                 <KPICard
@@ -767,7 +716,7 @@ function QuarterCarDashboard() {
               {/* Plot area */}
               <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-hidden min-h-0">
 
-                {/* â”€â”€ TAB 0: TIME DOMAIN â€” 2Ã—2 grid â”€â”€ */}
+                {/* ── TAB 0: TIME DOMAIN — 2×2 grid ── */}
                 {activeTab === 0 && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 auto-rows-[350px] gap-px bg-[#181818] overflow-y-auto custom-scrollbar h-full">
                     {/* Displacement */}
@@ -805,13 +754,13 @@ function QuarterCarDashboard() {
                         layout={darkLayout({
                           title: { text: "Sprung Acceleration", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Acceleration (m/sÂ²)", font: { color: "#444", size: 10 } } },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Acceleration (m/s²)", font: { color: "#444", size: 10 } } },
                           shapes: [
                             { type: "line", x0: 0, x1: 1, xref: "paper", y0:  0.315, y1:  0.315, line: { color: "rgba(52,211,153,0.3)", dash: "dot", width: 1 } },
                             { type: "line", x0: 0, x1: 1, xref: "paper", y0: -0.315, y1: -0.315, line: { color: "rgba(52,211,153,0.3)", dash: "dot", width: 1 } },
                           ],
                           annotations: [{ x: 0.02, xref: "paper", y: 0.315, yref: "y",
-                            text: "ISO 0.315 m/sÂ²", showarrow: false, font: { color: "#22c55e80", size: 9 }, xanchor: "left" }],
+                            text: "ISO 0.315 m/s²", showarrow: false, font: { color: "#22c55e80", size: 9 }, xanchor: "left" }],
                         })}
                         useResizeHandler style={{ width: "100%", height: "100%" }}
                         config={{ responsive: true, displayModeBar: true }}
@@ -834,7 +783,7 @@ function QuarterCarDashboard() {
                   </div>
                 )}
 
-                {/* â”€â”€ TAB 1: BODE / FRF â€” 2Ã—2 â”€â”€ */}
+                {/* ── TAB 1: BODE / FRF — 2×2 ── */}
                 {activeTab === 1 && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 auto-rows-[350px] gap-px bg-[#181818] overflow-y-auto custom-scrollbar h-full">
                     {/* Transmissibility linear */}
@@ -842,9 +791,9 @@ function QuarterCarDashboard() {
                       <Plot
                         data={bTrans(r, traces, deltaMode)}
                         layout={darkLayout({
-                          title: { text: "Transmissibility |H(jÏ‰)|", font: { color: "#888", size: 11 } },
+                          title: { text: "Transmissibility |H(jω)|", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#444", size: 10 } }, type: "log" },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Transmissibility (â€“)", font: { color: "#444", size: 10 } } },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Transmissibility (–)", font: { color: "#444", size: 10 } } },
                           shapes: [{ type: "line", x0: r.freq_at_peak_tx, x1: r.freq_at_peak_tx, y0: 0, y1: 1, yref: "paper",
                             line: { color: "rgba(242,169,0,0.2)", dash: "dot", width: 1 } }],
                           annotations: [{ x: Math.log10(r.freq_at_peak_tx), xref: "x", y: 0.98, yref: "paper",
@@ -860,7 +809,7 @@ function QuarterCarDashboard() {
                       <Plot
                         data={bBodeMag(r, traces, deltaMode)}
                         layout={darkLayout({
-                          title: { text: "Bode â€” Magnitude", font: { color: "#888", size: 11 } },
+                          title: { text: "Bode — Magnitude", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#444", size: 10 } }, type: "log" },
                           yaxis: { ...DARK_BASE.yaxis, title: { text: "Magnitude (dB)", font: { color: "#444", size: 10 } } },
                           shapes: [
@@ -1116,22 +1065,22 @@ function QuarterCarDashboard() {
                         <div className="space-y-2">
                           {[
                             { range: "< 0.315",     label: "Not uncomfortable",       aw: r.rms_body_accel_wk },
-                            { range: "0.315â€“0.63",  label: "Slightly uncomfortable",  aw: r.rms_body_accel_wk },
-                            { range: "0.63â€“1.0",    label: "Fairly uncomfortable",    aw: r.rms_body_accel_wk },
-                            { range: "1.0â€“2.0",     label: "Uncomfortable",           aw: r.rms_body_accel_wk },
+                            { range: "0.315–0.63",  label: "Slightly uncomfortable",  aw: r.rms_body_accel_wk },
+                            { range: "0.63–1.0",    label: "Fairly uncomfortable",    aw: r.rms_body_accel_wk },
+                            { range: "1.0–2.0",     label: "Uncomfortable",           aw: r.rms_body_accel_wk },
                             { range: "> 2.0",       label: "Very uncomfortable",      aw: r.rms_body_accel_wk },
                           ].map(({ range, label }) => {
                             const limits = range === "< 0.315"
-                              ? [0, 0.315] : range === "0.315â€“0.63"
-                              ? [0.315, 0.63] : range === "0.63â€“1.0"
-                              ? [0.63, 1.0] : range === "1.0â€“2.0"
+                              ? [0, 0.315] : range === "0.315–0.63"
+                              ? [0.315, 0.63] : range === "0.63–1.0"
+                              ? [0.63, 1.0] : range === "1.0–2.0"
                               ? [1.0, 2.0] : [2.0, 99];
                             const active = r.rms_body_accel_wk >= limits[0] && r.rms_body_accel_wk < limits[1];
                             return (
                               <div key={range}
                                 className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-mono
                                   ${active ? "border-ansys-yellow/40 bg-ansys-yellow/5 text-ansys-yellow" : "border-[#1e1e1e] text-gray-700"}`}>
-                                <span>{range} m/sÂ²</span>
+                                <span>{range} m/s²</span>
                                 <span className={active ? "font-bold" : ""}>{label}</span>
                                 {active && <RefreshCw size={11} className="text-ansys-yellow" />}
                               </div>
@@ -1141,11 +1090,11 @@ function QuarterCarDashboard() {
                         <div className="mt-2 pt-3 border-t border-[#1a1a1a] font-mono text-xs">
                           <div className="flex justify-between text-gray-600">
                             <span>Raw RMS a_z</span>
-                            <span className="text-white">{r.rms_body_accel.toFixed(4)} m/sÂ²</span>
+                            <span className="text-white">{r.rms_body_accel.toFixed(4)} m/s²</span>
                           </div>
                           <div className="flex justify-between text-gray-600 mt-1">
                             <span>Wk-weighted RMS</span>
-                            <span className="text-ansys-yellow">{(r.rms_body_accel_wk ?? 0).toFixed(4)} m/sÂ²</span>
+                            <span className="text-ansys-yellow">{(r.rms_body_accel_wk ?? 0).toFixed(4)} m/s²</span>
                           </div>
                         </div>
                       </div>
@@ -1172,7 +1121,7 @@ function QuarterCarDashboard() {
                         layout={darkLayout({
                           title: { text: "Cumulative RMS Acceleration", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Cum. RMS (m/sÂ²)", font: { color: "#444", size: 10 } } },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Cum. RMS (m/s²)", font: { color: "#444", size: 10 } } },
                           shapes: [
                             { type: "line", x0: 0, x1: 1, xref: "paper", y0: 0.315, y1: 0.315, line: { color: "rgba(52,211,153,0.3)", dash: "dot", width: 1 } },
                           ],
@@ -1228,7 +1177,7 @@ export default function Page() {
     <Suspense
       fallback={
         <div className="h-full flex items-center justify-center text-gray-600 text-sm">
-          Loading simulation environmentâ€¦
+          Loading simulation environment…
         </div>
       }
     >
