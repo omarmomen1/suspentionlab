@@ -1,9 +1,10 @@
 "use client";
 
 /**
- * components/quarter-car/ParameterControls.tsx (P1-ARCH-01)
- * Extracted from quarter-car/page.tsx — collapsible section wrapper and
- * the debounced numeric parameter input.
+ * components/sim/ParameterControls.tsx (P1-ARCH-02)
+ * Shared collapsible section wrapper + debounced numeric parameter input.
+ * Canonical version — previously duplicated across half-car, full-car,
+ * handling, and quarter-car pages.
  */
 
 import React, { useState, useEffect } from "react";

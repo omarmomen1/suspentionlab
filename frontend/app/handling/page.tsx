@@ -20,6 +20,7 @@ import KPICard from "../../components/sim/KPICard";
 import PlotBox from "../../components/sim/PlotBox";
 import { darkLayout, DARK_BASE } from "../../components/sim/theme";
 import { maxAbs } from "../../lib/array";
+import { ParamSection, ParameterInput } from "../../components/sim/ParameterControls";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const TABS = [
@@ -30,31 +31,6 @@ const TABS = [
 
 type Status = "good" | "warn" | "bad" | "neutral";
 type Toast  = { msg: string; type: "success" | "error" };
-
-function ParamSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <h3 className="text-[9px] font-bold text-gray-700 uppercase tracking-[0.16em] pb-1.5 border-b border-[#1e1e1e]">
-        {title}
-      </h3>
-      {children}
-    </div>
-  );
-}
-
-function ParameterInput({ label, val, unit, step = 1, min, onChange }: { label: string; val: number; unit: string; step?: number; min?: number; onChange: (v: number) => void; }) {
-  return (
-    <div className="flex justify-between items-center gap-2">
-      <label className="text-[11px] text-gray-500 flex-1 min-w-0 leading-tight">{label}</label>
-      <div className="relative shrink-0">
-        <input type="number" step={step} value={val} min={min} onChange={(e) => onChange(Number(e.target.value))}
-          className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white w-28 text-right pr-9 focus:outline-none focus:border-ansys-yellow/60 focus:ring-1 focus:ring-ansys-yellow/15 transition-all"
-        />
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-gray-700 pointer-events-none">{unit}</span>
-      </div>
-    </div>
-  );
-}
 
 interface HandlingResults {
   a_y?: number[];

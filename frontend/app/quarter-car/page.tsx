@@ -24,7 +24,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import SuspensionRig3D from "../../components/SuspensionRig3D";
 import Rig3DPlayer from "../../components/Rig3DPlayer";
 import KPIRibbon from "../../components/quarter-car/KPIRibbon";
-import { ParamSection, ParameterInput } from "../../components/quarter-car/ParameterControls";
+import { ParamSection, ParameterInput } from "../../components/sim/ParameterControls";
 import { useQuarterCarSimulation } from "../../hooks/useQuarterCarSimulation";
 import SmartInsights from "../../components/SmartInsights";
 import SensitivityTornado from "../../components/SensitivityTornado";
@@ -35,6 +35,7 @@ const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 import KPICard from "../../components/sim/KPICard";
 import PlotBox from "../../components/sim/PlotBox";
 import { darkLayout, DARK_BASE } from "../../components/sim/theme";
+import PlotTabs, { type PlotTabDef } from "../../components/sim/PlotTabs";
 import { maxOf, minOf } from "../../lib/array";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -51,7 +52,7 @@ const ROAD_PROFILES = [
 const ISO_CLASSES = ["A", "B", "C", "D", "E", "F", "G", "H"] as const;
 type IsoClass = typeof ISO_CLASSES[number];
 
-const TABS = [
+const TABS: PlotTabDef[] = [
   { label: "Time Domain",       icon: TrendingUp  },
   { label: "Bode / FRF",        icon: BarChart3   },
   { label: "Forces & Energy",   icon: Zap         },
@@ -492,6 +493,9 @@ function QuarterCarDashboard() {
 
               {/* KPI Ribbon — 8 cards */}
               <KPIRibbon r={r} MR={params.MR} />
+
+              {/* Tab nav */}
+              <PlotTabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
 
               {/* Plot area */}
               <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-hidden min-h-0">

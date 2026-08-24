@@ -4,6 +4,8 @@
 "use client";
 import { useState, useRef, Suspense, useMemo, useEffect } from "react";
 import dynamic from "next/dynamic";
+import { useJobPolling } from "../../hooks/useJobPolling";
+import { ParamSection, ParameterInput } from "../../components/sim/ParameterControls";
 
 import {
   Play, Settings2, AlertTriangle,
@@ -37,31 +39,6 @@ const TABS = [
 type Status = "good" | "warn" | "bad" | "neutral";
 type Toast  = { msg: string; type: "success" | "error" };
 
-function ParamSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <h3 className="text-[9px] font-bold text-gray-700 uppercase tracking-[0.16em] pb-1.5 border-b border-[#1e1e1e]">
-        {title}
-      </h3>
-      {children}
-    </div>
-  );
-}
-
-function ParameterInput({ label, val, unit, step = 1, min, onChange }: { label: string; val: number; unit: string; step?: number; min?: number; onChange: (v: number) => void; }) {
-  return (
-    <div className="flex justify-between items-center gap-2">
-      <label className="text-[11px] text-gray-500 flex-1 min-w-0 leading-tight">{label}</label>
-      <div className="relative shrink-0">
-        <input type="number" step={step} value={val} min={min} onChange={(e) => onChange(Number(e.target.value))}
-          className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white w-28 text-right pr-9 focus:outline-none focus:border-ansys-yellow/60 focus:ring-1 focus:ring-ansys-yellow/15 transition-all"
-        />
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-gray-700 pointer-events-none">{unit}</span>
-      </div>
-    </div>
-  );
-}
-
 interface FullCarResults {
   error?: boolean;
   message?: string;
@@ -94,13 +71,7 @@ type FullCarState = FullCarResults | { error: boolean; message: string; [key: st
 
 function FullCarDashboard() {
   const { authHeader } = useAuth();
-  // P1-PERF-04: track job-polling intervals and clear them on unmount so
-  // navigation away cannot leak intervals or setState on unmounted components.
-  const pollersRef = useRef<Set<ReturnType<typeof setInterval>>>(new Set());
-  useEffect(() => {
-    const s = pollersRef.current;
-    return () => { s.forEach((id) => clearInterval(id)); s.clear(); };
-  }, []);
+  const { pollJob } = useJobPolling();
 
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving,  setIsSaving]  = useState(false);
@@ -144,27 +115,19 @@ function FullCarDashboard() {
       }
       
       const jobId = data.job_id;
-      const interval = setInterval(async () => {
-        try {
-          const pollRes = await fetch(`${API_BASE}/jobs/${jobId}`, { headers: authHeader() });
-          const pollData = await pollRes.json();
-          if (pollData.status === "COMPLETED") {
-             clearInterval(interval); pollersRef.current.delete(interval);
-             setResults(pollData.result);
-             saveSimulationToHistory("sl_sim_history_fcar", params, pollData.result);
-             setIsRunning(false);
-          } else if (pollData.status === "FAILED" || pollData.status === "CANCELED") {
-             clearInterval(interval); pollersRef.current.delete(interval);
-             setResults({ error: true, message: pollData.error || "Simulation failed." });
-             setIsRunning(false);
-          }
-        } catch (e) {
-             clearInterval(interval); pollersRef.current.delete(interval);
-             setResults({ error: true, message: String(e) });
-             setIsRunning(false);
-        }
-      }, 1000);
-      pollersRef.current.add(interval);
+      pollJob({
+        jobId,
+        authHeader,
+        onCompleted: (result) => {
+          setResults(result);
+          saveSimulationToHistory("sl_sim_history_fcar", params, result);
+          setIsRunning(false);
+        },
+        onFailed: (msg) => {
+          setResults({ error: true, message: msg });
+          setIsRunning(false);
+        },
+      });
     } catch (err) {
       setResults({ error: true, message: String(err) });
       setIsRunning(false);
