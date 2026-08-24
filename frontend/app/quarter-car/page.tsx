@@ -23,15 +23,18 @@ import DamperLUTInput from "../../components/DamperLUTInput";
 import { useAuth } from "../../contexts/AuthContext";
 import SuspensionRig3D from "../../components/SuspensionRig3D";
 import Rig3DPlayer from "../../components/Rig3DPlayer";
+import KPIRibbon from "../../components/quarter-car/KPIRibbon";
+import { ParamSection, ParameterInput } from "../../components/quarter-car/ParameterControls";
+import { useQuarterCarSimulation } from "../../hooks/useQuarterCarSimulation";
 import SmartInsights from "../../components/SmartInsights";
 import SensitivityTornado from "../../components/SensitivityTornado";
 import ModelValidity, { ValidityReport } from "../../components/ModelValidity";
 import { Brain, FlaskConical } from "lucide-react";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
-import KPICard from "../../../components/sim/KPICard";
-import PlotBox from "../../../components/sim/PlotBox";
-import { darkLayout, DARK_BASE } from "../../../components/sim/theme";
+import KPICard from "../../components/sim/KPICard";
+import PlotBox from "../../components/sim/PlotBox";
+import { darkLayout, DARK_BASE } from "../../components/sim/theme";
 import { maxOf, minOf } from "../../lib/array";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -87,111 +90,35 @@ function getTXStatus(tx: number): Status {
 
 // ————————————————— Sub-components —————————————————————————————————————————————
 
-function ParamSection({ title, children, defaultOpen = true }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
-  return (
-    <div className="space-y-2">
-      <h3 
-        onClick={() => setIsOpen(!isOpen)}
-        className="text-[9px] font-bold text-gray-700 uppercase tracking-[0.16em] pb-1.5 border-b border-[#1e1e1e] cursor-pointer hover:text-gray-500 transition-colors flex justify-between items-center"
-      >
-        {title}
-        <span className="text-[10px] transform transition-transform duration-200" style={{ rotate: isOpen ? '0deg' : '-90deg' }}>▼</span>
-      </h3>
-      {isOpen && children}
-    </div>
-  );
-}
-
-function ParameterInput({
-  label, val, unit, step = 1, min, onChange, hasError
-}: {
-  label: string; val: number; unit: string;
-  step?: number; min?: number; onChange: (v: number) => void;
-  hasError?: boolean;
-}) {
-  const [localVal, setLocalVal] = useState(val.toString());
-  const id = label.toLowerCase().replace(/\s+/g, '-');
-
-  useEffect(() => {
-    setLocalVal(val.toString());
-  }, [val]);
-
-  const flush = () => {
-    const parsed = parseFloat(localVal);
-    if (!isNaN(parsed)) {
-      onChange(parsed);
-    } else {
-      setLocalVal(val.toString());
-    }
-  };
-
-  return (
-    <div className="flex justify-between items-center gap-2">
-      <label htmlFor={id} className="text-[11px] text-gray-500 flex-1 min-w-0 leading-tight cursor-pointer hover:text-gray-300 transition-colors">{label}</label>
-      <div className="relative shrink-0">
-        <input
-          id={id}
-          type="number" step={step} value={localVal} min={min}
-          onChange={(e) => setLocalVal(e.target.value)}
-          onBlur={flush}
-          onKeyDown={(e) => e.key === "Enter" && flush()}
-          className={`bg-[#0d0d0d] border text-[11px] rounded-lg px-2 py-1.5 text-white w-28 text-right pr-9 focus:outline-none transition-all ${
-            hasError ? "border-red-500/50 focus:border-red-500 focus:ring-1 focus:ring-red-500/50 text-red-100" : "border-[#252525] focus:border-ansys-yellow/60 focus:ring-1 focus:ring-ansys-yellow/50"
-          }`}
-        />
-        <span className={`absolute right-2 top-1/2 -translate-y-1/2 text-[9px] pointer-events-none ${hasError ? "text-red-500/70" : "text-gray-700"}`}>
-          {unit}
-        </span>
-      </div>
-    </div>
-  );
-}
-
 // ————————————————— Plot wrappers —————————————————————————————————————————————
 // ————————————————— Main dashboard —————————————————————————————————————————————
 function QuarterCarDashboard() {
   const searchParams = useSearchParams();
   const { authHeader } = useAuth();
 
-  const [isRunning, setIsRunning] = useState<boolean>(false);
   const [isSaving,  setIsSaving]  = useState<boolean>(false);
   const [isTuning,  setIsTuning]  = useState<boolean>(false);
-  const [results,   setResults]   = useState<SimResult | null>(null);
-  const [validity,  setValidity]  = useState<ValidityReport | null>(null);
   const [traces,    setTraces]    = useState<Trace[]>([]);
   const [deltaMode, setDeltaMode] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<number>(0);
   const [toast,     setToast]     = useState<Toast | null>(null);
-  // Snapshot of params used for the LAST successful simulation (MED-07)
-  const [simParams, setSimParams] = useState<typeof params | null>(null);
-  
   const [autoRun, setAutoRun] = useState(false);
-  // P1-PERF-02: frame animation moved into <Rig3DPlayer/> — the parent
-  // dashboard no longer re-renders at 50 fps.
-
-  const [params, setParams] = useState({
-    m_s:          300.0,
-    m_u:          35.0,
-    k_s:          25000.0,
-    c:            2050.0,
-    k_t:          200000.0,
-    MR:           0.85,
-    c_t:          0.0,
-    road_profile: "step",
-    amplitude:    0.05,
-    frequency:    2.0,
-    duration:     5.0,
-    iso_class:    "B" as IsoClass,   // ARCH-05: ISO 8608 road roughness class (A=smooth – H=very rough)
-    speed_mps:    20.0,              // ARCH-05: vehicle speed for ISO 8608 temporal PSD scaling
-    damper_curve_v: null as number[] | null,
-    damper_curve_f: null as number[] | null,
-  });
 
   const showToast = (msg: string, type: Toast["type"]) => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   };
+
+  // P1-ARCH-01: simulation domain logic lives in the hook
+  const {
+    isRunning, setIsRunning,
+    results, setResults,
+    validity,
+    simParams,
+    params, setParams,
+    buildPayload,
+    runSimulation,
+  } = useQuarterCarSimulation({ authHeader, showToast, autoRun });
 
   // MIN-07: Dismiss toast on Escape key
   useEffect(() => {
@@ -213,81 +140,6 @@ function QuarterCarDashboard() {
       })
       .catch(() => showToast("Could not load profile", "error"));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const validateParams = () => {
-    if (params.m_s <= 0) return "Sprung Mass must be strictly positive.";
-    if (params.m_u <= 0) return "Unsprung Mass must be strictly positive.";
-    if (params.k_s <= 0) return "Spring Rate must be strictly positive.";
-    if (params.k_t <= 0) return "Tire Stiffness must be strictly positive.";
-    if (params.c < 0) return "Damping cannot be negative.";
-    return null;
-  };
-
-  useEffect(() => {
-    if (!autoRun) return;
-    if (validateParams()) return;
-    const timer = setTimeout(() => {
-      runSimulation();
-    }, 500);
-    return () => clearTimeout(timer);
-  }, [params, autoRun]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const buildPayload = () => ({
-    params: {
-      m_s: params.m_s, m_u: params.m_u, k_s: params.k_s, c: params.c,
-      k_t: params.k_t, MR: params.MR, c_t: params.c_t,
-      damper_curve_v: params.damper_curve_v, damper_curve_f: params.damper_curve_f,
-    },
-    profile: {
-      profile_type: params.road_profile,
-      amplitude: params.amplitude,
-      frequency: params.frequency,
-      duration: params.duration,
-      iso_class: params.iso_class,
-      speed_mps: params.speed_mps,   // ARCH-05: pass ISO 8608 speed to backend
-    },
-  });
-
-  const runSimulation = async () => {
-    const errorMsg = validateParams();
-    if (errorMsg) {
-      showToast(errorMsg, "error");
-      return;
-    }
-    setIsRunning(true);
-    setResults(null);
-    try {
-      const res  = await fetch(`${API_BASE}/simulate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body:    JSON.stringify(buildPayload()),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setResults({ error: true, message: data.message ?? data.detail ?? "Simulation failed" });
-      } else {
-        setResults(data);
-        setSimParams({ ...params }); // MED-07: snapshot params at the moment simulation completes
-        saveSimulationToHistory("sl_sim_history_qcar", params, data);
-        // Issue 16: fetch MODEL VALIDITY alongside every result (non-blocking)
-        fetch(`${API_BASE}/api/v1/models/validity`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...authHeader() },
-          body: JSON.stringify({
-            model: "quarter_car",
-            params: buildPayload().params,
-          }),
-        })
-          .then((res) => (res.ok ? res.json() : null))
-          .then((v) => setValidity(v))
-          .catch(() => setValidity(null));
-      }
-    } catch (err) {
-      setResults({ error: true, message: String(err) });
-    } finally {
-      setIsRunning(false);
-    }
-  };
 
   const saveProfile = async () => {
     const name = prompt("Name this Quarter Car setup:", "Custom 2-DOF Setup");
@@ -639,79 +491,7 @@ function QuarterCarDashboard() {
               <TraceManager currentResult={r as any} currentParams={params} traces={traces} setTraces={setTraces} deltaMode={deltaMode} setDeltaMode={setDeltaMode} />
 
               {/* KPI Ribbon — 8 cards */}
-              <div className="grid grid-cols-8 gap-2 shrink-0">
-                <KPICard
-                  label="Ride Freq ƒₙ"
-                  value={r.f_n_s ?? 0}
-                  unit="Hz"
-                  sub={`ωₙ = ${r.omega_n_s?.toFixed(2) ?? 'N/A'} rad/s`}
-                  status={r.f_n_s >= 1.0 && r.f_n_s <= 1.5 ? "good" : "warn"}
-                />
-                <KPICard
-                  label="Wheel-Hop ƒₙ"
-                  value={r.f_n_u}
-                  unit="Hz"
-                  sub="Unsprung mode"
-                  status={r.f_n_u >= 8 && r.f_n_u <= 15 ? "good" : "warn"}
-                />
-                <KPICard
-                  label="Damping Ratio ζ"
-                  value={r.zeta_s ?? 0}
-                  sub={`c_crit = ${r.c_crit_s?.toFixed(0) ?? 'N/A'} N·s/m`}
-                  status={getDampingStatus(r.zeta_s ?? 0)}
-                />
-                <KPICard
-                  label="Peak TX"
-                  value={r.peak_transmissibility ?? 0}
-                  sub={`@ ${r.freq_at_peak_tx?.toFixed(2) ?? 'N/A'} Hz`}
-                  status={getTXStatus(r.peak_transmissibility ?? 0)}
-                />
-                <KPICard
-                  label="Wk RMS Accel"
-                  value={r.rms_body_accel_wk ?? r.rms_body_accel}
-                  unit="m/s²"
-                  sub={r.comfort_rating || "ISO 2631-1 Wk"}
-                  status={getComfortStatus(r.rms_body_accel_wk ?? r.rms_body_accel)}
-                />
-                <KPICard
-                  label="RMS Susp Travel"
-                  value={(r.rms_susp_travel ?? 0) * 1000}
-                  unit="mm"
-                  sub={`Peak: ${((r.peak_susp_travel ?? 0) * 1000).toFixed(1)} mm`}
-                  status={(r.peak_susp_travel ?? 0) < 0.08 ? "good" : (r.peak_susp_travel ?? 0) < 0.15 ? "warn" : "bad"}
-                />
-                <KPICard
-                  label="RMS Tire Load"
-                  value={r.rms_tire_load}
-                  unit="N"
-                  sub={`k_t·Î”z tire`}
-                  status={r.rms_tire_load < 500 ? "good" : r.rms_tire_load < 1500 ? "warn" : "bad"}
-                />
-                <KPICard
-                  label="Wheel Rate k_w"
-                  value={r.k_w}
-                  unit="N/m"
-                  sub={`MR = ${params.MR.toFixed(2)}`}
-                  status="neutral"
-                />
-              </div>
-
-              {/* Tab nav */}
-              <div className="flex gap-1.5 shrink-0">
-                {TABS.map((tab, i) => {
-                  const Icon = tab.icon;
-                  return (
-                    <button key={tab.label} onClick={() => setActiveTab(i)}
-                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                        activeTab === i
-                          ? "bg-ansys-yellow text-black shadow-[0_0_12px_rgba(242,169,0,0.2)]"
-                          : "bg-[#111113] border border-[#1e1e1e] text-gray-500 hover:text-gray-300 hover:border-[#2a2a2a]"
-                      }`}>
-                      <Icon size={12} /> {tab.label}
-                    </button>
-                  );
-                })}
-              </div>
+              <KPIRibbon r={r} MR={params.MR} />
 
               {/* Plot area */}
               <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-hidden min-h-0">

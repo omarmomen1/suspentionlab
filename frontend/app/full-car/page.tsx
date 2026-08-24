@@ -19,9 +19,9 @@ import SimHistory, { saveSimulationToHistory } from "../../components/SimHistory
 import { useAuth } from "../../contexts/AuthContext";
 
 const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
-import KPICard from "../../../components/sim/KPICard";
-import PlotBox from "../../../components/sim/PlotBox";
-import { darkLayout, DARK_BASE } from "../../../components/sim/theme";
+import KPICard from "../../components/sim/KPICard";
+import PlotBox from "../../components/sim/PlotBox";
+import { darkLayout, DARK_BASE } from "../../components/sim/theme";
 import { maxOf, minOf } from "../../lib/array";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
