@@ -2,6 +2,7 @@
 "use client";
 import { useState, useRef, Suspense, useEffect } from "react";
 import dynamic from "next/dynamic";
+import { alertModal } from "../../components/sim/ModalHost";
 import { useJobPolling } from "../../hooks/useJobPolling";
 import {
   Play, Settings2, AlertTriangle, Activity, Layers
@@ -66,7 +67,7 @@ function SensitivitySweepDashboard() {
   });
 
   const runSimulation = async () => {
-    if (params.var_x === params.var_y) { alert("Please select different variables for X and Y axes."); return; }
+    if (params.var_x === params.var_y) { void alertModal("Please select different variables for X and Y axes."); return; }
     setIsRunning(true);
     setResults(null);
     try {

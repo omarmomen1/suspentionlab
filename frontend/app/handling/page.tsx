@@ -20,6 +20,7 @@ import KPICard from "../../components/sim/KPICard";
 import PlotBox from "../../components/sim/PlotBox";
 import { darkLayout, DARK_BASE } from "../../components/sim/theme";
 import { maxAbs } from "../../lib/array";
+import { promptModal } from "../../components/sim/ModalHost";
 import { ParamSection, ParameterInput } from "../../components/sim/ParameterControls";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -121,7 +122,7 @@ function HandlingDashboard() {
   };
 
   const saveProfile = async () => {
-    const name = prompt("Name this Handling setup:", "Custom Setup");
+    const name = await promptModal("Name this Handling setup:", "Custom Setup");
     if (!name) return;
     setIsSaving(true);
     try {
@@ -172,7 +173,7 @@ function HandlingDashboard() {
   return (
     <div className="h-full flex flex-col p-5 pt-3 gap-3 min-h-0">
       {toast && (
-        <div className={`fixed top-14 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium transition-all ${toast.type === "success" ? "bg-[#0a1f12] border-emerald-800/50 text-emerald-300" : "bg-[#1f0a0a] border-red-800/50 text-red-300"}`}>
+        <div role="alert" aria-live="polite" className={`fixed top-14 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-2xl border text-sm font-medium transition-all ${toast.type === "success" ? "bg-[#0a1f12] border-emerald-800/50 text-emerald-300" : "bg-[#1f0a0a] border-red-800/50 text-red-300"}`}>
           {toast.msg} <button onClick={() => setToast(null)} className="opacity-50 hover:opacity-100 ml-1"><X size={13} /></button>
         </div>
       )}

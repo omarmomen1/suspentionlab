@@ -35,6 +35,7 @@ const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
 import KPICard from "../../components/sim/KPICard";
 import PlotBox from "../../components/sim/PlotBox";
 import { darkLayout, DARK_BASE } from "../../components/sim/theme";
+import { promptModal, alertModal } from "../../components/sim/ModalHost";
 import PlotTabs, { type PlotTabDef } from "../../components/sim/PlotTabs";
 import { maxOf, minOf } from "../../lib/array";
 
@@ -143,7 +144,7 @@ function QuarterCarDashboard() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveProfile = async () => {
-    const name = prompt("Name this Quarter Car setup:", "Custom 2-DOF Setup");
+    const name = await promptModal("Name this Quarter Car setup:", "Custom 2-DOF Setup");
     if (!name) return;
     setIsSaving(true);
     try {
@@ -243,7 +244,7 @@ function QuarterCarDashboard() {
 
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-14 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl
+        <div role="alert" aria-live="polite" className={`fixed top-14 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl
           shadow-2xl border text-sm font-medium transition-all
           ${toast.type === "success"
             ? "bg-[#0a1f12] border-emerald-800/50 text-emerald-300"

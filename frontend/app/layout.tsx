@@ -8,6 +8,8 @@ import GlobalSearchTrigger from "../components/GlobalSearchTrigger";
 import { AuthProvider } from "../contexts/AuthContext";
 import UserMenu from "../components/UserMenu";
 import CommandPalette from "../components/CommandPalette";
+import MobileNav from "../components/MobileNav";
+import PromptModalHost from "../components/sim/ModalHost";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,6 +24,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body suppressHydrationWarning className={`${inter.className} bg-black text-gray-100 antialiased selection:bg-ansys-yellow selection:text-black flex flex-col h-screen overflow-hidden`}>
           <AuthProvider>
             <CommandPalette />
+            <PromptModalHost />
             {/* Apple-Style Top Navigation Bar */}
             <nav className="w-full h-[44px] bg-[rgba(13,13,15,0.92)] backdrop-blur-md border-b border-white/8 flex items-center justify-center fixed top-0 z-50">
               <div className="max-w-[1400px] w-full px-5 flex items-center justify-between">
@@ -35,6 +38,11 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                     Suspension<span className="text-ansys-yellow">Lab</span>
                   </span>
                 </Link>
+
+                {/* P0-UX-01: mobile navigation drawer (below lg) */}
+                <div className="lg:hidden">
+                  <MobileNav />
+                </div>
 
                 {/* Nav links */}
                 <div className="hidden lg:flex items-center space-x-5 flex-1 justify-center">
@@ -73,8 +81,8 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               <footer className="border-t border-[#1a1a1a] py-4 px-6 flex flex-wrap items-center justify-center gap-4 text-[11px] text-gray-600">
                 <span>© {new Date().getFullYear()} SuspensionLab. All rights reserved.</span>
                 <Link href="/legal/terms" className="hover:text-gray-400 transition-colors">Terms of Service</Link>
-                <a href="/legal/privacy" className="hover:text-gray-400 transition-colors">Privacy Policy</a>
-                <a href="mailto:suspenlabsupp@outlook.com" className="hover:text-gray-400 transition-colors">Contact</a>
+                <Link href="/legal/privacy" className="hover:text-gray-400 transition-colors">Privacy Policy</Link>
+                <a href="/contact" className="hover:text-gray-400 transition-colors">Contact</a>
               </footer>
             </main>
           </AuthProvider>

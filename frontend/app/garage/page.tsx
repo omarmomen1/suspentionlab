@@ -114,7 +114,7 @@ export default function GarageDashboard() {
     <div className="h-full flex flex-col pt-[44px]">
       {/* Toast */}
       {toast && (
-        <div className={`fixed top-14 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl
+        <div role="alert" aria-live="polite" className={`fixed top-14 right-4 z-50 flex items-center gap-3 px-4 py-3 rounded-xl
           shadow-2xl border text-sm font-medium transition-all
           ${toast.type === "success"
             ? "bg-[#0a1f12] border-emerald-800/50 text-emerald-300"
