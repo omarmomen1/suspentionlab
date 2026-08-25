@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Zap, ChevronRight } from "lucide-react";
 
 export interface VehiclePreset {
@@ -87,6 +87,38 @@ interface VehiclePresetsProps {
 
 export default function VehiclePresets({ onSelect }: VehiclePresetsProps) {
   const [open, setOpen] = useState(false);
+  // WCAG 2.4.3: focus trap — keep Tab cycling inside the open dialog
+  const dialogRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+
+    const focusables = (): HTMLElement[] =>
+      Array.from(
+        dialog.querySelectorAll<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])')
+      );
+    // Move focus into the dialog on open
+    focusables()[0]?.focus();
+
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Tab") return;
+      const items = focusables();
+      if (items.length === 0) return;
+      const first = items[0];
+      const last = items[items.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
+    };
+    dialog.addEventListener("keydown", onKeyDown);
+    return () => dialog.removeEventListener("keydown", onKeyDown);
+  }, [open]);
   // P1-PERF-06: hover styling moved to CSS (:hover) — the previous
   // onMouseEnter/onMouseLeave useState pattern re-rendered the whole list
   // on every mouse movement.
@@ -100,7 +132,13 @@ export default function VehiclePresets({ onSelect }: VehiclePresetsProps) {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Vehicle Preset Library"
+          ref={dialogRef}
+        >
           <div className="w-full max-w-[360px] bg-[#0d0d0f] border border-[#252525] rounded-xl shadow-2xl overflow-hidden relative">
             <button 
               onClick={() => setOpen(false)}

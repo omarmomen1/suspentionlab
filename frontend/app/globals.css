@@ -53,7 +53,8 @@
    Without this class the elements fall back to browser defaults. */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #444 transparent;
+  /* WCAG 1.4.11: raised from #444 for ≥3:1 non-text contrast on #111 panels */
+  scrollbar-color: #5a5a5a transparent;
 }
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
@@ -63,7 +64,8 @@
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: #3a3a3a;
+  /* WCAG 1.4.11: thumb raised from #3a3a3a to #5a5a5a for ≥3:1 contrast on #111 */
+  background: #5a5a5a;
   border-radius: 9999px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {

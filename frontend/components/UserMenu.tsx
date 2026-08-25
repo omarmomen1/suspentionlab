@@ -50,7 +50,11 @@ export default function UserMenu() {
 
   return (
     <div className="relative" ref={ref} suppressHydrationWarning>
-      <button onClick={() => setOpen((v) => !v)}
+      <button
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-label="User account menu"
         className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
         <div className="w-7 h-7 rounded-full bg-ansys-yellow/20 border border-ansys-yellow/30
           flex items-center justify-center text-[10px] font-bold text-ansys-yellow">

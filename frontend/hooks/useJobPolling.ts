@@ -22,6 +22,8 @@ interface PollJobArgs {
   /** Called with an error message when the job fails or polling errors. */
   onFailed: (message: string) => void;
   intervalMs?: number;
+  /** Hard ceiling: stop polling and fail after this many attempts (default 600 ≈ 10 min at 1 s). */
+  maxAttempts?: number;
 }
 
 export function useJobPolling() {
@@ -42,9 +44,17 @@ export function useJobPolling() {
   }, []);
 
   const pollJob = useCallback(({
-    jobId, authHeader, onCompleted, onFailed, intervalMs = 1000,
+    jobId, authHeader, onCompleted, onFailed, intervalMs = 1000, maxAttempts = 600,
   }: PollJobArgs) => {
+    let attempts = 0;
     const id = setInterval(async () => {
+      attempts += 1;
+      // P1-ARCH-02: hung jobs must not poll forever — hard ceiling per poller
+      if (attempts > maxAttempts) {
+        stop(id);
+        onFailed(`Job ${jobId} did not complete within ${maxAttempts} polling attempts. It may still be running — check the jobs panel.`);
+        return;
+      }
       try {
         const pollRes = await fetch(`${API_BASE}/jobs/${jobId}`, { headers: authHeader() });
         const pollData = await pollRes.json();

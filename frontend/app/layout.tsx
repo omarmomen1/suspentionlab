@@ -30,7 +30,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               <div className="max-w-[1400px] w-full px-5 flex items-center justify-between">
                 {/* Logo */}
                 <Link href="/" className="text-gray-300 hover:text-white transition-colors flex items-center gap-2 mr-8">
-                  <svg viewBox="0 0 24 24" fill="none" height="16" width="16">
+                  <svg viewBox="0 0 24 24" fill="none" height="16" width="16" role="img" aria-label="SuspensionLab home">
                     <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
                       stroke="#f2a900" strokeWidth="2" strokeLinejoin="round" />
                   </svg>
