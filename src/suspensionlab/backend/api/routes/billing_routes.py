@@ -1,6 +1,7 @@
 import os
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Request
+from suspensionlab.backend.security.auth import verify_api_key
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -32,7 +33,10 @@ class CheckoutRequest(BaseModel):
     plan: str
 
 @router.post("/checkout")
-async def checkout(req: CheckoutRequest):
+async def checkout(
+    req: CheckoutRequest,
+    user: dict = Depends(verify_api_key),
+):
     if req.plan not in ["pro", "enterprise"]:
         raise HTTPException(status_code=400, detail="Unknown plan")
     # FIXED: Use the configured price ID, never a hardcoded placeholder.

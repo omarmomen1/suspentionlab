@@ -74,6 +74,11 @@ async def websocket_session_endpoint(
         from suspensionlab.backend.security.jwt_utils import decode_access_token
         user_data = decode_access_token(token)
     except Exception:
+        user_data = None
+    # decode_access_token returns None (does not raise) on invalid/expired
+    # tokens — a falsy result must be rejected, not passed through.
+    if not user_data:
+        logger.warning("WebSocket session join rejected: invalid or expired token.")
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 

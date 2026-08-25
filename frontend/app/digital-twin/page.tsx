@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { useAuth } from "../../contexts/AuthContext";
 import GGFrictionCircle from "../../components/GGFrictionCircle";
 import TelemetryGauges from "../../components/TelemetryGauges";
 import {
@@ -10,6 +11,7 @@ import {
 } from "lucide-react";
 
 export default function DigitalTwinPage() {
+  const { fetchWithAuth } = useAuth();
   const [activeTab, setActiveTab] = useState<"analysis" | "live">("analysis");
 
   // Analysis State
@@ -56,7 +58,10 @@ export default function DigitalTwinPage() {
     // Optional: formData.append("model_params", JSON.stringify({...}));
 
     try {
-      const res = await fetch("/api/telemetry/analyse", {
+      // /telemetry/analyse is an authenticated endpoint (API key or cookie +
+      // CSRF double-submit) — route through fetchWithAuth so cookies and the
+      // X-CSRF-Token header are attached and 401s trigger token refresh.
+      const res = await fetchWithAuth("/api/telemetry/analyse", {
         method: "POST",
         body: formData,
       });
