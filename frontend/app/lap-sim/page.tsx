@@ -415,7 +415,7 @@ export default function LapSimPage() {
         {result ? (
           <>
             {/* KPI Cards */}
-            <div className="flex-shrink-0 grid grid-cols-6 gap-2 p-3 border-b border-[#1a1a1a]">
+            <div className="flex-shrink-0 grid grid-cols-3 sm:grid-cols-6 gap-2 p-3 border-b border-[#1a1a1a]">
               <KpiCard label="Lap Time" value={formatLapTime(result.total_time_s)} unit="" icon={Timer} accent />
               <KpiCard label="Top Speed" value={result.max_speed_kmh.toFixed(0)} unit="km/h" icon={Gauge} />
               <KpiCard label="Min Speed" value={result.min_speed_kmh.toFixed(0)} unit="km/h" icon={TrendingDown} />

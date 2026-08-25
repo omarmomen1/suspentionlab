@@ -91,17 +91,38 @@ function CarModel({ zs = 0, pitch = 0, roll = 0, zu_fl = 0, zu_fr = 0, zu_rl = 0
   );
 }
 
+function describeRig(props: RigProps): string {
+  const last = (v: number | number[] | undefined): number =>
+    typeof v === "number" ? v : Array.isArray(v) && v.length > 0 ? v[v.length - 1] : 0;
+  const mm = (m: number | number[] | undefined) => `${(last(m) * 1000).toFixed(0)} mm`;
+  const deg = (a: number) => `${(a * (180 / Math.PI)).toFixed(1)} degrees`;
+  return (
+    `Interactive 3D suspension rig. Chassis heave ${mm(props.zs)}, ` +
+    `pitch ${deg(last(props.pitch))}, roll ${deg(last(props.roll))}. ` +
+    `Wheel travel — front left ${mm(props.zu_fl)}, front right ${mm(props.zu_fr)}, ` +
+    `rear left ${mm(props.zu_rl)}, rear right ${mm(props.zu_rr)}.`
+  );
+}
+
 export default function SuspensionRig3D(props: RigProps) {
   return (
-    <Canvas camera={{ position: [5, 4, 8], fov: 45 }} gl={{ alpha: true }}>
-      <ambientLight intensity={0.5} />
-      <directionalLight position={[10, 10, 5]} intensity={1} castShadow />
-      <Environment preset="city" />
-      
-      <CarModel {...props} />
-      
-      <Grid infiniteGrid fadeDistance={20} sectionColor="#444" cellColor="#333" />
-      <OrbitControls enablePan={false} maxPolarAngle={Math.PI / 2 - 0.05} minDistance={4} maxDistance={20} />
-    </Canvas>
+    <div
+      role="img"
+      aria-label={describeRig(props)}
+      className="h-full w-full"
+    >
+      {/* Screen-reader fallback: the live KPI/plot panels carry the same data;
+          this label summarises the current rig state for non-visual users. */}
+      <Canvas camera={{ position: [5, 4, 8], fov: 45 }} gl={{ alpha: true }}>
+        <ambientLight intensity={0.5} />
+        <directionalLight position={[10, 10, 5]} intensity={1} castShadow />
+        <Environment preset="city" />
+
+        <CarModel {...props} />
+
+        <Grid infiniteGrid fadeDistance={20} sectionColor="#444" cellColor="#333" />
+        <OrbitControls enablePan={false} maxPolarAngle={Math.PI / 2 - 0.05} minDistance={4} maxDistance={20} />
+      </Canvas>
+    </div>
   );
 }

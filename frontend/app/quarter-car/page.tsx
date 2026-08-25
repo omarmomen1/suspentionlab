@@ -453,7 +453,7 @@ function QuarterCarDashboard() {
           {/* Loading */}
           {isRunning && !hasResults && (
             <div className="flex flex-col gap-3 flex-1 overflow-hidden">
-              <div className="grid grid-cols-5 gap-3 shrink-0">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 shrink-0">
                 {[1, 2, 3, 4, 5].map((i) => (
                   <div key={i} className="h-16 bg-[#141416] border border-[#1e1e1e] rounded-xl animate-pulse" />
                 ))}

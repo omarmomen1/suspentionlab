@@ -28,6 +28,9 @@ import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable
 
+from fastapi import Depends
+from suspensionlab.backend.security.auth import UserContext, verify_api_key
+
 logger = logging.getLogger(__name__)
 
 # ── Bounded compute pool (#25) ────────────────────────────────────────────────
@@ -143,3 +146,53 @@ async def assert_user_concurrency(db, user_id: str, plan: str) -> None:
                 f"job(s) and you have {active} running. Wait for jobs to finish or upgrade."
             ),
         )
+
+
+# ── Inline-compute guard (round-2 hostile audit fix #2) ──────────────────────
+#
+# Inline simulation endpoints (AI engineer, model validity, kinematics,
+# durability, analytics) execute in-request instead of going through the job
+# orchestrator, so `assert_user_concurrency` never sees them. This dependency
+# caps concurrently-executing inline simulations per user via a Redis counter
+# with the same per-plan limits. Fail-open when Redis is unavailable (matches
+# the codebase-wide DEV behaviour), fail-closed on limit breach.
+
+INLINE_COUNTER_TTL_S = 300  # safety expiry so crashed requests cannot leak slots
+
+
+async def inline_compute_guard(user: UserContext = Depends(verify_api_key)):
+    """FastAPI dependency: cap in-flight inline simulations per user/plan."""
+    from fastapi import HTTPException
+
+    redis_conn = None
+    try:
+        from suspensionlab.backend.core.redis_client import get_async_redis_conn
+        redis_conn = get_async_redis_conn()
+    except Exception:
+        redis_conn = None
+
+    if redis_conn is None:
+        logger.warning("inline_compute_guard: Redis unavailable — inline concurrency cap not enforced.")
+        yield user
+        return
+
+    key = f"inline_conc:{user.user_id}"
+    limit = PLAN_CONCURRENCY.get(str(user.plan), PLAN_CONCURRENCY["FREE"])
+    current = await redis_conn.incr(key)
+    await redis_conn.expire(key, INLINE_COUNTER_TTL_S)
+    if current > limit:
+        await redis_conn.decr(key)
+        raise HTTPException(
+            status_code=429,
+            detail=(
+                f"Concurrency limit reached: your {user.plan} plan allows {limit} concurrent "
+                f"simulation(s). Wait for the current one to finish or upgrade."
+            ),
+        )
+    try:
+        yield user
+    finally:
+        try:
+            await redis_conn.decr(key)
+        except Exception:
+            logger.warning("inline_compute_guard: failed to release slot for user %s.", user.user_id)

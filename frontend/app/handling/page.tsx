@@ -272,7 +272,7 @@ function HandlingDashboard() {
 
           {hasResults && r && (
             <div id="sim-report" className="flex flex-col gap-3 flex-1 overflow-hidden">
-              <div className="grid grid-cols-4 gap-2 shrink-0">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 shrink-0">
                 <KPICard label="Peak Lat Accel" value={max_lat_g} unit="G" status={max_lat_g > 0.8 ? "good" : "warn"} />
                 <KPICard label="Peak Long Accel" value={max_long_g} unit="G" status="neutral" />
                 <KPICard label="Peak Yaw Rate" value={max_yaw} unit="°/s" status={max_yaw < 40 ? "good" : "warn"} />

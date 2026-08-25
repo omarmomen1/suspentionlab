@@ -270,7 +270,7 @@ function HalfCarDashboard() {
             <div id="sim-report" className="flex flex-col gap-3 flex-1 overflow-hidden">
               <ComparePanel current={r as unknown as React.ComponentProps<typeof ComparePanel>["current"]} />
 
-              <div className="grid grid-cols-8 gap-2 shrink-0">
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 shrink-0">
                 <KPICard label="Heave Freq ƒₙ" value={r.f_n_heave} unit="Hz" status={r.f_n_heave >= 1.0 && r.f_n_heave <= 1.5 ? "good" : "warn"} />
                 <KPICard label="Pitch Freq ƒₙ" value={r.f_n_pitch} unit="Hz" status={r.f_n_pitch >= 1.2 && r.f_n_pitch <= 1.8 ? "good" : "warn"} />
                 <KPICard label="F. Wheel-Hop" value={r.f_n_uf} unit="Hz" status="neutral" />

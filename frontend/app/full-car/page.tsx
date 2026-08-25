@@ -262,7 +262,7 @@ function FullCarDashboard() {
             <div id="sim-report" className="flex flex-col gap-3 flex-1 overflow-hidden">
               <ComparePanel current={r as unknown as React.ComponentProps<typeof ComparePanel>["current"]} />
 
-              <div className="grid grid-cols-8 gap-2 shrink-0">
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 shrink-0">
                 <KPICard label="Heave ƒₙ" value={r.f_n_heave} unit="Hz" status={r.f_n_heave >= 1.0 && r.f_n_heave <= 1.5 ? "good" : "warn"} />
                 <KPICard label="Roll ƒₙ" value={r.f_n_roll} unit="Hz" status={r.f_n_roll >= 1.5 && r.f_n_roll <= 2.5 ? "good" : "warn"} />
                 <KPICard label="Pitch ƒₙ" value={r.f_n_pitch} unit="Hz" status={r.f_n_pitch >= 1.2 && r.f_n_pitch <= 1.8 ? "good" : "warn"} />

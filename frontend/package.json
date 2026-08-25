@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start -p 3002",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:direct": "node tests/verify_qcar_params.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^9.105.0",
@@ -37,6 +38,7 @@
     "eslint-config-next": "14.2.5",
     "tailwindcss": "^4",
     "typescript": "^5",
+    "vite": "^7.3.6",
     "vitest": "^4.1.11"
   }
 }

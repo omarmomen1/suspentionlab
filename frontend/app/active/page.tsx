@@ -215,7 +215,7 @@ function ActiveSuspensionDashboard() {
 
           {hasResults && r && (
             <div id="sim-report" className="flex flex-col gap-3 flex-1 overflow-hidden">
-              <div className="grid grid-cols-4 gap-2 shrink-0">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 shrink-0">
                 <KPICard label="Passive RMS Accel" value={r.passive_rms_accel ?? 0} unit="m/s²" status="neutral" />
                 <KPICard label="Active RMS Accel" value={r.active_rms_accel ?? 0} unit="m/s²" status="good" />
                 <KPICard label="Comfort Improvement" value={comfort_improvement} unit="%" status={comfort_improvement > 0 ? "good" : "bad"} />

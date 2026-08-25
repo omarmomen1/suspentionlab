@@ -82,6 +82,50 @@ async def websocket_session_endpoint(
         await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
         return
 
+    # ── Membership enforcement (IDOR fix): mirror GET /sessions/{id} ─────────
+    # A valid JWT alone is not enough — the caller must own the session or
+    # belong to the team that owns it.
+    try:
+        import uuid as _uuid
+        from sqlalchemy import select
+        from suspensionlab.backend.database.core import SessionLocal
+        from suspensionlab.backend.database.models.session import SimSession
+        from suspensionlab.backend.database.models.user import User
+
+        session_uuid = _uuid.UUID(session_id)
+        requester_id = _uuid.UUID(str(user_data.get("sub")))
+        async with SessionLocal() as db:
+            sess_res = await db.execute(select(SimSession).where(SimSession.id == session_uuid))
+            sim_session = sess_res.scalar_one_or_none()
+            if not sim_session:
+                logger.warning("WebSocket join rejected: session %s not found.", session_id)
+                await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+                return
+            usr_res = await db.execute(select(User).where(User.id == requester_id))
+            requester = usr_res.scalar_one_or_none()
+            allowed = (
+                requester is not None
+                and (
+                    str(sim_session.owner_id) == str(requester.id)
+                    or (
+                        sim_session.team_id is not None
+                        and requester.team_id is not None
+                        and str(sim_session.team_id) == str(requester.team_id)
+                    )
+                )
+            )
+        if not allowed:
+            logger.warning(
+                "WebSocket join rejected: user %s is not a member of session %s.",
+                requester_id, session_id,
+            )
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+    except ValueError:
+        logger.warning("WebSocket join rejected: malformed session id '%s'.", session_id)
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
     await manager.connect(websocket, session_id)
     
     # Ideally, trigger a background task for redis_listener here if not already running for this session.

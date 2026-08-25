@@ -38,6 +38,7 @@ from suspensionlab.backend.billing import checkout
 from suspensionlab.backend.config import settings
 from suspensionlab.backend.security.auth import verify_api_key
 from suspensionlab.backend.security.rate_limit import RateLimiter
+from suspensionlab.backend.core.compute_governance import inline_compute_guard
 from suspensionlab.backend.security.logging_config import logging_middleware
 
 from contextlib import asynccontextmanager
@@ -87,7 +88,7 @@ FastAPIInstrumentor.instrument_app(app)
 # Protect routes with API key
 protected = [Depends(verify_api_key)]
 app.include_router(simulate.router, prefix="/api/v1", dependencies=[Depends(verify_api_key), Depends(RateLimiter("rate_limit_simulate"))])
-app.include_router(analytics.router, prefix="/api/v1", dependencies=[Depends(verify_api_key), Depends(RateLimiter("rate_limit_simulate"))])
+app.include_router(analytics.router, prefix="/api/v1", dependencies=[Depends(inline_compute_guard), Depends(RateLimiter("rate_limit_simulate"))])
 app.include_router(jobs.router, prefix="/api/v1", dependencies=protected)
 from suspensionlab.backend.api.routes import profiles
 app.include_router(profiles.router, prefix="/api/v1", dependencies=protected)
@@ -133,7 +134,7 @@ from suspensionlab.backend.api.routes.lap_sim_routes import router as lap_sim_ro
 app.include_router(lap_sim_router, prefix="/api/v1", dependencies=protected)
 
 from suspensionlab.backend.api.routes.kinematics_routes import router as kinematics_router
-app.include_router(kinematics_router, prefix="/api/v1", dependencies=protected)
+app.include_router(kinematics_router, prefix="/api/v1", dependencies=[Depends(inline_compute_guard), Depends(RateLimiter("rate_limit_simulate"))])
 
 from suspensionlab.backend.api.routes.vehicle_intelligence_routes import router as intelligence_router
 app.include_router(intelligence_router, prefix="/api/v1", dependencies=protected)
@@ -164,16 +165,16 @@ app.include_router(users.router, prefix="/api/v1", dependencies=[Depends(RateLim
 
 # ── Revolutionary Features ────────────────────────────────────────────────────
 from suspensionlab.backend.api.routes.ai_engineer_routes import router as ai_router
-app.include_router(ai_router, prefix="/api/v1", dependencies=[Depends(verify_api_key), Depends(RateLimiter("rate_limit_simulate"))])
+app.include_router(ai_router, prefix="/api/v1", dependencies=[Depends(inline_compute_guard), Depends(RateLimiter("rate_limit_simulate"))])
 
 from suspensionlab.backend.api.routes.share_routes import router as share_router
 app.include_router(share_router, prefix="/api/v1")  # GET /reports/{token} is public; POST requires auth via frontend
 
 from suspensionlab.backend.api.routes.durability_routes import router as durability_router
-app.include_router(durability_router, prefix="/api/v1", dependencies=[Depends(verify_api_key), Depends(RateLimiter("rate_limit_simulate"))])
+app.include_router(durability_router, prefix="/api/v1", dependencies=[Depends(inline_compute_guard), Depends(RateLimiter("rate_limit_simulate"))])
 
 from suspensionlab.backend.api.routes.model_validity_routes import router as model_validity_router
-app.include_router(model_validity_router, prefix="/api/v1", dependencies=protected)
+app.include_router(model_validity_router, prefix="/api/v1", dependencies=[Depends(inline_compute_guard), Depends(RateLimiter("rate_limit_simulate"))])
 
 from suspensionlab.backend.api.routes.vnv_routes import router as vnv_router
 app.include_router(vnv_router, prefix="/api/v1", dependencies=protected)

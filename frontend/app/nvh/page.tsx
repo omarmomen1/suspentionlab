@@ -157,7 +157,7 @@ function NVHDashboard() {
         </div>
 
         <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-hidden">
-          <div className="grid grid-cols-4 gap-2 shrink-0">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 shrink-0">
             <KPICard label="Peak Cabin Boom" value={results.max_boom} unit="dBA" sub="30-50 Hz Region" status={results.max_boom > 40 ? "warn" : "good"} />
             <KPICard label="Peak Cavity Roar" value={results.max_roar} unit="dBA" sub="100-200 Hz Region" status={results.max_roar > 45 ? "warn" : "good"} />
           </div>
