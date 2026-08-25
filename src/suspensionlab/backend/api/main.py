@@ -87,7 +87,7 @@ FastAPIInstrumentor.instrument_app(app)
 # Protect routes with API key
 protected = [Depends(verify_api_key)]
 app.include_router(simulate.router, prefix="/api/v1", dependencies=[Depends(verify_api_key), Depends(RateLimiter("rate_limit_simulate"))])
-app.include_router(analytics.router, prefix="/api/v1", dependencies=protected)
+app.include_router(analytics.router, prefix="/api/v1", dependencies=[Depends(verify_api_key), Depends(RateLimiter("rate_limit_simulate"))])
 app.include_router(jobs.router, prefix="/api/v1", dependencies=protected)
 from suspensionlab.backend.api.routes import profiles
 app.include_router(profiles.router, prefix="/api/v1", dependencies=protected)
@@ -164,7 +164,7 @@ app.include_router(users.router, prefix="/api/v1", dependencies=[Depends(RateLim
 
 # ── Revolutionary Features ────────────────────────────────────────────────────
 from suspensionlab.backend.api.routes.ai_engineer_routes import router as ai_router
-app.include_router(ai_router, prefix="/api/v1", dependencies=[Depends(verify_api_key)])
+app.include_router(ai_router, prefix="/api/v1", dependencies=[Depends(verify_api_key), Depends(RateLimiter("rate_limit_simulate"))])
 
 from suspensionlab.backend.api.routes.share_routes import router as share_router
 app.include_router(share_router, prefix="/api/v1")  # GET /reports/{token} is public; POST requires auth via frontend

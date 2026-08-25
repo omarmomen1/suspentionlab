@@ -41,12 +41,15 @@ Usage example:
 from __future__ import annotations
 
 import itertools
+import logging
 import math
 import copy
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -190,7 +193,12 @@ class ConstraintDrivenOptimizer:
             # Run lap simulation
             try:
                 result = solve_lap(v_mod, segments)
-            except Exception:
+            except Exception as exc:
+                logger.warning(
+                    "Constraint optimizer: candidate setup failed lap simulation and was skipped "
+                    "(%d of %d candidates so far). Params: %s. Error: %s",
+                    len(feasible_solutions), getattr(self, "_n_candidates", -1), combo, exc,
+                )
                 continue
 
             lap_time = float(result.total_time)

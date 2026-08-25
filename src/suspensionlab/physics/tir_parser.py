@@ -1,6 +1,9 @@
+import logging
 import re
 from typing import Optional
 from .magic_formula import TireCoeffs
+
+logger = logging.getLogger(__name__)
 
 def parse_tir_file(content: str) -> TireCoeffs:
     """
@@ -56,7 +59,12 @@ def parse_tir_file(content: str) -> TireCoeffs:
                     val_float = float(val_part)
                     setattr(coeffs, mapping[key_part], val_float)
                 except ValueError:
-                    # If it fails to parse as float, just skip it
-                    pass
+                    # Non-numeric value: keep the default coefficient but make the
+                    # degradation visible instead of silently shipping defaults.
+                    logger.warning(
+                        "TIR file: key '%s' has non-numeric value '%s'; "
+                        "falling back to default coefficient.",
+                        key_part, val_part,
+                    )
                     
     return coeffs

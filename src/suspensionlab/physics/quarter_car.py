@@ -147,6 +147,30 @@ class QuarterCarParams:
         if self.stribeck_vs <= 0.0:
             raise ValueError("Stribeck velocity (vs) must be strictly positive.")
 
+        # Damper dyno curve sanity: interpolation against a non-monotonic or
+        # mismatched velocity axis produces oscillating, physically impossible
+        # damper forces that look plausible on a plot. Reject them here.
+        for v_name, f_name in (
+            ("damper_curve_v", "damper_curve_f"),
+            ("damper_curve_v_comp", "damper_curve_f_comp"),
+            ("damper_curve_v_reb", "damper_curve_f_reb"),
+        ):
+            v_arr = getattr(self, v_name)
+            f_arr = getattr(self, f_name)
+            if v_arr is None:
+                continue
+            if len(v_arr) < 2:
+                raise ValueError(f"{v_name} must contain at least 2 points, got {len(v_arr)}.")
+            if any(v_arr[i + 1] <= v_arr[i] for i in range(len(v_arr) - 1)):
+                raise ValueError(
+                    f"{v_name} must be strictly increasing (duplicate or decreasing "
+                    "velocity samples make force interpolation ambiguous)."
+                )
+            if f_arr is not None and len(f_arr) != len(v_arr):
+                raise ValueError(
+                    f"{v_name} ({len(v_arr)} pts) and {f_name} ({len(f_arr)} pts) must have equal length."
+                )
+
     @property
     def k_w(self) -> float:
         """Wheel rate [N/m]: spring rate referred to wheel centre.

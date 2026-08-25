@@ -1,11 +1,13 @@
 import json
 import asyncio
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from typing import Dict, Any, Optional
 
 from suspensionlab.physics.magic_formula import TireCoeffs
 from suspensionlab.physics.lap_sim import LapSimVehicle
+from suspensionlab.backend.security.auth import verify_api_key
+from suspensionlab.backend.security.rate_limit import RateLimiter
 
 router = APIRouter(prefix="/telemetry", tags=["Telemetry"])
 
@@ -95,7 +97,13 @@ async def websocket_telemetry_endpoint(
         manager.disconnect(websocket)
 
 
-@router.post("/analyse")
+@router.post(
+    "/analyse",
+    dependencies=[
+        Depends(verify_api_key),
+        Depends(RateLimiter("rate_limit_simulate")),
+    ],
+)
 async def analyse_telemetry(
     file: UploadFile = File(..., description="Telemetry CSV file (AiM, MoTeC, generic)"),
     model_params: Optional[str] = Form(None, description="JSON string of quarter-car model parameters"),

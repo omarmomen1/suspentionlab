@@ -40,12 +40,15 @@ from __future__ import annotations
 
 import csv
 import io
+import logging
 import math
 import warnings
 from dataclasses import dataclass, field
 from typing import Any
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -278,6 +281,7 @@ def parse_telemetry_csv(content: str) -> dict:
     data: dict[str, list[float]] = {k: [] for k in channel_map}
     col_to_key = {info.column_index: key for key, info in channel_map.items()}
 
+    skipped_counts: dict[str, int] = {}
     reader = csv.reader(lines[header_idx + 1:])
     for row in reader:
         if not row or row[0].strip().startswith('#'):
@@ -288,7 +292,16 @@ def parse_telemetry_csv(content: str) -> dict:
                     val_str = row[col_idx].strip()
                     data[key].append(float(val_str))
             except (ValueError, IndexError):
-                pass
+                skipped_counts[key] = skipped_counts.get(key, 0) + 1
+
+    total_skipped = sum(skipped_counts.values())
+    if total_skipped:
+        worst = dict(sorted(skipped_counts.items(), key=lambda kv: -kv[1])[:10])
+        logger.warning(
+            "Telemetry CSV parse: %d non-numeric/unreadable sample(s) skipped across %d channel(s). "
+            "Worst channels: %s. Downstream QA may report gaps or dead channels.",
+            total_skipped, len(skipped_counts), worst,
+        )
 
     data['_channel_info'] = channel_map  # type: ignore[assignment]
     return data

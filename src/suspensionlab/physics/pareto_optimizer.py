@@ -32,10 +32,13 @@ References
 from __future__ import annotations
 
 import itertools
+import logging
 from dataclasses import dataclass, field
 from typing import Callable, Dict, List, Optional
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -437,7 +440,12 @@ class SuspensionParetoOptimizer:
                 "tire_load_variation": tire_var,
                 "ride_freq":           ride_hz,
             }
-        except Exception:
+        except Exception as exc:
+            logger.warning(
+                "Pareto optimizer: candidate evaluation failed; returning penalty metrics "
+                "so the point ranks last instead of silently distorting the frontier. Error: %s",
+                exc,
+            )
             return {
                 "rms_body_accel":      9999.0,
                 "peak_susp_travel":    9999.0,
