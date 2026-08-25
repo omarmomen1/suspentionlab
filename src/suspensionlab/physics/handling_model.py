@@ -337,6 +337,12 @@ def _handling_ode(
     dv_x = a_x_inst + v_y * omega_z
     dv_y = a_y_inst - v_x * omega_z
     domega_z = Sum_Mz / p.I_z
+
+    # P2-PHYS-01: velocity clamp — braking must not reverse the vehicle.
+    # Without this, hard braking integrates v_x through zero into negative
+    # territory (verification report observed -1.68 m/s after braking).
+    if v_x <= 0.0 and dv_x < 0.0:
+        dv_x = 0.0
     
     # Global coordinates
     cos_p, sin_p = np.cos(Psi), np.sin(Psi)

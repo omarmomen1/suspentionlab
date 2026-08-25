@@ -47,7 +47,8 @@ ENV ENVIRONMENT="PROD"
 # Ensure Python output is not buffered (critical for log streaming in K8s)
 ENV PYTHONUNBUFFERED=1
 
-EXPOSE 7860
+# P2-INFRA-03: aligned with docker-compose port mapping (8000:8000)
+EXPOSE 8000
 
 # FIXED: Drop to non-root user before executing the server.
 # The Kubernetes securityContext (runAsNonRoot: true, runAsUser: 1001) in

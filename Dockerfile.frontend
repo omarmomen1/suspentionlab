@@ -15,8 +15,9 @@ RUN npm run build
 FROM node:20-alpine AS runner
 WORKDIR /app
 
-ENV NODE_ENV production
-ENV NEXT_TELEMETRY_DISABLED 1
+ENV NODE_ENV=production
+# P2-INFRA-05: modern key=value ENV syntax (legacy space syntax deprecated)
+ENV NEXT_TELEMETRY_DISABLED=1
 
 # FIXED: Create a non-root user and group.
 # Previously the container ran as root. Node.js applications do not require root.
