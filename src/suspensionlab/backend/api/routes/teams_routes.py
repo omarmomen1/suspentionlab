@@ -42,6 +42,7 @@ class TeamResponse(BaseModel):
     name: str
     owner_id: str
     plan: str
+    data_region: str = "eu-central"
     members: List[TeamMemberResponse]
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
@@ -96,6 +97,7 @@ async def create_team(
         name=team.name,
         owner_id=str(team.owner_id),
         plan=team.plan,
+        data_region=team.data_region,
         members=[TeamMemberResponse(id=str(db_user.id), name=db_user.name or "", email=db_user.email, role=db_user.team_role)]
     )
 
@@ -122,6 +124,7 @@ async def get_team(
         name=team.name,
         owner_id=str(team.owner_id),
         plan=team.plan,
+        data_region=team.data_region,
         members=[
             TeamMemberResponse(
                 id=str(m.id),
@@ -302,3 +305,46 @@ async def update_member_role(
         metadata={"team_id": team_id, "old_role": old_role, "new_role": req.role, "changed_by": user.user_id},
     )
     return {"id": str(member.id), "role": member.team_role}
+
+
+class DataRegionRequest(BaseModel):
+    region: str = Field(..., description="eu-central | us-east")
+
+@router.patch("/{team_id}/data-region")
+async def set_data_region(
+    team_id: str,
+    req: DataRegionRequest,
+    user: dict = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Data residency selection (Tier C1). Owner/Admin only. The choice is
+    recorded on the team and enforced by the regional deployment topology.
+    """
+    if req.region not in ("eu-central", "us-east"):
+        raise HTTPException(status_code=400, detail="region must be 'eu-central' or 'us-east'.")
+    if not user.team_id or str(user.team_id) != team_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this team.")
+
+    actor_res = await db.execute(select(User).where(User.id == uuid.UUID(user.user_id)))
+    actor = actor_res.scalar_one()
+    if actor.team_role not in ("Owner", "Admin"):
+        raise HTTPException(status_code=403, detail="Only Owners and Admins can change data residency.")
+
+    team_res = await db.execute(select(Team).where(Team.id == uuid.UUID(team_id)))
+    team = team_res.scalar_one_or_none()
+    if team is None:
+        raise HTTPException(status_code=404, detail="Team not found.")
+
+    old_region = team.data_region
+    team.data_region = req.region
+    await db.commit()
+
+    from suspensionlab.backend.security.audit import log_audit_event
+    log_audit_event(
+        "TEAM_DATA_REGION_CHANGED",
+        user_id=user.user_id,
+        ip="-",
+        metadata={"team_id": team_id, "old_region": old_region, "new_region": req.region},
+    )
+    return {"team_id": team_id, "data_region": team.data_region}

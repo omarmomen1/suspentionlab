@@ -17,6 +17,8 @@ class Team(Base):
     slug       = Column(String(255), unique=True, index=True, nullable=False)
     owner_id   = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     plan       = Column(String(20), default="ENTERPRISE", nullable=False)
+    # Data residency (Tier C1): which regional stack holds this team's data.
+    data_region = Column(String(32), nullable=False, server_default="eu-central")
     deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 

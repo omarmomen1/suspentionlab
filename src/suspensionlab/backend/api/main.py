@@ -186,6 +186,14 @@ app.include_router(usage_router, prefix="/api/v1", dependencies=protected)
 from suspensionlab.backend.api.routes.score_routes import router as score_router
 app.include_router(score_router, prefix="/api/v1", dependencies=[Depends(RateLimiter("rate_limit_simulate"))])
 
+# ── Trust & compliance (Tier C1) — public by design ──────────────────────────
+from suspensionlab.backend.api.routes.trust_routes import router as trust_router
+app.include_router(trust_router, prefix="/api/v1")
+
+# ── Outbound webhooks (Tier C2) ───────────────────────────────────────────────
+from suspensionlab.backend.api.routes.webhook_routes import router as webhook_router
+app.include_router(webhook_router, prefix="/api/v1", dependencies=[Depends(RateLimiter("rate_limit_simulate"))])
+
 from suspensionlab.backend.api.routes.run_routes import router as run_router
 app.include_router(run_router, prefix="/api/v1", dependencies=protected)
 

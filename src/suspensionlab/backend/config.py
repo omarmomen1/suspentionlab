@@ -124,6 +124,9 @@ class Settings(BaseSettings):
     scim_bearer_token: str = ""           # IdP presents this as `Authorization: Bearer ...`
     scim_default_team_role: str = "Viewer"
 
+    # ── Data residency (Tier C1) ───────────────────────────────────────────
+    data_residency_region: str = "eu-central"   # eu-central | us-east
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     @field_validator("api_key")

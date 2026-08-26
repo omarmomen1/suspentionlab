@@ -17,6 +17,8 @@ const PLAN_BADGES: Record<string, { label: string; color: string }> = {
 
 import { type LucideIcon } from "lucide-react";
 import TeamSettings from "../../components/TeamSettings";
+import WebhooksCard from "../../components/WebhooksCard";
+import { Zap } from "lucide-react";
 
 function SectionCard({ title, icon: Icon, children }: {
   title: string; icon: LucideIcon; children: React.ReactNode;
@@ -36,7 +38,7 @@ interface ApiKey { id: string; name: string; key_prefix: string; created_at: str
 
 export default function SettingsPage() {
   const { user, logout, authHeader } = useAuth();
-  const [activeTab, setActiveTab]    = useState<"account" | "billing" | "api-keys" | "team" | "security">("account");
+  const [activeTab, setActiveTab]    = useState<"account" | "billing" | "api-keys" | "webhooks" | "team" | "security">("account");
   const [apiKeys,   setApiKeys]      = useState<ApiKey[]>([]);
   const [newKeyName, setNewKeyName]  = useState("");
   const [newKeyValue, setNewKeyValue] = useState<string | null>(null);
@@ -130,6 +132,7 @@ export default function SettingsPage() {
     { id: "team",     label: "Workspace",icon: Users     },
     { id: "billing",  label: "Billing",  icon: CreditCard },
     { id: "api-keys", label: "API Keys", icon: Key       },
+    { id: "webhooks", label: "Webhooks", icon: Zap       },
     { id: "security", label: "Security", icon: Shield    },
   ] as const;
 
@@ -352,6 +355,13 @@ export default function SettingsPage() {
                     </div>
                   </>
                 )}
+              </SectionCard>
+            )}
+
+            {/* Webhooks tab (Tier C2) */}
+            {activeTab === "webhooks" && (
+              <SectionCard title="Webhooks" icon={Zap}>
+                <WebhooksCard />
               </SectionCard>
             )}
 

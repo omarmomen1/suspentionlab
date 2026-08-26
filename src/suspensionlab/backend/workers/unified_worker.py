@@ -244,6 +244,15 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
                 
             WORKER_JOBS_TOTAL.labels(queue="default", status="completed").inc()
             WORKER_JOB_DURATION.labels(queue="default").observe(time.time() - start_time)
+
+            # Outbound webhooks (Tier C2) — fire-and-forget, never blocks.
+            if user_id:
+                from suspensionlab.backend.services.webhooks import fire_and_forget
+                fire_and_forget(str(user_id), "job.completed", {
+                    "job_id": job_id,
+                    "status": "COMPLETED",
+                    "finished_at": time.time(),
+                })
             return res
             
         except (ValueError, MathConvergenceError, ZeroDivisionError) as math_err:
@@ -266,6 +275,16 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
                 
             WORKER_JOBS_TOTAL.labels(queue="default", status="failed_math").inc()
             WORKER_JOB_DURATION.labels(queue="default").observe(time.time() - start_time)
+
+            # Outbound webhooks (Tier C2)
+            if user_id:
+                from suspensionlab.backend.services.webhooks import fire_and_forget
+                fire_and_forget(str(user_id), "job.failed", {
+                    "job_id": job_id,
+                    "status": "FAILED",
+                    "error": f"Compute Error: {str(math_err)}",
+                    "finished_at": time.time(),
+                })
             raise NonRetryableJobError("Math/domain exception. Do not retry.") from math_err
             
         except Exception as e:
