@@ -179,6 +179,13 @@ app.include_router(model_validity_router, prefix="/api/v1", dependencies=[Depend
 from suspensionlab.backend.api.routes.vnv_routes import router as vnv_router
 app.include_router(vnv_router, prefix="/api/v1", dependencies=protected)
 
+# ── Monetization Tier A ───────────────────────────────────────────────────────
+from suspensionlab.backend.api.routes.usage_routes import router as usage_router
+app.include_router(usage_router, prefix="/api/v1", dependencies=protected)
+
+from suspensionlab.backend.api.routes.score_routes import router as score_router
+app.include_router(score_router, prefix="/api/v1", dependencies=[Depends(RateLimiter("rate_limit_simulate"))])
+
 from suspensionlab.backend.api.routes.run_routes import router as run_router
 app.include_router(run_router, prefix="/api/v1", dependencies=protected)
 

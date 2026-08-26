@@ -109,6 +109,68 @@ async def calibrate_twin(
     return result
 
 
+@router.get("/{twin_id}/report")
+async def twin_dyno_report(
+    twin_id: str,
+    user: dict = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Dyno Day in a Box (Tier A2): everything a chief engineer needs on one page —
+    identified ride frequency & damping, calibration confidence, model-validity
+    assessment, and a SHA-256 provenance hash over the canonical payload so the
+    printed report is verifiable against this exact API response.
+    """
+    import hashlib
+    import json as _json
+
+    try:
+        twin = await digital_twin.get_twin(db, twin_id, user.user_id, getattr(user, "team_id", None))
+    except LookupError as exc:
+        raise _not_found(exc)
+
+    from suspensionlab.physics.model_validity import assess_quarter_car
+
+    identification = twin.last_identification or {}
+    calibrated = twin.calibrated_params or {}
+    validity = assess_quarter_car(calibrated if calibrated else twin.base_params)
+
+    report = {
+        "twin": {
+            "id": str(twin.id),
+            "car_ref": twin.car_ref,
+            "setup_ref": twin.setup_ref,
+            "track_ref": twin.track_ref,
+            "calibration_count": twin.calibration_count,
+            "last_calibration_at": (
+                twin.last_calibration_at.isoformat() if twin.last_calibration_at else None
+            ),
+        },
+        "identification": {
+            "sprung_freq_hz": identification.get("f_n_s_hz") or identification.get("sprung_freq_hz"),
+            "damping_ratio": identification.get("zeta_s") or identification.get("damping_ratio"),
+            "confidence": identification.get("confidence"),
+        },
+        "parameters": {
+            "base": twin.base_params,
+            "calibrated": calibrated,
+        },
+        "validity": validity.to_dict(),
+        "generated_at": __import__("datetime").datetime.now(
+            __import__("datetime").timezone.utc
+        ).isoformat(),
+    }
+
+    # Provenance: SHA-256 over the canonical JSON of everything above.
+    canonical = _json.dumps(report, sort_keys=True, separators=(",", ":"), default=str)
+    report["provenance"] = {
+        "algorithm": "sha256",
+        "hash": hashlib.sha256(canonical.encode("utf-8")).hexdigest(),
+        "note": "Hash of the canonical JSON of this payload excluding this field.",
+    }
+    return report
+
+
 @router.get("/{twin_id}/learnings")
 async def twin_learnings(
     twin_id: str,

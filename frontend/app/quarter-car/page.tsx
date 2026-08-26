@@ -24,6 +24,7 @@ import { useAuth } from "../../contexts/AuthContext";
 import SuspensionRig3D from "../../components/SuspensionRig3D";
 import Rig3DPlayer from "../../components/Rig3DPlayer";
 import KPIRibbon from "../../components/quarter-car/KPIRibbon";
+import SetupScoreBadge from "../../components/SetupScoreBadge";
 import { ParamSection, ParameterInput } from "../../components/sim/ParameterControls";
 import { useQuarterCarSimulation } from "../../hooks/useQuarterCarSimulation";
 import SmartInsights from "../../components/SmartInsights";
@@ -494,6 +495,12 @@ function QuarterCarDashboard() {
 
               {/* KPI Ribbon — 8 cards */}
               <KPIRibbon r={r} MR={params.MR} />
+              <SetupScoreBadge
+                rmsBodyAccel={r.rms_body_accel}
+                rmsTireLoadN={r.rms_tire_load}
+                peakSuspTravelM={r.peak_susp_travel}
+                runKey={`${r.time.length}-${r.rms_body_accel}-${r.rms_tire_load}`}
+              />
 
               {/* Tab nav */}
               <PlotTabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />

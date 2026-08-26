@@ -112,6 +112,30 @@ export default function TeamSettings() {
     }
   };
 
+  const handleRoleChange = async (memberId: string, role: string) => {
+    setActionBusy(true);
+    setActionError(null);
+    setActionSuccess(null);
+    try {
+      const res = await fetch(`${API_BASE}/teams/${team.id}/members/${memberId}/role`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ role })
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setActionError(body.detail ?? `Role change failed (HTTP ${res.status}).`);
+      } else {
+        setActionSuccess("Seat role updated.");
+        await fetchTeam();
+      }
+    } catch {
+      setActionError("Network error while changing seat role.");
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-6 bg-gray-900 text-white rounded" role="status" aria-live="polite">
@@ -167,9 +191,23 @@ export default function TeamSettings() {
           <h3 className="text-xl mb-4">Members</h3>
           <ul className="mb-4">
             {team.members.map((m: any) => (
-              <li key={m.id} className="mb-2 py-2 border-b border-gray-700 flex justify-between">
-                <span>{m.email}</span>
-                <span className="text-gray-400 text-sm">{m.role}</span>
+              <li key={m.id} className="mb-2 py-2 border-b border-gray-700 flex justify-between items-center gap-2">
+                <span className="truncate">{m.email}</span>
+                {m.role === "Owner" ? (
+                  <span className="text-gray-400 text-sm">Owner</span>
+                ) : (
+                  <select
+                    value={m.role ?? "Viewer"}
+                    disabled={actionBusy}
+                    aria-label={`Seat role for ${m.email}`}
+                    onChange={(e) => handleRoleChange(m.id, e.target.value)}
+                    className="bg-gray-800 text-gray-200 text-sm rounded px-2 py-1 disabled:opacity-50"
+                  >
+                    {["Admin", "Engineer", "Crew", "Viewer"].map((role) => (
+                      <option key={role} value={role}>{role}</option>
+                    ))}
+                  </select>
+                )}
               </li>
             ))}
           </ul>

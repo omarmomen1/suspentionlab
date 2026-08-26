@@ -22,6 +22,10 @@ from suspensionlab.shared.models import PlanTier
 
 router = APIRouter(prefix="/teams", tags=["teams"])
 
+# Seat roles (Tier A3): Owner > Admin > Engineer > Crew > Viewer.
+# Crew = pit-lane access on mobile setup sheets; Viewer = read-only dashboards.
+VALID_ROLES = ["Admin", "Engineer", "Crew", "Viewer"]
+
 # ─── Schemas ─────────────────────────────────────────────────────────────────
 
 class CreateTeamRequest(BaseModel):
@@ -160,8 +164,8 @@ async def invite_member(
     if target_user.team_id:
         raise HTTPException(status_code=400, detail="User is already in a team.")
 
-    if req.role not in ["Owner", "Admin", "Viewer"]:
-        raise HTTPException(status_code=400, detail="Invalid role specified.")
+    if req.role not in VALID_ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid role specified. Valid roles: {VALID_ROLES}.")
     if req.role == "Owner":
         raise HTTPException(status_code=400, detail="Cannot invite as Owner.")
 
@@ -246,3 +250,55 @@ async def get_team_analytics(
         "quota_limit": 1000,
         "quota_used": total_jobs
     }
+
+
+class UpdateRoleRequest(BaseModel):
+    role: str
+
+@router.patch("/{team_id}/members/{member_id}/role")
+async def update_member_role(
+    team_id: str,
+    member_id: str,
+    req: UpdateRoleRequest,
+    user: dict = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Change a member's seat role (Tier A3). Only Owners and Admins may change
+    roles; Admins cannot modify Owners or other Admins.
+    """
+    if req.role not in VALID_ROLES:
+        raise HTTPException(status_code=400, detail=f"Invalid role. Valid roles: {VALID_ROLES}.")
+
+    if not user.team_id or str(user.team_id) != team_id:
+        raise HTTPException(status_code=403, detail="Not authorized for this team.")
+
+    actor_res = await db.execute(select(User).where(User.id == uuid.UUID(user.user_id)))
+    actor = actor_res.scalar_one()
+    if actor.team_role not in ("Owner", "Admin"):
+        raise HTTPException(status_code=403, detail="Only Owners and Admins can change seat roles.")
+
+    member_res = await db.execute(
+        select(User).where(User.id == uuid.UUID(member_id), User.team_id == uuid.UUID(team_id))
+    )
+    member = member_res.scalar_one_or_none()
+    if member is None:
+        raise HTTPException(status_code=404, detail="Member not found in team.")
+
+    if member.team_role == "Owner" or str(member.id) == str(actor.id):
+        raise HTTPException(status_code=403, detail="Cannot change the Owner's role or your own role.")
+    if actor.team_role == "Admin" and member.team_role == "Admin":
+        raise HTTPException(status_code=403, detail="Admins cannot change other Admins' roles.")
+
+    old_role = member.team_role
+    member.team_role = req.role
+    await db.commit()
+
+    from suspensionlab.backend.security.audit import log_audit_event
+    log_audit_event(
+        "TEAM_ROLE_CHANGED",
+        user_id=str(member.id),
+        ip="-",
+        metadata={"team_id": team_id, "old_role": old_role, "new_role": req.role, "changed_by": user.user_id},
+    )
+    return {"id": str(member.id), "role": member.team_role}

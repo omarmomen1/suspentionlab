@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useAuth } from "../../contexts/AuthContext";
+import DynoDayReport from "../../components/DynoDayReport";
 import GGFrictionCircle from "../../components/GGFrictionCircle";
 import TelemetryGauges from "../../components/TelemetryGauges";
 import {
@@ -193,6 +194,16 @@ export default function DigitalTwinPage() {
                   </>
                 )}
               </button>
+            </div>
+
+            {/* Dyno Day in a Box (Tier A2) — chief-engineer report for a calibrated twin */}
+            <div className="rounded-xl border border-slate-800 bg-slate-900/20 p-5">
+              <h3 className="text-sm font-semibold text-slate-200 mb-1">Dyno Day in a Box</h3>
+              <p className="text-xs text-slate-500 mb-4">
+                Generate the printable identification report — ride frequency, damping ratio,
+                confidence and provenance hash — for any of your calibrated twins.
+              </p>
+              <DynoDayReport />
             </div>
 
             {/* Results */}

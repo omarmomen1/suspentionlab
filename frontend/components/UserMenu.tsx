@@ -10,10 +10,31 @@ const PLAN_STYLES: Record<string, string> = {
   ENTERPRISE: "text-purple-400 bg-purple-900/20",
 };
 
+interface UsageInfo {
+  month: string;
+  plan: string;
+  sims_used: number;
+  quota: number;
+  remaining: number;
+  utilization_pct: number;
+}
+
 export default function UserMenu() {
-  const { user, loading, logout } = useAuth();
+  const { user, loading, logout, fetchWithAuth } = useAuth();
   const [open, setOpen]           = useState(false);
+  const [usage, setUsage]         = useState<UsageInfo | null>(null);
   const ref                       = useRef<HTMLDivElement>(null);
+
+  // Fetch simulation usage (Tier A4) whenever the menu opens.
+  useEffect(() => {
+    if (!open || !user) return;
+    let cancelled = false;
+    fetchWithAuth("/api/v1/usage")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: UsageInfo | null) => { if (!cancelled) setUsage(data); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [open, user, fetchWithAuth]);
 
   // Close on outside click
   useEffect(() => {
@@ -75,6 +96,32 @@ export default function UserMenu() {
               {user.plan}
             </span>
           </div>
+
+          {/* Simulation usage meter (Tier A4) */}
+          {usage && (
+            <div className="px-4 py-2.5 border-b border-[#1e1e1e]">
+              <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
+                <span>Sims this month</span>
+                <span className={usage.remaining === 0 ? "text-red-400 font-bold" : "text-gray-400"}>
+                  {usage.sims_used}/{usage.quota}
+                </span>
+              </div>
+              <div className="h-1 rounded-full bg-[#252525] overflow-hidden" role="progressbar"
+                aria-valuenow={Math.round(usage.utilization_pct)} aria-valuemin={0} aria-valuemax={100}
+                aria-label="Monthly simulation quota usage">
+                <div
+                  className={`h-full rounded-full transition-all ${usage.utilization_pct >= 100 ? "bg-red-500" : usage.utilization_pct >= 80 ? "bg-amber-400" : "bg-ansys-yellow"}`}
+                  style={{ width: `${Math.min(100, usage.utilization_pct)}%` }}
+                />
+              </div>
+              {usage.remaining === 0 && (
+                <Link href="/pricing" onClick={() => setOpen(false)}
+                  className="block mt-1.5 text-[10px] text-ansys-yellow hover:underline">
+                  Quota reached — upgrade for more simulations →
+                </Link>
+              )}
+            </div>
+          )}
 
           {/* Menu items */}
           <div className="py-1">

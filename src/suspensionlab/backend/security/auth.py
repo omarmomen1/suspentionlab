@@ -29,6 +29,41 @@ class UserContext(BaseModel):
     name: str
     onboarding_complete: bool
     team_id: str | None = None
+    team_role: str | None = None   # Owner | Admin | Engineer | Viewer | Crew
+
+
+# Seat-role hierarchy (Tier A3). Higher number = more capability.
+TEAM_ROLE_LEVELS = {
+    "OWNER": 4,
+    "ADMIN": 3,
+    "ENGINEER": 2,
+    "CREW": 1,
+    "VIEWER": 0,
+}
+
+
+def require_team_role(minimum_role: str):
+    """
+    FastAPI dependency factory enforcing a minimum team seat role.
+    Non-team members always fail. Usage:
+        Depends(require_team_role("Engineer"))
+    """
+    minimum = TEAM_ROLE_LEVELS.get((minimum_role or "").upper(), 99)
+
+    async def _check(user: UserContext = Depends(verify_api_key)):
+        if not user.team_id or not user.team_role:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="This action requires a team workspace membership.",
+            )
+        level = TEAM_ROLE_LEVELS.get(user.team_role.upper(), -1)
+        if level < minimum:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"This action requires the {minimum_role} seat role or higher.",
+            )
+        return user
+    return _check
 
 async def verify_api_key(
     request:  Request,
@@ -91,6 +126,7 @@ async def verify_api_key(
                 name=user.name or "",
                 onboarding_complete=user.onboarding_complete,
                 team_id=str(user.team_id) if user.team_id else None,
+                team_role=user.team_role,
             )
         # Token present but invalid — do not fall through to API key
         log_audit_event("LOGIN_FAILURE", ip=ip, metadata={"reason": "Invalid Bearer token"})
@@ -133,6 +169,7 @@ async def verify_api_key(
                             name=user.name or "",
                             onboarding_complete=user.onboarding_complete,
                             team_id=str(user.team_id) if user.team_id else None,
+                            team_role=user.team_role,
                         )
 
     # ── 3. No credentials found ───────────────────────────────────────────

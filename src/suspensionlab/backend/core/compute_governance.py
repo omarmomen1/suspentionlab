@@ -113,6 +113,42 @@ PLAN_CONCURRENCY = {
     "ENTERPRISE": 16,
 }
 
+# ── Monthly simulation quota / metered overage (Tier A4) ─────────────────────
+# "PRO includes 500 sims/mo" — every inline simulation request increments a
+# monthly counter; exceeding the quota returns 402 with an upgrade CTA.
+# The counter is the billing-grade metering record (Redis, TTL'd past month
+# end so partial-month usage survives).
+
+SIM_QUOTAS = {
+    "FREE": 50,
+    "PRO": 500,
+    "ENTERPRISE": 5000,
+}
+MONTHLY_USAGE_TTL_S = 60 * 60 * 24 * 40  # 40 days — survives month boundary
+
+
+def _month_key() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m")
+
+
+def monthly_usage_key(user_id: str) -> str:
+    return f"sim_usage:{user_id}:{_month_key()}"
+
+
+async def get_monthly_usage(user_id: str) -> int:
+    """Current-month simulation count for a user (0 when Redis is down)."""
+    try:
+        from suspensionlab.backend.core.redis_client import get_async_redis_conn
+        redis_conn = get_async_redis_conn()
+        if redis_conn is None:
+            return 0
+        value = await redis_conn.get(monthly_usage_key(user_id))
+        return int(value or 0)
+    except Exception:
+        logger.warning("get_monthly_usage failed for user %s", user_id)
+        return 0
+
 
 async def assert_user_concurrency(db, user_id: str, plan: str) -> None:
     """
@@ -189,6 +225,23 @@ async def inline_compute_guard(user: UserContext = Depends(verify_api_key)):
                 f"simulation(s). Wait for the current one to finish or upgrade."
             ),
         )
+
+    # ── Monthly quota metering (Tier A4) ─────────────────────────────────
+    usage_key = monthly_usage_key(user.user_id)
+    used = await redis_conn.incr(usage_key)
+    await redis_conn.expire(usage_key, MONTHLY_USAGE_TTL_S)
+    quota = SIM_QUOTAS.get(str(user.plan), SIM_QUOTAS["FREE"])
+    if used > quota:
+        await redis_conn.decr(usage_key)
+        await redis_conn.decr(key)
+        raise HTTPException(
+            status_code=402,
+            detail=(
+                f"Monthly simulation quota reached ({quota}/{quota} on the {user.plan} plan "
+                f"for {_month_key()}). Upgrade your plan or buy simulation credits to continue."
+            ),
+        )
+
     try:
         yield user
     finally:
