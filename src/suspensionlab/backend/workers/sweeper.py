@@ -30,7 +30,10 @@ async def sweep_orphan_jobs(timeout_seconds: int = 60):
             logger.warning(f"Found {len(orphans)} orphaned jobs. Sweeping to FAILED.")
             import json
             import redis.asyncio as aioredis
-            redis_url = os.getenv("REDIS_URL", "redis://redis:6379/0")
+            redis_url = os.getenv("REDIS_URL")
+            if not redis_url:
+                logger.error("CRITICAL: REDIS_URL not configured for orphaned job sweeper.")
+                return
             r_conn = aioredis.from_url(redis_url)
             
             for job in orphans:

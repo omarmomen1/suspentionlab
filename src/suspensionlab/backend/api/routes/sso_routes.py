@@ -136,8 +136,10 @@ def _issue_state(nonce: str, verifier: str) -> str:
 
 
 def _read_state(state_token: str) -> dict[str, Any]:
+    from suspensionlab.backend.security.jwt_utils import get_jwt_keys, JWT_ACTIVE_KEY
+    keys = get_jwt_keys()
     try:
-        payload = jwt.decode(state_token, algorithms=["HS256"], options={"require_exp": True})
+        payload = jwt.decode(state_token, keys[JWT_ACTIVE_KEY], algorithms=["HS256"], options={"require_exp": True})
     except JWTError:
         raise HTTPException(status_code=400, detail="Invalid or expired SSO state.")
     if payload.get("type") != "sso_state":
@@ -186,23 +188,47 @@ async def _validate_id_token(id_token: str, discovery: dict[str, Any], expected_
 
 
 async def _upsert_sso_user(claims: dict[str, Any]) -> dict[str, Any]:
-    """Find or provision the local user record from verified IdP claims."""
+    """
+    Find or provision the local user record from verified IdP claims.
+    Enforces email_verified checks and binds the immutable IdP subject identifier (external_id)
+    to prevent OIDC account-takeover attacks.
+    """
     email = claims.get("email")
     if not email:
         raise HTTPException(status_code=502, detail="IdP did not provide an email claim.")
 
-    from sqlalchemy import select
+    # 1. Require verified email from the IdP
+    email_verified = claims.get("email_verified")
+    if email_verified is False:
+        logger.warning("SSO login attempt with unverified email: %s", email)
+        raise HTTPException(
+            status_code=401,
+            detail="Identity provider indicated email address is unverified. SSO login rejected.",
+        )
+
+    # 2. Extract immutable IdP subject identifier
+    sub = claims.get("sub")
+    if not sub:
+        raise HTTPException(status_code=502, detail="IdP did not provide a subject identifier (sub claim).")
+
+    from sqlalchemy import select, or_
     from suspensionlab.backend.database.core import SessionLocal
     from suspensionlab.backend.database.models.user import User
     from suspensionlab.backend.security.jwt_utils import hash_password
 
     async with SessionLocal() as db:
-        result = await db.execute(select(User).where(User.email == email.lower()))
+        # First query by IdP subject identifier, fallback to verified email
+        result = await db.execute(
+            select(User).where(or_(User.external_id == sub, User.email == email.lower()))
+        )
         user = result.scalar_one_or_none()
+
         if user is None:
             # Just-in-time provisioning. Random unusable password — auth is via IdP only.
             user = User(
                 email=email.lower(),
+                external_id=sub,
+                auth_provider="oidc",
                 password_hash=hash_password(secrets.token_urlsafe(32)),
                 name=claims.get("name") or claims.get("preferred_username"),
                 plan="PRO",
@@ -212,7 +238,26 @@ async def _upsert_sso_user(claims: dict[str, Any]) -> dict[str, Any]:
         else:
             if user.deleted_at is not None:
                 raise HTTPException(status_code=403, detail="This account has been deactivated.")
+            
+            # Security invariant: prevent IdP identity collision / takeover
+            if user.external_id and user.external_id != sub:
+                logger.error(
+                    "OIDC account takeover attempt: user %s has external_id %s but IdP sent sub %s",
+                    user.email, user.external_id, sub
+                )
+                raise HTTPException(
+                    status_code=403,
+                    detail="This account is bound to a different identity provider account.",
+                )
+
+            # Bind IdP subject identifier on first verified SSO login
+            if not user.external_id:
+                user.external_id = sub
+                user.auth_provider = "oidc"
+
             user.name = claims.get("name") or user.name
+            user.email = email.lower()
+
         await db.commit()
         await db.refresh(user)
         return {
@@ -223,6 +268,7 @@ async def _upsert_sso_user(claims: dict[str, Any]) -> dict[str, Any]:
             "team_id": str(user.team_id) if user.team_id else None,
             "is_admin": bool(user.is_admin),
         }
+
 
 
 @router.get("/providers")
@@ -336,12 +382,20 @@ async def sso_callback(
         f"{settings.app_base_url.rstrip('/')}/auth/login?sso=success", status_code=302
     )
     response.delete_cookie(STATE_COOKIE)
-    response.set_cookie("sl_access_token", access, httponly=True,
-                        secure=(settings.environment == "PROD"), samesite="lax", max_age=900)
+    response.set_cookie("sl_token", access, httponly=True,
+                        secure=(settings.environment == "PROD"), samesite="lax", max_age=900, path="/")
     response.set_cookie("sl_refresh_token", refresh, httponly=True,
                         secure=(settings.environment == "PROD"), samesite="lax",
-                        max_age=60 * 60 * 24 * 7)
+                        max_age=60 * 60 * 24 * 7, path="/")
+    response.set_cookie("sl_authed", "true", httponly=False,
+                        secure=(settings.environment == "PROD"), samesite="lax",
+                        max_age=60 * 60 * 24 * 7, path="/")
+    csrf_token = secrets.token_urlsafe(32)
+    response.set_cookie("csrf_token", csrf_token, httponly=False,
+                        secure=(settings.environment == "PROD"), samesite="lax",
+                        max_age=60 * 60 * 24 * 7, path="/")
     return response
+
 
 
 @router.post("/callback")

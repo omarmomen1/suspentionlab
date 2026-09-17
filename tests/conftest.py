@@ -9,9 +9,22 @@ import pytest
 from httpx import AsyncClient
 from unittest.mock import patch, AsyncMock, MagicMock
 
-# Mock JWT_KEYS for testing before app import
+# Cryptographically compliant test secrets before app import
 if "JWT_KEYS" not in os.environ and "JWT_SECRET_KEY" not in os.environ:
-    os.environ["JWT_KEYS"] = json.dumps({"v1": "test_secret_key"})
+    os.environ["JWT_KEYS"] = json.dumps({"v1": "9871239847192837491827349182739481723948712934871928374918273491"})
+if "DECISION_HMAC_SECRET" not in os.environ:
+    os.environ["DECISION_HMAC_SECRET"] = "8172938471928374918273948172394871293487192837491827349182736451"
+if "STRIPE_WEBHOOK_SECRET" not in os.environ:
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_8172938471928374918273948172394871293487192837491827349182736451"
+if "ED25519_AUTHORITY_PRIVATE_KEY_HEX" not in os.environ:
+    os.environ["ED25519_AUTHORITY_PRIVATE_KEY_HEX"] = "4a" * 32
+if "REDIS_URL" not in os.environ:
+    os.environ["REDIS_URL"] = "redis://127.0.0.1:6379/0"
+
+# Ensure xdist workers do not collide on default SQLite file
+_worker_id = os.environ.get("PYTEST_XDIST_WORKER")
+if _worker_id and "DATABASE_URL" not in os.environ:
+    os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///./data/test_{_worker_id}.db"
 
 # Ensure src is on path for all tests
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
@@ -19,12 +32,31 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 from suspensionlab.backend.api.main import app
 from suspensionlab.backend.security.auth import verify_api_key
 
+@pytest.fixture(autouse=True)
+def reset_authority_key_cache():
+    """Reset Ed25519 authority key cache to prevent inter-test key leakage."""
+    try:
+        from suspensionlab.backend.services.report_service import reset_authority_keypair_cache
+        reset_authority_keypair_cache()
+    except Exception:
+        pass
+    yield
+    try:
+        from suspensionlab.backend.services.report_service import reset_authority_keypair_cache
+        reset_authority_keypair_cache()
+    except Exception:
+        pass
+
 @pytest.fixture(scope="session")
 def anyio_backend():
     return "asyncio"
 
 @pytest.fixture(autouse=True)
-def bypass_rate_limiter():
+def bypass_rate_limiter(request):
+    node_str = f"{request.node.name} {request.node.nodeid}".lower()
+    if "rate_limit" in node_str or "security" in node_str or "rate_limit" in request.keywords or "security" in request.keywords:
+        yield None
+        return
     with patch("suspensionlab.backend.security.rate_limit.RateLimiter.__call__", autospec=True) as mock:
         mock.return_value = True
         yield mock
@@ -32,15 +64,32 @@ def bypass_rate_limiter():
 @pytest.fixture(autouse=True)
 def mock_redis():
     with patch("suspensionlab.backend.core.redis_client.get_async_redis_conn") as mock_get:
+        _store = {}
         mock = MagicMock()
         mock_get.return_value = mock
         pipeline_mock = MagicMock()
         pipeline_mock.execute = AsyncMock()
         mock.pipeline.return_value = pipeline_mock
-        # Mock other async methods on the redis connection itself
-        mock.get = AsyncMock(return_value=None)
-        mock.set = AsyncMock()
-        mock.setex = AsyncMock()
+        
+        async def _mock_get(k):
+            return _store.get(k)
+
+        async def _mock_set(k, v, **kw):
+            if kw.get("nx") and k in _store:
+                return False
+            _store[k] = v.encode() if isinstance(v, str) else v
+            return True
+
+        async def _mock_setex(k, ttl, v):
+            _store[k] = v.encode() if isinstance(v, str) else v
+            return True
+
+        mock.get = AsyncMock(side_effect=_mock_get)
+        mock.set = AsyncMock(side_effect=_mock_set)
+        mock.setex = AsyncMock(side_effect=_mock_setex)
+        mock.incr = AsyncMock(return_value=1)
+        mock.decr = AsyncMock(return_value=0)
+        mock.expire = AsyncMock(return_value=True)
         mock.zcard = AsyncMock(return_value=0)
         mock.zrange = AsyncMock(return_value=[])
         mock.aclose = AsyncMock()
@@ -48,8 +97,8 @@ def mock_redis():
         mock.lock.return_value.__aexit__ = AsyncMock()
         
         sync_mock = MagicMock()
-        sync_mock.get.return_value = None
-        sync_mock.set = MagicMock()
+        sync_mock.get.side_effect = lambda k: _store.get(k)
+        sync_mock.set.side_effect = lambda k, v: _store.update({k: v}) or True
         
         with patch("redis.asyncio.from_url", return_value=mock), \
              patch("redis.Redis.from_url", return_value=sync_mock):
@@ -82,17 +131,27 @@ def postgres_container():
 @pytest.fixture
 async def db_engine(postgres_container):
     # Import all models here to ensure they are registered with Base.metadata
-    from suspensionlab.backend.database.models.user import User
-    from suspensionlab.backend.database.models.profile import VehicleProfile
-    from suspensionlab.backend.database.models.job import JobRecord
-    from suspensionlab.backend.database.models.billing import StripeEvent
+    import suspensionlab.backend.database.models  # noqa: F401
 
     if postgres_container:
         db_url = postgres_container.get_connection_url()
+        engine = create_async_engine(db_url, echo=False)
     else:
+        from sqlalchemy.pool import StaticPool
         db_url = "sqlite+aiosqlite:///:memory:"
+        engine = create_async_engine(
+            db_url,
+            echo=False,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        from sqlalchemy import event
+        @event.listens_for(engine.sync_engine, "connect")
+        def _set_sqlite_pragma(dbapi_connection, connection_record):
+            cursor = dbapi_connection.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON;")
+            cursor.close()
 
-    engine = create_async_engine(db_url, echo=False)
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
@@ -130,6 +189,13 @@ def mock_user():
         onboarding_complete=True,
         team_id=None
     )
+
+@pytest.fixture(autouse=True)
+def clean_dependency_overrides():
+    """Ensure no test leaks global FastAPI dependency overrides into subsequent tests."""
+    yield
+    app.dependency_overrides.clear()
+
 
 @pytest.fixture
 async def authenticated_client(client, mock_user):

@@ -16,11 +16,12 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Upload
 from pydantic import BaseModel, Field
 
 from suspensionlab.backend.database.core import get_db_dependency
-from suspensionlab.backend.security.auth import verify_api_key
+from suspensionlab.backend.security.auth import require_permission, UserContext
+from suspensionlab.backend.security.permissions import Permission
 from suspensionlab.backend.services import digital_twin
 from sqlalchemy.ext.asyncio import AsyncSession
 
-router = APIRouter(prefix="/twins", tags=["digital-twin"])
+router = APIRouter(tags=["digital-twin"])
 
 
 class CreateTwinRequest(BaseModel):
@@ -37,15 +38,22 @@ def _not_found(exc: LookupError) -> HTTPException:
 @router.post("", status_code=201)
 async def create_twin(
     req: CreateTwinRequest,
-    user: dict = Depends(verify_api_key),
+    user: UserContext = Depends(require_permission(Permission.SETUP_CREATE)),
     db: AsyncSession = Depends(get_db_dependency),
 ):
     if "m_s" not in req.base_params:
         raise HTTPException(status_code=400, detail="base_params must include m_s (sprung mass).")
+
+    # ── Trial Governance: Enforce 1 vehicle limit & expiration ──
+    from suspensionlab.backend.services.trial_service import TrialService
+    trial = await TrialService.assert_trial_access(db, user, action="vehicle", delta=1)
+
     twin = await digital_twin.create_twin(
         db, user.user_id, getattr(user, "team_id", None),
         req.car_ref, req.setup_ref, req.track_ref, req.base_params,
     )
+    if trial:
+        await TrialService.record_trial_usage(db, user, action="vehicle", delta=1)
     return {
         "id": str(twin.id),
         "car_ref": twin.car_ref,
@@ -58,7 +66,7 @@ async def create_twin(
 @router.get("/{twin_id}")
 async def get_twin(
     twin_id: str,
-    user: dict = Depends(verify_api_key),
+    user: UserContext = Depends(require_permission(Permission.VEHICLE_READ)),
     db: AsyncSession = Depends(get_db_dependency),
 ):
     try:
@@ -83,7 +91,7 @@ async def calibrate_twin(
     twin_id: str,
     file: UploadFile = File(..., description="Telemetry CSV with time + vertical acceleration"),
     speed_band: Optional[str] = Form(None, description="Operating condition, e.g. '105-140 km/h'"),
-    user: dict = Depends(verify_api_key),
+    user: UserContext = Depends(require_permission(Permission.CALIBRATION_RUN)),
     db: AsyncSession = Depends(get_db_dependency),
 ):
     """
@@ -112,7 +120,7 @@ async def calibrate_twin(
 @router.get("/{twin_id}/report")
 async def twin_dyno_report(
     twin_id: str,
-    user: dict = Depends(verify_api_key),
+    user: UserContext = Depends(require_permission(Permission.VEHICLE_READ)),
     db: AsyncSession = Depends(get_db_dependency),
 ):
     """
@@ -174,7 +182,7 @@ async def twin_dyno_report(
 @router.get("/{twin_id}/learnings")
 async def twin_learnings(
     twin_id: str,
-    user: dict = Depends(verify_api_key),
+    user: UserContext = Depends(require_permission(Permission.VEHICLE_READ)),
     db: AsyncSession = Depends(get_db_dependency),
 ):
     """Vehicle-specific engineering intelligence aggregated from all calibrations (#41)."""
@@ -197,7 +205,7 @@ class ProposalRequest(BaseModel):
 async def create_proposal(
     twin_id: str,
     req: ProposalRequest,
-    user: dict = Depends(verify_api_key),
+    user: UserContext = Depends(require_permission(Permission.SETUP_CREATE)),
     db: AsyncSession = Depends(get_db_dependency),
 ):
     """
@@ -221,7 +229,7 @@ async def create_proposal(
 @router.get("/{twin_id}/proposals")
 async def list_proposals(
     twin_id: str,
-    user: dict = Depends(verify_api_key),
+    user: UserContext = Depends(require_permission(Permission.VEHICLE_READ)),
     db: AsyncSession = Depends(get_db_dependency),
 ):
     """All proposals for this twin, newest first."""
@@ -245,10 +253,11 @@ async def list_proposals(
 
 
 @router.post("/proposals/{proposal_id}/status")
+@router.put("/proposals/{proposal_id}/status")
 async def set_proposal_status(
     proposal_id: str,
     status: str = Query(..., pattern="^(APPROVED|REJECTED|EXPORTED)$"),
-    user: dict = Depends(verify_api_key),
+    user: UserContext = Depends(require_permission(Permission.SETUP_APPROVE)),
     db: AsyncSession = Depends(get_db_dependency),
 ):
     """
@@ -259,16 +268,167 @@ async def set_proposal_status(
     from sqlalchemy import select
     from suspensionlab.backend.database.models.setup_proposal import SetupProposal
 
-    conditions = [SetupProposal.id == _uuid.UUID(proposal_id),
-                  SetupProposal.user_id == _uuid.UUID(user.user_id)]
-    if getattr(user, "team_id", None):
-        pass  # team members may act on shared proposals
-
-    result = await db.execute(select(SetupProposal).where(*conditions))
+    # 1. Fetch proposal by ID
+    query = select(SetupProposal).where(SetupProposal.id == _uuid.UUID(str(proposal_id)))
+    result = await db.execute(query)
     proposal = result.scalar_one_or_none()
     if proposal is None:
         raise HTTPException(status_code=404, detail="Proposal not found.")
 
+    # 2. Multi-tenant boundary enforcement
+    is_owner = (str(proposal.user_id) == str(user.user_id))
+    is_same_team = bool(proposal.team_id and user.team_id and str(proposal.team_id) == str(user.team_id))
+    
+    # Org admin can only approve within their own organization
+    is_same_org_admin = False
+    if getattr(user, "organization_id", None) and (user.is_admin or user.org_role in ("ORG_ADMIN", "ADMIN")):
+        if proposal.team_id:
+            from suspensionlab.backend.database.models.team import Team
+            team_res = await db.execute(select(Team).where(Team.id == proposal.team_id))
+            p_team = team_res.scalar_one_or_none()
+            if p_team and str(p_team.organization_id) == str(user.organization_id):
+                is_same_org_admin = True
+    elif bool(user.is_admin and not getattr(user, "organization_id", None)):
+        is_same_org_admin = True
+
+    if not (is_owner or is_same_team or is_same_org_admin):
+        raise HTTPException(
+            status_code=403,
+            detail="Cross-tenant access forbidden: Cannot approve proposals from another organization or team."
+        )
+
+    # 3. Idempotency check: If already in requested status, return existing record
+    if proposal.status == status:
+        return {
+            "id": str(proposal.id),
+            "status": proposal.status,
+            "approved_by": str(proposal.approved_by_user_id) if proposal.approved_by_user_id else str(user.user_id),
+            "approved_role": proposal.approved_by_role or (user.team_role or user.org_role or "Admin").upper(),
+            "approved_at": proposal.approved_at.isoformat() if proposal.approved_at else None,
+            "proposal_hash": proposal.proposal_hash,
+            "approval_signature": proposal.approval_signature,
+            "idempotent": True,
+        }
+
+    import hmac as _hmac
+    import hashlib
+    from datetime import datetime, timezone
+    from suspensionlab.backend.security.jwt_utils import get_jwt_keys, JWT_ACTIVE_KEY
+    from suspensionlab.backend.security.audit import record_audit_event, canonical_hash
+
+    now_utc = datetime.now(timezone.utc)
+    actor_id = str(user.user_id)
+    actor_role = (user.team_role or user.org_role or "Admin").upper()
+
+    # Ensure proposal_hash is populated
+    if not proposal.proposal_hash:
+        prop_payload = {
+            "recommended_params": proposal.recommended_params,
+            "param_changes": proposal.param_changes,
+            "predicted_effects": proposal.predicted_effects,
+        }
+        proposal.proposal_hash = canonical_hash(prop_payload)
+
+    jwt_keys = get_jwt_keys()
+    active_key = jwt_keys.get(JWT_ACTIVE_KEY)
+    if not active_key:
+        raise HTTPException(
+            status_code=500,
+            detail="Active cryptographic key missing for digital twin sign-off.",
+        )
+    secret_key = active_key.encode("utf-8")
+    sig_msg = f"{proposal.id}:{actor_id}:{actor_role}:{status}:{proposal.proposal_hash}:{now_utc.isoformat()}".encode()
+    approval_sig = _hmac.new(secret_key, sig_msg, hashlib.sha256).hexdigest()
+
     proposal.status = status
+    proposal.approved_by_user_id = _uuid.UUID(actor_id)
+    proposal.approved_by_role = actor_role
+    proposal.approved_at = now_utc
+    proposal.approval_signature = approval_sig
+
+    # Emit tamper-evident Merkle audit log event
+    await record_audit_event(
+        db=db,
+        event_type=f"PROPOSAL_{status}",
+        user_id=actor_id,
+        team_id=str(user.team_id) if getattr(user, "team_id", None) else None,
+        metadata={
+            "proposal_id": str(proposal.id),
+            "twin_id": str(proposal.twin_id),
+            "status": status,
+            "role": actor_role,
+            "proposal_hash": proposal.proposal_hash,
+            "approval_signature": approval_sig,
+            "timestamp": now_utc.isoformat(),
+        }
+    )
+
     await db.commit()
-    return {"id": str(proposal.id), "status": proposal.status}
+    await db.refresh(proposal)
+
+    return {
+        "id": str(proposal.id),
+        "status": status,
+        "approved_by": actor_id,
+        "approved_role": actor_role,
+        "approved_at": now_utc.isoformat(),
+        "proposal_hash": proposal.proposal_hash,
+        "approval_signature": approval_sig,
+    }
+
+
+@router.get("/{twin_id}/operational-state")
+async def get_twin_operational_state_endpoint(
+    twin_id: str,
+    user: UserContext = Depends(require_permission(Permission.VEHICLE_READ)),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Answers: 'What does the virtual vehicle currently believe is happening to the real vehicle?' (Section 6 & 7).
+    Renders MEASURED, ESTIMATED, SIMULATED, RESIDUAL states, model health, and model divergence.
+    """
+    try:
+        twin = await digital_twin.get_twin(db, twin_id, user.user_id, getattr(user, "team_id", None))
+    except LookupError as exc:
+        raise _not_found(exc)
+
+    return await digital_twin.get_twin_operational_state(db, twin)
+
+
+class TrackLoopRequest(BaseModel):
+    session_id: str = Field(..., description="Track telemetry session ID, e.g. SESS-FP3-009")
+    telemetry_csv: str = Field(..., description="Raw CSV string from track telemetry")
+    proposal_id: Optional[str] = Field(None, description="Setup proposal ID being validated")
+
+
+@router.post("/{twin_id}/track-loop")
+async def execute_track_loop_endpoint(
+    twin_id: str,
+    req: TrackLoopRequest,
+    user: UserContext = Depends(require_permission(Permission.CALIBRATION_RUN)),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Executes Closed Track Loop (Section 16):
+    new telemetry → compare prediction → residual → model divergence → recalibrate if justified → update twin → record timeline event.
+    """
+    try:
+        twin = await digital_twin.get_twin(db, twin_id, user.user_id, getattr(user, "team_id", None))
+    except LookupError as exc:
+        raise _not_found(exc)
+
+    try:
+        report = await digital_twin.execute_track_loop_closure(
+            db=db,
+            twin=twin,
+            session_id=req.session_id,
+            telemetry_csv=req.telemetry_csv,
+            proposal_id=req.proposal_id,
+            user_id=str(user.user_id),
+            team_id=str(user.team_id) if getattr(user, "team_id", None) else None,
+        )
+        return report
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Track loop closure failed: {exc}")
+
+

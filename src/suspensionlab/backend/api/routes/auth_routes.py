@@ -24,12 +24,19 @@ from suspensionlab.backend.database.models.user_session import UserSession
 from suspensionlab.backend.core.redis_client import get_async_redis_conn
 from suspensionlab.shared.models import PlanTier
 
+from suspensionlab.backend.security.jwt_utils import TokenRevocationRegistry, is_jti_revoked
+from suspensionlab.backend.security.rate_limit import RateLimiter
+from suspensionlab.backend.security.permissions import Permission, get_role_permissions
+from suspensionlab.backend.config import settings
+
+
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 async def _blacklist_jti(payload: dict, reason: str = "logout"):
     jti = payload.get("jti")
     exp = payload.get("exp")
     if not jti or not exp: return
+    TokenRevocationRegistry.revoke_jti(jti)
     now = datetime.now(timezone.utc).timestamp()
     ttl = int(exp - now)
     if ttl > 0:
@@ -42,14 +49,7 @@ async def _blacklist_jti(payload: dict, reason: str = "logout"):
             pass  # Handle redis failure gracefully
 
 async def _is_revoked(jti: str) -> bool:
-    if not jti: return False
-    try:
-        async_redis = get_async_redis_conn()
-        if async_redis:
-            return await async_redis.get(f"revoked:{jti}") is not None
-        return False
-    except Exception:
-        return True
+    return await is_jti_revoked(jti)
 
 
 # ─── Schemas ─────────────────────────────────────────────────────────────────
@@ -62,13 +62,22 @@ class AuthResponse(BaseModel):
     name: str
     plan: str
     onboarding_complete: bool
+    is_trial: bool = False
+    trial_status: str | None = None
+    trial_expires_at: str | None = None
+    redirect_url: str = "/quarter-car"
 
 class RefreshRequest(BaseModel):
     refresh_token: str
 
-@router.post("/refresh")
-async def refresh_token_endpoint(request: Request, response: Response, req: RefreshRequest = None):
-    refresh_token = (req.refresh_token if req else None) or request.cookies.get("sl_refresh_token")
+@router.post("/refresh", dependencies=[Depends(RateLimiter("rate_limit_refresh"))])
+async def refresh_token_endpoint(
+    request: Request,
+    response: Response,
+    req: RefreshRequest = None,
+    db: AsyncSession = Depends(get_db_dependency)
+):
+    refresh_token = req.refresh_token if (req and req.refresh_token) else request.cookies.get("sl_refresh_token")
     if not refresh_token:
         raise HTTPException(status_code=401, detail="Refresh token missing.")
         
@@ -82,7 +91,6 @@ async def refresh_token_endpoint(request: Request, response: Response, req: Refr
     # Rotate: Blacklist old refresh token
     await _blacklist_jti(payload, reason="rotation")
     
-    db = request.state.db if hasattr(request.state, "db") else None
     if db:
         from sqlalchemy import delete
         await db.execute(delete(UserSession).where(UserSession.jti == payload.get("jti")))
@@ -116,16 +124,16 @@ async def refresh_token_endpoint(request: Request, response: Response, req: Refr
             device_type=device_type,
             expires_at=datetime.fromtimestamp(new_payload["exp"], tz=timezone.utc).replace(tzinfo=None)
         )
-        db = request.state.db if hasattr(request.state, "db") else None
         if db:
             db.add(session)
             await db.commit()
     
-    response.set_cookie(key="sl_token", value=new_access_token, httponly=True, samesite="strict", secure=True, path="/")
-    response.set_cookie(key="sl_refresh_token", value=new_refresh_token, httponly=True, samesite="strict", secure=True, path="/")
+    is_secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https" or (settings.environment == "PROD")
+    response.set_cookie(key="sl_token", value=new_access_token, httponly=True, samesite="lax", secure=is_secure, path="/")
+    response.set_cookie(key="sl_refresh_token", value=new_refresh_token, httponly=True, samesite="lax", secure=is_secure, path="/")
     
     csrf_token = secrets.token_urlsafe(32)
-    response.set_cookie(key="csrf_token", value=csrf_token, httponly=False, samesite="strict", secure=True, path="/")
+    response.set_cookie(key="csrf_token", value=csrf_token, httponly=False, samesite="lax", secure=is_secure, path="/")
     
     return {"token": new_access_token, "refresh_token": new_refresh_token}
 
@@ -158,7 +166,16 @@ class UserMeResponse(BaseModel):
     plan: str
     onboarding_complete: bool
     created_at: str
-    team_id: str | None
+    team_id: str | None = None
+    team_role: str | None = None
+    org_role: str | None = None
+    organization_id: str | None = None
+    is_admin: bool = False
+    is_trial: bool = False
+    trial_status: str | None = None
+    trial_expires_at: str | None = None
+    redirect_url: str = "/quarter-car"
+    permissions: list[str] = Field(default_factory=list)
 
 # /set-cookie and /clear-cookie are no longer needed as login/logout set headers natively
 @router.post("/clear-cookie")
@@ -193,7 +210,7 @@ class ResetPasswordRequest(BaseModel):
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
-@router.post("/forgot-password")
+@router.post("/forgot-password", dependencies=[Depends(RateLimiter("rate_limit_login"))])
 async def forgot_password(req: ForgotPasswordRequest, db: AsyncSession = Depends(get_db_dependency)):
     """Generate a signed, time-limited reset token and send via email."""
     # FIXED: Accept email in request body (not query param) to prevent PII leaking
@@ -240,7 +257,7 @@ async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(g
 
 # ─── Endpoints ────────────────────────────────────────────────────────────────
 
-@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(RateLimiter("rate_limit_login"))])
 async def register(request: Request, req: RegisterRequest, response: Response, db: AsyncSession = Depends(get_db_dependency)):
     """Create a new account. Free plan by default, 14-day Pro trial."""
     # Check duplicate email
@@ -264,9 +281,14 @@ async def register(request: Request, req: RegisterRequest, response: Response, d
         api_key=f"sk_{secrets.token_urlsafe(32)}",  # legacy single key
         onboarding_complete=False,
     )
+    from sqlalchemy.exc import IntegrityError
     db.add(user)
-    await db.commit()
-    await db.refresh(user)
+    try:
+        await db.commit()
+        await db.refresh(user)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="An account with this email already exists.")
 
     token = create_access_token({"sub": str(user.id), "email": user.email, "plan": user.plan})
     r_token = create_refresh_token({"sub": str(user.id), "email": user.email})
@@ -298,12 +320,13 @@ async def register(request: Request, req: RegisterRequest, response: Response, d
         db.add(session_obj)
         await db.commit()
     
-    response.set_cookie(key="sl_token", value=token, httponly=True, samesite="strict", secure=True, path="/")
-    response.set_cookie(key="sl_refresh_token", value=r_token, httponly=True, samesite="strict", secure=True, path="/")
-    response.set_cookie(key="sl_authed", value="true", httponly=False, samesite="strict", secure=True, path="/") # Helper for middleware
+    is_secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https" or (settings.environment == "PROD")
+    response.set_cookie(key="sl_token", value=token, httponly=True, samesite="lax", secure=is_secure, path="/")
+    response.set_cookie(key="sl_refresh_token", value=r_token, httponly=True, samesite="lax", secure=is_secure, path="/")
+    response.set_cookie(key="sl_authed", value="true", httponly=False, samesite="lax", secure=is_secure, path="/") # Helper for middleware
     
     csrf_token = secrets.token_urlsafe(32)
-    response.set_cookie(key="csrf_token", value=csrf_token, httponly=False, samesite="strict", secure=True, path="/")
+    response.set_cookie(key="csrf_token", value=csrf_token, httponly=False, samesite="lax", secure=is_secure, path="/")
     
     return AuthResponse(
         token=token,
@@ -316,7 +339,7 @@ async def register(request: Request, req: RegisterRequest, response: Response, d
     )
 
 
-@router.post("/login", response_model=AuthResponse)
+@router.post("/login", response_model=AuthResponse, dependencies=[Depends(RateLimiter("rate_limit_login"))])
 async def login(request: Request, req: LoginRequest, response: Response, db: AsyncSession = Depends(get_db_dependency)):
     """Authenticate with email + password, returns JWT."""
     from suspensionlab.backend.security.rate_limit import check_progressive_penalty, record_login_failure
@@ -386,13 +409,34 @@ async def login(request: Request, req: LoginRequest, response: Response, db: Asy
         db.add(session_obj)
         await db.commit()
     
-    response.set_cookie(key="sl_token", value=token, httponly=True, samesite="strict", secure=True, path="/")
-    response.set_cookie(key="sl_refresh_token", value=r_token, httponly=True, samesite="strict", secure=True, path="/")
-    response.set_cookie(key="sl_authed", value="true", httponly=False, samesite="strict", secure=True, path="/") # Helper for middleware
+    is_secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto") == "https" or (settings.environment == "PROD")
+    response.set_cookie(key="sl_token", value=token, httponly=True, samesite="lax", secure=is_secure, path="/")
+    response.set_cookie(key="sl_refresh_token", value=r_token, httponly=True, samesite="lax", secure=is_secure, path="/")
+    response.set_cookie(key="sl_authed", value="true", httponly=False, samesite="lax", secure=is_secure, path="/") # Helper for middleware
     
     csrf_token = secrets.token_urlsafe(32)
-    response.set_cookie(key="csrf_token", value=csrf_token, httponly=False, samesite="strict", secure=True, path="/")
-    
+    response.set_cookie(key="csrf_token", value=csrf_token, httponly=False, samesite="lax", secure=is_secure, path="/")
+
+    from suspensionlab.backend.database.models.trial import Trial
+    from sqlalchemy import or_
+    trial_res = await db.execute(
+        select(Trial).where(
+            or_(Trial.user_id == user.id, Trial.organization_id == user.organization_id),
+            Trial.deleted_at.is_(None)
+        )
+    )
+    user_trial = trial_res.scalar_one_or_none()
+    is_trial_user = bool(user_trial) or (user.plan == PlanTier.TRIAL.value)
+    target_redirect = "/evaluation" if is_trial_user else "/quarter-car"
+
+    t_status = None
+    t_expires = None
+    if user_trial:
+        if user_trial.is_expired():
+            user_trial.status = "EXPIRED"
+        t_status = user_trial.status
+        t_expires = user_trial.expires_at.isoformat() if user_trial.expires_at else None
+
     return AuthResponse(
         token=token,
         refresh_token=r_token,
@@ -401,10 +445,14 @@ async def login(request: Request, req: LoginRequest, response: Response, db: Asy
         name=u_name,
         plan=u_plan,
         onboarding_complete=u_onboarding,
+        is_trial=is_trial_user,
+        trial_status=t_status,
+        trial_expires_at=t_expires,
+        redirect_url=target_redirect,
     )
 
 
-@router.get("/me", response_model=UserMeResponse)
+@router.get("/me", response_model=UserMeResponse, dependencies=[Depends(RateLimiter("rate_limit_session"))])
 async def get_me(request: Request, db: AsyncSession = Depends(get_db_dependency)):
     """Get current user info from Bearer token or HttpOnly cookie."""
     from suspensionlab.backend.security.jwt_utils import decode_access_token
@@ -434,6 +482,35 @@ async def get_me(request: Request, db: AsyncSession = Depends(get_db_dependency)
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
 
+    perms = set()
+    if user.team_role:
+        perms.update(get_role_permissions(user.team_role))
+    if user.org_role:
+        perms.update(get_role_permissions(user.org_role))
+    if user.is_admin:
+        perms.update([p.value for p in Permission])
+    if not user.team_id and not user.organization_id and not user.team_role and not user.org_role:
+        perms.update(get_role_permissions("owner"))
+
+    from suspensionlab.backend.database.models.trial import Trial
+    from sqlalchemy import or_
+    trial_res = await db.execute(
+        select(Trial).where(
+            or_(Trial.user_id == user.id, Trial.organization_id == user.organization_id),
+            Trial.deleted_at.is_(None)
+        )
+    )
+    user_trial = trial_res.scalar_one_or_none()
+    is_trial_user = bool(user_trial) or (user.plan == PlanTier.TRIAL.value)
+    target_redirect = "/evaluation" if is_trial_user else "/quarter-car"
+    t_status = None
+    t_expires = None
+    if user_trial:
+        if user_trial.is_expired():
+            user_trial.status = "EXPIRED"
+        t_status = user_trial.status
+        t_expires = user_trial.expires_at.isoformat() if user_trial.expires_at else None
+
     return UserMeResponse(
         user_id=str(user.id),
         email=user.email,
@@ -442,7 +519,42 @@ async def get_me(request: Request, db: AsyncSession = Depends(get_db_dependency)
         onboarding_complete=user.onboarding_complete,
         created_at=user.created_at.isoformat() if user.created_at else "",
         team_id=str(user.team_id) if user.team_id else None,
+        team_role=user.team_role,
+        org_role=user.org_role,
+        organization_id=str(user.organization_id) if user.organization_id else None,
+        is_admin=False if is_trial_user else bool(user.is_admin),
+        is_trial=is_trial_user,
+        trial_status=t_status,
+        trial_expires_at=t_expires,
+        redirect_url=target_redirect,
+        permissions=sorted(list(perms)),
     )
+
+
+@router.get("/status", dependencies=[Depends(RateLimiter("rate_limit_session"))])
+async def get_auth_status(request: Request):
+    """Lightweight session/health validation endpoint."""
+    from suspensionlab.backend.security.jwt_utils import decode_access_token
+    auth_header = request.headers.get("Authorization", "")
+    token = None
+    if auth_header.startswith("Bearer "):
+        token = auth_header.removeprefix("Bearer ").strip()
+    else:
+        token = request.cookies.get("sl_token")
+
+    if not token:
+        return {"authenticated": False, "status": "unauthenticated"}
+    payload = decode_access_token(token)
+    if not payload:
+        return {"authenticated": False, "status": "expired"}
+    if await _is_revoked(payload.get("jti")):
+        return {"authenticated": False, "status": "revoked"}
+    return {
+        "authenticated": True,
+        "user_id": payload.get("sub"),
+        "status": "active",
+        "plan": payload.get("plan", "FREE"),
+    }
 
 
 @router.post("/onboard")
@@ -451,7 +563,10 @@ async def complete_onboarding(request: Request, db: AsyncSession = Depends(get_d
     from suspensionlab.backend.security.jwt_utils import decode_access_token
     auth_header = request.headers.get("Authorization", "")
     token = auth_header.removeprefix("Bearer ").strip()
-    payload = decode_access_token(token)
+    if not token:
+        token = request.cookies.get("sl_token", "").strip()
+
+    payload = decode_access_token(token) if token else None
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid token.")
 

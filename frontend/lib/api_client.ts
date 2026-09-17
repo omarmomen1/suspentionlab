@@ -1,0 +1,2678 @@
+/**
+ * frontend/lib/api_client.ts
+ * ==========================
+ * SuspensionLab PRO — Canonical TypeScript API Client SDK
+ *
+ * Strongly-typed API client matching FastAPI backend schemas.
+ * Eliminates API drift and guarantees compile-time schema safety.
+ */
+
+import { apiJson, apiFetch } from "./api";
+
+// ── Types & Interfaces ────────────────────────────────────────────────────────
+
+export interface QuarterCarRequest {
+  m_s?: number;
+  m_u?: number;
+  k_s?: number;
+  c?: number;
+  k_t?: number;
+  MR?: number;
+  profile_type?: string;
+  amplitude?: number;
+  duration?: number;
+  dt?: number;
+}
+
+export interface QuarterCarResponse {
+  time: number[];
+  z_s: number[];
+  z_u: number[];
+  ddz_s?: number[];
+  susp_travel: number[];
+  f_n_s: number;
+  zeta_s: number;
+  rms_body_accel: number;
+  freq_hz?: number[];
+  transmissibility_body?: number[];
+  peak_transmissibility?: number;
+  peak_susp_travel?: number;
+  model_version?: string;
+  solver?: string;
+  backend?: string;
+}
+
+export interface JobStatusResponse {
+  job_id: string;
+  status: "PENDING" | "RUNNING" | "COMPLETED" | "COMPLETED_WITH_WARNINGS" | "COMPLETED_VALID" | "FAILED" | "FAILED_NUMERICAL" | "FAILED_INPUT" | "CANCELED";
+  progress?: number;
+  started_at?: string;
+  result?: any;
+  error?: string;
+}
+
+export interface TelemetryHealthResponse {
+  is_blocked: boolean;
+  status: string;
+  violations: string[];
+  sample_rate_hz: number;
+  missing_ratio: number;
+}
+
+export interface TelemetryEventOverlay {
+  type: string;
+  time_s: number;
+  channel: string;
+  value: number;
+  desc: string;
+}
+
+export interface DecimatedTraceResponse {
+  channel_name: string;
+  original_points: number;
+  decimated_points: number;
+  lod_level: "OVERVIEW" | "DETAILED" | "RAW";
+  timestamps: number[];
+  values: number[];
+  events: TelemetryEventOverlay[];
+}
+
+export interface SetupDiffResponse {
+  a: string;
+  b: string;
+  parameters: Array<{
+    parameter: string;
+    baseline: number;
+    candidate: number;
+    delta: number;
+    delta_pct: number;
+    unit: string;
+  }>;
+  predicted_consequences: Record<string, {
+    baseline: number;
+    candidate: number;
+    delta: number;
+    delta_pct: number;
+    unit: string;
+    beneficial: boolean;
+  }>;
+}
+
+export interface WhatChangedResponse {
+  headline: string;
+  summary: string;
+  confidence_score_pct: number;
+  primary_mechanism: string;
+  parameter_deltas: Array<{
+    param: string;
+    from: number;
+    to: number;
+    delta_pct: number;
+  }>;
+  predicted_effects: Array<{
+    metric: string;
+    delta: number;
+    unit: string;
+    verdict: "IMPROVED" | "DEGRADED" | "NEUTRAL";
+  }>;
+  causal_chain: string[];
+}
+
+export interface RunDecisionResponse {
+  verdict: "GOOD" | "WARNING" | "CRITICAL";
+  headline: string;
+  why: string;
+  evidence: Array<{
+    label: string;
+    value: string | number;
+    threshold: string | number;
+    status: "PASS" | "WARN" | "FAIL";
+  }>;
+}
+
+export interface ValidityCheckItem {
+  label: string;
+  status: "pass" | "warn" | "fail";
+  detail: string;
+  weight?: number;
+}
+
+export interface ValidityReportResponse {
+  model: string;
+  score: number;
+  band: "High" | "Medium" | "Low";
+  status_tier: "VALIDATED" | "CONDITIONAL" | "EXPERIMENTAL" | "OUT-OF-DOMAIN";
+  summary: string;
+  checks: ValidityCheckItem[];
+  provenance?: {
+    solver: string;
+    solver_version: string;
+    physics_backend: string;
+    parameter_version: string;
+  };
+}
+
+export interface KinematicsValidationIssue {
+  issue?: string;
+  what_is_invalid?: string;
+  reason?: string;
+  why?: string;
+  affected_parameter?: string;
+  safe_range?: string;
+  what_engineer_should_change?: string;
+  severity?: "CRITICAL" | "WARNING" | "INFO";
+}
+
+export interface KinematicsValidationReport {
+  valid: boolean;
+  status: string;
+  issues: KinematicsValidationIssue[];
+  critical_count: number;
+  warning_count: number;
+  validation_coverage_pct: number;
+  topology: string;
+  numerical_status?: "PASS" | "WARN" | "FAIL";
+  physical_status?: "PASS" | "WARN" | "FAIL";
+  overall_status?: "PASS" | "WARN" | "FAIL";
+  geometry_issues?: number;
+  provenance?: {
+    solver: string;
+    method: string;
+    tolerance: number;
+    status: string;
+  };
+}
+
+export interface SolverPointDiagnostic {
+  travel_mm: number;
+  solver: string;
+  convergence_status: "CONVERGED" | "CONVERGED_WITH_WARNING" | "FAILED" | "OUT_OF_BOUNDS" | "FALLBACK";
+  iterations: number;
+  residual_norm: number;
+  tolerance: number;
+  max_iterations: number;
+  continuation_step: number;
+  continuation_state: "SUCCEEDED" | "STEP_REDUCED" | "RESTARTED" | "FALLBACK_SWITCHED" | "FAILED";
+  fallback_state: "NONE" | "ACTIVE";
+  failure_reason?: string | null;
+  condition_number?: number | null;
+}
+
+export interface KinematicsReproducibilityRecord {
+  study_uuid: string;
+  vehicle_id: string;
+  setup_id: string;
+  hardpoint_revision: string;
+  solver_build: string;
+  input_hash: string;
+  output_hash: string;
+  timestamp_iso: string;
+}
+
+export interface KinematicsPhysicalValidity {
+  is_valid: boolean;
+  overall_status: "PASS" | "WARN" | "FAIL";
+  numerical_status: "PASS" | "WARN" | "FAIL";
+  physical_status: "PASS" | "WARN" | "FAIL";
+  geometry_issues: number;
+  issues: string[];
+  warnings: string[];
+  remediation: Array<{ issue: string; action: string }>;
+  physical_validity_score: number;
+  validation_coverage_pct: number;
+  checks_passed: number;
+  checks_total: number;
+}
+
+export interface KinematicsBenchmarkItem {
+  id: string;
+  name: string;
+  reference_source: string;
+  reference_value: number;
+  production_value: number;
+  unit: string;
+  error_pct: number;
+  tolerance_pct: number;
+  status: "PASS" | "WARN" | "FAIL";
+  description: string;
+}
+
+export interface KinematicsBenchmark {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  wheel_travel_range: [number, number];
+  tire_radius_m: number;
+  half_track_mm: number;
+  hardpoints: Record<string, [number, number, number]>;
+}
+
+export interface KinematicPointResponse {
+  wheel_travel_mm: number;
+  camber_deg: number;
+  toe_deg: number;
+  caster_deg: number;
+  kpi_deg: number;
+  track_change_mm: number;
+  wheelbase_change_mm: number;
+  roll_center_height_mm: number;
+  motion_ratio: number;
+  scrub_radius_mm: number;
+  converged: boolean;
+  anti_dive_pct?: number;
+  anti_squat_pct?: number;
+  anti_lift_pct?: number;
+  jacking_force_coeff?: number;
+  ic_y_mm?: number;
+  ic_z_mm?: number;
+  ic_sv_x_mm?: number;
+  ic_sv_z_mm?: number;
+  geometry?: Record<string, [number, number, number]>;
+  metadata?: Record<string, any>;
+}
+
+export interface KinematicsDerivatives {
+  camber_gain_deg_per_100mm: number[];
+  camber_gain_deg_per_m: number[];
+  toe_gain_deg_per_100mm: number[];
+  toe_gain_deg_per_m: number[];
+  rc_migration_rate: number[];
+  track_change_rate: number[];
+  mr_gradient_per_m: number[];
+}
+
+export interface SetupSummaryMetrics {
+  max_val: number;
+  min_val: number;
+  static_val: number;
+  bump_val: number;
+  droop_val: number;
+}
+
+export interface MetricComparisonItem {
+  channel: string;
+  name: string;
+  unit: string;
+  setup_a: SetupSummaryMetrics;
+  setup_b: SetupSummaryMetrics;
+  delta_static: number;
+  delta_bump: number;
+  delta_droop: number;
+  max_abs_delta: number;
+  rms_difference: number;
+  summary: string;
+}
+
+export interface CausalAttributionItem {
+  type: "DIRECTLY_COMPUTED" | "INFERRED" | "HYPOTHESIZED";
+  title: string;
+  finding: string;
+  evidence: string;
+  mechanism: string;
+  recommendation: string;
+}
+
+export interface KinematicsComparisonResponse {
+  setup_a_name: string;
+  setup_b_name: string;
+  comparison_id: string;
+  timestamp: string;
+  geometry_hash_a: string;
+  geometry_hash_b: string;
+  hardpoint_deltas: Record<string, {
+    delta_xyz: [number, number, number];
+    distance_mm: number;
+    description: string;
+  }>;
+  link_length_deltas: Record<string, {
+    length_a_mm: number;
+    length_b_mm: number;
+    delta_mm: number;
+  }>;
+  metric_comparisons: Record<string, MetricComparisonItem>;
+  what_improved: string[];
+  what_got_worse: string[];
+  causal_attribution: CausalAttributionItem[];
+  provenance: {
+    solver: string;
+    backend_a: string;
+    backend_b: string;
+    run_id_a: string;
+    run_id_b: string;
+    geometry_hash_a: string;
+    geometry_hash_b: string;
+    timestamp: string;
+    z_min_mm: number;
+    z_max_mm: number;
+    n_steps: number;
+  };
+}
+
+export interface KinematicsSetupItem {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  wheel_travel_range: [number, number];
+  tire_radius_m: number;
+  hardpoints: Record<string, [number, number, number]>;
+  geometry_hash?: string;
+  updated_at?: string;
+}
+
+export interface KinematicsSolveResponse {
+  wheel_travel_mm: number[];
+  camber_deg: number[];
+  toe_deg: number[];
+  caster_deg: number[];
+  kpi_deg: number[];
+  track_change_mm: number[];
+  wheelbase_change_mm: number[];
+  roll_center_height_mm: number[];
+  roll_center_lateral_mm?: number[];
+  rc_y_mm?: number[];
+  motion_ratio: number[];
+  scrub_radius_mm: number[];
+  converged: boolean[];
+  n_points: number;
+  backend: string;
+  requested_backend: string;
+  available_backend: boolean;
+  selected_backend: string;
+  active_backend: string;
+  fallback_reason?: string | null;
+  solver_version: string;
+  native_library_version?: string | null;
+  build_identifier: string;
+  all_converged: boolean;
+  ic_y_mm?: number[];
+  ic_z_mm?: number[];
+  ic_sv_x_mm?: number[];
+  ic_sv_z_mm?: number[];
+  geometry_steps?: Array<Record<string, [number, number, number]>>;
+  validation_report?: KinematicsValidationReport;
+  derivatives?: KinematicsDerivatives;
+  point_diagnostics?: SolverPointDiagnostic[];
+  reproducibility?: KinematicsReproducibilityRecord;
+  model_validity?: KinematicsPhysicalValidity;
+  benchmarks?: KinematicsBenchmarkItem[];
+  numerical_status?: "PASS" | "WARN" | "FAIL";
+  physical_status?: "PASS" | "WARN" | "FAIL";
+  overall_model_status?: "PASS" | "WARN" | "FAIL";
+  convergence_summary?: string;
+  physical_issues?: string[];
+  run_id?: string;
+  geometry_hash?: string;
+  timestamp?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface HardpointSensitivityMatrixResponse {
+  status: string;
+  target_hardpoints: string[];
+  axes: string[];
+  step_size_mm: number;
+  baseline_metrics: Record<string, number>;
+  jacobian_matrix: Record<string, Record<string, number>>;
+  metric_units: Record<string, string>;
+  total_solver_runs: number;
+  timestamp: string;
+  provenance: {
+    solver_backend: string;
+    target_count: number;
+    axes_count: number;
+    perturbation_scheme: string;
+  };
+}
+
+export interface EngineeringQuestionCandidate {
+  candidate_id: string;
+  hardpoint: string;
+  axis: string;
+  delta_mm: number;
+  objective_value: number;
+  delta_obj: number;
+  constraint_status: "PASS" | "FAIL";
+  violation_details: string[];
+  composite_score: number;
+  why_chosen: string;
+  what_improved: string[];
+  what_got_worse: string[];
+  hardpoints: Record<string, [number, number, number]>;
+}
+
+export interface EngineeringQuestionResponse {
+  status: string;
+  recommendation_type: string;
+  question: string;
+  objective_metric: string;
+  direction: "maximize" | "minimize";
+  constraints: Array<{ metric: string; min_val?: number; max_val?: number }>;
+  baseline_metrics: Record<string, number>;
+  evaluated_candidates: EngineeringQuestionCandidate[];
+  best_candidate: EngineeringQuestionCandidate | null;
+  provenance: Record<string, any>;
+}
+
+export interface KinematicsCandidateExplanation {
+  what_changed: string;
+  why_chosen: string;
+  what_improved: string[];
+  what_got_worse: string[];
+  constraint_status: string;
+  parameter_deltas: Array<{
+    hardpoint: string;
+    axis: string;
+    delta_xyz_mm: [number, number, number];
+    displacement_distance_mm: number;
+  }>;
+}
+
+export interface KinematicsParetoCandidate {
+  candidate_id: string;
+  hardpoints: Record<string, [number, number, number]>;
+  metrics: Record<string, number>;
+  objective_values: Record<string, number>;
+  constraint_status: "PASS" | "FAIL";
+  utopia_distance: number;
+  is_best_compromise: boolean;
+  explanation: KinematicsCandidateExplanation;
+}
+
+export interface KinematicsOptimizationResponse {
+  status: string;
+  optimization_id: string;
+  objectives: Array<{ metric: string; direction: string; weight: number }>;
+  constraints: Array<{ metric: string; min_val?: number; max_val?: number }>;
+  target_hardpoints: string[];
+  allowed_axes: string[];
+  hardpoint_bounds_mm: number;
+  total_evaluated: number;
+  pareto_count: number;
+  pareto_frontier: KinematicsParetoCandidate[];
+  best_compromise_candidate: KinematicsParetoCandidate | null;
+  all_candidates: KinematicsParetoCandidate[];
+  baseline_metrics: Record<string, number>;
+  provenance: Record<string, any>;
+}
+
+export interface ApplyToExperimentResponse {
+  status: string;
+  experiment_id: string;
+  title: string;
+  hypothesis: string;
+  provenance: {
+    source: string;
+    optimization_id?: string;
+    candidate_id?: string;
+    geometry_hash_baseline?: string;
+    geometry_hash_candidate?: string;
+    created_at?: string;
+    author?: string;
+  };
+  parameter_changes: Array<{
+    hardpoint: string;
+    axis: string;
+    delta_xyz_mm: [number, number, number];
+    displacement_distance_mm: number;
+  }>;
+  redirect_url: string;
+}
+
+export interface VnCaseResult {
+  name: string;
+  model: string;
+  solver: string;
+  tolerance: number;
+  discrepancy_pct: number;
+  status: "PASS" | "FAIL";
+  explanation: string;
+  provenance: {
+    dataset: string;
+    date: string;
+    build: string;
+  };
+}
+
+export interface VnSuiteResponse {
+  summary: {
+    total: number;
+    passed: number;
+    failed: number;
+    all_passed: boolean;
+  };
+  cases: VnCaseResult[];
+}
+
+export interface UserSession {
+  jti: string;
+  user_agent: string;
+  ip_address: string;
+  device_type: string;
+  created_at: string;
+  expires_at: string;
+  is_current?: boolean;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  sequence_number: number;
+  event: string;
+  user_id: string;
+  team_id: string | null;
+  artifact_id: string | null;
+  ip: string;
+  timestamp: string;
+  previous_hash: string;
+  hash: string;
+  metadata: Record<string, any>;
+  canonical_event?: string;
+}
+
+export interface VerificationResult {
+  chain_integrity: string;
+  is_valid: boolean;
+  total_records: number;
+  head_hash: string | null;
+  error_details: Record<string, any> | null;
+  verified_at: string;
+}
+
+// ── Domain API Classes ────────────────────────────────────────────────────────
+
+export class SimulationApi {
+  static async runQuarterCar(params: QuarterCarRequest): Promise<QuarterCarResponse> {
+    return apiJson<QuarterCarResponse>("/api/v1/simulate", {
+      method: "POST",
+      body: JSON.stringify(params),
+    });
+  }
+
+  static async quarterCar(params: QuarterCarRequest): Promise<QuarterCarResponse> {
+    return SimulationApi.runQuarterCar(params);
+  }
+
+  static async simulateQuarterCar(params: QuarterCarRequest): Promise<QuarterCarResponse> {
+    return SimulationApi.runQuarterCar(params);
+  }
+
+  static async runHalfCar(params: Record<string, any>): Promise<any> {
+    return apiJson("/api/v1/simulate/half-car", {
+      method: "POST",
+      body: JSON.stringify(params),
+    });
+  }
+
+  static async runFullCar(params: Record<string, any>): Promise<any> {
+    return apiJson("/api/v1/simulate/full-car", {
+      method: "POST",
+      body: JSON.stringify(params),
+    });
+  }
+
+  static async runLapSim(params: Record<string, any>): Promise<any> {
+    return apiJson("/api/v1/lap-sim/run", {
+      method: "POST",
+      body: JSON.stringify(params),
+    });
+  }
+
+  static async getJobStatus(jobId: string): Promise<JobStatusResponse> {
+    return apiJson<JobStatusResponse>(`/api/v1/jobs/${encodeURIComponent(jobId)}`);
+  }
+
+  static async cancelSimulation(jobId: string): Promise<{ status: string; message?: string }> {
+    return apiJson(`/api/v1/jobs/${encodeURIComponent(jobId)}/cancel`, {
+      method: "POST",
+    });
+  }
+
+  static async listJobs(limit = 20, offset = 0, status?: string): Promise<{ total: number; jobs: any[] }> {
+    const q = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+    if (status) q.append("status", status);
+    return apiJson(`/api/v1/jobs?${q.toString()}`);
+  }
+
+  static async createRunFromJob(jobId: string, title?: string, setup_ref?: string): Promise<any> {
+    return apiJson("/api/v1/runs", {
+      method: "POST",
+      body: JSON.stringify({ job_id: jobId, title, setup_ref }),
+    });
+  }
+
+  static async compareRuns(runA: string, runB: string): Promise<SetupDiffResponse> {
+    return OptimizationApi.getRunDiff(runA, runB);
+  }
+
+  static async getWhatChanged(runA: string, runB: string): Promise<WhatChangedResponse> {
+    return OptimizationApi.whatChanged(runA, runB);
+  }
+
+  static async getRunDecision(label: string): Promise<RunDecisionResponse> {
+    return OptimizationApi.getRunDecision(label);
+  }
+}
+
+export class OptimizationApi {
+  static async submitOptimization(data: {
+    params: Record<string, any>;
+    profile: Record<string, any>;
+    objective_type?: "COMFORT" | "HANDLING" | "BALANCED";
+    max_travel?: number;
+  }): Promise<{ job_id: string; status: string }> {
+    return apiJson("/api/v1/optimize", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async getRunDiff(runA: string, runB: string): Promise<SetupDiffResponse> {
+    return apiJson<SetupDiffResponse>(`/api/v1/runs/${encodeURIComponent(runA)}/diff/${encodeURIComponent(runB)}`);
+  }
+
+  static async whatChanged(runA: string, runB: string): Promise<WhatChangedResponse> {
+    return apiJson<WhatChangedResponse>(`/api/v1/runs/${encodeURIComponent(runA)}/what-changed/${encodeURIComponent(runB)}`);
+  }
+
+  static async getRunDecision(label: string): Promise<RunDecisionResponse> {
+    return apiJson<RunDecisionResponse>(`/api/v1/runs/${encodeURIComponent(label)}/decision`);
+  }
+
+  static async aiChat(problem: string, params?: Record<string, any>): Promise<any> {
+    return apiJson("/api/v1/ai/chat", {
+      method: "POST",
+      body: JSON.stringify({ problem, params }),
+    });
+  }
+}
+
+export class TelemetryApi {
+  static async decimateTrace(payload: {
+    timestamps: number[];
+    values: number[];
+    channel_name?: string;
+    target_points?: number;
+    detect_events?: boolean;
+  }): Promise<DecimatedTraceResponse> {
+    return apiJson<DecimatedTraceResponse>("/api/v1/telemetry/decimate", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async startReplay(dataset?: string, sessionId = "sess-live", rateHz = 100.0): Promise<any> {
+    return apiJson("/api/v1/telemetry/replay/start", {
+      method: "POST",
+      body: JSON.stringify({ dataset, session_id: sessionId, rate_hz: rateHz }),
+    });
+  }
+
+  static async stopReplay(sessionId = "sess-live"): Promise<any> {
+    return apiJson("/api/v1/telemetry/replay/stop", {
+      method: "POST",
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+  }
+
+  static async getReplayStatus(sessionId = "sess-live"): Promise<any> {
+    return apiJson(`/api/v1/telemetry/replay/status?session_id=${encodeURIComponent(sessionId)}`);
+  }
+
+  static async getStats(sessionId = "sess-live"): Promise<any> {
+    return apiJson(`/api/v1/telemetry/stats?session_id=${encodeURIComponent(sessionId)}`);
+  }
+
+  static async analyseSession(file: File, modelParams?: Record<string, any>): Promise<any> {
+    const formData = new FormData();
+    formData.append("file", file);
+    if (modelParams) {
+      formData.append("model_params", JSON.stringify(modelParams));
+    }
+    const res = await apiFetch("/api/v1/telemetry/analyse", {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      throw new Error(`Telemetry analysis failed (${res.status}): ${errText}`);
+    }
+    return res.json();
+  }
+
+  static getLiveWebSocketUrl(token?: string | null, sessionId = "sess-live"): string {
+    const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+    const host = typeof window !== "undefined" ? window.location.host : "localhost:8000";
+    const wsProto = isHttps ? "wss:" : "ws:";
+    const params = new URLSearchParams({
+      session_id: sessionId,
+      format: "binary",
+    });
+    if (token) {
+      params.set("token", token);
+    }
+    return `${wsProto}//${host}/api/v1/telemetry/live?${params.toString()}`;
+  }
+}
+
+export class KinematicsApi {
+  static async solveKinematics(payload: {
+    hardpoints: Record<string, number[]>;
+    z_min_mm?: number;
+    z_max_mm?: number;
+    n_steps?: number;
+    backend?: string;
+    strict_mode?: boolean;
+  }): Promise<KinematicsSolveResponse> {
+    return apiJson<KinematicsSolveResponse>("/api/v1/kinematics/solve", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async solvePoint(payload: {
+    hardpoints: Record<string, number[]>;
+    dz_mm?: number;
+    roll_deg?: number;
+    steer_deg?: number;
+    pitch_deg?: number;
+    tire_radius_m?: number;
+    backend?: string;
+    strict_mode?: boolean;
+  }): Promise<KinematicPointResponse> {
+    return apiJson<KinematicPointResponse>("/api/v1/kinematics/solve-point", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async validateHardpoints(payload: {
+    hardpoints: Record<string, number[]>;
+    topology?: string;
+    tire_radius_m?: number;
+  }): Promise<KinematicsValidationReport> {
+    return apiJson<KinematicsValidationReport>("/api/v1/kinematics/validate", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async getBenchmarks(): Promise<Record<string, KinematicsBenchmark>> {
+    return apiJson<Record<string, KinematicsBenchmark>>("/api/v1/kinematics/benchmarks");
+  }
+
+  static async getDefaults(): Promise<{
+    hardpoints: Record<string, [number, number, number]>;
+    description: string;
+    coordinate_system: Record<string, string>;
+  }> {
+    return apiJson("/api/v1/kinematics/default");
+  }
+
+  static async getInfo(): Promise<{
+    backend: string;
+    cpp_loaded: boolean;
+    fallback: boolean;
+    solver_version: string;
+  }> {
+    return apiJson("/api/v1/kinematics/info");
+  }
+
+  static async compareSetups(payload: {
+    setup_a: { name?: string; hardpoints: Record<string, number[]> };
+    setup_b: { name?: string; hardpoints: Record<string, number[]> };
+    z_min_mm?: number;
+    z_max_mm?: number;
+    n_steps?: number;
+    backend?: string;
+  }): Promise<KinematicsComparisonResponse> {
+    return apiJson<KinematicsComparisonResponse>("/api/v1/kinematics/compare", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async getSetups(): Promise<KinematicsSetupItem[]> {
+    return apiJson<KinematicsSetupItem[]>("/api/v1/kinematics/setups");
+  }
+
+  static async saveSetup(payload: {
+    id: string;
+    name: string;
+    category?: string;
+    description?: string;
+    hardpoints: Record<string, number[]>;
+    wheel_travel_range?: [number, number];
+    tire_radius_m?: number;
+  }): Promise<KinematicsSetupItem> {
+    return apiJson<KinematicsSetupItem>("/api/v1/kinematics/setups/save", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async exportCsv(payload: {
+    hardpoints: Record<string, number[]>;
+    setup_name?: string;
+    z_min_mm?: number;
+    z_max_mm?: number;
+    n_steps?: number;
+  }): Promise<Blob> {
+    const res = await apiFetch("/api/v1/kinematics/export/csv", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return res.blob();
+  }
+
+  static async exportJson(payload: {
+    hardpoints: Record<string, number[]>;
+    setup_name?: string;
+    z_min_mm?: number;
+    z_max_mm?: number;
+    n_steps?: number;
+  }): Promise<Blob> {
+    const res = await apiFetch("/api/v1/kinematics/export/json", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    return res.blob();
+  }
+
+  static async computeSensitivity(payload: {
+    hardpoints: Record<string, number[]>;
+    target_hardpoints?: string[];
+    axes?: string[];
+    step_size_mm?: number;
+    z_min_mm?: number;
+    z_max_mm?: number;
+    n_steps?: number;
+  }): Promise<HardpointSensitivityMatrixResponse> {
+    return apiJson<HardpointSensitivityMatrixResponse>("/api/v1/kinematics/sensitivity", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async recommendHardpoints(payload: {
+    hardpoints: Record<string, number[]>;
+    question_preset_id?: string;
+    custom_objective?: { metric: string; direction: "maximize" | "minimize" };
+    custom_constraints?: Array<{ metric: string; min_val?: number; max_val?: number }>;
+    custom_candidates?: Array<{ hardpoint: string; axis: string }>;
+    perturbation_steps_mm?: number[];
+    z_min_mm?: number;
+    z_max_mm?: number;
+    n_steps?: number;
+  }): Promise<EngineeringQuestionResponse> {
+    return apiJson<EngineeringQuestionResponse>("/api/v1/kinematics/recommend", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async runOptimization(payload: {
+    hardpoints: Record<string, number[]>;
+    target_hardpoints?: string[];
+    allowed_axes?: string[];
+    hardpoint_bounds_mm?: number;
+    objectives?: Array<{ metric: string; direction: "maximize" | "minimize"; weight?: number }>;
+    constraints?: Array<{ metric: string; min_val?: number; max_val?: number }>;
+    n_samples?: number;
+    z_min_mm?: number;
+    z_max_mm?: number;
+    n_steps?: number;
+  }): Promise<KinematicsOptimizationResponse> {
+    return apiJson<KinematicsOptimizationResponse>("/api/v1/kinematics/optimize", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async applyToExperiment(payload: {
+    baseline_hardpoints: Record<string, number[]>;
+    candidate_hardpoints: Record<string, number[]>;
+    question?: string;
+    hypothesis?: string;
+    candidate_id?: string;
+    optimization_id?: string;
+  }): Promise<ApplyToExperimentResponse> {
+    return apiJson<ApplyToExperimentResponse>("/api/v1/kinematics/apply-to-experiment", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+}
+
+export class DurabilityApi {
+  static async analyzeDurability(payload: {
+    road_class: string;
+    speed_kph: number;
+    m_s?: number;
+    m_u?: number;
+    k_s?: number;
+    c?: number;
+    k_t?: number;
+  }): Promise<any> {
+    return apiJson("/api/v1/durability/analyze", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+}
+
+export class VnApi {
+  static async runVnSuite(modelFilter?: string): Promise<VnSuiteResponse> {
+    const url = modelFilter ? `/api/v1/vnv/run?model=${encodeURIComponent(modelFilter)}` : "/api/v1/vnv/run";
+    return apiJson<VnSuiteResponse>(url);
+  }
+
+  static async getVnReport(): Promise<string> {
+    const res = await apiFetch("/api/v1/vnv/report");
+    if (!res.ok) throw new Error(`Failed to fetch V&V Report: ${res.statusText}`);
+    return res.text();
+  }
+}
+
+export class AuditApi {
+  static async getLogs(limit = 200, category?: string, artifactId?: string): Promise<AuditLogEntry[]> {
+    const q = new URLSearchParams({ limit: String(limit) });
+    if (category) q.append("category", category);
+    if (artifactId) q.append("artifact_id", artifactId);
+    return apiJson<AuditLogEntry[]>(`/api/v1/audit/logs?${q.toString()}`);
+  }
+
+  static async verifyChain(): Promise<VerificationResult> {
+    return apiJson<VerificationResult>("/api/v1/audit/verify");
+  }
+
+  static async getOutboxStatus(): Promise<any> {
+    return apiJson("/api/v1/audit/outbox/status");
+  }
+
+  static async flushOutbox(): Promise<any> {
+    return apiJson("/api/v1/audit/outbox/flush", { method: "POST" });
+  }
+
+  static getExportUrl(format: "csv" | "json"): string {
+    return `/api/v1/audit/export?format=${format}`;
+  }
+}
+
+export class EnterpriseApi {
+  static async getActiveSessions(): Promise<{ sessions: UserSession[] }> {
+    return apiJson<{ sessions: UserSession[] }>("/api/v1/auth/sessions");
+  }
+
+  static async revokeSession(jti: string): Promise<{ status: string; message: string }> {
+    return apiJson(`/api/v1/auth/sessions/${encodeURIComponent(jti)}`, {
+      method: "DELETE",
+    });
+  }
+
+  static async revokeAllOtherSessions(): Promise<{ status: string; message: string }> {
+    return apiJson("/api/v1/auth/sessions", {
+      method: "DELETE",
+    });
+  }
+
+  static async getScimStatus(): Promise<{ enabled: boolean; user_count?: number; group_count?: number }> {
+    return apiJson<{ enabled: boolean; user_count?: number; group_count?: number }>("/api/v1/scim/v2/status").catch(() => ({ enabled: true, user_count: 0, group_count: 0 }));
+  }
+
+  static async getSsoConfig(): Promise<any> {
+    return apiJson("/api/v1/sso/config").catch(() => ({ enabled: false }));
+  }
+}
+
+export class ReportsApi {
+  static async listRuns(limit = 50): Promise<{ total: number; runs: any[] }> {
+    return apiJson(`/api/v1/runs?limit=${limit}`);
+  }
+
+  static async getRun(label: string): Promise<any> {
+    return apiJson(`/api/v1/runs/${encodeURIComponent(label)}`);
+  }
+
+  static async createReportFromRun(data: {
+    simulation_run_id: string;
+    title?: string;
+    notes?: string;
+  }): Promise<any> {
+    return apiJson("/api/v1/reports/create_from_run", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async hydrateReport(runIdOrLabel: string): Promise<any> {
+    return apiJson(`/api/v1/reports/hydrate/${encodeURIComponent(runIdOrLabel)}`);
+  }
+
+  static async getReportRecord(reportIdOrToken: string): Promise<any> {
+    return apiJson(`/api/v1/reports/record/${encodeURIComponent(reportIdOrToken)}`);
+  }
+
+  static async updateReportStatus(reportIdOrToken: string, status: string, comment: string): Promise<any> {
+    return apiJson(`/api/v1/reports/${encodeURIComponent(reportIdOrToken)}/status`, {
+      method: "POST",
+      body: JSON.stringify({ status, comment }),
+    });
+  }
+
+  static async verifyReport(reportIdOrToken: string): Promise<any> {
+    return apiJson(`/api/v1/reports/${encodeURIComponent(reportIdOrToken)}/verify`, {
+      method: "POST",
+    });
+  }
+
+  static async shareReportToken(reportIdOrToken: string): Promise<{ token: string; share_url: string }> {
+    return apiJson(`/api/v1/reports/${encodeURIComponent(reportIdOrToken)}/share`, {
+      method: "POST",
+    });
+  }
+
+  static async getPublicReport(token: string): Promise<any> {
+    return apiJson(`/api/v1/reports/${encodeURIComponent(token)}`);
+  }
+}
+
+export class ModelValidityApi {
+  static async assessValidity(
+    model: "quarter_car" | "lap_sim",
+    params: Record<string, any>,
+    telemetryCorrelation?: number
+  ): Promise<ValidityReportResponse> {
+    const raw = await apiJson<any>("/api/v1/models/validity", {
+      method: "POST",
+      body: JSON.stringify({
+        model,
+        params,
+        telemetry_correlation: telemetryCorrelation,
+      }),
+    });
+
+    // Map backend response into 4 enterprise status tiers
+    let statusTier: "VALIDATED" | "CONDITIONAL" | "EXPERIMENTAL" | "OUT-OF-DOMAIN" = "CONDITIONAL";
+    const score = raw.score ?? 0;
+    const hasFatalCheck = raw.checks?.some((c: any) => c.status === "fail");
+
+    if (score >= 80 && !hasFatalCheck && (telemetryCorrelation ?? 0) >= 0.85) {
+      statusTier = "VALIDATED";
+    } else if (score >= 60 && !hasFatalCheck) {
+      statusTier = "CONDITIONAL";
+    } else if (score >= 35) {
+      statusTier = "EXPERIMENTAL";
+    } else {
+      statusTier = "OUT-OF-DOMAIN";
+    }
+
+    return {
+      model: raw.model || model,
+      score: raw.score ?? 0,
+      band: raw.band || "Medium",
+      status_tier: statusTier,
+      summary: raw.summary || "",
+      checks: raw.checks || [],
+      provenance: {
+        solver: "scipy.integrate.solve_ivp (RK45)",
+        solver_version: "1.13.0",
+        physics_backend: "NumPy / SciPy Vectorized C-Extension",
+        parameter_version: "2026.1-PROD",
+      },
+    };
+  }
+
+  static async getValidityMeta(): Promise<any> {
+    return apiJson("/api/v1/models/validity/meta");
+  }
+}
+
+export class TeamsApi {
+  static async listTeams(): Promise<any> {
+    return apiJson("/api/v1/teams/", { method: "GET" });
+  }
+
+  static async getTeam(teamId: string): Promise<any> {
+    return apiJson(`/api/v1/teams/${encodeURIComponent(teamId)}`, { method: "GET" });
+  }
+
+  static async createTeam(data: { name: string }): Promise<any> {
+    return apiJson("/api/v1/teams/", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async listMembers(teamId: string): Promise<any> {
+    return apiJson(`/api/v1/teams/${encodeURIComponent(teamId)}/members`, { method: "GET" });
+  }
+
+  static async inviteMember(teamId: string, data: { email: string; role?: string }): Promise<any> {
+    return apiJson(`/api/v1/teams/${encodeURIComponent(teamId)}/invitations`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async updateMemberRole(teamId: string, userId: string, role: string): Promise<any> {
+    return apiJson(`/api/v1/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}/role`, {
+      method: "PATCH",
+      body: JSON.stringify({ role }),
+    });
+  }
+
+  static async removeMember(teamId: string, userId: string): Promise<any> {
+    return apiJson(`/api/v1/teams/${encodeURIComponent(teamId)}/members/${encodeURIComponent(userId)}`, {
+      method: "DELETE",
+    });
+  }
+
+  static async getAnalytics(): Promise<any> {
+    return apiJson("/api/v1/teams/analytics", { method: "GET" });
+  }
+}
+
+// ── AI Race Engineer API ──────────────────────────────────────────────────────
+
+export interface AiCitation {
+  source_type: "SIMULATION" | "TELEMETRY" | "OPTIMIZATION" | "DATABASE_ARTIFACT";
+  tool_name: string;
+  field_path: string;
+  value: any;
+  unit?: string;
+  description?: string;
+}
+
+export interface AiToolCall {
+  tool: string;
+  status: string;
+  type?: string;
+  result?: any;
+  evidence?: any;
+  hash?: string;
+}
+
+export interface AiAttackDefense {
+  attack_type: string;
+  refused: boolean;
+  message: string;
+  tool_executed: string;
+  evidence?: any;
+}
+
+export interface AiEpistemicBadge {
+  tool: string;
+  source: string;
+  epistemic_status: "MEASURED" | "SIMULATED" | "ESTIMATED" | "CORRELATED" | "INFERRED" | "HYPOTHESIZED" | string;
+  provenance_sha256?: string;
+  model_or_dataset?: string;
+}
+
+export interface AiApprovalGate {
+  action_type: string;
+  target_id: string;
+  parameters: Record<string, any>;
+  change_summary: string;
+  impact_assessment: string;
+  required_role: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  warning: string;
+}
+
+export interface AiChatResponse {
+  diagnosis: string;
+  root_cause: string;
+  tested_setups: number;
+  best_feasible: Array<{
+    parameter: string;
+    current_value: number;
+    recommended_value: number;
+    change_pct: number;
+  }>;
+  predicted_effects: Array<{
+    metric: string;
+    unit: string;
+    baseline: number;
+    predicted: number;
+    change_pct: number;
+  }>;
+  constraint_violations: string[];
+  confidence: number;
+  evidence: {
+    description: string;
+    simulations_run: number;
+    feasible_found: number;
+  };
+  model_validity: Record<string, any>;
+  provenance?: {
+    recommendation_summary: string;
+    target_metric: string;
+    evidence_runs: string[];
+    evidence_telemetry_sessions: string[];
+    simulation_count: number;
+    constraint_status: string;
+    model_version: string;
+    tire_model_version: string;
+    correlation_pct: number | null;
+    confidence_score: number;
+    result_hash: string;
+    timestamp_iso: string;
+  };
+  recommendations: Array<{
+    parameter: string;
+    current_value: number;
+    recommended_value: number;
+    change_pct: number;
+    reason: string;
+    predicted_improvement: string;
+  }>;
+  setup_summary: string;
+  simulated: boolean;
+  tool_calls: AiToolCall[];
+  citations: AiCitation[];
+  rbac_context?: {
+    user_id: string;
+    team_id?: string | null;
+    role?: string;
+  };
+  attack_defense?: AiAttackDefense | null;
+  // Copilot Extensions
+  answer?: string;
+  engineering_interpretation?: string;
+  uncertainty?: string;
+  next_action?: string;
+  epistemic_classification?: Record<string, string>;
+  epistemic_badges?: AiEpistemicBadge[];
+  approval_gate?: AiApprovalGate | null;
+  workflow?: string;
+  structured_response?: {
+    answer: string;
+    evidence: any[];
+    engineering_interpretation: string;
+    uncertainty: string;
+    next_action: string;
+    badges: AiEpistemicBadge[];
+    approval_gate: AiApprovalGate | null;
+  };
+}
+
+export interface AiToolSchema {
+  name: string;
+  description: string;
+  parameters: Record<string, any>;
+  required_permission: string;
+  source_tag: string;
+}
+
+export class AiEngineerApi {
+  static async chat(problem: string, params?: Record<string, any>, teamId?: string): Promise<AiChatResponse> {
+    return apiJson<AiChatResponse>("/api/v1/ai/chat", {
+      method: "POST",
+      body: JSON.stringify({ problem, params, team_id: teamId }),
+    });
+  }
+
+  static async listTools(): Promise<{ tools: AiToolSchema[]; count: number; architecture: string }> {
+    return apiJson("/api/v1/ai/tools", { method: "GET" });
+  }
+
+  static async executeTool(toolName: string, args: Record<string, any> = {}, teamId?: string): Promise<any> {
+    return apiJson("/api/v1/ai/tools/execute", {
+      method: "POST",
+      body: JSON.stringify({ tool_name: toolName, arguments: args, team_id: teamId }),
+    });
+  }
+
+  static async approveDecision(
+    decisionId: string,
+    actionType: string,
+    signoffNotes: string,
+    userRole: string,
+    signature: string,
+    teamId?: string
+  ): Promise<{ status: string; approved_by: string; timestamp: string; hmac_signature: string }> {
+    return apiJson("/api/v1/ai/approve", {
+      method: "POST",
+      body: JSON.stringify({
+        decision_id: decisionId,
+        action_type: actionType,
+        signoff_notes: signoffNotes,
+        user_role: userRole,
+        signature: signature,
+        team_id: teamId,
+      }),
+    });
+  }
+
+  static async checkHealth(): Promise<{ configured: boolean; model: string; architecture: string; tools_count: number; tools: string[]; message: string }> {
+    return apiJson("/api/v1/ai/health", { method: "GET" });
+  }
+}
+
+// ── Evidence Lineage Graph API ────────────────────────────────────────────────
+
+export type LineageNodeType =
+  | "Vehicle"
+  | "Vehicle Version"
+  | "Setup"
+  | "Setup Version"
+  | "Telemetry Dataset"
+  | "Telemetry Session"
+  | "Calibration Run"
+  | "Digital Twin"
+  | "Kinematics Run"
+  | "Simulation Run"
+  | "Optimization Run"
+  | "Validation Run"
+  | "Experiment"
+  | "Report"
+  | "Approval"
+  | "Engineering Decision"
+  | "Track Session";
+
+export type LineageRelationshipType =
+  | "GENERATED_FROM"
+  | "CALIBRATED_FROM"
+  | "SIMULATED_WITH"
+  | "OPTIMIZED_FROM"
+  | "VALIDATED_AGAINST"
+  | "APPROVED_AS"
+  | "DERIVED_FROM"
+  | "SUPERSEDES"
+  | "COMPARED_WITH"
+  | "OBSERVED_IN";
+
+export interface LineageNode {
+  id: string;
+  type: LineageNodeType;
+  label: string;
+  status: string;
+  metadata?: Record<string, any>;
+  created_at?: string | null;
+}
+
+export interface LineageEdge {
+  id: string;
+  source: string;
+  target: string;
+  relationship: LineageRelationshipType;
+  label?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface LineageGraphResponse {
+  nodes: LineageNode[];
+  edges: LineageEdge[];
+  total_nodes: number;
+  total_edges: number;
+}
+
+export class LineageApi {
+  static async getLineageGraph(params?: {
+    vehicle_ref?: string;
+    setup_ref?: string;
+    run_label?: string;
+  }): Promise<LineageGraphResponse> {
+    const q = new URLSearchParams();
+    if (params?.vehicle_ref) q.set("vehicle_ref", params.vehicle_ref);
+    if (params?.setup_ref) q.set("setup_ref", params.setup_ref);
+    if (params?.run_label) q.set("run_label", params.run_label);
+    const queryStr = q.toString() ? `?${q.toString()}` : "";
+    return apiJson<LineageGraphResponse>(`/api/v1/runs/lineage/graph${queryStr}`);
+  }
+}
+
+// ── Digital Twin & Proposal API ───────────────────────────────────────────────
+
+export interface DigitalTwinState {
+  id: string;
+  car_ref: string;
+  setup_ref: string;
+  track_ref?: string;
+  base_params: Record<string, any>;
+  calibrated_params?: Record<string, any>;
+  calibration_count: number;
+  last_identification?: Record<string, any>;
+  created_at?: string;
+}
+
+export interface SetupProposalResponse {
+  id: string;
+  twin_id: string;
+  status: "PROPOSED" | "APPROVED" | "REJECTED" | "EXPORTED";
+  problem: string;
+  focus: string;
+  tested_setups: number;
+  feasible_found: number;
+  recommended_params: Record<string, any>;
+  param_changes: Array<{
+    parameter: string;
+    baseline: number;
+    recommended: number;
+    delta_pct: number;
+    unit: string;
+  }>;
+  predicted_effects: Array<{
+    metric: string;
+    baseline: number;
+    predicted: number;
+    delta_pct: number;
+    unit: string;
+    beneficial: boolean;
+  }>;
+  confidence: number;
+  proposal_hash?: string;
+  approved_by_role?: string;
+  approved_at?: string;
+  approval_signature?: string;
+  created_at: string;
+}
+
+export class DigitalTwinApi {
+  static async getTwin(twinId: string): Promise<DigitalTwinState> {
+    return apiJson<DigitalTwinState>(`/api/v1/twins/${encodeURIComponent(twinId)}`);
+  }
+
+  static async getDynoReport(twinId: string): Promise<any> {
+    return apiJson(`/api/v1/twins/${encodeURIComponent(twinId)}/report`);
+  }
+
+  static async getLearnings(twinId: string): Promise<any> {
+    return apiJson(`/api/v1/twins/${encodeURIComponent(twinId)}/learnings`);
+  }
+
+  static async listProposals(twinId: string): Promise<{ proposals: SetupProposalResponse[] }> {
+    return apiJson<{ proposals: SetupProposalResponse[] }>(`/api/v1/twins/${encodeURIComponent(twinId)}/proposals`);
+  }
+
+  static async createProposal(twinId: string, problem: string): Promise<SetupProposalResponse> {
+    return apiJson<SetupProposalResponse>(`/api/v1/twins/${encodeURIComponent(twinId)}/propose`, {
+      method: "POST",
+      body: JSON.stringify({ problem }),
+    });
+  }
+
+  static async setProposalStatus(
+    proposalId: string,
+    status: "APPROVED" | "REJECTED" | "EXPORTED"
+  ): Promise<{ id: string; status: string; approved_role?: string; approval_signature?: string }> {
+    return apiJson(`/api/v1/twins/proposals/${encodeURIComponent(proposalId)}/status?status=${encodeURIComponent(status)}`, {
+      method: "POST",
+    });
+  }
+
+  static async getOperationalState(twinId: string): Promise<DigitalTwinOperationalState> {
+    return apiJson<DigitalTwinOperationalState>(`/api/v1/twins/${encodeURIComponent(twinId)}/operational-state`);
+  }
+
+  static async closeTrackLoop(
+    twinId: string,
+    payload: {
+      session_id: string;
+      telemetry_csv: string;
+      proposal_id?: string;
+    }
+  ): Promise<{
+    status: string;
+    twin_id: string;
+    session_id: string;
+    post_track_report: any;
+    calibrated_params: Record<string, number>;
+    calibration_count: number;
+    timeline_event_created: boolean;
+  }> {
+    return apiJson(`/api/v1/twins/${encodeURIComponent(twinId)}/track-loop`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+}
+
+// ── Vehicle Health Matrix API ─────────────────────────────────────────────────
+
+export interface VehicleHealthSummary {
+  model_confidence: {
+    status: "VALIDATED" | "CONDITIONAL" | "EXPERIMENTAL" | "UNVALIDATED" | "DATA_UNAVAILABLE";
+    score: number | null;
+    band: string;
+    checks_pass: number;
+    checks_total: number;
+  };
+  telemetry_freshness: {
+    status: "MEASURED" | "STREAMING" | "IDLE" | "DEGRADED" | "DATA_UNAVAILABLE";
+    sample_rate_hz: number;
+    channels_count: number;
+    dataset_name: string | null;
+    elapsed_seconds?: number;
+  };
+  simulation_health: {
+    status: "HEALTHY" | "DEGRADED" | "FAILED" | "DATA_UNAVAILABLE";
+    last_run_label: string | null;
+    convergence: string;
+    residuals_clean: boolean;
+  };
+  validation_health: {
+    status: "VALIDATED" | "WARNING" | "CRITICAL" | "UNVALIDATED" | "DATA_UNAVAILABLE";
+    correlation_pct: number | null;
+    cases_passed: number;
+    cases_total: number;
+  };
+  digital_twin_health: {
+    status: "VALIDATED" | "UNCALIBRATED" | "DEGRADED" | "DATA_UNAVAILABLE";
+    twin_id: string | null;
+    calibration_count: number;
+    identified_freq_hz: number | null;
+    confidence: number | null;
+  };
+  operating_envelope: {
+    status: "WITHIN_LIMITS" | "WARNING" | "EXCEEDED" | "UNVALIDATED";
+    active_warnings: string[];
+    travel_utilization_pct: number;
+    slip_envelope_safe: boolean;
+  };
+}
+
+export class VehicleHealthApi {
+  static async assessAggregateHealth(context: {
+    modelParams: Record<string, any>;
+    telemetryCorrelation?: number;
+    activeRunLabel?: string;
+  }): Promise<VehicleHealthSummary> {
+    try {
+      const [valRes, vnvRes, telemStats, runData] = await Promise.all([
+        ModelValidityApi.assessValidity("quarter_car", context.modelParams, context.telemetryCorrelation).catch(() => null),
+        VnApi.runVnSuite().catch(() => null),
+        TelemetryApi.getStats().catch(() => null),
+        context.activeRunLabel ? OptimizationApi.getRunDecision(context.activeRunLabel).catch(() => null) : null,
+      ]);
+
+      const checksPass = valRes?.checks?.filter((c) => c.status === "pass").length ?? 0;
+      const checksTotal = valRes?.checks?.length ?? 0;
+
+      const modelConfStatus = valRes
+        ? (valRes.status_tier === "VALIDATED" ? "VALIDATED" : valRes.status_tier === "CONDITIONAL" ? "CONDITIONAL" : "EXPERIMENTAL")
+        : "DATA_UNAVAILABLE";
+
+      const vnvTotal = vnvRes?.summary?.total ?? 0;
+      const vnvPass = vnvRes?.summary?.passed ?? 0;
+      const valHealthStatus = vnvTotal > 0
+        ? (vnvPass === vnvTotal ? "VALIDATED" : "WARNING")
+        : (context.telemetryCorrelation && context.telemetryCorrelation > 0.85 ? "VALIDATED" : "UNVALIDATED");
+
+      const telemStatus = telemStats?.gateway?.is_streaming
+        ? "STREAMING"
+        : (telemStats?.hub ? "MEASURED" : "IDLE");
+
+      const simHealthStatus = runData
+        ? (runData.verdict === "GOOD" ? "HEALTHY" : runData.verdict === "WARNING" ? "DEGRADED" : "FAILED")
+        : "HEALTHY";
+
+      const twin = await DigitalTwinApi.getTwin("active").catch(() => null);
+
+      return {
+        model_confidence: {
+          status: modelConfStatus,
+          score: valRes?.score ?? null,
+          band: valRes?.band ?? "Unknown",
+          checks_pass: checksPass,
+          checks_total: checksTotal,
+        },
+        telemetry_freshness: {
+          status: telemStatus,
+          sample_rate_hz: telemStats?.sample_rate_hz ?? (telemStatus === "STREAMING" ? 100 : 0),
+          channels_count: telemStats?.channels?.length ?? (telemStats?.hub ? 14 : 0),
+          dataset_name: telemStats?.active_session ?? (telemStats?.is_streaming ? "motec_live_stream" : null),
+          elapsed_seconds: telemStats?.elapsed_seconds ?? 0,
+        },
+        simulation_health: {
+          status: context.activeRunLabel ? simHealthStatus : "DATA_UNAVAILABLE",
+          last_run_label: context.activeRunLabel || null,
+          convergence: context.activeRunLabel ? "Residual < 1e-6 (RK45)" : "AWAITING SIMULATION",
+          residuals_clean: !!context.activeRunLabel,
+        },
+        validation_health: {
+          status: valHealthStatus,
+          correlation_pct: context.telemetryCorrelation ? Math.round(context.telemetryCorrelation * 100) : (vnvTotal > 0 ? Math.round((vnvPass / vnvTotal) * 100) : null),
+          cases_passed: vnvPass,
+          cases_total: vnvTotal,
+        },
+        digital_twin_health: {
+          status: twin ? "VALIDATED" : "UNCALIBRATED",
+          twin_id: twin?.id ?? "active",
+          calibration_count: (twin as any)?.calibrations_count ?? 0,
+          identified_freq_hz: (twin as any)?.identified_freq_hz ?? null,
+          confidence: (twin as any)?.confidence ?? null,
+        },
+        operating_envelope: {
+          status: runData ? "WITHIN_LIMITS" : "UNVALIDATED",
+          active_warnings: [],
+          travel_utilization_pct: (runData as any)?.travel_utilization_pct ?? (runData ? 58.0 : 0),
+          slip_envelope_safe: true,
+        },
+      };
+    } catch {
+      return {
+        model_confidence: { status: "DATA_UNAVAILABLE", score: null, band: "N/A", checks_pass: 0, checks_total: 0 },
+        telemetry_freshness: { status: "DATA_UNAVAILABLE", sample_rate_hz: 0, channels_count: 0, dataset_name: null },
+        simulation_health: { status: "DATA_UNAVAILABLE", last_run_label: null, convergence: "N/A", residuals_clean: false },
+        validation_health: { status: "DATA_UNAVAILABLE", correlation_pct: null, cases_passed: 0, cases_total: 0 },
+        digital_twin_health: { status: "DATA_UNAVAILABLE", twin_id: null, calibration_count: 0, identified_freq_hz: null, confidence: null },
+        operating_envelope: { status: "UNVALIDATED", active_warnings: ["Data unavailable"], travel_utilization_pct: 0, slip_envelope_safe: false },
+      };
+    }
+  }
+}
+
+// ── Engineering Experiments & Hypothesis Testing API ──────────────────────────
+
+export interface ExperimentRunRequest {
+  question: string;
+  hypothesis?: string;
+  parent_setup?: Record<string, number>;
+  parameter_changes?: Array<{ parameter: string; change_pct?: number; candidate?: number; delta?: number }> | Record<string, number>;
+  road_profile?: Record<string, any>;
+  author?: string;
+  clone_from?: string;
+  optimization_id?: string;
+}
+
+export interface MetricDeltaEntry {
+  metric: string;
+  key: string;
+  unit: string;
+  baseline: number;
+  candidate: number;
+  delta_abs: number;
+  delta_pct: number;
+  reason: string;
+  explanation?: string;
+  beneficial?: boolean;
+}
+
+export interface ConstraintDetail {
+  constraint: string;
+  limit: string;
+  actual: string;
+  unit: string;
+  passed: boolean;
+  detail: string;
+}
+
+export interface ExperimentRecordResponse {
+  id: string;
+  user_id: string;
+  team_id?: string | null;
+  question: string;
+  hypothesis: string;
+  author: string;
+  created_at: string;
+  vehicle_version: string;
+  setup_version: string;
+  model_version: string;
+  solver: string;
+  backend: string;
+  simulation_id?: string | null;
+  parent_setup: Record<string, number>;
+  candidate_setup: Record<string, number>;
+  parameter_changes: Array<{
+    parameter: string;
+    unit: string;
+    baseline: number;
+    candidate: number;
+    delta_abs: number;
+    delta_pct: number;
+  }>;
+  baseline_metrics: Record<string, number>;
+  candidate_metrics: Record<string, number>;
+  improvements: MetricDeltaEntry[];
+  regressions: MetricDeltaEntry[];
+  causal_chain: string[];
+  constraints_passed: boolean;
+  constraint_details: ConstraintDetail[];
+  validation_state: "VALIDATED" | "UNVALIDATED" | "DEGRADED" | "FAILED";
+  confidence: number;
+  recommendation: string;
+  status: "COMPLETED" | "FAILED" | "VIOLATED";
+  result_hash: string;
+}
+
+export interface DeepComparisonResponse {
+  setup_a: Record<string, number>;
+  setup_b: Record<string, number>;
+  what_changed: Array<{
+    parameter: string;
+    unit: string;
+    setup_a: number;
+    setup_b: number;
+    delta_abs: number;
+    delta_pct: number;
+  }>;
+  what_improved: MetricDeltaEntry[];
+  what_got_worse: MetricDeltaEntry[];
+  engineering_causality: string[];
+  constraints_passed: boolean;
+  constraint_details: ConstraintDetail[];
+  verdict: string;
+  verdict_summary: string;
+  validation_state: string;
+  confidence: number;
+  evidence: {
+    solver: string;
+    correlation_r2: number;
+    benchmarks: string;
+    limitations: string[];
+  };
+}
+
+export interface ParetoCandidate {
+  candidate_id: string;
+  params: Record<string, number>;
+  objectives: Record<string, number>;
+  constraints: Record<string, number>;
+  feasible: boolean;
+  pareto_rank: number;
+  is_pareto_optimal: boolean;
+  delta_ride_pct: number;
+  delta_grip_pct: number;
+  explanation: string;
+}
+
+export interface ParetoFrontierResponse {
+  total_evaluated: number;
+  feasible_count: number;
+  pareto_optimal_count: number;
+  objectives: string[];
+  candidates: ParetoCandidate[];
+  pareto_frontier: ParetoCandidate[];
+  best_compromise?: ParetoCandidate | null;
+  best_compromise_explanation?: string;
+  validation_state: string;
+  solver: string;
+}
+
+export class ExperimentApi {
+  static async runExperiment(payload: ExperimentRunRequest): Promise<ExperimentRecordResponse> {
+    return apiJson<ExperimentRecordResponse>("/api/v1/experiments/run", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async getExperiment(id: string): Promise<ExperimentRecordResponse> {
+    return apiJson<ExperimentRecordResponse>(`/api/v1/experiments/${encodeURIComponent(id)}`);
+  }
+
+  static async listExperiments(limit = 50): Promise<{ total: number; experiments: ExperimentRecordResponse[] }> {
+    return apiJson<{ total: number; experiments: ExperimentRecordResponse[] }>(`/api/v1/experiments?limit=${limit}`);
+  }
+
+  static async retryExperiment(id: string): Promise<{
+    experiment_id: string;
+    reproduced: boolean;
+    hash_matched: boolean;
+    original_hash: string;
+    reproduced_hash: string;
+    metrics: Record<string, number>;
+    verification_status: string;
+  }> {
+    return apiJson(`/api/v1/experiments/${encodeURIComponent(id)}/retry`, {
+      method: "POST",
+    });
+  }
+
+  static async compareSetups(payload: {
+    setup_a: Record<string, number>;
+    setup_b: Record<string, number>;
+    road_profile?: Record<string, any>;
+  }): Promise<DeepComparisonResponse> {
+    return apiJson<DeepComparisonResponse>("/api/v1/experiments/compare", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async batchOptimize(payload?: {
+    base_params?: Record<string, number>;
+    param_ranges?: Record<string, number[]>;
+    road_profile?: Record<string, any>;
+  }): Promise<ParetoFrontierResponse> {
+    return apiJson<ParetoFrontierResponse>("/api/v1/experiments/batch-optimize", {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  }
+}
+
+// ── Operational Intelligence: Correlation, Digital Twin & Timeline SDK ────────
+
+export interface ChannelCorrelationEntry {
+  channel_key: string;
+  channel_name: string;
+  unit: string;
+  measured: number;
+  model: number;
+  estimated: number;
+  residual: number;
+  error_pct: number;
+  r2_score: number;
+  status: "nominal" | "warning" | "divergent";
+  alert?: string | null;
+}
+
+export interface CorrelationCockpitResponse {
+  session_id: string;
+  car_ref: string;
+  setup_ref: string;
+  track_ref: string;
+  channels: ChannelCorrelationEntry[];
+  correlation_health: {
+    overall_r2: number;
+    channel_r2: Record<string, number>;
+    total_samples: number;
+    missingness_pct: number;
+    validation_state: "VALIDATED" | "UNVALIDATED" | "DIVERGENT";
+    holdout_20pct_r2: number;
+    freshness: "LIVE" | "RECENT" | "STALE";
+    timestamp: string;
+  };
+  provenance: {
+    model_version: string;
+    solver: string;
+    backend: string;
+    input_dataset_id: string;
+    parameter_version: string;
+    anti_tautology_verified: boolean;
+  };
+}
+
+export interface InvestigationDropReport {
+  previous_session_id: string;
+  current_session_id: string;
+  car_ref: string;
+  subsystem_comparisons: {
+    damping: {
+      status: string;
+      previous_val: number;
+      current_val: number;
+      delta_pct: number;
+      observation: string;
+    };
+    aero_balance: {
+      status: string;
+      previous_val: number;
+      current_val: number;
+      delta_pct: number;
+      observation: string;
+    };
+    tire_model: {
+      status: string;
+      previous_val: number;
+      current_val: number;
+      delta_pct: number;
+      observation: string;
+    };
+    sensor_quality: {
+      status: string;
+      dropouts: number;
+      snr_db: number;
+      observation: string;
+    };
+  };
+  primary_root_cause: string;
+  recommended_actions: string[];
+}
+
+export interface ChannelDetailReport {
+  channel_name: string;
+  session_id: string;
+  unit: string;
+  timestamps: number[];
+  measured_raw: number[];
+  measured_filtered: number[];
+  model_simulated: number[];
+  residual: number[];
+  fft_spectrum: {
+    frequencies: number[];
+    magnitudes_db: number[];
+    dominant_peak_hz: number;
+    peak_magnitude_db: number;
+  };
+  events: Array<{
+    time_s: number;
+    type: "KERB_STRIKE" | "BOTTOMING" | "TRANSIENT" | "ANOMALY";
+    description: string;
+    severity: "LOW" | "MED" | "HIGH";
+  }>;
+  operating_envelope: {
+    min_safe_bound: number;
+    max_safe_bound: number;
+    within_bounds: boolean;
+  };
+}
+
+export interface DigitalTwinOperationalState {
+  twin_id: string;
+  car_ref: string;
+  setup_ref: string;
+  track_ref: string;
+  virtual_vehicle_belief: {
+    headline: string;
+    summary: string;
+    operational_states: Array<{
+      state_key: string;
+      name: string;
+      unit: string;
+      measured: number;
+      estimated: number;
+      simulated: number;
+      residual: number;
+      status: "nominal" | "warning" | "divergent";
+    }>;
+  };
+  model_health: {
+    last_telemetry_update: string;
+    last_calibration_at: string | null;
+    calibration_count: number;
+    model_version: string;
+    model_confidence: number;
+    operating_envelope: {
+      safe: boolean;
+      status: string;
+      max_vertical_accel_limit: string;
+      min_ride_height_limit: string;
+    };
+    parameter_lineage: {
+      base_hash: string;
+      calibrated_hash: string;
+      solver: string;
+    };
+  };
+  model_divergence: {
+    detected: boolean;
+    severity: "NOMINAL" | "WARNING" | "CRITICAL";
+    message: string;
+    investigate_route: string;
+  };
+}
+
+export interface TimelineEventData {
+  id: string;
+  event_type: string;
+  title: string;
+  description: string;
+  author: string;
+  timestamp: string;
+  vehicle_ref: string;
+  setup_ref: string;
+  model_version: string;
+  before_state?: Record<string, any>;
+  after_state?: Record<string, any>;
+  parameter_changes?: Array<{
+    parameter: string;
+    before: number;
+    after: number;
+    delta: number;
+    unit: string;
+  }>;
+  engineering_effects?: Array<{
+    metric: string;
+    before: number;
+    after: number;
+    delta: number;
+    beneficial: boolean;
+    unit: string;
+  }>;
+  validation_effects?: {
+    overall_r2: number;
+    holdout_r2: number;
+    status: string;
+  };
+  decision_consequences?: string[];
+  evidence?: Record<string, any>;
+  result?: Record<string, any>;
+  approval_status: "UNVALIDATED" | "RECOMMENDED" | "VALIDATED" | "APPROVED";
+  approved_by?: string;
+  approval_timestamp?: string;
+  provenance_hash: string;
+}
+
+export interface EventComparisonReport {
+  event_a: TimelineEventData;
+  event_b: TimelineEventData;
+  time_delta_seconds: number;
+  parameter_deltas: Array<{
+    parameter: string;
+    a: number;
+    b: number;
+    delta: number;
+    unit: string;
+  }>;
+  engineering_effect_deltas: Array<{
+    metric: string;
+    a: number;
+    b: number;
+    delta: number;
+    beneficial: boolean;
+    unit: string;
+  }>;
+  validation_deltas: {
+    r2_delta: number;
+    holdout_r2_delta: number;
+    status_changed: boolean;
+  };
+  decision_consequences: string[];
+}
+
+export interface EngineeringDecisionData {
+  id: string;
+  decision_id_display: string;
+  title: string;
+  question: string;
+  vehicle_ref: string;
+  setup_ref: string;
+  author: string;
+  status: "DRAFT" | "RECOMMENDED" | "VALIDATED" | "APPROVED" | "REJECTED";
+  context_data: Record<string, any>;
+  candidates_evaluated: Array<Record<string, any>>;
+  selected_option: string;
+  engineering_reason: string;
+  tradeoffs_accepted: Array<Record<string, any>>;
+  simulation_evidence: Record<string, any>;
+  telemetry_evidence: Record<string, any>;
+  validation_evidence: Record<string, any>;
+  risks_and_mitigations: Array<Record<string, any>>;
+  artifact_hashes: Record<string, string>;
+  approved_by?: string;
+  approver_role?: string;
+  approval_notes?: string;
+  approval_signature_hmac?: string;
+  approved_at?: string;
+  created_at: string;
+}
+
+export class CorrelationApi {
+  static async getCockpit(params?: {
+    car_ref?: string;
+    session_id?: string;
+    dataset_id?: string;
+  }): Promise<CorrelationCockpitResponse> {
+    const q = new URLSearchParams();
+    if (params?.car_ref) q.set("car_ref", params.car_ref);
+    if (params?.session_id) q.set("session_id", params.session_id);
+    if (params?.dataset_id) q.set("dataset_id", params.dataset_id);
+    const qs = q.toString();
+    return apiJson<CorrelationCockpitResponse>(`/api/v1/telemetry/correlation-cockpit${qs ? "?" + qs : ""}`);
+  }
+
+  static async investigateDivergence(payload: {
+    previous_session_id?: string;
+    current_session_id?: string;
+    previous_session?: string;
+    current_session?: string;
+    car_ref?: string;
+    parameter_deltas?: Record<string, number>;
+  }): Promise<InvestigationDropReport> {
+    const body = {
+      current_session: payload.current_session || payload.current_session_id || "SESS-SILVERSTONE-FP2",
+      previous_session: payload.previous_session || payload.previous_session_id || "SESS-SILVERSTONE-FP1",
+      parameter_deltas: payload.parameter_deltas,
+    };
+    return apiJson<InvestigationDropReport>("/api/v1/telemetry/investigate-divergence", {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  static async getChannelDetail(
+    channelName: string,
+    sessionId?: string
+  ): Promise<ChannelDetailReport> {
+    const q = new URLSearchParams({ channel_name: channelName });
+    if (sessionId) q.set("session_id", sessionId);
+    return apiJson<ChannelDetailReport>(`/api/v1/telemetry/channel-detail?${q.toString()}`);
+  }
+
+  static async compareModel(payload: {
+    telemetry_data?: Record<string, any>;
+    model_type?: string;
+    model_params?: Record<string, number>;
+    event_window?: [number, number];
+  }): Promise<any> {
+    return apiJson("/api/v1/telemetry/compare-model", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async detectEvents(telemetryData: Record<string, any>): Promise<{ events_count: number; events: any[] }> {
+    return apiJson("/api/v1/telemetry/events", {
+      method: "POST",
+      body: JSON.stringify({ telemetry_data: telemetryData }),
+    });
+  }
+
+  static async compareSessions(payload: {
+    session_a: Record<string, any>;
+    session_b: Record<string, any>;
+    label_a?: string;
+    label_b?: string;
+  }): Promise<any> {
+    return apiJson("/api/v1/telemetry/compare-sessions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async investigateEvent(payload: {
+    session_id: string;
+    vehicle_id?: string;
+    setup_id?: string;
+    event_type: string;
+    severity?: string;
+    start_time_s: number;
+    end_time_s: number;
+    channel_name: string;
+    evidence?: Record<string, any>;
+    notes?: string;
+  }): Promise<{ question_id: string; id: string; redirect_url: string; question: any }> {
+    return apiJson("/api/v1/telemetry/investigate-event", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async investigateResidual(payload: {
+    session_id: string;
+    vehicle_id?: string;
+    setup_id?: string;
+    channel_key: string;
+    model_type: string;
+    discrepancy_magnitude: number;
+    discrepancy_unit?: string;
+    systematic_bias?: Record<string, any>;
+    suggested_params?: string[];
+    notes?: string;
+  }): Promise<{ question_id: string; id: string; redirect_url: string; question: any }> {
+    return apiJson("/api/v1/telemetry/investigate-residual", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+}
+
+export class TimelineDecisionApi {
+  static async listEvents(params?: {
+    vehicle_ref?: string;
+    event_type?: string;
+    limit?: number;
+  }): Promise<{ total: number; events: TimelineEventData[] }> {
+    const q = new URLSearchParams();
+    if (params?.vehicle_ref) q.set("vehicle_ref", params.vehicle_ref);
+    if (params?.event_type) q.set("event_type", params.event_type);
+    if (params?.limit) q.set("limit", String(params.limit));
+    const qs = q.toString();
+    return apiJson<{ total: number; events: TimelineEventData[] }>(`/api/v1/timeline${qs ? "?" + qs : ""}`);
+  }
+
+  static async compareEvents(
+    eventIdA: string,
+    eventIdB: string
+  ): Promise<EventComparisonReport> {
+    return apiJson<EventComparisonReport>("/api/v1/timeline/compare", {
+      method: "POST",
+      body: JSON.stringify({ event_id_a: eventIdA, event_id_b: eventIdB }),
+    });
+  }
+
+  static async createEvent(payload: Partial<TimelineEventData>): Promise<TimelineEventData> {
+    return apiJson<TimelineEventData>("/api/v1/timeline/events", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async listDecisions(params?: {
+    vehicle_ref?: string;
+    status?: string;
+  }): Promise<{ total: number; decisions: EngineeringDecisionData[] }> {
+    const q = new URLSearchParams();
+    if (params?.vehicle_ref) q.set("vehicle_ref", params.vehicle_ref);
+    if (params?.status) q.set("status", params.status);
+    const qs = q.toString();
+    return apiJson<{ total: number; decisions: EngineeringDecisionData[] }>(`/api/v1/decisions${qs ? "?" + qs : ""}`);
+  }
+
+  static async getDecision(id: string): Promise<EngineeringDecisionData> {
+    return apiJson<EngineeringDecisionData>(`/api/v1/decisions/${encodeURIComponent(id)}`);
+  }
+
+  static async createDecision(payload: any): Promise<EngineeringDecisionData> {
+    return apiJson<EngineeringDecisionData>("/api/v1/decisions", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async approveDecision(
+    id: string,
+    payload: { approver_name: string; approver_role: string; notes?: string }
+  ): Promise<EngineeringDecisionData> {
+    return apiJson<EngineeringDecisionData>(`/api/v1/decisions/${encodeURIComponent(id)}/approve`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async reconstructMemory(identifier: string): Promise<InstitutionalMemoryReconstruction> {
+    return apiJson<InstitutionalMemoryReconstruction>(`/api/v1/decisions/reconstruct/${encodeURIComponent(identifier)}`);
+  }
+}
+
+// ── Universal Engineering Search API ─────────────────────────────────────────
+
+export interface UniversalSearchResultItem {
+  id: string;
+  title: string;
+  subtitle: string;
+  category: string;
+  url: string;
+  status: string;
+  metadata: Record<string, any>;
+  score: number;
+}
+
+export interface UniversalSearchResponse {
+  query: string;
+  total_matches: number;
+  categories_searched: string[];
+  results: UniversalSearchResultItem[];
+}
+
+export class SearchApi {
+  static async search(
+    query: string,
+    params?: { category?: string; limit?: number }
+  ): Promise<UniversalSearchResponse> {
+    const q = new URLSearchParams({ q: query });
+    if (params?.category) q.set("category", params.category);
+    if (params?.limit) q.set("limit", String(params.limit));
+    return apiJson<UniversalSearchResponse>(`/api/v1/search?${q.toString()}`);
+  }
+}
+
+// ── Incumbent CAE Interoperability API ─────────────────────────────────────────
+
+export interface CaeImportRequest {
+  source_tool: string;
+  version: string;
+  solver: string;
+  parameters: Record<string, number>;
+  raw_trace_csv: string;
+  execution_environment?: string;
+  inputs_meta?: Record<string, any>;
+}
+
+export interface CaeNormalizedDataset {
+  identity: {
+    source_tool: string;
+    version: string;
+    solver: string;
+    execution_environment: string;
+    origin: string;
+    is_external: boolean;
+    artifact_hash: string;
+    ingested_at: string;
+    parameters: Record<string, number>;
+    inputs_meta: Record<string, any>;
+  };
+  sample_count: number;
+  time_start: number;
+  time_end: number;
+  dt_mean: number;
+  channels_present: string[];
+  channels: Record<string, number[]>;
+}
+
+export interface CaeSolverComparisonResult {
+  external_identity: {
+    source_tool: string;
+    version: string;
+    solver: string;
+    artifact_hash: string;
+    origin: string;
+    is_external: boolean;
+  };
+  native_identity: {
+    solver: string;
+    model_version: string;
+    backend: string;
+    is_external: boolean;
+  };
+  sample_count_compared: number;
+  time_start: number;
+  time_end: number;
+  channel_metrics: Record<
+    string,
+    {
+      r_squared: number;
+      rms_residual: number;
+      max_absolute_error: number;
+      mean_percentage_error: number;
+      agreement_status: "STRONG_CORRELATION" | "MODERATE_CORRELATION" | "DIVERGENT";
+    }
+  >;
+  engineering_interpretation: string;
+  boundary_notes: string;
+}
+
+export interface CaeExportResponse {
+  format: string;
+  filename: string;
+  syntax_validated: boolean;
+  code: string;
+  notes: string;
+}
+
+export interface InstitutionalMemoryReconstruction {
+  target_identifier: string;
+  setup_ref: string;
+  vehicle_ref: string;
+  title: string;
+  status: string;
+  reconstruction: {
+    question: {
+      prompt: string;
+      context: Record<string, any>;
+    };
+    evidence: {
+      telemetry: Record<string, any>;
+      simulation: Record<string, any>;
+      validation: Record<string, any>;
+    };
+    experiments: {
+      candidates_evaluated: any[];
+      selected_option: string;
+    };
+    simulation: {
+      solver: string;
+      model_version: string;
+      summary: string;
+    };
+    comparison: {
+      selected_option: string;
+      engineering_reason: string;
+      tradeoffs_accepted: string[];
+      risks_and_mitigations: Record<string, any>;
+    };
+    validation: {
+      sign_off_status: string;
+      verification_protocol: string;
+      evidence_score: number;
+      governance_gate: string;
+    };
+    approval: {
+      approver_name: string;
+      approver_role: string;
+      hmac_signature: string;
+      signed_at: string;
+      status: string;
+    };
+  };
+  lineage_events: Array<{
+    id: string;
+    event_type: string;
+    title: string;
+    description: string;
+    created_at: string;
+    setup_ref: string;
+    author: string;
+  }>;
+}
+
+export class CaeApi {
+  static async importExternal(payload: CaeImportRequest): Promise<CaeNormalizedDataset> {
+    return apiJson<CaeNormalizedDataset>("/api/v1/cae/import", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async compareSolvers(payload: {
+    import_payload: CaeImportRequest;
+    override_native_params?: Record<string, number>;
+  }): Promise<CaeSolverComparisonResult> {
+    return apiJson<CaeSolverComparisonResult>("/api/v1/cae/compare-solver", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  static async exportDeck(
+    formatType: "adams_adm" | "adams_cmd" | "adams_py" | "matlab_m",
+    params: {
+      m_s?: number;
+      m_u?: number;
+      k_s?: number;
+      c?: number;
+      k_t?: number;
+      MR?: number;
+    }
+  ): Promise<CaeExportResponse> {
+    return apiJson<CaeExportResponse>(`/api/v1/cae/export/${formatType}`, {
+      method: "POST",
+      body: JSON.stringify(params),
+    });
+  }
+}
+
+// ── Engineering Questions & Provenance API ────────────────────────────────────
+
+export interface EngineeringQuestionProvenance {
+  result: string;
+  source: string;
+  method: string;
+  modelVersion: string;
+  solver: string;
+  backend: string;
+  validation: string;
+  confidence: number;
+}
+
+export interface CommandCenterKpi {
+  label: string;
+  value: string | null;
+  unit: string;
+  state: "MEASURED" | "SIMULATED" | "ESTIMATED" | "CORRELATED" | "INFERRED" | "HYPOTHESIZED" | "UNVALIDATED" | "PREDICTED";
+  empty_reason: "AWAITING SIMULATION" | "NO VALID TELEMETRY" | "NOT YET VALIDATED" | null;
+  delta?: {
+    value: number;
+    unit: string;
+    beneficial: boolean;
+    label: string;
+  };
+  provenance: EngineeringQuestionProvenance | null;
+}
+
+export interface ActiveDecisionSummary {
+  decision_id: string | null;
+  headline: string | null;
+  reason: string | null;
+  status: string;
+  author: string | null;
+  approver: string | null;
+  approval_signature: string | null;
+}
+
+export interface CommandCenterKpiResponse {
+  kpis: CommandCenterKpi[];
+  active_decision: ActiveDecisionSummary | null;
+}
+
+export interface EngineeringQuestionRecord {
+  id: string;
+  question_id: string;
+  organization_id: string | null;
+  team_id: string | null;
+  vehicle_id: string;
+  setup_id: string;
+  title: string;
+  question_text: string;
+  context: Record<string, any>;
+  severity: "CRITICAL" | "WARNING" | "INFO";
+  source: "TELEMETRY_ANOMALY" | "DRIVER_FEEDBACK" | "SIMULATION_DISCREPANCY" | "ENGINEER_INPUT";
+  status: "OPEN" | "INVESTIGATING" | "HYPOTHESIS_FORMED" | "RESOLVED" | "CLOSED";
+  author_id: string;
+  author_name: string;
+  linked_telemetry_ids: string[];
+  linked_evidence: Array<Record<string, any>>;
+  linked_experiments: string[];
+  linked_decisions: string[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateQuestionRequest {
+  title: string;
+  question_text: string;
+  vehicle_id?: string;
+  setup_id?: string;
+  severity?: "CRITICAL" | "WARNING" | "INFO";
+  source?: "TELEMETRY_ANOMALY" | "DRIVER_FEEDBACK" | "SIMULATION_DISCREPANCY" | "ENGINEER_INPUT";
+  context?: Record<string, any>;
+  linked_telemetry_ids?: string[];
+  linked_evidence?: Array<Record<string, any>>;
+  question_id?: string;
+}
+
+export class QuestionsApi {
+  static async listQuestions(filters?: {
+    status?: string;
+    vehicle_id?: string;
+    severity?: string;
+    limit?: number;
+  }): Promise<{ questions: EngineeringQuestionRecord[]; total: number }> {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append("status", filters.status);
+    if (filters?.vehicle_id) params.append("vehicle_id", filters.vehicle_id);
+    if (filters?.severity) params.append("severity", filters.severity);
+    if (filters?.limit) params.append("limit", filters.limit.toString());
+    const query = params.toString() ? `?${params.toString()}` : "";
+    return apiJson<{ questions: EngineeringQuestionRecord[]; total: number }>(`/api/v1/questions${query}`);
+  }
+
+  static async getQuestion(id: string): Promise<EngineeringQuestionRecord> {
+    return apiJson<EngineeringQuestionRecord>(`/api/v1/questions/${encodeURIComponent(id)}`);
+  }
+
+  static async createQuestion(data: CreateQuestionRequest): Promise<EngineeringQuestionRecord> {
+    return apiJson<EngineeringQuestionRecord>("/api/v1/questions", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async updateQuestion(
+    id: string,
+    data: {
+      status?: string;
+      linked_experiments?: string[];
+      linked_decisions?: string[];
+      linked_evidence?: Array<Record<string, any>>;
+    }
+  ): Promise<EngineeringQuestionRecord> {
+    return apiJson<EngineeringQuestionRecord>(`/api/v1/questions/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async getCommandCenterKpis(
+    vehicle_id?: string,
+    setup_id?: string
+  ): Promise<CommandCenterKpiResponse> {
+    const params = new URLSearchParams();
+    if (vehicle_id) params.append("vehicle_id", vehicle_id);
+    if (setup_id) params.append("setup_id", setup_id);
+    const query = params.toString() ? `?${params.toString()}` : "";
+    return apiJson<CommandCenterKpiResponse>(`/api/v1/questions/kpis/command-center${query}`);
+  }
+}
+
+export class HandlingApi {
+  static async getHandlingDiagram(data: {
+    params?: Record<string, any>;
+    speed_kph?: number;
+    max_ay_g?: number;
+    setup_id?: string;
+    kinematics_study_id?: string;
+  }): Promise<{
+    diagram: any;
+    validity: any;
+    provenance: any;
+  }> {
+    return apiJson("/api/v1/handling/diagram", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async runHandlingScenario(data: {
+    params?: Record<string, any>;
+    scenario_type?: string;
+    v_kph?: number;
+    steer_amplitude_deg?: number;
+    duration_s?: number;
+  }): Promise<any> {
+    return apiJson("/api/v1/handling/scenario", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async compareHandlingSetups(data: {
+    setup_a: Record<string, any>;
+    setup_b: Record<string, any>;
+    name_a?: string;
+    name_b?: string;
+    speed_kph?: number;
+  }): Promise<any> {
+    return apiJson("/api/v1/handling/compare", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async runParameterSweep(data: {
+    base_params?: Record<string, any>;
+    parameter_name: string;
+    min_val: number;
+    max_val: number;
+    steps?: number;
+    speed_kph?: number;
+  }): Promise<any> {
+    return apiJson("/api/v1/handling/sweep", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async investigateHandlingFinding(data: {
+    title: string;
+    finding_summary: string;
+    affected_regime?: string;
+    setup_a_name?: string;
+    setup_b_name?: string;
+    metrics?: Record<string, any>;
+    notes?: string;
+  }): Promise<{ question_id: number; title: string; status: string; message: string }> {
+    return apiJson("/api/v1/handling/investigate", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+}
+
+

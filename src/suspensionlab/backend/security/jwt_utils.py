@@ -41,8 +41,9 @@ def get_jwt_keys() -> dict[str, str]:
         
     return keys
 
+
 ALGORITHM  = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 15  # 15 minutes
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # Default 24 hours (1440 min)
 REFRESH_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7 days
 
 # Argon2 is preferred, bcrypt supported for legacy hashes via raw bcrypt
@@ -128,3 +129,67 @@ def decode_refresh_token(token: str) -> dict[str, Any] | None:
     if not payload or payload.get("type") != "refresh":
         return None
     return payload
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Session Revocation & JWKS Key Management (Finding 50)
+# ─────────────────────────────────────────────────────────────────────────────
+
+class TokenRevocationRegistry:
+    """In-memory and Redis-compatible revocation & reuse detection registry."""
+    _revoked_jtis: set[str] = set()
+    _used_refresh_jtis: set[str] = set()
+
+    @classmethod
+    def revoke_jti(cls, jti: str) -> None:
+        cls._revoked_jtis.add(jti)
+
+    @classmethod
+    def is_revoked(cls, jti: str) -> bool:
+        return jti in cls._revoked_jtis
+
+    @classmethod
+    def register_refresh_use(cls, jti: str) -> bool:
+        """
+        Record refresh token use. Returns True if this is the first use.
+        Returns False if REUSE is detected (triggers family revocation).
+        """
+        if jti in cls._used_refresh_jtis:
+            # Token reuse detected! Invalidate all related sessions.
+            return False
+        cls._used_refresh_jtis.add(jti)
+        return True
+
+
+async def is_jti_revoked(jti: str | None) -> bool:
+    """Check if JTI is revoked via in-memory registry or Redis."""
+    if not jti:
+        return False
+    if TokenRevocationRegistry.is_revoked(jti):
+        return True
+    try:
+        from suspensionlab.backend.core.redis_client import get_async_redis_conn
+        async_redis = get_async_redis_conn()
+        if async_redis:
+            val = await async_redis.get(f"revoked:{jti}")
+            return val is not None
+        return False
+    except Exception:
+        return False
+
+
+def get_public_jwks() -> dict[str, Any]:
+    """Export public JWKS (JSON Web Key Set) metadata for internal verification."""
+    keys = get_jwt_keys()
+    jwks = []
+    for kid in keys.keys():
+        jwks.append({
+            "kty": "oct",
+            "kid": kid,
+            "alg": ALGORITHM,
+            "use": "sig",
+            "status": "active" if kid == JWT_ACTIVE_KEY else "rotation_fallback",
+        })
+    return {"keys": jwks}
+
+
