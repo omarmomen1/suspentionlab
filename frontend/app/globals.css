@@ -1,4 +1,9 @@
 @import "tailwindcss";
+@source "./**/*.{js,ts,jsx,tsx}";
+@source "../components/**/*.{js,ts,jsx,tsx}";
+@source "../contexts/**/*.{js,ts,jsx,tsx}";
+@source "../hooks/**/*.{js,ts,jsx,tsx}";
+@source "../lib/**/*.{js,ts,jsx,tsx}";
 
 @theme {
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -73,29 +78,66 @@
 }
 
 @media print {
-  /* Hide the navbar and parameter sidebars for clean PDF export */
-  nav, .shrink-0 {
+  /* Hide interactive controls, navbars, and buttons */
+  nav, header, .no-print, .print-hide, button, .shrink-0 {
     display: none !important;
   }
   
-  /* Reset backgrounds to white for printing */
-  body, .bg-ansys-dark, .bg-ansys-surface, .bg-black {
-    background-color: white !important;
-    color: black !important;
+  /* Reset background and layout for clean printing */
+  html, body {
+    background: #ffffff !important;
+    color: #111111 !important;
+    font-size: 11pt !important;
   }
   
-  /* Remove borders and shadows */
-  .border, .border-ansys-border {
+  /* Remove borders and shadows for clean print */
+  .border {
     border-color: #ddd !important;
   }
-  
-  /* Ensure charts print properly */
-  .h-full {
-    height: auto !important;
-  }
-  
-  /* Set text to black */
-  h1, h2, h3, h4, p, span, div {
-    color: black !important;
+}
+
+
+
+/* Accessibility: WCAG 2.4.7 & 2.4.11 Focus Visible & Focus Not Obscured */
+:focus-visible {
+  outline: 2px solid #f2a900 !important;
+  outline-offset: 2px !important;
+}
+
+/* Ensure sr-only elements become visible when focused (skip-links) */
+.sr-only:focus,
+.sr-only-focusable:focus {
+  position: static !important;
+  width: auto !important;
+  height: auto !important;
+  padding: inherit !important;
+  margin: inherit !important;
+  overflow: visible !important;
+  clip: auto !important;
+  white-space: normal !important;
+}
+
+/* Accessibility: WCAG 2.3.3 Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
+
+/* Accessibility: WCAG 1.4.3 Contrast Remediation (≥4.5:1 normal text on dark backgrounds) */
+.text-gray-500, .text-slate-500, .text-zinc-500 {
+  color: #9ca3af;
+}
+.text-gray-600, .text-slate-600, .text-zinc-600 {
+  color: #a1a1aa;
+}
+.text-gray-700, .text-slate-700, .text-zinc-700 {
+  color: #b0b0b8;
+}
+
+

@@ -1,15 +1,15 @@
-﻿"use client";
+"use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import {
   Sliders, BarChart3, Activity, TrendingDown, TrendingUp,
   AlertCircle, CheckCircle, Info, RefreshCw, Zap,
-  Wind, Gauge, ChevronDown, ChevronRight,
+  Wind, Gauge, ChevronDown, ChevronRight, GitCompare,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
-
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import SetupDiffViewer from "../../components/sim/SetupDiffViewer";
+import Plot from "../../components/sim/Plot";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -145,7 +145,8 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 // â”€â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function SetupSensitivityPage() {
-  const { authHeader } = useAuth();
+  const { fetchWithAuth } = useAuth();
+  const [viewMode, setViewMode] = useState<"diff" | "sensitivity">("diff");
 
   const [setup, setSetup] = useState<SuspensionSetup>({
     k_spring_front:    35_000,
@@ -174,9 +175,9 @@ export default function SetupSensitivityPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${API}/api/v1/lapsim/sensitivity`, {
+      const res = await fetchWithAuth("/api/v1/lapsim/sensitivity", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           speed_ms:          op.speed_ms,
           lateral_g:         op.lateral_g,
@@ -205,7 +206,7 @@ export default function SetupSensitivityPage() {
     } finally {
       setLoading(false);
     }
-  }, [authHeader]);
+  }, [fetchWithAuth]);
 
   // Debounce slider changes
   useEffect(() => {
@@ -299,7 +300,31 @@ export default function SetupSensitivityPage() {
               Real-time suspension setup analysis â€” ARB balance, ride height, aero coupling
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center bg-white/5 border border-white/10 rounded-xl p-1">
+              <button
+                onClick={() => setViewMode("diff")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all ${
+                  viewMode === "diff"
+                    ? "bg-ansys-yellow text-black shadow-md"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                <GitCompare size={13} />
+                Setup Diff (A vs B)
+              </button>
+              <button
+                onClick={() => setViewMode("sensitivity")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all ${
+                  viewMode === "sensitivity"
+                    ? "bg-ansys-yellow text-black shadow-md"
+                    : "text-gray-400 hover:text-white"
+                }`}
+              >
+                <Sliders size={13} />
+                Sensitivity Sliders
+              </button>
+            </div>
             {loading && <RefreshCw size={13} className="text-[#f2a900] animate-spin" />}
             {error && (
               <span className="text-[10px] text-red-400 flex items-center gap-1">
@@ -309,7 +334,12 @@ export default function SetupSensitivityPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-[320px_1fr] gap-4">
+        {viewMode === "diff" ? (
+          <div className="animate-in fade-in duration-200">
+            <SetupDiffViewer />
+          </div>
+        ) : (
+          <div className="grid grid-cols-[320px_1fr] gap-4">
 
           {/* â”€â”€ Left panel: sliders â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
           <div className="space-y-4">
@@ -615,6 +645,7 @@ export default function SetupSensitivityPage() {
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
   );

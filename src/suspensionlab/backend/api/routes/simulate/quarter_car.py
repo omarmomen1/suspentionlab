@@ -3,7 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
 from suspensionlab.backend.database.core import get_db_dependency
-from suspensionlab.backend.security.auth import verify_api_key
+from suspensionlab.backend.security.auth import require_permission, UserContext
+from suspensionlab.backend.security.permissions import Permission
 from suspensionlab.backend.services.simulation_service import SimulationService
 from suspensionlab.shared.models import SimulateRequest
 from pydantic import BaseModel
@@ -18,7 +19,7 @@ class JobResponse(BaseModel):
 @router.post("/simulate", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def simulate(
     payload: SimulateRequest,
-    user: dict = Depends(verify_api_key),
+    user: UserContext = Depends(require_permission(Permission.SIMULATION_RUN)),
     db: AsyncSession = Depends(get_db_dependency)
 ):
     try:
@@ -27,9 +28,12 @@ async def simulate(
             plan=user.plan,
             job_type="SIMULATE_QUARTER",
             payload=payload.model_dump(),
-            db=db, team_id=getattr(user, "team_id", None)
+            db=db,
+            team_id=getattr(user, "team_id", None),
         )
-        return {"job_id": job_id, "status": "PENDING"}
+        return JobResponse(job_id=job_id, status="PENDING")
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.exception("Unhandled error in /simulate/quarter-car: %s", e)
+        logger.exception("Unhandled error in /simulate: %s", e)
         raise HTTPException(status_code=500, detail="Internal simulation error.")

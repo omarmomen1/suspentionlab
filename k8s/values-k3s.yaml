@@ -1,0 +1,68 @@
+environment: production
+
+redis:
+  authoritativeAddress: redis.suspensionlab.svc.cluster.local:6379
+
+rbac:
+  create: true
+
+externalSecrets:
+  enabled: false
+
+api:
+  replicaCount: 1
+  image:
+    repository: suspensionlab-backend
+    tag: prod
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+workers:
+  replicaCount: 1
+  image:
+    repository: suspensionlab-backend
+    tag: prod
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+  keda:
+    enabled: false
+
+ui:
+  enabled: false
+  replicaCount: 0
+
+ingress:
+  enabled: false
+
+monitoring:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+  alertingRules:
+    enabled: false
+
+networkPolicy:
+  enabled: false
+
+secrets:
+  databaseUrl: postgresql+asyncpg://susplab:Pr0d_Secur3_P0stgr3s_Passw0rd_2026!@postgres.suspensionlab.svc.cluster.local:5432/suspensionlab
+  redisUrl: redis://:Pr0d_Secur3_R3d1s_Auth_T0k3n_2026!@redis.suspensionlab.svc.cluster.local:6379/0
+  redisPassword: Pr0d_Secur3_R3d1s_Auth_T0k3n_2026!
+  apiKey: Authoritative_Production_Secure_API_Key_256bit_String_2026_Audit!
+  jwtSecretKey: Authoritative_Production_Super_Secret_JWT_Key_256bit_Secure_String_2026
+  stripeWebhookSecret: dummy_stripe_secret

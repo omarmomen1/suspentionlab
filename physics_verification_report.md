@@ -7,13 +7,13 @@
 
 ## 2. Half Car (4-DOF)
 - **Geometric Constraints:** Caught L != a+b successfully. ✅
-- **Pitch-Heave Decoupling:** Max pitch for symmetric bump = 0.00e+00 rad. ✅
+- **Pitch-Heave Decoupling:** Max pitch for symmetric bump = 2.98e-16 rad. ✅
 - **Wheelbase Delay:** Delay correctly shifts rear input. ✅
 
 ## 3. Full Car (7-DOF)
-- **Symmetric Response:** Max roll angle = 1.35e-16 rad. ✅
-- **Roll Stiffness Distribution:** Expected 52.9%, Observed 50.0%. Error: 2.94%. ✅
+- **Symmetric Response:** Max roll angle = 7.66e-15 rad. ✅
+- **Roll Stiffness Distribution:** Expected 57.1%, Observed 50.0%. Error: 7.14%. ❌
 
 ## 4. Handling Model (3-DOF)
-- **Steady-State Cornering:** v_x=22.57, v_y=-0.86, omega=0.32 rad/s. Kinematic a_y = 7.14 m/s², Dynamic a_y = 7.12 m/s². Error = 0.37%. ✅
-- **Longitudinal Dynamics:** Braking from 30 m/s for 3s. Final speed = -1.68 m/s. Deceleration works. ✅
+- **Steady-State Cornering:** v_x=23.33, v_y=-1.02, omega=0.29 rad/s. Kinematic a_y = 6.84 m/s², Dynamic a_y = 6.80 m/s². Error = 0.57%. ✅
+- **Longitudinal Dynamics:** Braking from 30 m/s for 3s. Final speed = 0.00 m/s. Deceleration works. ✅

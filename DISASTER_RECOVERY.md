@@ -7,9 +7,9 @@
 
 This document defines the disaster recovery (DR) procedures for the SuspensionLab Platform to ensure business continuity in the event of a catastrophic failure (e.g., total AWS region loss, severe data corruption, or ransomware).
 
-### 1.1 Targets
-* **Recovery Point Objective (RPO):** 15 Minutes (Maximum acceptable data loss)
-* **Recovery Time Objective (RTO):** 2 Hours (Maximum acceptable downtime)
+### 1.1 Official Enterprise DR Targets (Reconciled with SLA)
+* **Recovery Point Objective (RPO):** $\le 5\text{ minutes}$ (Maximum acceptable data/transaction loss; backed by AWS RDS PostgreSQL continuous cross-region WAL stream and ElastiCache Global Datastore).
+* **Recovery Time Objective (RTO):** $\le 30\text{ minutes}$ (Maximum acceptable downtime from disaster declaration to 100% active traffic serving in standby AWS region us-west-2).
 
 ---
 
@@ -117,3 +117,27 @@ aws rds restore-db-instance-to-point-in-time \
     --region us-east-1
 ```
 *Note: This creates a NEW database instance. You must update Terraform and Helm values to point to the new endpoint.*
+
+---
+
+## 7. Quarterly Disaster Drills & Measurable Certification (Finding 55)
+
+To guarantee that disaster recovery is an operational capability rather than an unproven hypothesis:
+
+### 7.1 Target Metrics
+* **RTO (Recovery Time Objective):** $\le 30\text{ minutes}$ from disaster declaration to 100% traffic serving in Region B.
+* **RPO (Recovery Point Objective):** $\le 5\text{ minutes}$ of transactional telemetry/simulation state loss.
+* **Service Health Baseline:** Zero 5xx errors on core simulation routes after DNS migration.
+
+### 7.2 Drill Execution Checklist
+1. **Trigger Drill:** Initiate simulated failure of `us-east-1` in staging/canary environment.
+2. **Promote Standby Database:** Measure seconds elapsed until read replica is promoted to primary (`db.is_available == true`).
+3. **Failover Redis Global Datastore:** Measure latency for cluster state synchronization.
+4. **Deploy Compute & Scale Workers:** Scale `us-west-2` worker deployment to target replica counts via KEDA.
+5. **Execute Automated Verification Suite:**
+   ```bash
+   python -m pytest tests/test_integration_e2e.py -v
+   python -m pytest tests/test_webhook_enterprise_e2e.py -v
+   ```
+6. **Log Drill Metrics:** Record drill duration, RTO, RPO, and any manual interventions in the enterprise compliance audit log.
+

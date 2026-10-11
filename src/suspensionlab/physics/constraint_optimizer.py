@@ -89,9 +89,9 @@ class SetupConstraints:
     tire_load_variation_max_n:  Optional[float] = 3000.0
     aero_balance_min:           Optional[float] = 0.42
     aero_balance_max:           Optional[float] = 0.48
-    ride_freq_front_min:        Optional[float] = 1.5
+    ride_freq_front_min:        Optional[float] = 1.0
     ride_freq_front_max:        Optional[float] = 4.5
-    ride_freq_rear_min:         Optional[float] = 1.8
+    ride_freq_rear_min:         Optional[float] = 1.0
     ride_freq_rear_max:         Optional[float] = 5.0
     k_arb_front_min:            Optional[float] = 0.0
     k_arb_front_max:            Optional[float] = 50_000.0
@@ -204,7 +204,7 @@ class ConstraintDrivenOptimizer:
             lap_time = float(result.total_time)
 
             # Post-run constraint check
-            constraint_check = self.check_constraints(v_mod, combo, constraints)
+            constraint_check = self.check_constraints(v_mod, combo, constraints, lap_result=result)
             if not constraint_check["all_hard_satisfied"]:
                 continue
 
@@ -237,6 +237,7 @@ class ConstraintDrivenOptimizer:
         vehicle,
         solution: dict,
         constraints: SetupConstraints,
+        lap_result: Optional[Any] = None,
     ) -> dict:
         """Check all constraints for a given parameter set.
 
@@ -245,6 +246,7 @@ class ConstraintDrivenOptimizer:
         vehicle     : LapSimVehicle  (with solution params already applied)
         solution    : dict  parameter values
         constraints : SetupConstraints
+        lap_result  : Optional LapSimResult (for dynamic telemetry constraint checking)
 
         Returns
         -------
@@ -281,7 +283,7 @@ class ConstraintDrivenOptimizer:
 
         c = constraints
 
-        # Ride heights (from suspension config, may change with aero load — use static here)
+        # Ride heights (static setup check)
         results["ride_height_front_mm"] = _check(
             "ride_height_front", sus.ride_height_front,
             c.ride_height_front_min_mm, None, "mm"
@@ -290,6 +292,19 @@ class ConstraintDrivenOptimizer:
             "ride_height_rear", sus.ride_height_rear,
             c.ride_height_rear_min_mm, None, "mm"
         )
+
+        # Dynamic ride heights (from lap telemetry if available)
+        if lap_result is not None and hasattr(lap_result, "ride_height_front") and len(lap_result.ride_height_front) > 0:
+            min_dyn_rh_f = float(np.min(lap_result.ride_height_front))
+            min_dyn_rh_r = float(np.min(lap_result.ride_height_rear))
+            results["ride_height_front_min_dynamic_mm"] = _check(
+                "dynamic_ride_height_front", min_dyn_rh_f,
+                c.ride_height_front_min_mm, None, "mm"
+            )
+            results["ride_height_rear_min_dynamic_mm"] = _check(
+                "dynamic_ride_height_rear", min_dyn_rh_r,
+                c.ride_height_rear_min_mm, None, "mm"
+            )
 
         # ARB bounds
         results["k_arb_front"] = _check(

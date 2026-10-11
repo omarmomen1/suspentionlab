@@ -1,5 +1,5 @@
 "use client";
-import { useState, Suspense } from "react";
+import { useState, Suspense, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import {
   Settings2, Activity, AlertTriangle, Activity as Pulse, Zap
@@ -7,7 +7,7 @@ import {
 import { useUndoRedo } from "../../hooks/useUndoRedo";
 import { useAuth } from "../../contexts/AuthContext";
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import Plot from "../../components/sim/Plot";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const DARK_BASE = {
@@ -55,14 +55,15 @@ function ParamSection({ title, children }: { title: string; children: React.Reac
 }
 
 function ParameterInput({ label, val, unit, step = 1, min, onChange }: { label: string; val: number; unit: string; step?: number; min?: number; onChange: (v: number) => void; }) {
+  const inputId = `active-param-${label.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
   return (
     <div className="flex justify-between items-center gap-2">
-      <label className="text-[11px] text-gray-500 flex-1 min-w-0 leading-tight">{label}</label>
+      <label htmlFor={inputId} className="text-[11px] text-gray-400 flex-1 min-w-0 leading-tight">{label}</label>
       <div className="relative shrink-0">
-        <input type="number" step={step} value={val} min={min} onChange={(e) => onChange(Number(e.target.value))}
+        <input id={inputId} aria-label={`${label} (${unit})`} type="number" step={step} value={val} min={min} onChange={(e) => onChange(Number(e.target.value))}
           className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white w-28 text-right pr-9 focus:outline-none focus:border-ansys-yellow/60 focus:ring-1 focus:ring-ansys-yellow/15 transition-all"
         />
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-gray-700 pointer-events-none">{unit}</span>
+        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 pointer-events-none">{unit}</span>
       </div>
     </div>
   );
@@ -85,9 +86,16 @@ interface ActiveResults {
 }
 
 function ActiveSuspensionDashboard() {
-  const { authHeader } = useAuth();
+  const { fetchWithAuth } = useAuth();
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState<ActiveResults | null>(null);
+  const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+    };
+  }, []);
 
   const [params, setParams] = useUndoRedo({
     c_sky: 4000.0,
@@ -101,6 +109,7 @@ function ActiveSuspensionDashboard() {
   });
 
   const runSimulation = async () => {
+    if (pollTimerRef.current) clearInterval(pollTimerRef.current);
     setIsRunning(true);
     setResults(null);
     try {
@@ -108,9 +117,9 @@ function ActiveSuspensionDashboard() {
         params: { m_s: params.m_s, m_u: params.m_u, k_s: params.k_s, k_t: params.k_t, MR: params.MR, c_sky: params.c_sky, c_min: params.c_min },
         bump_height: params.bump_height
       };
-      const res = await fetch(`${API_BASE}/simulate/active`, {
+      const res = await fetchWithAuth("/api/v1/simulate/active", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
       });
       const data = await res.json();
@@ -120,26 +129,39 @@ function ActiveSuspensionDashboard() {
         return;
       }
       
-      const jobId = data.job_id;
-      const interval = setInterval(async () => {
-        try {
-          const pollRes = await fetch(`${API_BASE}/jobs/${jobId}`, { headers: authHeader() });
-          const pollData = await pollRes.json();
-          if (pollData.status === "COMPLETED") {
-             clearInterval(interval);
-             setResults(pollData.result);
-             setIsRunning(false);
-          } else if (pollData.status === "FAILED" || pollData.status === "CANCELED") {
-             clearInterval(interval);
-             setResults({ error: true, message: pollData.error || "Simulation failed." });
-             setIsRunning(false);
+      if (data.job_id) {
+        const jobId = data.job_id;
+        const startTime = Date.now();
+        pollTimerRef.current = setInterval(async () => {
+          if (Date.now() - startTime > 30000) {
+            if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+            setResults({ error: true, message: "Simulation timed out after 30s." });
+            setIsRunning(false);
+            return;
           }
-        } catch (e) {
-             clearInterval(interval);
-             setResults({ error: true, message: String(e) });
-             setIsRunning(false);
-        }
-      }, 1000);
+          try {
+            const pollRes = await fetchWithAuth(`/api/v1/jobs/${jobId}`);
+            const pollData = await pollRes.json();
+            const isSuccess = pollData.status === "COMPLETED" || pollData.status === "COMPLETED_WITH_WARNINGS" || pollData.status === "COMPLETED_VALID";
+            if (isSuccess) {
+                if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+                setResults(pollData.result);
+                setIsRunning(false);
+            } else if (pollData.status === "FAILED" || pollData.status === "FAILED_NUMERICAL" || pollData.status === "FAILED_INPUT" || pollData.status === "CANCELED") {
+                if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+                setResults({ error: true, message: pollData.error || "Simulation failed." });
+                setIsRunning(false);
+            }
+          } catch (e) {
+                if (pollTimerRef.current) clearInterval(pollTimerRef.current);
+                setResults({ error: true, message: String(e) });
+                setIsRunning(false);
+          }
+        }, 1000);
+      } else {
+        setResults(data);
+        setIsRunning(false);
+      }
     } catch (err) {
       setResults({ error: true, message: String(err) });
       setIsRunning(false);

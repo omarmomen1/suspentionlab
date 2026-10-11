@@ -16,11 +16,29 @@ from pydantic import BaseModel, ConfigDict, Field
 import defusedxml.ElementTree as ET
 import gpxpy
 import numpy as np
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from suspensionlab.backend.database.core import get_db_dependency
 from suspensionlab.backend.security.auth import verify_api_key
 from suspensionlab.physics.lap_sim import (
     LapSimVehicle, MassProperties, AeroMap, PowertrainModel,
     parse_track_from_gps, parse_track_from_curvature, solve_lap, TrackSegment,
+    FAST_QUASI_STEADY,
+)
+from suspensionlab.physics.dynamic_lap_sim import (
+    DynamicLapSimulator,
+    DynamicVehicleParams,
+    DynamicTrackModel,
+    solve_dynamic_lap,
+    DYNAMIC_TRANSIENT_14DOF,
+    FAST_QSS,
+    TRANSIENT_ENGINEERING,
+    HIGH_FIDELITY_LAP,
+    DifferentialType,
+    DifferentialConfig,
+    solve_transient_maneuver,
+    compare_quasi_steady_vs_dynamic,
+    cross_validate_qss_and_transient,
 )
 from suspensionlab.physics.magic_formula import TireCoeffs
 from suspensionlab.physics.suspension_aero_coupling import (
@@ -28,7 +46,7 @@ from suspensionlab.physics.suspension_aero_coupling import (
     CoupledVehicleModel,
 )
 
-router = APIRouter(prefix="/lapsim", tags=["Lap Simulation"])
+router = APIRouter(tags=["Lap Simulation"])
 
 MAX_GPS_POINTS = 10_000
 
@@ -94,6 +112,16 @@ class SuspensionInput(BaseModel):
     ride_height_rear:   Optional[float] = None   # mm
 
 
+class DifferentialInput(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+    diff_type:            Optional[str]   = "OPEN"             # OPEN, LOCKED, LSD_TORQUE_BIASED, CLUTCH_PACK
+    bias_ratio:           Optional[float] = 3.0                # Torque Bias Ratio for Torsen
+    preload_nm:           Optional[float] = 60.0               # Static preload for Clutch Pack [N*m]
+    ramp_angle_accel_deg: Optional[float] = 45.0               # Power ramp angle [deg]
+    ramp_angle_decel_deg: Optional[float] = 60.0               # Coast ramp angle [deg]
+    drivetrain_layout:    Optional[str]   = "RWD"              # RWD, FWD, AWD
+
+
 class VehicleInput(BaseModel):
     model_config = ConfigDict(allow_inf_nan=False)
     # Legacy scalar overrides (backwards-compatible)
@@ -103,12 +131,15 @@ class VehicleInput(BaseModel):
     max_power: Optional[float] = None   # W — scales torque curve proportionally
 
     # Sub-model overrides
-    mass_props:  Optional[MassPropertiesInput]  = None
-    aero:        Optional[AeroMapInput]         = None
-    powertrain:  Optional[PowertrainInput]      = None
-    tire_coeffs: Optional[TireCoeffsInput]      = None
-    suspension:  Optional[SuspensionInput]      = None
+    mass_props:   Optional[MassPropertiesInput] = None
+    aero:         Optional[AeroMapInput]        = None
+    powertrain:   Optional[PowertrainInput]     = None
+    tire_coeffs:  Optional[TireCoeffsInput]     = None
+    suspension:   Optional[SuspensionInput]     = None
+    differential: Optional[DifferentialInput]   = None
     use_coupling: bool = False   # enable ride-height/aero coupling iteration
+    tire_model:   Optional[str]  = None   # QUASI_STEADY or DYNAMIC
+    tire_model_type: Optional[str] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -200,6 +231,16 @@ def _build_vehicle(vehicle_input: Optional[VehicleInput]) -> LapSimVehicle:
     )
 
 
+def _get_track_coordinates(distances, curvatures) -> Dict[str, Any]:
+    """Numerically integrate track coordinates for 2D map visualization."""
+    try:
+        from suspensionlab.physics.track_geometry import integrate_track_coordinates
+        coords = integrate_track_coordinates(distances, curvatures)
+        return coords.to_dict()
+    except Exception:
+        return {"x": [], "y": [], "heading_rad": [], "is_closed": False, "closure_error_m": 0.0}
+
+
 def _result_to_dict(result) -> Dict:
     """Serialise LapSimResult to JSON-safe dict."""
     d = {
@@ -236,14 +277,35 @@ def _result_to_dict(result) -> Dict:
             "roll_deg":            result.roll_deg.tolist(),
             "ride_height_front_mm": result.ride_height_front.tolist(),
             "ride_height_rear_mm":  result.ride_height_rear.tolist(),
+            # Tire utilization & force margins (Section 8)
+            "tire_utilization_x":        result.tire_utilization_x.tolist() if len(result.tire_utilization_x) else [],
+            "tire_utilization_y":        result.tire_utilization_y.tolist() if len(result.tire_utilization_y) else [],
+            "tire_utilization_combined": result.tire_utilization_combined.tolist() if len(result.tire_utilization_combined) else [],
+            "ax_available_ms2":          result.ax_available.tolist() if len(result.ax_available) else [],
+            "ay_available_ms2":          result.ay_available.tolist() if len(result.ay_available) else [],
         },
-        # GGV envelope
+        # GGV envelope & 3D surface
         "ggv": {
-            "speeds_ms":    result.ggv_speeds.tolist()   if len(result.ggv_speeds)   else [],
-            "ay_max_ms2":   result.ggv_ay_max.tolist()   if len(result.ggv_ay_max)   else [],
-            "ax_accel_ms2": result.ggv_ax_accel.tolist() if len(result.ggv_ax_accel) else [],
-            "ax_brake_ms2": result.ggv_ax_brake.tolist() if len(result.ggv_ax_brake) else [],
+            "speeds_ms":          result.ggv_speeds.tolist()           if len(result.ggv_speeds)           else [],
+            "ay_max_ms2":         result.ggv_ay_max.tolist()           if len(result.ggv_ay_max)           else [],
+            "ax_accel_ms2":       result.ggv_ax_accel.tolist()         if len(result.ggv_ax_accel)         else [],
+            "ax_brake_ms2":       result.ggv_ax_brake.tolist()         if len(result.ggv_ax_brake)         else [],
+            "ay_frac":            result.ggv_ay_frac.tolist()          if hasattr(result, "ggv_ay_frac") and len(result.ggv_ay_frac) else [],
+            "ax_accel_surface":   result.ggv_ax_accel_surface.tolist() if hasattr(result, "ggv_ax_accel_surface") and len(result.ggv_ax_accel_surface) else [],
+            "ax_brake_surface":   result.ggv_ax_brake_surface.tolist() if hasattr(result, "ggv_ax_brake_surface") and len(result.ggv_ax_brake_surface) else [],
+            "ggv_type":           getattr(result, "ggv_type", "INTERPOLATED_PRE_COMPUTED"),
         },
+        # Diagnostics and transparency metadata
+        "solver_converged":    result.solver_converged,
+        "solver_warnings":     result.solver_warnings,
+        "model_assumptions":   result.model_assumptions.to_dict() if hasattr(result, "model_assumptions") and hasattr(result.model_assumptions, "to_dict") else {},
+        "simulation_metadata": result.simulation_metadata.to_dict() if hasattr(result, "simulation_metadata") and hasattr(result.simulation_metadata, "to_dict") else {},
+        # 2D Circuit Track Coordinates (Phase 3)
+        "track_coordinates": (
+            _get_track_coordinates(result.distances, result.curvatures)
+            if len(result.distances) >= 2 and len(result.curvatures) >= 2
+            else {"x": [], "y": [], "heading_rad": [], "is_closed": False, "closure_error_m": 0.0}
+        ),
     }
     # ERS telemetry (only if ERS was active — i.e. arrays are non-zero)
     import numpy as _np
@@ -268,34 +330,76 @@ def _result_to_dict(result) -> Dict:
 
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Routes
-# ─────────────────────────────────────────────────────────────────────────────
+def _build_dynamic_vehicle_params(
+    vehicle: LapSimVehicle,
+    v_input: Optional[VehicleInput],
+    tire_model: Optional[str] = None,
+) -> DynamicVehicleParams:
+    """Map LapSimVehicle and VehicleInput into authoritative DynamicVehicleParams."""
+    mp = vehicle.mass_props
+    ae = vehicle.aero
+    pt = vehicle.powertrain
+    sc = vehicle.suspension
 
-@router.post("/run")
-async def run_lap_sim(
-    request_data: Dict[str, Any],
-    user=Depends(verify_api_key),
-):
-    """Run a QSS lap simulation from GPS arrays or pre-computed curvature data.
+    diff_cfg = DifferentialConfig()
+    drivetrain = "RWD"
+    tm = tire_model
+    if v_input and v_input.differential:
+        d = v_input.differential
+        drivetrain = d.drivetrain_layout or "RWD"
+        try:
+            dtype = DifferentialType(d.diff_type)
+        except Exception:
+            dtype = DifferentialType.OPEN
+        diff_cfg = DifferentialConfig(
+            diff_type=dtype,
+            bias_ratio=d.bias_ratio if d.bias_ratio is not None else 3.0,
+            preload_nm=d.preload_nm if d.preload_nm is not None else 60.0,
+            ramp_angle_accel_deg=d.ramp_angle_accel_deg if d.ramp_angle_accel_deg is not None else 45.0,
+            ramp_angle_decel_deg=d.ramp_angle_decel_deg if d.ramp_angle_decel_deg is not None else 60.0,
+        )
 
-    Request body (JSON)
-    -------------------
-    Either GPS mode:
-        latitudes  : [float, ...]
-        longitudes : [float, ...]
-        elevations : [float, ...] (optional)
+    if tm is None and v_input is not None:
+        tm = v_input.tire_model or v_input.tire_model_type
+    if tm is None:
+        tm = "DYNAMIC"
 
-    Or curvature mode:
-        distances   : [float, ...] in metres
-        curvatures  : [float, ...] in 1/m
-        elevations  : [float, ...] (optional)
-        bank_angles : [float, ...] in radians (optional)
-        sectors     : [int, ...] 1-based (optional)
+    k_sp_f = sc.k_spring_front if sc and sc.k_spring_front else 65_000.0
+    k_sp_r = sc.k_spring_rear if sc and sc.k_spring_rear else 85_000.0
+    k_arb_f = sc.k_arb_front if sc and sc.k_arb_front else 25_000.0
+    k_arb_r = sc.k_arb_rear if sc and sc.k_arb_rear else 18_000.0
+    rh_f = sc.ride_height_front if sc and sc.ride_height_front else 30.0
+    rh_r = sc.ride_height_rear if sc and sc.ride_height_rear else 55.0
 
-    Plus optional vehicle config:
-        vehicle : { mass, aero_cl, aero_cd, max_power, mass_props, aero, powertrain, tire_coeffs }
-    """
+    return DynamicVehicleParams(
+        mass_kg=mp.total_mass,
+        wheelbase_m=mp.wheelbase,
+        a_m=mp.cog_dist_front,
+        b_m=max(0.5, mp.wheelbase - mp.cog_dist_front),
+        tw_f_m=mp.track_front,
+        tw_r_m=mp.track_rear,
+        cg_height_m=mp.h_cog,
+        cd_base=ae.cd_base,
+        cl_base=ae.cl_base,
+        frontal_area_m2=ae.frontal_area,
+        gear_ratios=pt.gear_ratios,
+        shift_time_s=pt.shift_time_s,
+        rev_limit_rpm=pt.rev_limit,
+        wheel_radius_m=pt.wheel_radius,
+        k_spring_front_nm=k_sp_f,
+        k_spring_rear_nm=k_sp_r,
+        k_arb_front_nm=k_arb_f,
+        k_arb_rear_nm=k_arb_r,
+        ref_ride_height_front_mm=rh_f,
+        ref_ride_height_rear_mm=rh_r,
+        diff_rear=diff_cfg,
+        drivetrain_layout=drivetrain,
+        tire_model_type=tm.upper(),
+    )
+
+
+def _extract_track_segments(request_data: Dict[str, Any]) -> List[TrackSegment]:
+    """Parse track segments from request payload."""
     latitudes  = request_data.get("latitudes")
     longitudes = request_data.get("longitudes")
     distances  = request_data.get("distances")
@@ -308,7 +412,7 @@ async def run_lap_sim(
             raise HTTPException(422, f"GPS track too long. Maximum {MAX_GPS_POINTS:,} points.")
         elevations = request_data.get("elevations")
         try:
-            segments = parse_track_from_gps(latitudes, longitudes, elevations)
+            return parse_track_from_gps(latitudes, longitudes, elevations)
         except Exception as e:
             raise HTTPException(422, f"Failed to parse GPS track: {e}")
 
@@ -319,14 +423,90 @@ async def run_lap_sim(
         bank_angles = request_data.get("bank_angles")
         sectors     = request_data.get("sectors")
         try:
-            segments = parse_track_from_curvature(distances, curvatures, elevations, bank_angles, sectors)
+            return parse_track_from_curvature(distances, curvatures, elevations, bank_angles, sectors)
         except Exception as e:
             raise HTTPException(422, f"Failed to parse curvature track: {e}")
 
     else:
         raise HTTPException(400, "Provide either (latitudes + longitudes) or (distances + curvatures).")
 
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Routes
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/lapsim/run")
+@router.post("/lap-sim/run")
+@router.post("/run")
+async def run_lap_sim(
+    request_data: Dict[str, Any],
+    user=Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """Run a QSS or 14-DOF Dynamic lap simulation from GPS arrays or pre-computed curvature data."""
+    if user and getattr(user, "is_trial", False):
+        from suspensionlab.backend.services.trial_service import TrialService
+        await TrialService.assert_trial_access(db, user, action="simulate", delta=1)
+        await TrialService.record_trial_usage(db, user, action="simulate", delta=1)
+
+    segments = _extract_track_segments(request_data)
+
     # Build vehicle
+    v_input = None
+    if "vehicle" in request_data:
+        try:
+            v_input = VehicleInput(**request_data["vehicle"])
+        except Exception as e:
+            raise HTTPException(422, f"Invalid vehicle parameters: {e}")
+
+    vehicle = _build_vehicle(v_input)
+
+    # Solver Mode Selection
+    solver_mode = request_data.get("solver_mode", FAST_QUASI_STEADY).upper()
+
+    import asyncio
+    loop = asyncio.get_running_loop()
+
+    try:
+        if solver_mode in ("DYNAMIC", "DYNAMIC_TRANSIENT_14DOF", "TRANSIENT", "HIGH_FIDELITY_LAP"):
+            track_dist = np.array([s.distance for s in segments])
+            track_curv = np.array([s.curvature for s in segments])
+            track_elev = np.array([s.elevation for s in segments])
+            track_bank = np.array([s.bank_angle for s in segments])
+            dyn_track = DynamicTrackModel(
+                distances=track_dist,
+                curvatures=track_curv,
+                elevations=track_elev,
+                bank_angles=track_bank,
+            )
+            dyn_params = _build_dynamic_vehicle_params(
+                vehicle, v_input, tire_model=request_data.get("tire_model") or request_data.get("tire_model_type")
+            )
+            dyn_sim = DynamicLapSimulator(params=dyn_params)
+            result = await loop.run_in_executor(None, solve_dynamic_lap, dyn_sim, dyn_track)
+        else:
+            result = await loop.run_in_executor(None, solve_lap, vehicle, segments)
+    except Exception as e:
+        raise HTTPException(500, f"Lap simulation failed: {e}")
+
+    return _result_to_dict(result)
+
+
+@router.post("/lapsim/cross_validate")
+@router.post("/lap-sim/cross-validate")
+async def cross_validate_lap_sim(
+    request_data: Dict[str, Any],
+    user=Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """Execute and cross-validate Fast QSS with 14-DOF Dynamic simulation on the same circuit."""
+    if user and getattr(user, "is_trial", False):
+        from suspensionlab.backend.services.trial_service import TrialService
+        await TrialService.assert_trial_access(db, user, action="simulate", delta=2)
+        await TrialService.record_trial_usage(db, user, action="simulate", delta=2)
+
+    segments = _extract_track_segments(request_data)
+
     v_input = None
     if "vehicle" in request_data:
         try:
@@ -340,13 +520,125 @@ async def run_lap_sim(
     loop = asyncio.get_running_loop()
 
     try:
-        result = await loop.run_in_executor(None, solve_lap, vehicle, segments)
+        # 1. Fast QSS Pass
+        res_qss = await loop.run_in_executor(None, solve_lap, vehicle, segments)
+
+        # 2. Dynamic 14-DOF Pass
+        track_dist = np.array([s.distance for s in segments])
+        track_curv = np.array([s.curvature for s in segments])
+        track_elev = np.array([s.elevation for s in segments])
+        track_bank = np.array([s.bank_angle for s in segments])
+        dyn_track = DynamicTrackModel(
+            distances=track_dist,
+            curvatures=track_curv,
+            elevations=track_elev,
+            bank_angles=track_bank,
+        )
+        dyn_params = _build_dynamic_vehicle_params(
+            vehicle, v_input, tire_model=request_data.get("tire_model") or request_data.get("tire_model_type")
+        )
+        dyn_sim = DynamicLapSimulator(params=dyn_params)
+        res_dyn = await loop.run_in_executor(None, solve_dynamic_lap, dyn_sim, dyn_track)
+
+        # 3. Cross-Validation Delta Decomposition
+        cross_val = cross_validate_qss_and_transient(res_qss, res_dyn)
+
+        return {
+            "status": "success",
+            "qss": _result_to_dict(res_qss),
+            "dyn": _result_to_dict(res_dyn),
+            "cross_validation": cross_val.to_dict(),
+        }
     except Exception as e:
-        raise HTTPException(500, f"Lap simulation failed: {e}")
-
-    return _result_to_dict(result)
+        raise HTTPException(500, f"Cross-validation simulation failed: {e}")
 
 
+@router.post("/lapsim/maneuver")
+@router.post("/lap-sim/maneuver")
+async def run_handling_maneuver(
+    request_data: Dict[str, Any],
+    user=Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """Execute standardized time-domain vehicle handling maneuver (step steer, ramp, sine sweep, etc.)."""
+    if user and getattr(user, "is_trial", False):
+        from suspensionlab.backend.services.trial_service import TrialService
+        await TrialService.assert_trial_access(db, user, action="simulate", delta=1)
+        await TrialService.record_trial_usage(db, user, action="simulate", delta=1)
+
+    v_input = None
+    if "vehicle" in request_data:
+        try:
+            v_input = VehicleInput(**request_data["vehicle"])
+        except Exception as e:
+            raise HTTPException(422, f"Invalid vehicle parameters: {e}")
+
+    vehicle = _build_vehicle(v_input)
+    dyn_params = _build_dynamic_vehicle_params(
+        vehicle, v_input, tire_model=request_data.get("tire_model") or request_data.get("tire_model_type")
+    )
+    sim = DynamicLapSimulator(params=dyn_params)
+
+    maneuver_type = request_data.get("maneuver_type", "STEP_STEER")
+    initial_speed_mps = float(request_data.get("initial_speed_mps", 30.0))
+    params = request_data.get("parameters", {})
+
+    import asyncio
+    loop = asyncio.get_running_loop()
+
+    try:
+        res = await loop.run_in_executor(
+            None,
+            lambda: solve_transient_maneuver(sim, maneuver_type=maneuver_type, initial_speed_mps=initial_speed_mps, **params)
+        )
+        return res.to_dict()
+    except Exception as e:
+        raise HTTPException(500, f"Maneuver simulation failed: {e}")
+
+
+@router.post("/lapsim/maneuver/compare")
+@router.post("/lap-sim/maneuver/compare")
+async def compare_handling_maneuver_endpoint(
+    request_data: Dict[str, Any],
+    user=Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """Compare vehicle handling maneuver under QUASI_STEADY vs DYNAMIC tire relaxation."""
+    if user and getattr(user, "is_trial", False):
+        from suspensionlab.backend.services.trial_service import TrialService
+        await TrialService.assert_trial_access(db, user, action="simulate", delta=1)
+        await TrialService.record_trial_usage(db, user, action="simulate", delta=1)
+
+    v_input = None
+    if "vehicle" in request_data:
+        try:
+            v_input = VehicleInput(**request_data["vehicle"])
+        except Exception as e:
+            raise HTTPException(422, f"Invalid vehicle parameters: {e}")
+
+    vehicle = _build_vehicle(v_input)
+    dyn_params = _build_dynamic_vehicle_params(vehicle, v_input)
+    sim = DynamicLapSimulator(params=dyn_params)
+
+    maneuver_type = request_data.get("maneuver_type", "STEP_STEER")
+    initial_speed_mps = float(request_data.get("initial_speed_mps", 30.0))
+    params = request_data.get("parameters", {})
+
+    import asyncio
+    loop = asyncio.get_running_loop()
+
+    try:
+        res = await loop.run_in_executor(
+            None,
+            lambda: compare_quasi_steady_vs_dynamic(sim, maneuver_type=maneuver_type, initial_speed_mps=initial_speed_mps, **params)
+        )
+        return res
+    except Exception as e:
+        raise HTTPException(500, f"Maneuver comparison failed: {e}")
+
+
+@router.post("/lapsim/upload_gpx")
+@router.post("/lap-sim/upload_gpx")
 @router.post("/upload_gpx")
 async def upload_gpx(
     file: UploadFile = File(...),
@@ -387,6 +679,8 @@ async def upload_gpx(
         raise HTTPException(400, f"Failed to parse GPX: {e}")
 
 
+@router.get("/lapsim/ggv")
+@router.get("/lap-sim/ggv")
 @router.get("/ggv")
 async def get_ggv_envelope(
     mass: float = 800.0,
@@ -415,11 +709,15 @@ async def get_ggv_envelope(
         raise HTTPException(500, f"GGV computation failed: {e}")
 
     return {
-        "speeds_ms":    vehicle._ggv_speeds.tolist(),
-        "speeds_kmh":   (vehicle._ggv_speeds * 3.6).tolist(),
-        "ay_max_ms2":   vehicle._ggv_ay_max.tolist(),
-        "ax_accel_ms2": vehicle._ggv_ax_accel[:, 0].tolist(),
-        "ax_brake_ms2": vehicle._ggv_ax_brake[:, 0].tolist(),
+        "speeds_ms":          vehicle._ggv_speeds.tolist(),
+        "speeds_kmh":         (vehicle._ggv_speeds * 3.6).tolist(),
+        "ay_max_ms2":         vehicle._ggv_ay_max.tolist(),
+        "ax_accel_ms2":       vehicle._ggv_ax_accel[:, 0].tolist(),
+        "ax_brake_ms2":       vehicle._ggv_ax_brake[:, 0].tolist(),
+        "ay_frac":            vehicle._ggv_ay_frac.tolist() if vehicle._ggv_ay_frac is not None else [],
+        "ax_accel_surface":   vehicle._ggv_ax_accel.tolist() if vehicle._ggv_ax_accel is not None else [],
+        "ax_brake_surface":   vehicle._ggv_ax_brake.tolist() if vehicle._ggv_ax_brake is not None else [],
+        "ggv_type":           "INTERPOLATED_PRE_COMPUTED",
         "terminal_velocity_kmh": float(vehicle.terminal_velocity() * 3.6),
     }
 
@@ -428,7 +726,9 @@ async def get_ggv_envelope(
 # Setup sensitivity endpoint — the "intelligence platform" core
 # ─────────────────────────────────────────────────────────────────────────────
 
-@router.post("/sensitivity",
+@router.post("/lapsim/sensitivity",
+             summary="Vehicle setup sensitivity analysis (ARB, ride height, springs)")
+@router.post("/lap-sim/sensitivity",
              summary="Vehicle setup sensitivity analysis (ARB, ride height, springs)")
 async def setup_sensitivity(
     request_data: Dict[str, Any],
@@ -489,7 +789,8 @@ async def setup_sensitivity(
     # Suspension info
     K_phi_f = sus.roll_stiffness_front(mp.track_front)
     K_phi_r = sus.roll_stiffness_rear(mp.track_rear)
-    K_theta = sus.pitch_stiffness(mp.wheelbase)
+    K_theta = sus.pitch_stiffness(mp.wheelbase, a=mp.cog_dist_front, b=mp.b)
+
 
     q_dyn = 0.5 * vehicle.aero.rho_air * vehicle.aero.frontal_area * speed_ms ** 2
 
@@ -518,3 +819,340 @@ async def setup_sensitivity(
             "q_dynamic_pa": round(q_dyn, 1),
         },
     }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Corner Analysis & Setup Comparison Endpoints (Phase 1 Engineering APIs)
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/lapsim/corners")
+@router.post("/lap-sim/corners")
+async def get_lap_corners(
+    request_data: Dict[str, Any],
+    user=Depends(verify_api_key),
+):
+    """Detect and analyze corners on a circuit with entry/apex/exit speeds and braking metrics."""
+    from suspensionlab.physics.corner_analysis import analyze_lap_corners, classify_zones
+
+    distances = request_data.get("distances")
+    curvatures = request_data.get("curvatures")
+    speeds = request_data.get("speeds")
+    lat_g = request_data.get("lateral_g")
+    long_g = request_data.get("longitudinal_g")
+    sectors = request_data.get("sectors")
+
+    if not distances or not curvatures:
+        raise HTTPException(400, "Must provide distances and curvatures arrays.")
+
+    # If speeds are not provided, run a quick QSS solve to compute them
+    if not speeds or not lat_g or not long_g:
+        v_input = None
+        if "vehicle" in request_data:
+            v_input = VehicleInput(**request_data["vehicle"])
+        vehicle = _build_vehicle(v_input)
+        segments = parse_track_from_curvature(distances, curvatures, sectors=sectors)
+        result = solve_lap(vehicle, segments)
+        speeds = result.speeds.tolist()
+        lat_g = result.lateral_g.tolist()
+        long_g = result.longitudinal_g.tolist()
+        dt = np.zeros(len(distances))
+        for i in range(1, len(distances)):
+            ds = distances[i] - distances[i-1]
+            v_avg = max(0.5 * (speeds[i] + speeds[i-1]), 0.1)
+            dt[i] = ds / v_avg
+    else:
+        dt = np.zeros(len(distances))
+        for i in range(1, len(distances)):
+            ds = distances[i] - distances[i-1]
+            v_avg = max(0.5 * (speeds[i] + speeds[i-1]), 0.1)
+            dt[i] = ds / v_avg
+
+    dist_arr = np.array(distances)
+    curv_arr = np.array(curvatures)
+    speed_arr = np.array(speeds)
+    lat_g_arr = np.array(lat_g)
+    long_g_arr = np.array(long_g)
+
+    corners = analyze_lap_corners(
+        dist_arr, speed_arr, curv_arr, lat_g_arr, long_g_arr, dt,
+        sectors=np.array(sectors) if sectors else None,
+    )
+    zones = classify_zones(dist_arr, speed_arr, curv_arr, long_g_arr)
+
+    return {
+        "num_corners": len(corners),
+        "corners": [c.to_dict() for c in corners],
+        "track_zones": zones.tolist(),
+    }
+
+
+@router.post("/lapsim/compare")
+@router.post("/lap-sim/compare")
+async def compare_lap_setups(
+    request_data: Dict[str, Any],
+    user=Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """Compare two vehicle setups (A vs B) on the same track with causal delta attribution."""
+    if user and getattr(user, "is_trial", False):
+        from suspensionlab.backend.services.trial_service import TrialService
+        await TrialService.assert_trial_access(db, user, action="simulate", delta=1)
+        await TrialService.record_trial_usage(db, user, action="simulate", delta=1)
+
+    from suspensionlab.physics.lap_delta import compute_lap_delta
+    from suspensionlab.physics.corner_analysis import analyze_lap_corners
+
+    distances = request_data.get("distances")
+    curvatures = request_data.get("curvatures")
+    sectors = request_data.get("sectors")
+    elevations = request_data.get("elevations")
+    bank_angles = request_data.get("bank_angles")
+
+    if not distances or not curvatures:
+        raise HTTPException(400, "Must provide distances and curvatures arrays.")
+
+    v_input_a = None
+    if "vehicle_a" in request_data:
+        v_input_a = VehicleInput(**request_data["vehicle_a"])
+    elif "vehicle" in request_data:
+        v_input_a = VehicleInput(**request_data["vehicle"])
+
+    v_input_b = None
+    if "vehicle_b" in request_data:
+        v_input_b = VehicleInput(**request_data["vehicle_b"])
+    else:
+        raise HTTPException(400, "Must provide vehicle_b configuration for comparison.")
+
+    vehicle_a = _build_vehicle(v_input_a)
+    vehicle_b = _build_vehicle(v_input_b)
+
+    segments = parse_track_from_curvature(
+        distances, curvatures, elevations=elevations, bank_angles=bank_angles, sectors=sectors
+    )
+
+    res_a = solve_lap(vehicle_a, segments)
+    res_b = solve_lap(vehicle_b, segments)
+
+    # Compute corners for both
+    dt_a = np.zeros(len(distances))
+    dt_b = np.zeros(len(distances))
+    for i in range(1, len(distances)):
+        ds = distances[i] - distances[i-1]
+        dt_a[i] = ds / max(0.5 * (res_a.speeds[i] + res_a.speeds[i-1]), 0.1)
+        dt_b[i] = ds / max(0.5 * (res_b.speeds[i] + res_b.speeds[i-1]), 0.1)
+
+    corners_a = analyze_lap_corners(
+        res_a.distances, res_a.speeds, res_a.curvatures,
+        res_a.lateral_g, res_a.longitudinal_g, dt_a,
+    )
+    corners_b = analyze_lap_corners(
+        res_b.distances, res_b.speeds, res_b.curvatures,
+        res_b.lateral_g, res_b.longitudinal_g, dt_b,
+    )
+
+    report = compute_lap_delta(res_a, res_b, corners_a=corners_a, corners_b=corners_b)
+
+    return {
+        "setup_a": {
+            "total_time_s": round(res_a.total_time, 4),
+            "max_speed_kmh": round(res_a.max_speed_kmh, 1),
+            "avg_speed_kmh": round(res_a.avg_speed_kmh, 1),
+        },
+        "setup_b": {
+            "total_time_s": round(res_b.total_time, 4),
+            "max_speed_kmh": round(res_b.max_speed_kmh, 1),
+            "avg_speed_kmh": round(res_b.avg_speed_kmh, 1),
+        },
+        "delta_report": report.to_dict(),
+    }
+
+
+@router.post("/lapsim/sweep")
+@router.post("/lap-sim/sweep")
+async def sweep_setup(
+    request_data: Dict[str, Any],
+    user=Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Evaluate parameter sensitivity sweep across a range of candidate values.
+    Returns lap times, deltas, sector times, corner speeds, and numerical gradients (dT/dp).
+    """
+    if user and getattr(user, "is_trial", False):
+        from suspensionlab.backend.services.trial_service import TrialService
+        await TrialService.assert_trial_access(db, user, action="simulate", delta=1)
+        await TrialService.record_trial_usage(db, user, action="simulate", delta=1)
+
+    from suspensionlab.physics.setup_sweep import run_parameter_sweep, SweepParameter
+
+    distances = request_data.get("distances")
+    curvatures = request_data.get("curvatures")
+    sectors = request_data.get("sectors")
+    elevations = request_data.get("elevations")
+    bank_angles = request_data.get("bank_angles")
+
+    parameter = request_data.get("parameter")
+    values = request_data.get("values")
+    baseline_value = request_data.get("baseline_value")
+    ggv_resolution = request_data.get("ggv_resolution", [15, 11])
+
+    if not distances or not curvatures:
+        raise HTTPException(400, "Must provide distances and curvatures arrays.")
+    if not parameter or values is None:
+        raise HTTPException(400, "Must provide 'parameter' and 'values' for sweep.")
+
+    v_input = None
+    if "vehicle" in request_data:
+        v_input = VehicleInput(**request_data["vehicle"])
+    baseline_vehicle = _build_vehicle(v_input)
+
+    track = parse_track_from_curvature(
+        distances, curvatures, elevations=elevations, bank_angles=bank_angles, sectors=sectors
+    )
+
+    try:
+        sweep_result = run_parameter_sweep(
+            baseline_vehicle=baseline_vehicle,
+            track=track,
+            parameter=parameter,
+            values=values,
+            baseline_val=baseline_value,
+            ggv_resolution=tuple(ggv_resolution),
+        )
+        return sweep_result.to_dict()
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Parameter sweep failed: {str(e)}")
+
+
+@router.post("/lapsim/correlate")
+@router.post("/lap-sim/correlate")
+async def correlate_telemetry(
+    request_data: Dict[str, Any],
+    user=Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Correlate simulation output against measured telemetry.
+    Supports calculating simulation on the fly or passing precomputed simulation traces.
+    """
+    if user and getattr(user, "is_trial", False):
+        from suspensionlab.backend.services.trial_service import TrialService
+        await TrialService.assert_trial_access(db, user, action="simulate", delta=1)
+        await TrialService.record_trial_usage(db, user, action="simulate", delta=1)
+
+    from suspensionlab.physics.telemetry_analysis import compare_sim_vs_measured
+
+    telemetry_data = request_data.get("telemetry")
+    if not telemetry_data:
+        raise HTTPException(400, "Must provide 'telemetry' dictionary with measured data.")
+
+    distance_step_m = float(request_data.get("distance_step_m", 2.0))
+    session_id = str(request_data.get("session_id", "telemetry_session_01"))
+
+    # Determine simulation source
+    if "sim_result" in request_data:
+        sim_data = request_data["sim_result"]
+
+        class SimResultProxy:
+            distances = np.asarray(sim_data.get("distances", []), dtype=float)
+            speeds = np.asarray(sim_data.get("speeds", sim_data.get("speeds_ms", [])), dtype=float)
+            lateral_g = np.asarray(sim_data.get("lateral_g", []), dtype=float)
+            longitudinal_g = np.asarray(sim_data.get("longitudinal_g", []), dtype=float)
+
+        sim_obj = SimResultProxy()
+    else:
+        distances = request_data.get("distances")
+        curvatures = request_data.get("curvatures")
+        if not distances or not curvatures:
+            raise HTTPException(400, "Must provide either 'sim_result' or 'distances' and 'curvatures' to run simulation.")
+        sectors = request_data.get("sectors")
+        elevations = request_data.get("elevations")
+        bank_angles = request_data.get("bank_angles")
+
+        v_input = None
+        if "vehicle" in request_data:
+            v_input = VehicleInput(**request_data["vehicle"])
+        vehicle = _build_vehicle(v_input)
+        track = parse_track_from_curvature(
+            distances, curvatures, elevations=elevations, bank_angles=bank_angles, sectors=sectors
+        )
+        sim_obj = solve_lap(vehicle, track)
+
+    try:
+        report = compare_sim_vs_measured(
+            sim_obj,
+            telemetry_data,
+            distance_step_m=distance_step_m,
+            session_id=session_id,
+        )
+        return report.to_dict()
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        raise HTTPException(500, f"Telemetry correlation failed: {str(e)}")
+
+
+@router.post("/lapsim/decision")
+@router.post("/lap-sim/decision")
+async def race_engineer_decision_endpoint(
+    request_data: Dict[str, Any],
+    user=Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Synthesizes an evidence-backed race engineering decision answering:
+    "Where am I losing lap time, why, what setup change should I test, and what evidence supports that recommendation?"
+    """
+    if user and getattr(user, "is_trial", False):
+        from suspensionlab.backend.services.trial_service import TrialService
+        await TrialService.assert_trial_access(db, user, action="decision")
+        await TrialService.record_trial_usage(db, user, action="simulate", delta=1)
+
+    from suspensionlab.physics.race_engineer_decision import synthesize_race_engineer_decision
+
+    distances = request_data.get("distances")
+    curvatures = request_data.get("curvatures")
+    sectors = request_data.get("sectors")
+    elevations = request_data.get("elevations")
+    bank_angles = request_data.get("bank_angles")
+
+    if not distances or not curvatures:
+        raise HTTPException(400, "Must provide distances and curvatures arrays.")
+
+    v_input_a = None
+    if "vehicle_a" in request_data:
+        v_input_a = VehicleInput(**request_data["vehicle_a"])
+    elif "vehicle" in request_data:
+        v_input_a = VehicleInput(**request_data["vehicle"])
+    baseline_vehicle = _build_vehicle(v_input_a)
+
+    v_input_b = None
+    if "vehicle_b" in request_data:
+        v_input_b = VehicleInput(**request_data["vehicle_b"])
+    else:
+        # Default perturbation if no candidate vehicle is given (e.g. baseline test)
+        v_input_b = VehicleInput(mass=baseline_vehicle.mass_props.total_mass)
+    candidate_vehicle = _build_vehicle(v_input_b)
+
+    track = parse_track_from_curvature(
+        distances, curvatures, elevations=elevations, bank_angles=bank_angles, sectors=sectors
+    )
+
+    try:
+        res_a = solve_lap(baseline_vehicle, track)
+        res_b = solve_lap(candidate_vehicle, track)
+
+        decision = synthesize_race_engineer_decision(
+            res_a,
+            res_b,
+            setup_baseline=request_data.get("setup_baseline"),
+            setup_candidate=request_data.get("setup_candidate"),
+            sensitivities=request_data.get("sensitivities"),
+        )
+        return decision.to_dict()
+    except Exception as e:
+        raise HTTPException(500, f"Race engineer decision synthesis failed: {str(e)}")
+
+

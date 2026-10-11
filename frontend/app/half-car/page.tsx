@@ -1,8 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 // Half Car Page
 
 "use client";
 import { useState, useRef, Suspense, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useJobPolling } from "../../hooks/useJobPolling";
 import { promptModal } from "../../components/sim/ModalHost";
@@ -22,7 +23,7 @@ import SimHistory, { saveSimulationToHistory } from "../../components/SimHistory
 import DamperLUTInput from "../../components/DamperLUTInput";
 import { useAuth } from "../../contexts/AuthContext";
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import Plot from "../../components/sim/Plot";
 import KPICard from "../../components/sim/KPICard";
 import PlotBox from "../../components/sim/PlotBox";
 import { darkLayout, DARK_BASE } from "../../components/sim/theme";
@@ -58,7 +59,8 @@ interface HalfCarResults {
 type HalfCarState = HalfCarResults | { error: boolean; message: string; [key: string]: any };
 
 function HalfCarDashboard() {
-  const { authHeader } = useAuth();
+  const searchParams = useSearchParams();
+  const { authHeader, fetchWithAuth } = useAuth();
   const { pollJob } = useJobPolling();
 
   const [isRunning, setIsRunning] = useState(false);
@@ -75,6 +77,20 @@ function HalfCarDashboard() {
   });
 
   const showToast = (msg: string, type: Toast["type"]) => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
+
+  useEffect(() => {
+    const profileId = searchParams.get("load");
+    if (!profileId) return;
+    fetchWithAuth(`/api/v1/profiles/${profileId}`)
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((data) => {
+        if (data.params) {
+          setParams((prev: any) => ({ ...prev, ...data.params }));
+          showToast(`Loaded "${data.name}" from Garage`, "success");
+        }
+      })
+      .catch(() => showToast("Could not load profile", "error"));
+  }, [searchParams]);
 
   const buildPayload = () => {
     const b = params.L * (params.weight_dist / 100.0);
@@ -101,20 +117,25 @@ function HalfCarDashboard() {
         return;
       }
       
-      const jobId = data.job_id;
-      pollJob({
-        jobId,
-        authHeader,
-        onCompleted: (result) => {
-          setResults(result);
-          saveSimulationToHistory("sl_sim_history_hcar", params, result);
-          setIsRunning(false);
-        },
-        onFailed: (msg) => {
-          setResults({ error: true, message: msg });
-          setIsRunning(false);
-        },
-      });
+      if (data.job_id) {
+        pollJob({
+          jobId: data.job_id,
+          authHeader,
+          onCompleted: (result) => {
+            setResults(result);
+            saveSimulationToHistory("sl_sim_history_hcar", params, result);
+            setIsRunning(false);
+          },
+          onFailed: (msg) => {
+            setResults({ error: true, message: msg });
+            setIsRunning(false);
+          },
+        });
+      } else {
+        setResults(data);
+        saveSimulationToHistory("sl_sim_history_hcar", params, data);
+        setIsRunning(false);
+      }
     } catch (err) {
       setResults({ error: true, message: String(err) });
       setIsRunning(false);
@@ -122,11 +143,16 @@ function HalfCarDashboard() {
   };
 
   const saveProfile = async () => {
+    if (isSaving) return;
     const name = await promptModal("Name this Half Car setup:", "Custom 4-DOF Setup");
     if (!name) return;
     setIsSaving(true);
     try {
-      const r = await fetch(`${API_BASE}/profiles`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ name, vehicle_type: "HALF_CAR", params }) });
+      const r = await fetchWithAuth("/api/v1/profiles/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, vehicle_type: "HALF_CAR", params })
+      });
       if (r.ok) showToast("Setup saved to Garage!", "success");
       else showToast("Failed to save", "error");
     } catch { showToast("Failed to save profile", "error"); }
@@ -176,22 +202,39 @@ function HalfCarDashboard() {
 
         <div className="flex items-center gap-2">
           <SimHistory storageKey="sl_sim_history_hcar" renderParams={(p, m) => [["m_s", p.m_s], ["k_sf", p.k_sf], ["k_sr", p.k_sr], ["RMS", m?.rms_body_accel], ["TX", m?.peak_transmissibility], ["fₙ", m?.f_n_s]]} onRestore={(p) => { setParams(prev => ({ ...prev, ...p })); showToast("Restored from history", "success"); }} />
-                    {/* Undo/Redo/Reset Controls */}
+          {/* Undo/Redo/Reset Controls */}
           <div className="flex items-center bg-[#141416] border border-[#252525] rounded-lg overflow-hidden mr-2">
-            <button onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)"
-              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-gray-400 disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+            <button
+              type="button"
+              onClick={undo}
+              disabled={!canUndo}
+              title="Undo (Ctrl+Z)"
+              aria-label="Undo parameter change"
+              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            >
               <Undo2 size={14} />
             </button>
-            <button onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)"
-              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-gray-400 border-l border-[#252525] disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+            <button
+              type="button"
+              onClick={redo}
+              disabled={!canRedo}
+              title="Redo (Ctrl+Y)"
+              aria-label="Redo parameter change"
+              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-gray-400 hover:text-white border-l border-[#252525] disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            >
               <Redo2 size={14} />
             </button>
-            <button onClick={reset} title="Reset to Defaults"
-              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-red-400/80 hover:text-red-400 border-l border-[#252525] transition-colors">
+            <button
+              type="button"
+              onClick={reset}
+              title="Reset to Defaults"
+              aria-label="Reset parameters to defaults"
+              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-red-400/80 hover:text-red-400 border-l border-[#252525] transition-colors"
+            >
               <RotateCcw size={14} />
             </button>
           </div>
-<button onClick={saveProfile} disabled={isSaving} className="px-3 py-1.5 bg-[#141416] border border-[#252525] hover:bg-[#1e1e20] rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40">
+          <button onClick={saveProfile} disabled={isSaving} className="px-3 py-1.5 bg-[#141416] border border-[#252525] hover:bg-[#1e1e20] rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40">
             <Save size={13} className="text-ansys-yellow" /> Save Setup
           </button>
           <PDFExport captureId="sim-report" fileName={`HCar_${params.m_s}`} />
@@ -202,6 +245,15 @@ function HalfCarDashboard() {
             {isRunning ? <><div className="w-3 h-3 border border-gray-600 border-t-gray-300 rounded-full animate-spin" />Solving…</> : <><Play size={13} fill="currentColor" /> Run Solver</>}
           </button>
         </div>
+      </div>
+
+      {/* Screen Reader Live Solver Announcer */}
+      <div className="sr-only" role="status" aria-live="polite">
+        {isRunning
+          ? "Solving 4-DOF half car ODE system..."
+          : results
+          ? `Simulation completed. Heave frequency: ${(results as any).f_n_heave?.toFixed(2) ?? "N/A"} Hertz, Pitch frequency: ${(results as any).f_n_pitch?.toFixed(2) ?? "N/A"} Hertz`
+          : ""}
       </div>
 
       <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
@@ -216,25 +268,29 @@ function HalfCarDashboard() {
               <ParameterInput label="Weight Dist (F)" val={params.weight_dist} unit="%" step={1} min={10} onChange={(v) => setParams({ ...params, weight_dist: v })} />
             </ParamSection>
             <ParamSection title="Front Axle">
-              <ParameterInput label="Unsprung Mass" val={params.m_uf} unit="kg" onChange={(v) => setParams({ ...params, m_uf: v })} />
-              <ParameterInput label="Spring Rate" val={params.k_sf} unit="N/m" step={500} onChange={(v) => setParams({ ...params, k_sf: v })} />
-              <ParameterInput label="Damping" val={params.c_f} unit="N·s/m" step={50} onChange={(v) => setParams({ ...params, c_f: v })} />
-              <ParameterInput label="Tire Stiffness" val={params.k_tf} unit="N/m" step={5000} onChange={(v) => setParams({ ...params, k_tf: v })} />
+              <ParameterInput label="Unsprung Mass (F)" val={params.m_uf} unit="kg" onChange={(v) => setParams({ ...params, m_uf: v })} />
+              <ParameterInput label="Spring Rate (F)" val={params.k_sf} unit="N/m" step={500} onChange={(v) => setParams({ ...params, k_sf: v })} />
+              <ParameterInput label="Damping (F)" val={params.c_f} unit="N·s/m" step={50} onChange={(v) => setParams({ ...params, c_f: v })} />
+              <ParameterInput label="Tire Stiffness (F)" val={params.k_tf} unit="N/m" step={5000} onChange={(v) => setParams({ ...params, k_tf: v })} />
               <DamperLUTInput label="Non-Linear Front Damper" isActive={params.damper_curve_v_f !== null} onApply={(v, f) => setParams({ ...params, damper_curve_v_f: v, damper_curve_f_f: f })} onClear={() => setParams({ ...params, damper_curve_v_f: null, damper_curve_f_f: null })} />
             </ParamSection>
             <ParamSection title="Rear Axle">
-              <ParameterInput label="Unsprung Mass" val={params.m_ur} unit="kg" onChange={(v) => setParams({ ...params, m_ur: v })} />
-              <ParameterInput label="Spring Rate" val={params.k_sr} unit="N/m" step={500} onChange={(v) => setParams({ ...params, k_sr: v })} />
-              <ParameterInput label="Damping" val={params.c_r} unit="N·s/m" step={50} onChange={(v) => setParams({ ...params, c_r: v })} />
-              <ParameterInput label="Tire Stiffness" val={params.k_tr} unit="N/m" step={5000} onChange={(v) => setParams({ ...params, k_tr: v })} />
+              <ParameterInput label="Unsprung Mass (R)" val={params.m_ur} unit="kg" onChange={(v) => setParams({ ...params, m_ur: v })} />
+              <ParameterInput label="Spring Rate (R)" val={params.k_sr} unit="N/m" step={500} onChange={(v) => setParams({ ...params, k_sr: v })} />
+              <ParameterInput label="Damping (R)" val={params.c_r} unit="N·s/m" step={50} onChange={(v) => setParams({ ...params, c_r: v })} />
+              <ParameterInput label="Tire Stiffness (R)" val={params.k_tr} unit="N/m" step={5000} onChange={(v) => setParams({ ...params, k_tr: v })} />
               <DamperLUTInput label="Non-Linear Rear Damper" isActive={params.damper_curve_v_r !== null} onApply={(v, f) => setParams({ ...params, damper_curve_v_r: v, damper_curve_f_r: f })} onClear={() => setParams({ ...params, damper_curve_v_r: null, damper_curve_f_r: null })} />
             </ParamSection>
-            <ParamSection title="Environment">
-              <ParameterInput label="Speed" val={params.speed_kph} unit="km/h" step={1} min={0} onChange={(v) => setParams({ ...params, speed_kph: v })} />
-              <div className="flex justify-between items-center gap-2 mt-2">
-                <label className="text-[11px] text-gray-500 flex-1">Profile</label>
-                <select value={params.road_profile} onChange={(e) => setParams({ ...params, road_profile: e.target.value })} className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white w-[7.5rem] focus:outline-none focus:border-ansys-yellow/60 focus:ring-1 focus:ring-ansys-yellow/15">
-                  {ROAD_PROFILES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            <ParamSection title="Road Profile">
+              <div className="flex justify-between items-center gap-2">
+                <label htmlFor="half-car-road-profile" className="text-[11px] text-gray-400 flex-1">Profile Type</label>
+                <select id="half-car-road-profile" aria-label="Road profile type" value={params.road_profile} onChange={(e) => setParams({ ...params, road_profile: e.target.value })}
+                  className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white w-28 focus:outline-none focus:border-ansys-yellow/60">
+                  <option value="step">Step</option>
+                  <option value="sine">Sine Wave</option>
+                  <option value="bump">Single Bump</option>
+                  <option value="pothole">Pothole</option>
+                  <option value="random">Random Rough</option>
                 </select>
               </div>
               <ParameterInput label="Amplitude" val={params.amplitude} unit="m" step={0.005} min={0.001} onChange={(v) => setParams({ ...params, amplitude: v })} />
@@ -248,7 +304,7 @@ function HalfCarDashboard() {
           {!results && !isRunning && (
             <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl flex flex-col items-center justify-center gap-4">
               <div className="w-16 h-16 rounded-2xl bg-ansys-yellow/5 border border-ansys-yellow/10 flex items-center justify-center"><Activity size={32} strokeWidth={1} className="text-ansys-yellow/40" /></div>
-              <div className="text-center"><p className="text-sm font-semibold text-gray-400 mb-1">Configure parameters and click <span className="text-ansys-yellow">Run Solver</span></p><p className="text-xs text-gray-700">4-DOF half car · RK45 ODE · Pitch & Heave coupling</p></div>
+              <div className="text-center"><p className="text-sm font-semibold text-gray-400 mb-1">Configure parameters and click <span className="text-ansys-yellow">Run Solver</span></p><p className="text-xs text-gray-400">4-DOF half car · RK45 ODE · Pitch & Heave coupling</p></div>
             </div>
           )}
 
@@ -260,9 +316,9 @@ function HalfCarDashboard() {
           )}
 
           {results && results.error ? (
-            <div className="flex-1 bg-[#111113] border border-red-900/30 rounded-xl flex flex-col items-center justify-center gap-3">
+            <div role="alert" aria-live="assertive" className="flex-1 bg-[#111113] border border-red-900/30 rounded-xl flex flex-col items-center justify-center gap-3">
               <AlertTriangle size={44} className="text-red-500 opacity-60" /><p className="text-sm font-semibold text-red-400">Simulation Error</p>
-              <pre className="text-xs text-red-600/70 max-w-sm text-center font-mono bg-red-950/30 px-4 py-2 rounded-lg border border-red-900/20 whitespace-pre-wrap">{results.message as string}</pre>
+              <pre className="text-xs text-red-400 max-w-sm text-center font-mono bg-red-950/30 px-4 py-2 rounded-lg border border-red-900/20 whitespace-pre-wrap">{results.message as string}</pre>
             </div>
           ) : null}
 
@@ -281,12 +337,22 @@ function HalfCarDashboard() {
                 <KPICard label="RMS Susp R" value={r.rms_susp_travel_r * 1000} unit="mm" status="neutral" />
               </div>
 
-              <div className="flex gap-1.5 shrink-0">
+              <div className="flex gap-1.5 shrink-0" role="tablist" aria-label="Half-car simulation views">
                 {TABS.map((tab, i) => {
                   const Icon = tab.icon;
                   return (
-                    <button key={tab.label} onClick={() => setActiveTab(i)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === i ? "bg-ansys-yellow text-black shadow-[0_0_12px_rgba(242,169,0,0.2)]" : "bg-[#111113] border border-[#1e1e1e] text-gray-500 hover:text-gray-300 hover:border-[#2a2a2a]"}`}>
-                      <Icon size={12} /> {tab.label}
+                    <button
+                      key={tab.label}
+                      role="tab"
+                      aria-selected={activeTab === i}
+                      onClick={() => setActiveTab(i)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        activeTab === i
+                          ? "bg-ansys-yellow text-black shadow-[0_0_12px_rgba(242,169,0,0.2)]"
+                          : "bg-[#111113] border border-[#1e1e1e] text-gray-400 hover:text-white hover:border-[#2a2a2a]"
+                      }`}
+                    >
+                      <Icon size={12} aria-hidden="true" /> {tab.label}
                     </button>
                   );
                 })}

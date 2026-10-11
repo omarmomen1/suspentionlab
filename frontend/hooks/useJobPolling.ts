@@ -1,77 +1,123 @@
 "use client";
 
 /**
- * hooks/useJobPolling.ts (P1-ARCH-02)
- * Shared job-status polling with automatic unmount cleanup.
+ * hooks/useJobPolling.ts
+ * Shared simulation & optimization job lifecycle manager.
  *
- * Previously duplicated as raw setInterval blocks in half-car, full-car,
- * and sensitivity pages — each of which leaked the interval if the user
- * navigated away before the job finished (P1-PERF-04).
+ * Implements: queued, running, progress, completed, failed, cancelled, retry.
+ * Backed by canonical SimulationApi SDK.
  */
 
 import { useEffect, useRef, useCallback } from "react";
+import { SimulationApi, JobStatusResponse } from "../lib/api_client";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
-
-interface PollJobArgs {
+export interface PollJobArgs {
   jobId: string;
-  authHeader: () => Record<string, string>;
-  /** Called with the job result when status === COMPLETED. */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  authHeader?: () => Record<string, string>;
   onCompleted: (result: any) => void;
-  /** Called with an error message when the job fails or polling errors. */
   onFailed: (message: string) => void;
+  onProgress?: (progress: number, status: "PENDING" | "RUNNING") => void;
+  onCancelled?: () => void;
   intervalMs?: number;
-  /** Hard ceiling: stop polling and fail after this many attempts (default 600 ≈ 10 min at 1 s). */
   maxAttempts?: number;
 }
 
 export function useJobPolling() {
-  const pollersRef = useRef<Set<ReturnType<typeof setInterval>>>(new Set());
+  const pollersRef = useRef<Map<string, ReturnType<typeof setInterval>>>(new Map());
 
-  // Clear any still-active pollers on unmount (P1-PERF-04).
+  // Clear all pollers on unmount
   useEffect(() => {
-    const s = pollersRef.current;
     return () => {
-      s.forEach((id) => clearInterval(id));
-      s.clear();
+      pollersRef.current.forEach((id) => clearInterval(id));
+      pollersRef.current.clear();
     };
   }, []);
 
-  const stop = useCallback((id: ReturnType<typeof setInterval>) => {
-    clearInterval(id);
-    pollersRef.current.delete(id);
+  const stop = useCallback((jobId: string) => {
+    const timerId = pollersRef.current.get(jobId);
+    if (timerId) {
+      clearInterval(timerId);
+      pollersRef.current.delete(jobId);
+    }
   }, []);
 
-  const pollJob = useCallback(({
-    jobId, authHeader, onCompleted, onFailed, intervalMs = 1000, maxAttempts = 600,
-  }: PollJobArgs) => {
-    let attempts = 0;
-    const id = setInterval(async () => {
-      attempts += 1;
-      // P1-ARCH-02: hung jobs must not poll forever — hard ceiling per poller
-      if (attempts > maxAttempts) {
-        stop(id);
-        onFailed(`Job ${jobId} did not complete within ${maxAttempts} polling attempts. It may still be running — check the jobs panel.`);
-        return;
-      }
-      try {
-        const pollRes = await fetch(`${API_BASE}/jobs/${jobId}`, { headers: authHeader() });
-        const pollData = await pollRes.json();
-        if (pollData.status === "COMPLETED") {
-          stop(id);
-          onCompleted(pollData.result);
-        } else if (pollData.status === "FAILED" || pollData.status === "CANCELED") {
-          stop(id);
-          onFailed(pollData.error || "Simulation failed.");
-        }
-      } catch (e) {
-        stop(id);
-        onFailed(String(e));
-      }
-    }, intervalMs);
-    pollersRef.current.add(id);
+  const cancelJob = useCallback(async (jobId: string) => {
+    stop(jobId);
+    try {
+      await SimulationApi.cancelSimulation(jobId);
+    } catch (e) {
+      console.error("Cancellation error:", e);
+    }
   }, [stop]);
 
-  return { pollJob };
+  const pollJob = useCallback(
+    ({
+      jobId,
+      onCompleted,
+      onFailed,
+      onProgress,
+      onCancelled,
+      intervalMs = 1000,
+      maxAttempts = 600,
+    }: PollJobArgs) => {
+      // Clear any prior poller for this job
+      stop(jobId);
+
+      let attempts = 0;
+      const id = setInterval(async () => {
+        attempts += 1;
+
+        if (attempts > maxAttempts) {
+          stop(jobId);
+          onFailed(
+            `Job ${jobId} did not complete within ${maxAttempts} attempts. It may still be running.`
+          );
+          return;
+        }
+
+        try {
+          const pollData: JobStatusResponse = await SimulationApi.getJobStatus(jobId);
+
+          const isCompleted =
+            pollData.status === "COMPLETED" ||
+            pollData.status === "COMPLETED_WITH_WARNINGS" ||
+            pollData.status === "COMPLETED_VALID";
+
+          if (isCompleted) {
+            stop(jobId);
+            onCompleted(pollData.result);
+          } else if (pollData.status === "CANCELED") {
+            stop(jobId);
+            if (onCancelled) onCancelled();
+            else onFailed("Simulation was cancelled.");
+          } else if (
+            pollData.status === "FAILED" ||
+            pollData.status === "FAILED_NUMERICAL" ||
+            pollData.status === "FAILED_INPUT"
+          ) {
+            stop(jobId);
+            onFailed(pollData.error || "Simulation solver execution failed.");
+          } else {
+            // PENDING or RUNNING
+            if (onProgress) {
+              // Synthetic smooth progress progression if backend doesn't provide fine-grained %
+              const calculatedProgress =
+                pollData.progress ?? Math.min(95, Math.round((attempts / 15) * 100));
+              const runningStatus: "PENDING" | "RUNNING" =
+                pollData.status === "RUNNING" ? "RUNNING" : "PENDING";
+              onProgress(calculatedProgress, runningStatus);
+            }
+          }
+        } catch (e: any) {
+          stop(jobId);
+          onFailed(e?.message || String(e));
+        }
+      }, intervalMs);
+
+      pollersRef.current.set(jobId, id);
+    },
+    [stop]
+  );
+
+  return { pollJob, cancelJob, stop };
 }

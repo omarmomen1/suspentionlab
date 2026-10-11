@@ -52,116 +52,19 @@ logger = logging.getLogger(__name__)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Channel Alias Map — maps raw column names (lower-case, stripped) to
-# standardised channel keys
 # ─────────────────────────────────────────────────────────────────────────────
+# Channel Alias Map — routed directly to canonical telemetry dataset ontology
+# (Rule 21 & Step 3 Single Source of Truth)
+# ─────────────────────────────────────────────────────────────────────────────
+from suspensionlab.physics.telemetry_dataset import (
+    _UNIVERSAL_ONTOLOGY_MAP,
+    resolve_channel_mapping,
+)
 
 # Format: {alias_substring: (standard_key, inferred_unit)}
-# Matching is case-insensitive, substring. First match wins.
+# Derived directly from canonical telemetry dataset ontology rules
 _CHANNEL_ALIAS_MAP: list[tuple[str, str, str]] = [
-    # Time / Distance
-    ("time",          "time",         "s"),
-    ("sec",           "time",         "s"),
-    ("timestamp",     "time",         "s"),
-    ("t_abs",         "time",         "s"),
-    ("distance",      "distance",     "m"),
-    ("dist",          "distance",     "m"),
-    ("odometer",      "distance",     "m"),
-    # Speed
-    ("speed",         "speed",        "m/s"),
-    ("v_x",           "speed",        "m/s"),
-    ("vx",            "speed",        "m/s"),
-    ("gps speed",     "speed",        "m/s"),
-    ("ground speed",  "speed",        "m/s"),
-    ("wheel speed fl","wsp_fl",       "m/s"),
-    ("wheel speed fr","wsp_fr",       "m/s"),
-    ("wheel speed rl","wsp_rl",       "m/s"),
-    ("wheel speed rr","wsp_rr",       "m/s"),
-    ("wsp_fl",        "wsp_fl",       "m/s"),
-    ("wsp_fr",        "wsp_fr",       "m/s"),
-    ("wsp_rl",        "wsp_rl",       "m/s"),
-    ("wsp_rr",        "wsp_rr",       "m/s"),
-    # Lateral / Longitudinal G
-    ("latg",          "lat_g",        "G"),
-    ("lat_g",         "lat_g",        "G"),
-    ("lateral acc",   "lat_g",        "G"),
-    ("lateral g",     "lat_g",        "G"),
-    ("a_y",           "lat_g",        "G"),
-    ("ay",            "lat_g",        "G"),
-    ("g force lat",   "lat_g",        "G"),
-    ("longg",         "long_g",       "G"),
-    ("long_g",        "long_g",       "G"),
-    ("longitudinal",  "long_g",       "G"),
-    ("a_x",           "long_g",       "G"),
-    ("ax",            "long_g",       "G"),
-    ("g force long",  "long_g",       "G"),
-    # Vertical G
-    ("vert g",        "vert_g",       "G"),
-    ("vertical acc",  "vert_g",       "G"),
-    ("a_z",           "vert_g",       "G"),
-    ("az",            "vert_g",       "G"),
-    # Steering
-    ("steering",      "steer_deg",    "deg"),
-    ("steer",         "steer_deg",    "deg"),
-    ("steer angle",   "steer_deg",    "deg"),
-    # Yaw / Roll / Pitch rates
-    ("yaw",           "yaw_rate",     "deg/s"),
-    ("omega_z",       "yaw_rate",     "rad/s"),
-    ("gyro z",        "yaw_rate",     "deg/s"),
-    ("roll rate",     "roll_rate",    "deg/s"),
-    ("pitch rate",    "pitch_rate",   "deg/s"),
-    # Throttle / Brake
-    ("throttle",      "throttle_pct", "%"),
-    ("tps",           "throttle_pct", "%"),
-    ("brake",         "brake_bar",    "bar"),
-    ("brake pres",    "brake_bar",    "bar"),
-    # Ride heights
-    ("ride height fl","rh_fl",        "mm"),
-    ("ride height fr","rh_fr",        "mm"),
-    ("ride height rl","rh_rl",        "mm"),
-    ("ride height rr","rh_rr",        "mm"),
-    ("rh_fl",         "rh_fl",        "mm"),
-    ("rh_fr",         "rh_fr",        "mm"),
-    ("rh_rl",         "rh_rl",        "mm"),
-    ("rh_rr",         "rh_rr",        "mm"),
-    # Damper positions
-    ("damper fl",     "damper_fl",    "mm"),
-    ("damper fr",     "damper_fr",    "mm"),
-    ("damper rl",     "damper_rl",    "mm"),
-    ("damper rr",     "damper_rr",    "mm"),
-    ("susp fl",       "damper_fl",    "mm"),
-    ("susp fr",       "damper_fr",    "mm"),
-    ("susp rl",       "damper_rl",    "mm"),
-    ("susp rr",       "damper_rr",    "mm"),
-    # GPS
-    ("latitude",      "gps_lat",      "deg"),
-    ("gps lat",       "gps_lat",      "deg"),
-    ("longitude",     "gps_lon",      "deg"),
-    ("gps lon",       "gps_lon",      "deg"),
-    ("gps alt",       "gps_alt",      "m"),
-    # Tire temperatures (FL/FR/RL/RR)
-    ("tire temp fl",  "t_tire_fl",    "°C"),
-    ("tire temp fr",  "t_tire_fr",    "°C"),
-    ("tire temp rl",  "t_tire_rl",    "°C"),
-    ("tire temp rr",  "t_tire_rr",    "°C"),
-    ("tyre temp fl",  "t_tire_fl",    "°C"),
-    ("tyre temp fr",  "t_tire_fr",    "°C"),
-    ("tyre temp rl",  "t_tire_rl",    "°C"),
-    ("tyre temp rr",  "t_tire_rr",    "°C"),
-    # Tire pressures
-    ("tire pres fl",  "p_tire_fl",    "bar"),
-    ("tire pres fr",  "p_tire_fr",    "bar"),
-    ("tire pres rl",  "p_tire_rl",    "bar"),
-    ("tire pres rr",  "p_tire_rr",    "bar"),
-    # Gear
-    ("gear",          "gear",         "-"),
-    ("n gear",        "gear",         "-"),
-    # RPM / Engine
-    ("rpm",           "rpm",          "rpm"),
-    ("engine speed",  "rpm",          "rpm"),
-    # Lap / Sector
-    ("lap",           "lap_number",   "-"),
-    ("sector",        "sector",       "-"),
+    (entry[0], entry[1], entry[2]) for entry in _UNIVERSAL_ONTOLOGY_MAP
 ]
 
 
@@ -174,6 +77,36 @@ class ChannelInfo:
     inferred_unit: str    # Inferred physical unit
     confidence:   float   # 0.0–1.0 match confidence
     warnings:     list[str] = field(default_factory=list)
+
+
+@dataclass
+class TelemetryChannel:
+    """Canonical channel ontology for motorsport & automotive data acquisition."""
+    canonical_name: str          # e.g. "steering_angle", "damper_pos_fl", "speed"
+    source_name: str             # Raw name from MoTeC / AiM / CSV column
+    unit: str                    # e.g. "deg", "mm", "m/s"
+    scale: float = 1.0           # Conversion multiplier
+    offset: float = 0.0          # Conversion offset
+    sampling_rate_hz: float = 100.0
+    quality_score: float = 1.0   # 0-1 based on noise and dropouts
+    data: np.ndarray = field(default_factory=lambda: np.zeros(0))
+
+
+@dataclass
+class VehicleSessionMetadata:
+    """Vehicle-engineering aware session metadata."""
+    vehicle_id: str = "Unknown"
+    driver: str = "Unknown"
+    track: str = "Unknown"
+    session_type: str = "Practice"
+    date_iso: str = ""
+    timezone: str = "UTC"
+    tire_compound: str = "Slick"
+    setup_identifier: str = "Base"
+    weather_ambient_c: float = 20.0
+    track_temp_c: float = 30.0
+    coordinate_convention: str = "ISO 8855 (X-Forward, Y-Left, Z-Up)"
+
 
 
 @dataclass
@@ -242,6 +175,45 @@ def identify_channels(headers: list[str]) -> dict[str, ChannelInfo]:
     return identified
 
 
+@dataclass
+class IngestionAuditTrail:
+    """Complete audit record of the ingestion pipeline."""
+    raw_lines_count: int
+    header_line_index: int
+    raw_headers: list[str]
+    identified_channels: list[str]
+    rejected_channels: list[str]
+    total_parsed_rows: int
+    rejected_rows_count: int
+    duplicate_timestamps_count: int
+    non_monotonic_timestamps_count: int
+    sample_rate_hz: float
+    modifications: list[str] = field(default_factory=list)
+    rejections: list[str] = field(default_factory=list)
+    missing_channels: list[str] = field(default_factory=list)
+    unit_mappings: dict[str, str] = field(default_factory=dict)
+    alignment_operations: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "raw_lines_count": self.raw_lines_count,
+            "header_line_index": self.header_line_index,
+            "raw_headers": self.raw_headers,
+            "identified_channels": self.identified_channels,
+            "rejected_channels": self.rejected_channels,
+            "total_parsed_rows": self.total_parsed_rows,
+            "rejected_rows_count": self.rejected_rows_count,
+            "duplicate_timestamps_count": self.duplicate_timestamps_count,
+            "non_monotonic_timestamps_count": self.non_monotonic_timestamps_count,
+            "sample_rate_hz": round(self.sample_rate_hz, 2),
+            "modifications": self.modifications,
+            "rejections": self.rejections,
+            "missing_channels": self.missing_channels,
+            "unit_mappings": self.unit_mappings,
+            "alignment_operations": self.alignment_operations,
+        }
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Core CSV parser
 # ─────────────────────────────────────────────────────────────────────────────
@@ -254,6 +226,8 @@ def parse_telemetry_csv(content: str) -> dict:
     1. Find the header row (first row containing 'time' or 'sec' within first 30 lines)
     2. Identify all known channels
     3. Parse numeric data for all identified channels
+    4. Audit all ingested rows, non-numeric values, duplicates, and unit transformations.
+       Never silently repair corrupt data or convert missing telemetry to zero.
 
     Parameters
     ----------
@@ -262,49 +236,187 @@ def parse_telemetry_csv(content: str) -> dict:
     Returns
     -------
     dict with keys matching standardised channel names → list[float].
-    Also includes '_channel_info': dict[str, ChannelInfo]
+    Also includes:
+      - '_channel_info': dict[str, ChannelInfo]
+      - '_audit_trail': dict (IngestionAuditTrail serialized)
     """
     lines = content.splitlines()
+    if not lines or all(not l.strip() for l in lines):
+        raise ValueError("Telemetry CSV content cannot be empty.")
 
     # Find header row
     header_idx = 0
+    header_found = False
     for i, line in enumerate(lines[:30]):
         line_lower = line.lower()
-        if 'time' in line_lower or 'sec' in line_lower or 'speed' in line_lower:
+        if 'time' in line_lower or 'sec' in line_lower or 'speed' in line_lower or 'lat' in line_lower:
             header_idx = i
+            header_found = True
             break
 
-    headers = [h.strip() for h in lines[header_idx].split(',')]
+    raw_header_line = lines[header_idx] if header_found else lines[0]
+    headers = [h.strip() for h in raw_header_line.split(',')]
     channel_map = identify_channels(headers)
+
+    identified_keys = [info.standard_key for info in channel_map.values()]
+    identified_raw_names = set(info.raw_name for info in channel_map.values())
+    rejected_raw_headers = [h for h in headers if h and h not in identified_raw_names]
 
     # Initialise data arrays
     data: dict[str, list[float]] = {k: [] for k in channel_map}
     col_to_key = {info.column_index: key for key, info in channel_map.items()}
 
     skipped_counts: dict[str, int] = {}
+    rejections_log: list[str] = []
+    modifications_log: list[str] = []
+    unit_mappings = {info.standard_key: info.inferred_unit for info in channel_map.values()}
+
+    duplicate_ts_count = 0
+    non_monotonic_ts_count = 0
+    prev_time = None
+    row_num = header_idx + 1
+    total_parsed = 0
+
     reader = csv.reader(lines[header_idx + 1:])
     for row in reader:
-        if not row or row[0].strip().startswith('#'):
+        row_num += 1
+        if not row or all(not c.strip() for c in row) or row[0].strip().startswith('#'):
             continue
-        for col_idx, key in col_to_key.items():
-            try:
-                if col_idx < len(row):
-                    val_str = row[col_idx].strip()
-                    data[key].append(float(val_str))
-            except (ValueError, IndexError):
-                skipped_counts[key] = skipped_counts.get(key, 0) + 1
+        total_parsed += 1
 
+        for col_idx, key in col_to_key.items():
+            if col_idx < len(row):
+                val_str = row[col_idx].strip()
+                try:
+                    num_val = float(val_str)
+                    data[key].append(num_val)
+                except (ValueError, IndexError):
+                    data[key].append(float('nan'))
+                    skipped_counts[key] = skipped_counts.get(key, 0) + 1
+                    if len(rejections_log) < 50:
+                        rejections_log.append(f"Row {row_num}: non-numeric value '{val_str}' in channel '{key}' preserved as NaN (not zeroed).")
+            else:
+                data[key].append(float('nan'))
+                skipped_counts[key] = skipped_counts.get(key, 0) + 1
+                if len(rejections_log) < 50:
+                    rejections_log.append(f"Row {row_num}: missing column for channel '{key}' preserved as NaN.")
+
+        # Timestamp audit
+        if "time" in data and len(data["time"]) > 0:
+            curr_t = data["time"][-1]
+            if math.isfinite(curr_t):
+                if prev_time is not None:
+                    if curr_t == prev_time:
+                        duplicate_ts_count += 1
+                        if len(rejections_log) < 50:
+                            rejections_log.append(f"Row {row_num}: duplicate timestamp t={curr_t:.4f}s detected.")
+                    elif curr_t < prev_time:
+                        non_monotonic_ts_count += 1
+                        if len(rejections_log) < 50:
+                            rejections_log.append(f"Row {row_num}: non-monotonic timestamp reversal t={curr_t:.4f}s < {prev_time:.4f}s.")
+                prev_time = curr_t
+
+    # Sample rate estimation
+    sample_rate_hz = 0.0
+    if "time" in data and len(data["time"]) > 1:
+        t_arr = np.asarray([t for t in data["time"] if math.isfinite(t)], dtype=float)
+        if len(t_arr) > 1:
+            dt = np.diff(t_arr)
+            pos_dt = dt[dt > 1e-7]
+            if len(pos_dt) > 0:
+                sample_rate_hz = float(1.0 / np.median(pos_dt))
+
+    # Unit transformations documentation
+    for key, info in channel_map.items():
+        if info.inferred_unit:
+            modifications_log.append(f"Channel '{key}' mapped from raw '{info.raw_name}' with unit '{info.inferred_unit}' (confidence: {info.confidence:.2f}).")
+
+    missing_core = [c for c in ["time", "speed", "lat_g", "long_g"] if c not in data]
     total_skipped = sum(skipped_counts.values())
-    if total_skipped:
-        worst = dict(sorted(skipped_counts.items(), key=lambda kv: -kv[1])[:10])
-        logger.warning(
-            "Telemetry CSV parse: %d non-numeric/unreadable sample(s) skipped across %d channel(s). "
-            "Worst channels: %s. Downstream QA may report gaps or dead channels.",
-            total_skipped, len(skipped_counts), worst,
-        )
+
+    audit = IngestionAuditTrail(
+        raw_lines_count=len(lines),
+        header_line_index=header_idx,
+        raw_headers=headers,
+        identified_channels=identified_keys,
+        rejected_channels=rejected_raw_headers,
+        total_parsed_rows=total_parsed,
+        rejected_rows_count=total_skipped,
+        duplicate_timestamps_count=duplicate_ts_count,
+        non_monotonic_timestamps_count=non_monotonic_ts_count,
+        sample_rate_hz=sample_rate_hz,
+        modifications=modifications_log,
+        rejections=rejections_log,
+        missing_channels=missing_core,
+        unit_mappings=unit_mappings,
+        alignment_operations=[],
+    )
 
     data['_channel_info'] = channel_map  # type: ignore[assignment]
+    data['_audit_trail'] = audit.to_dict()  # type: ignore[assignment]
     return data
+
+
+def normalize_to_100hz(data: dict[str, list[float]]) -> dict[str, list[float]]:
+    """
+    Resample all continuous telemetry channels onto a strictly uniform 100 Hz time grid (dt = 0.01s).
+    Preserves NaN handling and row alignment across all channels.
+    Documents resampling and alignment transformations in _audit_trail.
+    """
+    if "time" not in data or len(data["time"]) < 2:
+        return data
+
+    t_raw = np.asarray(data["time"], dtype=np.float64)
+    valid_t_mask = np.isfinite(t_raw)
+    if np.sum(valid_t_mask) < 2:
+        return data
+
+    # Strictly filter monotonic unique timestamps for interpolation
+    t_valid_indices = np.where(valid_t_mask)[0]
+    t_valid = t_raw[t_valid_indices]
+    
+    # Filter duplicate timestamps
+    strict_monotonic_mask = np.diff(t_valid, prepend=t_valid[0] - 1.0) > 1e-7
+    t_clean = t_valid[strict_monotonic_mask]
+    clean_indices = t_valid_indices[strict_monotonic_mask]
+
+    if len(t_clean) < 2:
+        return data
+
+    t_start, t_end = t_clean[0], t_clean[-1]
+    if t_end <= t_start:
+        return data
+
+    # Strict 100 Hz grid
+    t_100hz = np.arange(t_start, t_end + 1e-7, 0.01)
+    resampled: dict[str, list[float]] = {"time": t_100hz.tolist()}
+
+    for k, v in data.items():
+        if k == "time" or k.startswith("_"):
+            continue
+        v_arr = np.asarray(v, dtype=np.float64)
+        if len(v_arr) != len(t_raw):
+            continue
+
+        v_clean = v_arr[clean_indices]
+        valid_val_mask = np.isfinite(v_clean)
+
+        if np.sum(valid_val_mask) >= 2:
+            interpolated = np.interp(t_100hz, t_clean[valid_val_mask], v_clean[valid_val_mask])
+            resampled[k] = interpolated.tolist()
+        else:
+            resampled[k] = np.full(len(t_100hz), np.nan).tolist()
+
+    if "_channel_info" in data:
+        resampled["_channel_info"] = data["_channel_info"]
+    if "_audit_trail" in data:
+        resampled["_audit_trail"] = dict(data["_audit_trail"])
+        resampled["_audit_trail"].setdefault("alignment_operations", []).append(
+            f"Resampled channels to uniform 100 Hz grid ({len(t_100hz)} points, t=[{t_start:.2f}s, {t_end:.2f}s])"
+        )
+
+    return resampled
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -425,16 +537,26 @@ def segment_lap(
     time_arr  = np.asarray(data.get("time",   []), dtype=float)
     speed_arr = np.asarray(data.get("speed",  []), dtype=float)
     lat_g_arr = np.asarray(data.get("lat_g",  []), dtype=float)
-    long_g_arr= np.asarray(data.get("long_g", []), dtype=float)
 
-    n = min(len(time_arr), len(speed_arr), len(lat_g_arr), len(long_g_arr))
-    if n < 10:
+    if len(time_arr) < 10 or len(speed_arr) < 10 or len(lat_g_arr) < 10:
         return []
 
+    n = min(len(time_arr), len(speed_arr), len(lat_g_arr))
     time_arr  = time_arr[:n]
     speed_arr = speed_arr[:n]
     lat_g_arr = lat_g_arr[:n]
-    long_g_arr= long_g_arr[:n]
+
+    long_g_raw = data.get("long_g")
+    if long_g_raw is not None and len(long_g_raw) >= n:
+        long_g_arr = np.asarray(long_g_raw[:n], dtype=float)
+    elif len(speed_arr) > 1:
+        dt = np.diff(time_arr)
+        valid_dt = np.where(dt > 1e-4, dt, 0.01)
+        long_g_arr = np.zeros(n)
+        long_g_arr[:-1] = np.diff(speed_arr) / (valid_dt * 9.81)
+        long_g_arr[-1] = long_g_arr[-2] if n > 1 else 0.0
+    else:
+        long_g_arr = np.zeros(n)
 
     abs_lat_g = np.abs(lat_g_arr)
 

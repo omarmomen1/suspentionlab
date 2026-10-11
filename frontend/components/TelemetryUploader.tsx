@@ -30,6 +30,7 @@ export default function TelemetryUploader({ onParsed, onClear, hasData }: Teleme
     try {
       const res = await fetch(`${API_BASE}/parse-telemetry`, {
         method: "POST",
+        credentials: "include",
         headers,
         body: formData,
       });

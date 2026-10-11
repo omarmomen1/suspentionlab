@@ -7,6 +7,7 @@ class PlanTier(str, Enum):
     PRO = "PRO"
     ENTERPRISE = "ENTERPRISE"
     PAST_DUE = "PAST_DUE"
+    TRIAL = "TRIAL"
 
 
 class QuarterCarParamsSchema(BaseModel):
@@ -256,6 +257,9 @@ class FullCarParamsSchema(BaseModel):
     road_asymmetry: float = Field(default=0.3, ge=0.0, le=1.0, description="Fraction of left-side amplitude applied to right side")
     MR_f: float = Field(default=0.85, gt=0.1, le=1.5)
     MR_r: float = Field(default=0.85, gt=0.1, le=1.5)
+    cg_height_mm: float = Field(default=350.0, gt=50.0, le=2000.0, description="CG height [mm]")
+    brake_bias_front: float = Field(default=0.60, ge=0.0, le=1.0, description="Front brake bias fraction")
+    drive_bias_rear: float = Field(default=1.00, ge=0.0, le=1.0, description="Rear drive bias fraction (1.0 = full RWD)")
     model_config = ConfigDict(allow_inf_nan=False)
     damper_curve_v_f: Optional[List[float]] = None
     damper_curve_f_f: Optional[List[float]] = None
@@ -324,6 +328,15 @@ class FullCarResultSchema(BaseModel):
     psd_freqs: List[float] = []
     psd_values: List[float] = []
 
+    # Diagnostics & Contact States
+    contact_states_fl: Optional[List[str]] = None
+    contact_states_fr: Optional[List[str]] = None
+    contact_states_rl: Optional[List[str]] = None
+    contact_states_rr: Optional[List[str]] = None
+    minimum_Fz: Optional[float] = None
+    diagnostics: Optional[Dict[str, Any]] = None
+    provenance: Optional[Dict[str, Any]] = None
+
 
 class FullCarSimulateRequest(BaseModel):
     params: FullCarParamsSchema
@@ -331,20 +344,61 @@ class FullCarSimulateRequest(BaseModel):
 
 
 class TireCoeffsSchema(BaseModel):
+    """Pacejka MF 5.2 tire coefficient schema.
+
+    All fields have defaults matching the TireCoeffs dataclass for
+    backward compatibility.  New MF 5.2 coefficients use sensible defaults
+    that recover the simplified model behaviour when not explicitly set.
+    """
+    # Nominal load
+    Fz0: float = 4000.0
+
+    # Lateral pure slip
     pCy1: float = 1.30
     pDy1: float = 1.05
+    pDy2: float = -0.10
+    pDy3: float = 0.0
     pEy1: float = -0.50
+    pEy2: float = -0.10
+    pEy3: float = 0.0
+    pEy4: float = 0.0
     pKy1: float = 15.0
     pKy2: float = 2.0
+    pKy3: float = 0.0
+    pHy1: float = 0.0
+    pHy2: float = 0.0
+    pHy3: float = 0.0
+    pVy1: float = 0.0
+    pVy2: float = 0.0
+    pVy3: float = 0.0
+    pVy4: float = 0.0
+
+    # Longitudinal pure slip
     pCx1: float = 1.60
     pDx1: float = 1.10
+    pDx2: float = -0.10
+    pDx3: float = 0.0
     pEx1: float = 0.30
+    pEx2: float = 0.0
+    pEx3: float = 0.0
+    pEx4: float = 0.0
     pKx1: float = 22.0
     pKx2: float = 0.4
+    pKx3: float = 0.4
+    pHx1: float = 0.0
+    pHx2: float = 0.0
+    pVx1: float = 0.0
+    pVx2: float = 0.0
+
+    # Combined slip (Similarity Method)
     rBx1: float = 10.0
-    rBy1: float = 10.0
+    rBx2: float = 8.0
     rCx1: float = 1.0
+    rBy1: float = 10.0
+    rBy2: float = 8.0
     rCy1: float = 1.0
+    rHx1: float = 0.0
+    rHy1: float = 0.0
 
 class HandlingParamsSchema(BaseModel):
     m: float = Field(default=1200.0, gt=50.0, le=50000.0, description="Vehicle mass [kg]")

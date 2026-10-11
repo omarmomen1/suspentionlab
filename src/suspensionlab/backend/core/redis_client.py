@@ -7,6 +7,9 @@ _async_redis_conn: aioredis.Redis | None = None
 def get_async_redis_conn() -> aioredis.Redis | None:
     return _async_redis_conn
 
+def get_async_redis() -> aioredis.Redis | None:
+    return _async_redis_conn
+
 async def init_async_redis():
     global _async_redis_conn
     redis_url = os.getenv("REDIS_URL", "")

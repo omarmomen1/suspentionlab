@@ -1,0 +1,110 @@
+"""
+Gumroad License Verification Route
+==================================
+Handles license key verification for Gumroad purchases.
+"""
+from __future__ import annotations
+
+import logging
+import uuid as _uuid
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
+import httpx
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy.exc import IntegrityError
+
+from suspensionlab.backend.database.core import get_db_dependency
+from suspensionlab.backend.database.models.user import User
+from suspensionlab.backend.security.auth import verify_api_key, PlanTier
+from suspensionlab.backend.config import settings
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/billing", tags=["billing-gumroad"])
+
+
+class LicenseVerificationRequest(BaseModel):
+    license_key: str
+
+
+class LicenseVerificationResponse(BaseModel):
+    success: bool
+    plan: PlanTier
+    message: str
+
+
+@router.post("/verify-license", response_model=LicenseVerificationResponse)
+@router.post("/gumroad/verify-license", response_model=LicenseVerificationResponse)
+async def verify_gumroad_license(
+    req: LicenseVerificationRequest,
+    user_data: dict = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Verifies a Gumroad License Key.
+    If valid, upgrades the user to PRO.
+    """
+    if not req.license_key:
+        raise HTTPException(status_code=400, detail="License key is required.")
+
+    permalink = settings.gumroad_product_permalink
+    if not permalink:
+        raise HTTPException(status_code=500, detail="Gumroad configuration is missing.")
+
+    # Call Gumroad API
+    url = "https://api.gumroad.com/v2/licenses/verify"
+    payload = {
+        "product_permalink": permalink,
+        "license_key": req.license_key,
+    }
+
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.post(url, data=payload, timeout=10.0)
+            data = resp.json()
+        except Exception as e:
+            logger.error("Failed to reach Gumroad API: %s", e)
+            raise HTTPException(status_code=502, detail="Failed to verify license with Gumroad.")
+
+    if not data.get("success"):
+        raise HTTPException(status_code=400, detail="Invalid or deactivated license key.")
+
+    # Check if the license is refunded or cancelled
+    purchase = data.get("purchase", {})
+    if purchase.get("refunded") or purchase.get("chargebacked"):
+        raise HTTPException(status_code=400, detail="This license key has been refunded and is no longer active.")
+
+    if purchase.get("subscription_failed_at"):
+        raise HTTPException(status_code=400, detail="The subscription for this license has failed.")
+
+    # Prevent someone from adding the same key multiple times
+    if data.get("uses", 0) > 1:
+        raise HTTPException(status_code=400, detail="This license key has already been used on another account.")
+
+    # License is valid! Upgrade the user.
+    raw_uid = user_data.get("user_id") if isinstance(user_data, dict) else getattr(user_data, "user_id", None)
+    user_id = _uuid.UUID(str(raw_uid))
+    result = await db.execute(select(User).where(User.id == user_id).with_for_update())
+    user_model = result.scalar_one_or_none()
+
+    if not user_model:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    # Upgrade to PRO
+    user_model.plan = PlanTier.PRO.value
+    user_model.gumroad_license_key = req.license_key
+
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="This license key is already in use by another account.")
+
+    return LicenseVerificationResponse(
+        success=True,
+        plan=PlanTier.PRO,
+        message="License verified successfully! Your account has been upgraded to PRO.",
+    )

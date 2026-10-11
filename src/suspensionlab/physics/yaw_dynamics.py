@@ -130,11 +130,11 @@ class YawMomentAnalyzer:
         K_us < 0 : oversteer (need less steer, unstable above critical speed)
         K_us = 0 : neutral steer
 
-        From equilibrium: K_us = m/L * (b/C_αr - a/C_αf)  [rad/(m/s²)]
+        From equilibrium: K_us = m/L * (b/C_αf - a/C_αr)  [rad/(m/s²)]
         Converted to deg/g: multiply by (180/π × g)
         """
         p = self.p
-        K_us_rad = p.mass / p.wheelbase * (p.b / p.C_alpha_rear - p.a / p.C_alpha_front)
+        K_us_rad = p.mass / p.wheelbase * (p.b / p.C_alpha_front - p.a / p.C_alpha_rear)
         return K_us_rad * 9.81 * (180.0 / math.pi)  # deg/g
 
     def neutral_steer_speed(self) -> float:
@@ -146,10 +146,11 @@ class YawMomentAnalyzer:
         Returns math.inf for oversteer or neutral vehicles.
         """
         p = self.p
-        K_us_rad = p.mass / p.wheelbase * (p.b / p.C_alpha_rear - p.a / p.C_alpha_front)
+        K_us_rad = p.mass / p.wheelbase * (p.b / p.C_alpha_front - p.a / p.C_alpha_rear)
         if K_us_rad <= 1e-9:
             return math.inf
         return math.sqrt(9.81 * p.wheelbase / K_us_rad)
+
 
     def compute_mmm(
         self,
@@ -191,9 +192,11 @@ class YawMomentAnalyzer:
         Fy_mat = np.zeros((n_beta, n_delta))
         Mz_mat = np.zeros((n_beta, n_delta))
 
-        K_us_rad = m / L * (b / Cr - a / Cf)
+        # Equilibrium understeer gradient: m/L * (b/Cf - a/Cr)
+        K_us_rad = m / L * (b / Cf - a / Cr)
 
         for i, beta_d in enumerate(beta_arr):
+
             for j, delta_d in enumerate(delta_arr):
                 beta_r  = math.radians(beta_d)
                 delta_r = math.radians(delta_d)
@@ -521,9 +524,10 @@ def compute_stability_metrics(params: BicycleModelParams, v: float) -> dict:
     slowest_real = max(np.real(eigvals), key=lambda x: -x)  # least negative real
     tau = 1.0 / max(abs(slowest_real), 0.01)
 
-    # Understeer gradient
-    K_us_rad = m / L * (b / Cr - a / Cf)
+    # Understeer gradient: m/L * (b/Cf - a/Cr)
+    K_us_rad = m / L * (b / Cf - a / Cr)
     K_us_deg = K_us_rad * g * (180.0 / math.pi)
+
 
     # Neutral steer speed
     if K_us_rad > 1e-9:

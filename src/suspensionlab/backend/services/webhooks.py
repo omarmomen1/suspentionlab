@@ -28,8 +28,57 @@ from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
+import ipaddress
+import os
+import socket
+from urllib.parse import urlparse
+
 RETRY_DELAYS_S = (1.0, 2.0, 4.0)
 TIMEOUT_S = 10.0
+
+
+def validate_webhook_url(url: str) -> str | None:
+    """
+    Validates webhook URL to prevent Server-Side Request Forgery (SSRF).
+    Blocks private RFC 1918 addresses, loopbacks, link-local (AWS metadata 169.254.169.254),
+    and non-http(s) schemes unless ALLOW_PRIVATE_WEBHOOKS=true is explicitly set in testing.
+    Returns the first verified safe IP string.
+    """
+    if os.getenv("ALLOW_PRIVATE_WEBHOOKS", "false").lower() == "true":
+        return None
+
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ValueError(f"Invalid URL scheme '{parsed.scheme}'. Only http and https are permitted.")
+
+    hostname = parsed.hostname
+    if not hostname:
+        raise ValueError("Invalid URL: missing hostname.")
+
+    if hostname.lower() in ("localhost", "127.0.0.1", "::1", "metadata.google.internal"):
+        raise ValueError(f"Webhook target '{hostname}' is not permitted.")
+
+    try:
+        addr_info = socket.getaddrinfo(hostname, None)
+        safe_ip = None
+        for _, _, _, _, sockaddr in addr_info:
+            ip_str = sockaddr[0]
+            ip = ipaddress.ip_address(ip_str)
+            if (
+                ip.is_private
+                or ip.is_loopback
+                or ip.is_link_local
+                or ip.is_reserved
+                or ip.is_multicast
+                or ip.is_unspecified
+                or ip_str == "169.254.169.254"
+            ):
+                raise ValueError(f"Webhook URL resolves to prohibited IP address: {ip_str}")
+            if safe_ip is None:
+                safe_ip = ip_str
+        return safe_ip
+    except socket.gaierror as exc:
+        raise ValueError(f"Could not resolve webhook hostname '{hostname}': {exc}")
 
 
 def sign_payload(secret: str, timestamp: str, body: str) -> str:
@@ -40,13 +89,22 @@ def sign_payload(secret: str, timestamp: str, body: str) -> str:
 
 async def _deliver_once(url: str, headers: dict, body: str) -> bool:
     try:
+        validate_webhook_url(url)
+    except ValueError as val_err:
+        logger.warning("Blocked outbound webhook to %s due to SSRF policy: %s", url, val_err)
+        return False
+
+    try:
         import httpx
-        async with httpx.AsyncClient(timeout=TIMEOUT_S) as client:
+        # Explicitly disallow redirects (follow_redirects=False) to prevent redirect-based SSRF bypass
+        async with httpx.AsyncClient(timeout=TIMEOUT_S, follow_redirects=False) as client:
             resp = await client.post(url, content=body, headers=headers)
         return 200 <= resp.status_code < 300
     except Exception as exc:
         logger.warning("Webhook delivery to %s failed: %s", url, exc)
         return False
+
+
 
 
 async def dispatch_event(db, user_id: str, event: str, payload: dict) -> int:

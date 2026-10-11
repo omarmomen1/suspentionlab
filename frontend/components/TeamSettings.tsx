@@ -1,11 +1,11 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function TeamSettings() {
-  const { token } = useAuth();
+  const { fetchWithAuth, user } = useAuth();
   const [team, setTeam] = useState<any>(null);
   const [analytics, setAnalytics] = useState<any>(null);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -19,13 +19,10 @@ export default function TeamSettings() {
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
   const fetchTeam = async () => {
-    if (!token) return;
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await fetch(`${API_BASE}/teams/`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetchWithAuth("/api/v1/teams/");
       if (res.ok) {
         setTeam(await res.json());
         await fetchAnalytics();
@@ -45,9 +42,7 @@ export default function TeamSettings() {
 
   const fetchAnalytics = async () => {
     try {
-      const res = await fetch(`${API_BASE}/teams/analytics`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await fetchWithAuth("/api/v1/teams/analytics");
       if (res.ok) {
         setAnalytics(await res.json());
       }
@@ -57,8 +52,8 @@ export default function TeamSettings() {
   };
 
   useEffect(() => {
-    setTimeout(() => fetchTeam(), 0);
-  }, [token]); // eslint-disable-line react-hooks/exhaustive-deps
+    fetchTeam();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleCreate = async () => {
     if (!teamName.trim()) { setActionError("Please enter a team name."); return; }
@@ -66,10 +61,10 @@ export default function TeamSettings() {
     setActionError(null);
     setActionSuccess(null);
     try {
-      const res = await fetch(`${API_BASE}/teams/`, {
+      const res = await fetchWithAuth("/api/v1/teams/", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name: teamName })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: teamName.trim() })
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -88,14 +83,15 @@ export default function TeamSettings() {
 
   const handleInvite = async () => {
     if (!inviteEmail.trim()) { setActionError("Please enter an email address."); return; }
+    if (!team?.id) return;
     setActionBusy(true);
     setActionError(null);
     setActionSuccess(null);
     try {
-      const res = await fetch(`${API_BASE}/teams/invite`, {
+      const res = await fetchWithAuth(`/api/v1/teams/${team.id}/invitations`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ email: inviteEmail })
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: inviteEmail.trim(), role: "Engineer" })
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -113,13 +109,14 @@ export default function TeamSettings() {
   };
 
   const handleRoleChange = async (memberId: string, role: string) => {
+    if (!team?.id) return;
     setActionBusy(true);
     setActionError(null);
     setActionSuccess(null);
     try {
-      const res = await fetch(`${API_BASE}/teams/${team.id}/members/${memberId}/role`, {
+      const res = await fetchWithAuth(`/api/v1/teams/${team.id}/members/${memberId}/role`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ role })
       });
       if (!res.ok) {

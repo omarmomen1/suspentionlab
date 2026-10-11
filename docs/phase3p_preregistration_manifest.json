@@ -1,0 +1,298 @@
+{
+  "allowed_final_outcomes": [
+    "MODEL_PARAMETER_DECISION_SUPPORTED",
+    "EFFECT_UNRESOLVED",
+    "HYPOTHESIS_NOT_SUPPORTED",
+    "INSUFFICIENT_EVIDENCE"
+  ],
+  "blocker_status": {
+    "actionability_rationale": "No empirical mapping exists connecting sigma_y0 to specific tire cold inflation pressure, tread compound, or carcass construction.",
+    "execution_blockers": "NONE",
+    "physical_track_actionability": "BLOCKED / NOT_YET_MAPPED"
+  },
+  "candidate_generation_algorithm": {
+    "alternative_mechanism_registry": {
+      "parameter_name": "DynamicVehicleParams.tire_coeffs.pDy2",
+      "phase3p_execution": "EXCLUDED",
+      "status": "NEXT_CANDIDATE / ALTERNATIVE_MECHANISM",
+      "symbol": "pDy2"
+    },
+    "formal_generation_protocol": {
+      "baseline_setup_id": "SETUP-P3P-BASE",
+      "candidate_setup_id": "SETUP-P3P-CAL",
+      "failure_behavior": "HALT_FAIL_CLOSED_WITHOUT_UNSEALING_HOLDOUTS",
+      "holdout_access_policy": "STRICTLY_PROHIBITED_DURING_CALIBRATION",
+      "max_iterations": 25,
+      "method": "BOUNDED_1D_OPTIMIZATION",
+      "numerical_rounding_precision": 3,
+      "objective_function": "RMSE_r = sqrt(mean((r_sim - r_meas)^2)) on Turn_4_Entry (11200..12199)",
+      "optimizer_implementation": "scipy.optimize.minimize_scalar",
+      "optimizer_method": "bounded",
+      "partition": "FIT_PARTITION_ONLY (Turn_4_Entry: 11200..12199)",
+      "search_bounds": [
+        0.1,
+        0.5
+      ],
+      "tie_breaking_rule": "Choose candidate value closest to nominal reference 0.250 m",
+      "tolerance_xatol": 0.005
+    }
+  },
+  "canonical_vehicle_parameters": {
+    "a_m": 1.05,
+    "b_m": 1.59,
+    "c_damper_front_nsm": 2244.46,
+    "c_damper_rear_nsm": 4500.0,
+    "camber_gain_deg_m": 15.0,
+    "cop_fraction_base": 0.44,
+    "drivetrain_layout": "FWD",
+    "k_arb_front_nm": 25000.0,
+    "k_arb_rear_nm": 18000.0,
+    "k_spring_front_nm": 65000.0,
+    "k_spring_rear_nm": 85000.0,
+    "mass_kg": 1530.0,
+    "nominal_tire_pressure_bar": 2.0,
+    "sprung_mass_kg": 1410.0,
+    "static_camber_front_deg": -3.2,
+    "static_camber_rear_deg": -1.8,
+    "steer_ratio": 13.5,
+    "steering_compliance_rad_per_mps2": 0.0,
+    "tire_relaxation_length_y_m": 0.25,
+    "tw_f_m": 1.54,
+    "tw_r_m": 1.52,
+    "unsprung_mass_front_kg": 30.0,
+    "unsprung_mass_rear_kg": 30.0,
+    "wheelbase_m": 2.64
+  },
+  "data_partitions": {
+    "authoritative_definition": "Sample-index sets are the authoritative partition definition. Time intervals are half-open [t_start, t_end) derived from authoritative sample indices.",
+    "buffer_1": {
+      "access_policy": "EXCLUDED_FROM_EVALUATION",
+      "end_sample_index": 12699,
+      "exposure_classification": "EXCLUDED_BUFFER",
+      "interval_half_open": "[61.001, 63.501) s",
+      "is_blind": false,
+      "role": "EXCLUDED_BUFFER",
+      "sample_count": 500,
+      "start_sample_index": 12200,
+      "window_name": "Buffer_1_Fit_Cross"
+    },
+    "buffer_2": {
+      "access_policy": "EXCLUDED_FROM_EVALUATION",
+      "end_sample_index": 13899,
+      "exposure_classification": "EXCLUDED_BUFFER",
+      "interval_half_open": "[68.501, 69.501) s",
+      "is_blind": false,
+      "role": "EXCLUDED_BUFFER",
+      "sample_count": 200,
+      "start_sample_index": 13700,
+      "window_name": "Buffer_2_Cross_Temp"
+    },
+    "dataset_provenance": {
+      "doi": "10.25740/hh613qz0317",
+      "file_path": "data/external/stanford_vw_golf_thunderhill_2023_11.csv",
+      "nominal_dt_s": 0.005,
+      "organization": "Dynamic Design Lab (DDL), Stanford University",
+      "sampling_rate_hz": 200.0,
+      "sha256": "489adbf01d27da1c281c0fff353554dfd7d07a3f1c48e2744e9dd902546b74d3",
+      "vehicle": "2017 Volkswagen Golf VII GTI Performance (FWD)",
+      "venue": "Thunderhill Raceway Park — West Track"
+    },
+    "fit_partition": {
+      "access_policy": "PERMITTED_DURING_CALIBRATION",
+      "end_sample_index": 12199,
+      "exposure_classification": "PREVIOUSLY_ACCESSED_NON_TIRE_ANALYSIS",
+      "interval_half_open": "[56.001, 61.001) s",
+      "is_blind": false,
+      "maneuver": "Transient turn-in and directional initiation",
+      "role": "FIT_ESTIMATION",
+      "sample_count": 1000,
+      "start_sample_index": 11200,
+      "tire_evaluation_status": "NEW_FOR_TIRE_PARAMETER_EVALUATION",
+      "window_name": "Turn_4_Entry"
+    },
+    "partition_disjointness_proof": {
+      "all_partitions_pairwise_disjoint": true,
+      "authoritative_basis": "EXACT_SAMPLE_INDICES",
+      "sample_overlap_count": 0
+    },
+    "sustained_holdout_partition": {
+      "access_policy": "SEALED_UNTIL_CANDIDATE_FROZEN",
+      "end_sample_index": 13699,
+      "exposure_classification": "CATEGORY_A_NEVER_ACCESSED",
+      "interval_half_open": "[63.501, 68.501) s",
+      "is_blind": true,
+      "maneuver": "Sustained high-lateral-acceleration apex (ay ~ 1.15 G, yaw_dot ~ 0)",
+      "role": "SUSTAINED_BLIND_HOLDOUT",
+      "sample_count": 1000,
+      "start_sample_index": 12700,
+      "tire_evaluation_status": "AUTHENTIC_BLIND_SUSTAINED_HOLDOUT",
+      "window_name": "Turn_4_Apex"
+    },
+    "temporal_holdout_partition": {
+      "access_policy": "SEALED_UNTIL_CANDIDATE_FROZEN",
+      "end_sample_index": 14599,
+      "exposure_classification": "CATEGORY_A_NEVER_ACCESSED",
+      "interval_half_open": "[69.501, 73.001) s",
+      "is_blind": true,
+      "maneuver": "Transient unwinding and power-on corner exit",
+      "role": "TEMPORAL_BLIND_HOLDOUT",
+      "sample_count": 700,
+      "start_sample_index": 13900,
+      "tire_evaluation_status": "AUTHENTIC_BLIND_TEMPORAL_HOLDOUT",
+      "window_name": "Turn_4_Exit"
+    }
+  },
+  "epistemic_identifiability_contract": {
+    "authoritative_statement": "The fresh Turn 4 Entry/Apex comparison indicates reduced sigma_y0 sensitivity in the sustained apex regime (||S_sigma||_Entry = 0.015324 vs ||S_sigma||_Apex = 0.009494), but exploratory evidence does not establish that sigma_y0 sensitivity is negligible or universally lower across all sustained maneuvers (||S_sigma||_Carousel = 0.017650).",
+    "classification": "CONDITIONALLY_IDENTIFIABLE",
+    "conditional_decoupling_diagnostics": {
+      "sigma_y0_vs_k_delta_correlation": 0.004,
+      "sigma_y0_vs_pKy1_correlation": -0.0537
+    },
+    "universal_identifiability_claimed": false
+  },
+  "governance_classification": "FROZEN_PRE_REGISTRATION_PROTOCOL",
+  "metrics_and_governance_rules": {
+    "bootstrap_configuration": {
+      "algorithm": "PAIRED_MOVING_BLOCK_BOOTSTRAP",
+      "block_duration_ms": 100.0,
+      "block_length_samples": 20,
+      "confidence_level": 0.95,
+      "percentile_method": "empirical_percentiles [2.5%, 97.5%]",
+      "random_seed": 42,
+      "replicate_formula": "RMSE_m^(b) = sqrt(mean_{i in b}((r_m,i - r_meas,i)^2)), Delta_RMSE^(b) = RMSE_cand^(b) - RMSE_base^(b)",
+      "replicates_B": 1000,
+      "sampling_rate_hz": 200.0,
+      "target_statistic": "Delta_RMSE^(b) = RMSE_candidate^(b) - RMSE_baseline^(b)"
+    },
+    "fit_calibration_adequacy_diagnostic": {
+      "blocks_decision": false,
+      "classification_rules": {
+        "FAILED": "Relative Delta_RMSE > 0.0%",
+        "PASS": "Relative Delta_RMSE <= -1.0%",
+        "WEAK": "-1.0% < Relative Delta_RMSE <= 0.0%"
+      },
+      "evidential_weight": 0.0,
+      "optimizer_failure_consequence": "ABORT_OPTIMIZER_DIVERGENCE",
+      "role": "PRE_REGISTERED_EXPLORATORY_CALIBRATION_ADEQUACY_DIAGNOSTIC"
+    },
+    "primary_metric": {
+      "channel": "yawRate_radps",
+      "provenance": "MEASURED vs SIMULATED",
+      "role": "PRIMARY_TRACKING_METRIC",
+      "sensor_type": "3-axis Gyroscope (Oxford RT3000 RTK-GNSS/IMU)",
+      "units": "rad/s"
+    },
+    "secondary_metrics": {
+      "chassis_roll": {
+        "admissibility_limit": "Degradation <= +5.0% relative to baseline",
+        "channel": "rollAngle_rad",
+        "provenance": "MEASURED vs SIMULATED",
+        "role": "SECONDARY_ENGINEERING_CONSTRAINT",
+        "threshold_relative_pct": 5.0,
+        "units": "rad"
+      },
+      "dynamic_jounce": {
+        "channel": "z_jounce_mm",
+        "failure_status_on_breach": "REJECT_DUE_TO_KINEMATIC_JOUNCE_BOUNDARY",
+        "is_direct_transducer": false,
+        "nature_of_constraint": "Model clearance boundary (15.0 + 0.5 * tw * sin(|phi|)), not a physical bump-stop claim",
+        "provenance": "MODEL-DERIVED KINEMATIC SCREEN",
+        "role": "MODEL_KINEMATIC_BOUNDARY_ONLY",
+        "threshold_mm": 55.0,
+        "units": "mm"
+      },
+      "lateral_acceleration": {
+        "admissibility_limit": "Degradation <= +5.0% relative to baseline",
+        "channel": "ayCG_mps2",
+        "filter": "5 Hz Butterworth low-pass",
+        "provenance": "MEASURED vs DERIVED_FROM_SIMULATION",
+        "role": "SECONDARY_ENGINEERING_CONSTRAINT",
+        "threshold_relative_pct": 5.0,
+        "units": "m/s^2"
+      },
+      "sideslip_angle": {
+        "channel": "slipAngle_rad",
+        "failure_status_on_breach": "REJECT_DUE_TO_SIDESLIP_STABILITY_BOUNDARY",
+        "is_direct_transducer": false,
+        "nature_of_constraint": "Engineering stability boundary, not a statistical confidence threshold",
+        "provenance": "SIMULATED SECONDARY STABILITY INDICATOR",
+        "provenance_derivation": "slipAngle_rad = arctan2(Vy_mps, Vx_mps) derived from integrated GNSS/INS state vector",
+        "role": "MODEL_STABILITY_SCREEN_ONLY",
+        "threshold_deg": 5.7296,
+        "threshold_rad": 0.1,
+        "units": "rad"
+      }
+    },
+    "sustained_holdout_decision_rule": {
+      "decision_conditions": [
+        "CI95_upper(Delta_RMSE_apex) <= 0.05 * RMSE_base_apex"
+      ],
+      "failure_status": "EFFECT_UNRESOLVED",
+      "formula": "Delta_RMSE_apex = RMSE_cal - RMSE_base",
+      "improvement_required": false,
+      "requirement": "NON_INFERIORITY",
+      "sample_count": 1000,
+      "window": "Turn_4_Apex"
+    },
+    "temporal_holdout_decision_rule": {
+      "decision_conditions": [
+        "CI95_upper(Delta_RMSE_temporal) < 0.0",
+        "Point estimate Delta_RMSE_temporal < 0.0"
+      ],
+      "failure_status": "HYPOTHESIS_NOT_SUPPORTED",
+      "formula": "Delta_RMSE_temporal = RMSE_cal - RMSE_base",
+      "requirement": "TEMPORAL_IMPROVEMENT",
+      "sample_count": 700,
+      "secondary_diagnostic_only": "CI95_upper <= 0.05 * RMSE_base_temporal (CANNOT substitute for improvement)",
+      "window": "Turn_4_Exit"
+    }
+  },
+  "prohibited_terminology": [
+    "VALIDATED"
+  ],
+  "protected_physics_manifest": {
+    "brake_distribution.py": "15338e921252e35afc9ee543fdb996464e4784b36e1ce18e05c8832e392a57ea",
+    "dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690",
+    "magic_formula.py": "69b182da4d2687e8cf7f9326501fc30c6380023445ea99d04f0f67bbc3d3f76c",
+    "powertrain_lap_sim.py": "45b77e9ac726e5f517564343dbbbbf991c58eb7428fc9aa37d16e9b6ef55d398",
+    "tire_model.py": "da72dea8adf6b83846997fa02c9b1cade1b74272bcaa96f5aa0e2ea389005209"
+  },
+  "protocol_id": "PREREG-P3P-01",
+  "protocol_version": "1.0.0-frozen",
+  "revision_history": [],
+  "scientific_hypothesis": "Changing the existing sigma_y0 parameter modulates the rate at which the dynamically relaxed lateral tire-slip state alpha' approaches instantaneous kinematic slip alpha during transient steering (d alpha / dt != 0). In sustained steady state (d alpha / dt ~ 0), alpha' approaches alpha, leaving sustained peak lateral force (Dy = mu_y * Fz) unaltered. Therefore, transient tracking should improve while sustained apex behavior remains non-inferior.",
+  "scientific_question": "Can calibration of the existing tire lateral relaxation-length parameter sigma_y0 improve transient yaw-response tracking on unseen Turn 4 Exit while remaining non-inferior on structurally distinct sustained Turn 4 Apex behavior?",
+  "solver_contract": {
+    "canonical_timestep_s": 0.001,
+    "derivative_evaluations_per_step": 4,
+    "integrator_algorithm": "Fixed-step 4th-Order Runge-Kutta (RK4)",
+    "mandatory_substeps_per_sample": 5,
+    "silent_timestep_substitution_prohibited": true,
+    "simulator_class": "DynamicLapSimulator",
+    "simulator_module": "suspensionlab.physics.dynamic_lap_sim",
+    "state_dimension": 22,
+    "telemetry_sampling_dt_s": 0.005
+  },
+  "target_mechanism": {
+    "actionability_demarcation_note": "sigma_y0 operates as an active, numerically stable mathematical parameter within the 14-DOF simulation equations. However, no empirical transfer function exists connecting sigma_y0 to physical tire pressure (bar/psi), tread compound, or carcass construction. No trackside mechanical setup adjustments may be recommended from this parameter alone.",
+    "baseline_qualification": "Production default in dynamic_lap_sim.py:692 and Phase 3O simulation setup; uncalibrated nominal reference",
+    "baseline_semantics": "UNIDENTIFIED_NOMINAL_REFERENCE",
+    "baseline_value": 0.25,
+    "model_parameter_actionability": "SUPPORTED_AS_MODEL_VARIABLE",
+    "parameter_name": "DynamicVehicleParams.tire_relaxation_length_y_m",
+    "physical_track_actionability": "BLOCKED / NOT_YET_MAPPED",
+    "production_equation_path": [
+      "DynamicVehicleParams.tire_relaxation_length_y_m (sigma_0,y)",
+      "sig_y(Fz) = sig_0,y * (Fz / Fz0)^load_exp (TireRelaxationDynamics.calc_relaxation_lengths)",
+      "tau_y = sig_y / max(|vx|, 1.0)",
+      "d(alpha')/dt = (alpha - alpha') / tau_y",
+      "st.tire_slip_alpha integrated dynamically via fixed-step RK4",
+      "Fy = MF5.2(alpha', kappa', Fz, gamma)",
+      "d(r)/dt = (1/Iz) * [a * (Fy_fl + Fy_fr) - b * (Fy_rl + Fy_rr) + ...]"
+    ],
+    "symbol": "sigma_y0",
+    "target_attribute": "tire_relaxation_length_y_m",
+    "units": "m"
+  }
+}

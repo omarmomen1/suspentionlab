@@ -134,7 +134,11 @@ async def websocket_session_endpoint(
     try:
         while True:
             data = await websocket.receive_text()
-            message = json.loads(data)
+            try:
+                message = json.loads(data)
+            except (json.JSONDecodeError, TypeError):
+                await websocket.send_json({"error": "Invalid JSON frame."})
+                continue
             
             # Broadcast to everyone in the room
             # In a distributed system, we would publish to Redis here:

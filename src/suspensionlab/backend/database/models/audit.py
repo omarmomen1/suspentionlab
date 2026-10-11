@@ -19,6 +19,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy import Column, String, DateTime, JSON, Integer, Text, ForeignKey, Index, Float
+from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 
 JSON_TYPE = JSON().with_variant(JSONB, "postgresql")
@@ -38,15 +39,52 @@ class AuditLog(Base):
     )
 
     id         = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    sequence_number = Column(Integer, nullable=False, default=1, index=True)
     event      = Column(String(64), nullable=False)            # e.g. LOGIN_SUCCESS, SIMULATION_START
     user_id    = Column(PG_UUID(as_uuid=True), nullable=True, index=True)
+    organization_id = Column(PG_UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id    = Column(PG_UUID(as_uuid=True), nullable=True, index=True)
     ip         = Column(String(64), nullable=True)
     user_agent = Column(String(255), nullable=True)
+    artifact_id = Column(String(255), nullable=True, index=True)
     timestamp  = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     # NOTE: 'metadata' is reserved by SQLAlchemy's declarative API — the DB
     # column is still named "metadata" but the Python attribute is event_data.
     event_data = Column("metadata", JSON_TYPE, nullable=True)
+    previous_hash = Column(String(64), nullable=True)
+    hash = Column(String(64), nullable=True)
+
+    # Relationships
+    organization = relationship("Organization", back_populates="audit_logs")
+
+
+class AuditOutbox(Base):
+    """
+    Transactional outbox for tamper-evident audit events (Step 4).
+    Guarantees that no audit event is silently lost during transient failures.
+    """
+    __tablename__ = "audit_outbox"
+    __table_args__ = (
+        Index("ix_audit_outbox_status", "status"),
+        Index("ix_audit_outbox_created", "created_at"),
+    )
+
+    id              = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    idempotency_key = Column(String(128), nullable=True, unique=True, index=True)
+    event_type      = Column(String(64), nullable=False)
+    user_id         = Column(PG_UUID(as_uuid=True), nullable=True, index=True)
+    organization_id = Column(PG_UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
+    team_id         = Column(PG_UUID(as_uuid=True), nullable=True, index=True)
+    ip              = Column(String(64), nullable=True)
+    user_agent      = Column(String(255), nullable=True)
+    artifact_id     = Column(String(255), nullable=True, index=True)
+    event_data      = Column("metadata", JSON_TYPE, nullable=True)
+    status          = Column(String(20), nullable=False, default="PENDING")  # PENDING, PROCESSED, FAILED, DEAD_LETTER
+    retry_count     = Column(Integer, nullable=False, default=0)
+    max_retries     = Column(Integer, nullable=False, default=5)
+    last_error      = Column(Text, nullable=True)
+    created_at      = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    processed_at    = Column(DateTime(timezone=True), nullable=True)
 
 
 class EngineeringAuditLog(Base):
@@ -68,6 +106,7 @@ class EngineeringAuditLog(Base):
     id                = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     job_id            = Column(PG_UUID(as_uuid=True), nullable=True, index=True)   # FK-free ref to jobs.id
     user_id           = Column(PG_UUID(as_uuid=True), nullable=True)
+    organization_id   = Column(PG_UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id           = Column(PG_UUID(as_uuid=True), nullable=True)
 
     # What was simulated

@@ -1,7 +1,7 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { History, ChevronRight, Clock, X } from "lucide-react";
+
 
 interface HistoryEntry {
   id: string;
@@ -58,13 +58,36 @@ interface SimHistoryProps {
 export default function SimHistory({ storageKey, onRestore, renderParams }: SimHistoryProps) {
   const [open,    setOpen]    = useState(false);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+
+  // Escape key handler
+  useEffect(() => {
+    if (!open) return;
+    const triggerEl = triggerRef.current;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      triggerEl?.focus();
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     setTimeout(() => {
       try {
         const raw = localStorage.getItem(storageKey);
-        setHistory(raw ? JSON.parse(raw) : []);
+        if (!raw) { setHistory([]); return; }
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const validated = parsed.filter(item => item && typeof item === "object" && item.id && item.params && item.metrics);
+          setHistory(validated);
+        } else {
+          setHistory([]);
+        }
       } catch {
         setHistory([]);
       }
@@ -84,10 +107,16 @@ export default function SimHistory({ storageKey, onRestore, renderParams }: SimH
 
   return (
     <div className="relative">
-      <button onClick={() => setOpen((v) => !v)}
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
         className="flex items-center gap-1.5 px-3 py-1.5 bg-[#141416] border border-[#252525]
-          hover:bg-[#1e1e20] rounded-lg text-xs font-medium transition-colors">
-        <History size={13} /> History
+          hover:bg-[#1e1e20] rounded-lg text-xs font-medium transition-colors"
+      >
+        <History size={13} aria-hidden="true" /> History
         {history.length > 0 && (
           <span className="ml-0.5 text-[9px] font-bold bg-ansys-yellow/20 text-ansys-yellow
             rounded-full px-1.5 min-w-[18px] text-center">
@@ -97,17 +126,31 @@ export default function SimHistory({ storageKey, onRestore, renderParams }: SimH
       </button>
 
       {open && (
-        <div className="absolute top-full mt-2 right-0 z-50 w-[340px] bg-[#0d0d0f] border border-[#252525]
-          rounded-xl shadow-2xl overflow-hidden">
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Simulation History"
+          className="absolute top-full mt-2 right-0 z-50 w-[340px] bg-[#0d0d0f] border border-[#252525]
+          rounded-xl shadow-2xl overflow-hidden"
+        >
           <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#1e1e1e]">
             <h3 className="text-xs font-bold text-white">Simulation History</h3>
             <div className="flex items-center gap-3">
               {history.length > 0 && (
-                <button onClick={clearHistory} className="text-[10px] text-gray-600 hover:text-red-400 transition-colors">
+                <button
+                  type="button"
+                  onClick={clearHistory}
+                  className="text-[10px] text-gray-400 hover:text-red-400 transition-colors"
+                >
                   Clear all
                 </button>
               )}
-              <button onClick={() => setOpen(false)} className="text-gray-600 hover:text-white transition-colors">
+              <button
+                type="button"
+                onClick={() => setOpen(false)}
+                aria-label="Close history"
+                className="text-gray-400 hover:text-white transition-colors p-1"
+              >
                 <X size={13} />
               </button>
             </div>

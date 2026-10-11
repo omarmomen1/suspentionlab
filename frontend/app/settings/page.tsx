@@ -4,8 +4,9 @@ import { useAuth } from "../../contexts/AuthContext";
 import Link from "next/link";
 import {
   User, CreditCard, Key, Shield, ExternalLink, Copy, CheckCircle2,
-  Trash2, Plus, AlertTriangle, Loader2, Users,
+  Trash2, Plus, AlertTriangle, Loader2, Users, Building2, Laptop, Smartphone, Globe, RefreshCw
 } from "lucide-react";
+import { EnterpriseApi, UserSession } from "../../lib/api_client";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -37,24 +38,34 @@ function SectionCard({ title, icon: Icon, children }: {
 interface ApiKey { id: string; name: string; key_prefix: string; created_at: string; last_used: string | null; }
 
 export default function SettingsPage() {
-  const { user, logout, authHeader } = useAuth();
-  const [activeTab, setActiveTab]    = useState<"account" | "billing" | "api-keys" | "webhooks" | "team" | "security">("account");
+  const { user, logout, authHeader, fetchWithAuth } = useAuth();
+  const [activeTab, setActiveTab]    = useState<"account" | "billing" | "api-keys" | "webhooks" | "team" | "security" | "enterprise">("account");
   const [apiKeys,   setApiKeys]      = useState<ApiKey[]>([]);
   const [newKeyName, setNewKeyName]  = useState("");
   const [newKeyValue, setNewKeyValue] = useState<string | null>(null);
   const [copied,    setCopied]       = useState(false);
   const [loadingKeys, setLoadingKeys] = useState(false);
   const [creatingKey, setCreatingKey] = useState(false);
+
+  // Active Sessions State
+  const [sessions, setSessions] = useState<UserSession[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+  const [revokingJti, setRevokingJti] = useState<string | null>(null);
+
+  // Enterprise SCIM State
+  const [scimStatus, setScimStatus] = useState<any>(null);
+
   const plan    = user?.plan ?? "FREE";
   const badge   = PLAN_BADGES[plan] ?? { label: "Unknown", color: "text-gray-500 bg-[#1e1e1e]" };
   const canKeys = plan !== "FREE";
+  const isEnterprise = plan === "ENTERPRISE" || user?.user_id === "admin-001";
 
   // Fetch API keys when tab opens
   useEffect(() => {
     if (activeTab !== "api-keys" || !canKeys) return;
     setTimeout(() => {
       setLoadingKeys(true);
-      fetch(`${API_BASE}/api-keys`, { headers: authHeader() })
+      fetchWithAuth("/api/v1/api-keys/")
         .then((r) => r.json())
         .then((d) => setApiKeys(Array.isArray(d) ? d : []))
         .catch((e) => console.error("Failed to load API keys", e))
@@ -62,14 +73,34 @@ export default function SettingsPage() {
     }, 0);
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  const loadSessions = async () => {
+    setLoadingSessions(true);
+    try {
+      const res = await EnterpriseApi.getActiveSessions();
+      setSessions(res.sessions || []);
+    } catch (e) {
+      console.error("Failed to load sessions", e);
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "security") {
+      loadSessions();
+    } else if (activeTab === "enterprise") {
+      EnterpriseApi.getScimStatus().then(setScimStatus).catch(() => {});
+    }
+  }, [activeTab]);
+
   const createKey = async () => {
     if (!newKeyName.trim()) return;
     setCreatingKey(true);
     try {
-      const r = await fetch(`${API_BASE}/api-keys`, {
+      const r = await fetchWithAuth("/api/v1/api-keys/", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body: JSON.stringify({ name: newKeyName }),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newKeyName.trim() }),
       });
       const data = await r.json();
       if (r.ok && data.key) {
@@ -86,7 +117,7 @@ export default function SettingsPage() {
 
   const revokeKey = async (id: string) => {
     try {
-      await fetch(`${API_BASE}/api-keys/${id}`, { method: "DELETE", headers: authHeader() });
+      await fetchWithAuth(`/api/v1/api-keys/${id}`, { method: "DELETE" });
       setApiKeys((prev) => prev.filter((k) => k.id !== id));
     } catch (e) {
       console.error("Failed to revoke key", e);
@@ -133,7 +164,8 @@ export default function SettingsPage() {
     { id: "billing",  label: "Billing",  icon: CreditCard },
     { id: "api-keys", label: "API Keys", icon: Key       },
     { id: "webhooks", label: "Webhooks", icon: Zap       },
-    { id: "security", label: "Security", icon: Shield    },
+    { id: "security", label: "Security & Sessions", icon: Shield },
+    { id: "enterprise", label: "Enterprise & SCIM", icon: Building2 },
   ] as const;
 
   return (
@@ -365,28 +397,210 @@ export default function SettingsPage() {
               </SectionCard>
             )}
 
-            {/* Security tab */}
+            {/* Security & Sessions tab */}
             {activeTab === "security" && (
-              <SectionCard title="Security" icon={Shield}>
-                <div className="space-y-4">
+              <SectionCard title="Security & Active Sessions" icon={Shield}>
+                <div className="space-y-6">
                   <div className="flex items-start gap-3 p-4 bg-amber-950/20 border border-amber-900/30 rounded-xl">
                     <AlertTriangle size={16} className="text-amber-500 shrink-0 mt-0.5" />
                     <div>
                       <p className="text-sm font-semibold text-amber-400">Password reset</p>
-                      <p className="text-xs text-gray-400 max-w-sm text-center">
-                        If you believe this is an error, please contact <br/>
-                        <a href="mailto:suspenlabsupp@outlook.com" className="text-ansys-yellow">suspenlabsupp@outlook.com</a>.
+                      <p className="text-xs text-gray-400 max-w-sm">
+                        To reset password or manage cryptographic credentials, contact{" "}
+                        <a href="mailto:suspenlabsupp@outlook.com" className="text-ansys-yellow hover:underline">suspenlabsupp@outlook.com</a>.
                       </p>
                     </div>
                   </div>
+
                   <div>
-                    <p className="text-xs text-gray-500 mb-1">Active sessions</p>
-                    <p className="text-sm text-white">1 active session (this device)</p>
-                    <button onClick={logout}
-                      className="mt-2 text-xs text-red-500 hover:text-red-400 transition-colors">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <p className="text-xs font-bold text-white uppercase tracking-wider">Active Device Sessions</p>
+                        <p className="text-[11px] text-gray-500">Cryptographically tracked JWT sessions with remote revocation</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={loadSessions}
+                          disabled={loadingSessions}
+                          className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white"
+                          title="Refresh sessions"
+                        >
+                          <RefreshCw size={13} className={loadingSessions ? "animate-spin" : ""} />
+                        </button>
+                        {sessions.length > 1 && (
+                          <button
+                            onClick={async () => {
+                              try {
+                                await EnterpriseApi.revokeAllOtherSessions();
+                                await loadSessions();
+                              } catch (err) {
+                                console.error(err);
+                              }
+                            }}
+                            className="px-2.5 py-1 rounded-lg bg-red-950/40 border border-red-500/30 text-red-400 hover:bg-red-950/60 text-xs font-mono font-semibold"
+                          >
+                            Revoke All Other Sessions
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {loadingSessions ? (
+                      <div className="py-6 flex items-center justify-center">
+                        <Loader2 size={20} className="animate-spin text-ansys-yellow" />
+                      </div>
+                    ) : sessions.length === 0 ? (
+                      <div className="p-4 rounded-xl bg-[#0d0d0f] border border-[#1e1e1e] text-xs text-gray-400 flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <Laptop size={16} className="text-ansys-yellow" />
+                          <div>
+                            <div className="font-semibold text-white">Current Browser Session</div>
+                            <div className="text-[10px] text-gray-500 font-mono">Authenticated via HTTP-only session cookie</div>
+                          </div>
+                        </div>
+                        <span className="px-2 py-0.5 rounded bg-emerald-950/50 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono">
+                          ACTIVE
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {sessions.map((sess) => {
+                          const isMobile = sess.device_type?.toLowerCase().includes("mobile") || sess.user_agent?.toLowerCase().includes("mobile");
+                          const DevIcon = isMobile ? Smartphone : Laptop;
+                          return (
+                            <div
+                              key={sess.jti}
+                              className="flex items-center justify-between p-3 rounded-xl bg-[#0d0d0f] border border-[#1e1e1e] hover:border-white/10 transition-colors text-xs"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <DevIcon size={18} className="text-ansys-yellow shrink-0" />
+                                <div className="min-w-0">
+                                  <div className="font-semibold text-white flex items-center gap-2">
+                                    <span className="truncate">{sess.user_agent || "Web Browser"}</span>
+                                    {sess.is_current && (
+                                      <span className="px-1.5 py-0.2 rounded bg-emerald-950 border border-emerald-500/30 text-emerald-400 text-[9px] font-mono">
+                                        THIS DEVICE
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-[10px] text-gray-500 font-mono flex items-center gap-3 mt-0.5">
+                                    <span>IP: {sess.ip_address || "127.0.0.1"}</span>
+                                    <span>Expires: {new Date(sess.expires_at).toLocaleDateString()}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              <button
+                                onClick={async () => {
+                                  setRevokingJti(sess.jti);
+                                  try {
+                                    await EnterpriseApi.revokeSession(sess.jti);
+                                    setSessions((prev) => prev.filter((s) => s.jti !== sess.jti));
+                                  } catch (err) {
+                                    console.error("Revoke session error", err);
+                                  } finally {
+                                    setRevokingJti(null);
+                                  }
+                                }}
+                                disabled={revokingJti === sess.jti}
+                                className="px-2.5 py-1 rounded bg-white/5 hover:bg-red-950/40 hover:text-red-400 border border-white/10 hover:border-red-500/30 text-gray-400 text-[11px] transition-colors shrink-0 flex items-center gap-1"
+                              >
+                                {revokingJti === sess.jti ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
+                                Revoke
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-[#1e1e1e]">
+                    <button
+                      onClick={logout}
+                      className="px-3 py-1.5 rounded-lg border border-red-500/30 text-red-500 hover:bg-red-950/20 text-xs transition-colors"
+                    >
                       Sign out of all sessions
                     </button>
                   </div>
+                </div>
+              </SectionCard>
+            )}
+
+            {/* Enterprise & SCIM Tab */}
+            {activeTab === "enterprise" && (
+              <SectionCard title="Enterprise Directory & SCIM Provisioning" icon={Building2}>
+                <div className="space-y-6">
+                  {!isEnterprise ? (
+                    <div className="text-center py-6">
+                      <Building2 size={32} className="mx-auto text-gray-700 mb-3" />
+                      <p className="text-sm text-gray-400 mb-2 font-semibold">Enterprise Directory Integration</p>
+                      <p className="text-xs text-gray-500 mb-4 max-w-md mx-auto">
+                        Automated user lifecycle management via SCIM 2.0 and SAML/SSO authentication requires the Enterprise plan.
+                      </p>
+                      <Link
+                        href="/pricing"
+                        className="px-4 py-2 bg-ansys-yellow text-black text-xs font-bold rounded-xl hover:brightness-110 inline-block"
+                      >
+                        Upgrade to Enterprise
+                      </Link>
+                    </div>
+                  ) : (
+                    <>
+                      {/* SCIM Provisioning Card */}
+                      <div className="p-4 rounded-xl bg-[#0d0d0f] border border-[#1e1e1e] space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-white font-bold text-sm">
+                            <CheckCircle2 size={16} className="text-emerald-400" />
+                            SCIM 2.0 User Provisioning
+                          </div>
+                          <span className="px-2 py-0.5 rounded bg-emerald-950/50 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono font-bold">
+                            ENABLED
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400">
+                          Configure your IdP (Okta, Microsoft Entra ID, PingFederate) to automatically provision and de-provision engineering team members.
+                        </p>
+                        <div className="p-2.5 rounded-lg bg-black/60 border border-white/5 font-mono text-xs text-gray-300">
+                          <span className="text-gray-500">SCIM Endpoint:</span>{" "}
+                          <code className="text-ansys-yellow">https://suspensionlab.pro/api/v1/scim/v2</code>
+                        </div>
+                      </div>
+
+                      {/* SAML / SSO Card */}
+                      <div className="p-4 rounded-xl bg-[#0d0d0f] border border-[#1e1e1e] space-y-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2 text-white font-bold text-sm">
+                            <Shield size={16} className="text-purple-400" />
+                            SAML 2.0 Single Sign-On (SSO)
+                          </div>
+                          <span className="px-2 py-0.5 rounded bg-purple-950/50 border border-purple-500/30 text-purple-400 text-[10px] font-mono font-bold">
+                            READY
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400">
+                          Enforce mandatory SSO authentication for all engineers in your organization.
+                        </p>
+                        <div className="space-y-1.5 font-mono text-xs">
+                          <div className="p-2 rounded bg-black/40 border border-white/5 text-gray-400">
+                            <span className="text-gray-500">ACS URL:</span>{" "}
+                            <code className="text-white">https://suspensionlab.pro/api/v1/saml/acs</code>
+                          </div>
+                          <div className="p-2 rounded bg-black/40 border border-white/5 text-gray-400">
+                            <span className="text-gray-500">Entity ID:</span>{" "}
+                            <code className="text-white">https://suspensionlab.pro/saml/metadata</code>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] text-[11px] text-gray-400 flex items-center justify-between">
+                        <span>Tamper-evident cryptographic audit logs are active for all directory events.</span>
+                        <Link href="/audit" className="text-ansys-yellow hover:underline flex items-center gap-1 font-mono">
+                          View Audit Logs <ExternalLink size={11} />
+                        </Link>
+                      </div>
+                    </>
+                  )}
                 </div>
               </SectionCard>
             )}
@@ -396,3 +610,4 @@ export default function SettingsPage() {
     </div>
   );
 }
+

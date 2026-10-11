@@ -5,6 +5,9 @@
 global:
   domain: suspensionlab.pro
 
+rbac:
+  create: true
+
 api:
   replicaCount: 1
   image:
@@ -52,6 +55,27 @@ workers:
     limits:
       cpu: 1000m
       memory: 1024Mi
+  keda:
+    enabled: false
+
+redis:
+  enabled: false
+  host: "redis-master"
+  port: 6379
+
+externalSecrets:
+  enabled: false
+
+secrets:
+  databaseUrl: "postgresql://susplab:devpassword@postgres:5432/suspensionlab"
+  redisUrl: "redis://redis-master:6379/0"
+  redisPassword: ""
+  apiKey: "dev-api-key"
+  stripeWebhookSecret: "whsec_dev"
+
+networkPolicy:
+  enabled: false
+  vpcCidr: "10.0.0.0/16"
 
 ingress:
   enabled: true
@@ -61,3 +85,14 @@ ingress:
     - secretName: suspensionlab-tls
       hosts:
         - app.suspensionlab.pro
+
+monitoring:
+  serviceMonitor:
+    enabled: false
+  prometheusRule:
+    enabled: false
+  grafanaDashboard:
+    enabled: false
+  alertmanager:
+    enabled: false
+

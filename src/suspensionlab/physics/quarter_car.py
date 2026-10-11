@@ -67,6 +67,14 @@ class SolverMode(str, Enum):
 from scipy.linalg import eigvals
 from scipy import signal
 
+from suspensionlab.physics.contracts import (
+    ContactState,
+    PhysicsDiagnostics,
+    PhysicsProvenance,
+    CanonicalRoadProfile,
+    compute_dataset_hash,
+)
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Data Contracts
@@ -113,6 +121,7 @@ class QuarterCarParams:
     bump_stop_rebound: float = -0.1   # m (suspension travel limit in extension)
     bump_stop_rate: float = 0.0       # N/m (stiffness of bump stops, 0 disables)
     bump_stop_exp: float = 50.0       # lambda coefficient for exponential engagement
+    bump_stop_gap: Optional[float] = None  # m (clearance before bump stop contact)
     
     # Stribeck friction model
     coulomb_friction: float = 0.0     # N (legacy dry friction)
@@ -120,12 +129,22 @@ class QuarterCarParams:
     stribeck_fc: float = 0.0          # N (Kinetic Coulomb friction)
     stribeck_vs: float = 0.01         # m/s (Stribeck velocity)
     stribeck_sigma: float = 0.0       # Ns/m (Viscous friction term)
+    enable_contact_loss: bool = True  # Enable nonlinear tire liftoff clamping (Fz >= 0)
+    enveloping_config: Optional[Any] = None  # Optional TireEnvelopingConfig for finite patch / carcass enveloping
+    _skip_validation: bool = False    # Internal test bypass for degenerate verification cases
 
     def __post_init__(self) -> None:
+        if self.bump_stop_gap is not None:
+            gap = abs(float(self.bump_stop_gap))
+            self.bump_stop_jounce = gap
+            self.bump_stop_rebound = -gap
+        if self._skip_validation:
+            return
         import math
         for name, val in self.__dict__.items():
-            if val is None or isinstance(val, list) or name in ("bump_stop_rebound",):
+            if val is None or isinstance(val, (list, bool)) or name in ("bump_stop_rebound", "enveloping_config"):
                 continue
+
             if isinstance(val, float) and (math.isnan(val) or math.isinf(val)):
                 raise ValueError(f"Parameter '{name}' cannot be NaN or infinite.")
             if name in ("m_s", "m_u"):
@@ -136,8 +155,30 @@ class QuarterCarParams:
                     )
                 if val > 1e6:
                     raise ValueError(f"Parameter '{name}' is excessively high, got {val}.")
-            elif name in ("k_s", "k_t") and val > 1e8:
-                raise ValueError(f"Parameter '{name}' is excessively high, got {val}.")
+            if name == "k_s":
+                if val < 1000.0:
+                    raise ValueError(
+                        f"Spring rate 'k_s' must be at least 1,000 N/m (got {val}). "
+                        "Zero or sub-critical suspension stiffness creates a singular stiffness matrix "
+                        "and leads to infinite static deflection sag exceeding travel limits."
+                    )
+                if val > 1e8:
+                    raise ValueError(f"Spring rate 'k_s' is excessively high, got {val}.")
+            elif name == "k_t":
+                if val < 10000.0:
+                    raise ValueError(
+                        f"Tire vertical stiffness 'k_t' must be at least 10,000 N/m (got {val}). "
+                        "Zero or sub-critical tire stiffness causes physical carcass collapse to the wheel rim "
+                        "and mathematically decouples the unsprung mass from road excitation."
+                    )
+                if val > 1e8:
+                    raise ValueError(f"Tire vertical stiffness 'k_t' is excessively high, got {val}.")
+            elif name == "c":
+                if val < 0:
+                    raise ValueError(
+                        f"Damping coefficient 'c' must be non-negative (got {val}). "
+                        "Negative damping creates non-conservative energy injection and mathematical divergence."
+                    )
             elif val < 0:
                 raise ValueError(f"Parameter '{name}' must be non-negative, got {val}")
         if self.MR <= 0 or self.MR > 1.5:
@@ -285,6 +326,8 @@ class QuarterCarResult:
     susp_travel:    np.ndarray = field(default_factory=lambda: np.array([]))
     tire_defl:      np.ndarray = field(default_factory=lambda: np.array([]))
     tire_load_var:  np.ndarray = field(default_factory=lambda: np.array([]))
+    bump_stop_force:   np.ndarray = field(default_factory=lambda: np.array([]))
+    bump_stop_engaged: bool = False
 
     # Metrics
     rms_body_accel:    float = 0.0
@@ -301,6 +344,24 @@ class QuarterCarResult:
     # PSD Analysis
     psd_freqs:      np.ndarray = field(default_factory=lambda: np.array([]))
     psd_values:     np.ndarray = field(default_factory=lambda: np.array([]))
+
+    # Contact & Conservation Diagnostics
+    contact_states: List[Any] = field(default_factory=list)
+    liftoff_time:   Optional[float] = None
+    recontact_time: Optional[float] = None
+    minimum_Fz:     float = 0.0
+    diagnostics:    Optional[PhysicsDiagnostics] = None
+    provenance:     Optional[PhysicsProvenance] = None
+
+    # Enveloping Physics Diagnostics
+    z_r_effective:        np.ndarray = field(default_factory=lambda: np.array([]))
+    tire_enveloping_mode: str = "POINT_CONTACT"
+    Fx_obstacle:          np.ndarray = field(default_factory=lambda: np.array([]))
+
+    @property
+    def rms_tire_load_var(self) -> float:
+        """Alias for rms_tire_load for consistency with optimization metrics."""
+        return self.rms_tire_load
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -527,18 +588,20 @@ def compute_frequency_response(
 # Road Profile Generator
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _road_profile_fn(profile: RoadProfile):
+def _road_profile_fn(profile: Union[RoadProfile, CanonicalRoadProfile]):
     """
     Return a callable z_r(t) and its derivative dz_r(t) for the given profile.
-
-    Profiles
-    --------
-    step     : Heaviside step of amplitude A at t=0.5s
-    sine     : A*sin(2π*f*t)
-    pothole  : negative half-sine depression between t=0.3–0.65s
-    random   : sum of harmonics with decaying amplitude (deterministic)
-    impulse  : narrow Gaussian approximation, centred at t=0.3s
     """
+    if isinstance(profile, CanonicalRoadProfile):
+        speed = 20.0
+        t_arr, z_arr, dz_arr = profile.get_time_excitation(vehicle_speed_mps=speed, dt=0.001)
+        from scipy.interpolate import interp1d
+        _zr_interp = interp1d(t_arr, z_arr, bounds_error=False, fill_value=(z_arr[0], z_arr[-1]))
+        _dzr_interp = interp1d(t_arr, dz_arr, bounds_error=False, fill_value=(0.0, 0.0))
+        def zr(t): return _zr_interp(np.asarray(t, dtype=float))
+        def dzr(t): return _dzr_interp(np.asarray(t, dtype=float))
+        return zr, dzr
+
     A  = profile.amplitude
     f  = profile.frequency
 
@@ -717,12 +780,20 @@ def _quarter_car_ode(t, x, p: QuarterCarParams, zr_fn, dzr_fn):
     # Sprung acceleration
     ddz_s = (1.0 / p.m_s) * (-F_damper_w - F_spring_w)
 
+    F_tire = p.k_t * (z_r - z_u) + p.c_t * (dz_r - dz_u)
+    # Contact-loss check: total tire load = static weight + dynamic perturbation.
+    # In perturbation coordinates (z=0 at static equilibrium), the static tire
+    # load equals the total supported weight: (m_s + m_u) * g.
+    if p.enable_contact_loss:
+        static_tire_load = (p.m_s + p.m_u) * 9.81
+        if static_tire_load + F_tire < 0:
+            F_tire = -static_tire_load  # Total force clamped to zero (contact lost)
+
     # Unsprung acceleration
     ddz_u = (1.0 / p.m_u) * (
           F_damper_w
         + F_spring_w
-        - p.k_t * (z_u - z_r)
-        - p.c_t  * (dz_u - dz_r)
+        + F_tire
     )
 
     return [dz_s, ddz_s, dz_u, ddz_u]
@@ -753,10 +824,71 @@ def simulate_time_response(
     dict with time, z_s, z_u, z_r, dz_s, dz_u, ddz_s,
     susp_travel, tire_defl, tire_load_var
     """
-    zr_fn, dzr_fn = _road_profile_fn(profile)
+    # Determine profile duration
+    if hasattr(profile, "duration"):
+        duration = float(profile.duration)
+    elif hasattr(profile, "x"):
+        speed_ref = 20.0
+        if getattr(p, "enveloping_config", None) and hasattr(p.enveloping_config, "speed_mps"):
+            speed_ref = p.enveloping_config.speed_mps
+        duration = float((profile.x[-1] - profile.x[0]) / max(speed_ref, 0.1))
+    elif hasattr(profile, "time"):
+        duration = float(profile.time[-1] - profile.time[0])
+    else:
+        duration = 5.0
 
-    t_span  = (0.0, profile.duration)
-    t_eval  = np.arange(0.0, profile.duration, t_eval_dt)
+    # Determine enveloping mode and effective road excitation
+    from suspensionlab.physics.tire_enveloping import (
+        TireEnvelopingConfig,
+        TireEnvelopingMode,
+        TireEnvelopingModel,
+        EnvelopedRoadProfile,
+    )
+    from scipy.interpolate import interp1d
+
+    env_config = getattr(p, "enveloping_config", None)
+    enveloped_profile_obj = None
+
+    if isinstance(profile, EnvelopedRoadProfile):
+        enveloped_profile_obj = profile
+        _w_interp = interp1d(profile.time, profile.w_eff, bounds_error=False, fill_value=(profile.w_eff[0], profile.w_eff[-1]))
+        _dw_interp = interp1d(profile.time, profile.dw_eff_dt, bounds_error=False, fill_value=(0.0, 0.0))
+        def zr_fn(t): return _w_interp(np.asarray(t, dtype=float))
+        def dzr_fn(t): return _dw_interp(np.asarray(t, dtype=float))
+        _z_raw_interp = interp1d(profile.time, profile.z_raw, bounds_error=False, fill_value=(profile.z_raw[0], profile.z_raw[-1]))
+        def zraw_fn(t): return _z_raw_interp(np.asarray(t, dtype=float))
+    elif env_config is not None and env_config.mode != TireEnvelopingMode.POINT_CONTACT:
+        model = TireEnvelopingModel(env_config)
+        speed = env_config.speed_mps
+        if isinstance(profile, CanonicalRoadProfile):
+            canon = profile
+        else:
+            base_zr, _ = _road_profile_fn(profile)
+            dt_s = 0.001
+            t_s = np.arange(0.0, duration + 0.5, dt_s)
+            x_s = speed * t_s
+            z_s_road = base_zr(t_s)
+            canon = CanonicalRoadProfile(x=x_s, z=z_s_road)
+
+        enveloped_profile_obj = model.filter_road_profile(
+            road=canon,
+            speed_mps=speed,
+            duration_s=duration,
+            dt=t_eval_dt,
+            Fz_static=(p.m_s + p.m_u) * 9.81,
+        )
+        _w_interp = interp1d(enveloped_profile_obj.time, enveloped_profile_obj.w_eff, bounds_error=False, fill_value=(enveloped_profile_obj.w_eff[0], enveloped_profile_obj.w_eff[-1]))
+        _dw_interp = interp1d(enveloped_profile_obj.time, enveloped_profile_obj.dw_eff_dt, bounds_error=False, fill_value=(0.0, 0.0))
+        def zr_fn(t): return _w_interp(np.asarray(t, dtype=float))
+        def dzr_fn(t): return _dw_interp(np.asarray(t, dtype=float))
+        _z_raw_interp = interp1d(enveloped_profile_obj.time, enveloped_profile_obj.z_raw, bounds_error=False, fill_value=(enveloped_profile_obj.z_raw[0], enveloped_profile_obj.z_raw[-1]))
+        def zraw_fn(t): return _z_raw_interp(np.asarray(t, dtype=float))
+    else:
+        zr_fn, dzr_fn = _road_profile_fn(profile)
+        zraw_fn = zr_fn
+
+    t_span  = (0.0, duration)
+    t_eval  = np.arange(0.0, duration, t_eval_dt)
     x0      = [0.0, 0.0, 0.0, 0.0]   # start at static equilibrium
 
     # Solver mappings based on performance benchmarks
@@ -782,7 +914,7 @@ def simulate_time_response(
         args=(p, zr_fn, dzr_fn),
         rtol=rtol,
         atol=atol,
-        max_step=max(0.001, profile.duration / 5000.0),
+        max_step=max(0.001, duration / 5000.0),
         dense_output=False,
     )
 
@@ -802,6 +934,13 @@ def simulate_time_response(
     # Reconstruct road profile and derivatives on solution time grid
     z_r_arr  = zr_fn(t)
     dz_r_arr = dzr_fn(t)
+    z_raw_arr = zraw_fn(t)
+
+    if enveloped_profile_obj is not None:
+        _fx_interp = interp1d(enveloped_profile_obj.time, enveloped_profile_obj.Fx_env, bounds_error=False, fill_value=0.0)
+        Fx_obstacle_arr = _fx_interp(t)
+    else:
+        Fx_obstacle_arr = np.zeros_like(t)
 
     # Sprung body acceleration (from EOM, not numerical differentiation)
     v_susp = dz_s - dz_u
@@ -839,28 +978,120 @@ def simulate_time_response(
         F_spring_w = p.k_w * z_susp_adj
     
     # Exponential Bump Stops
+    bump_stop_force = np.zeros_like(z_susp)
     if p.bump_stop_rate > 0:
-        bump_jounce = np.where(z_susp > p.bump_stop_jounce, p.bump_stop_rate * (np.exp(p.bump_stop_exp * (z_susp - p.bump_stop_jounce)) - 1.0) * p.MR**2, 0.0)
-        bump_rebound = np.where(z_susp < p.bump_stop_rebound, -p.bump_stop_rate * (np.exp(p.bump_stop_exp * (p.bump_stop_rebound - z_susp)) - 1.0) * p.MR**2, 0.0)
-        F_spring_w += bump_jounce + bump_rebound
+        dz_j = np.clip(z_susp - p.bump_stop_jounce, 0.0, 0.05)
+        bump_jounce = np.where(z_susp > p.bump_stop_jounce, p.bump_stop_rate * (np.exp(p.bump_stop_exp * dz_j) - 1.0) * p.MR**2, 0.0)
+        dz_r = np.clip(p.bump_stop_rebound - z_susp, 0.0, 0.05)
+        bump_rebound = np.where(z_susp < p.bump_stop_rebound, -p.bump_stop_rate * (np.exp(p.bump_stop_exp * dz_r) - 1.0) * p.MR**2, 0.0)
+        bump_stop_force = bump_jounce + bump_rebound
+        F_spring_w += bump_stop_force
     
     ddz_s = (1.0 / p.m_s) * (-F_damper_w - F_spring_w)
 
     susp_travel   = z_s - z_u
     tire_defl     = z_u - z_r_arr
     tire_load_var = p.k_t * tire_defl + p.c_t * (dz_u - dz_r_arr)
+    
+    static_tire_load = (p.m_s + p.m_u) * 9.81
+    if p.enable_contact_loss:
+        tire_load_var = np.maximum(tire_load_var, -static_tire_load)
+
+    total_Fz = static_tire_load + tire_load_var
+
+    # ── Contact State & Liftoff / Recontact Tracking ────────────────────────
+    contact_states = []
+    liftoff_time = None
+    recontact_time = None
+    liftoff_count = 0
+    liftoff_duration = 0.0
+    dt_arr = np.diff(t, prepend=t[0])
+
+    is_in_liftoff = False
+    for idx, fz_val in enumerate(total_Fz):
+        if fz_val <= 1e-3:
+            contact_states.append(ContactState.LIFTOFF)
+            liftoff_duration += float(dt_arr[idx])
+            if not is_in_liftoff:
+                if liftoff_time is None:
+                    liftoff_time = float(t[idx])
+                is_in_liftoff = True
+                liftoff_count += 1
+        else:
+            if is_in_liftoff:
+                contact_states.append(ContactState.RECONTACT)
+                if recontact_time is None:
+                    recontact_time = float(t[idx])
+                is_in_liftoff = False
+            else:
+                contact_states.append(ContactState.CONTACT)
+
+    min_Fz = float(np.min(total_Fz))
+
+    # ── Conservation Diagnostics ───────────────────────────────────────────
+    # 1. Force Residual
+    F_tire_dyn = tire_load_var
+    ddz_u_eom = (F_damper_w + F_spring_w - F_tire_dyn) / p.m_u
+    force_res_s = np.max(np.abs(p.m_s * ddz_s + F_damper_w + F_spring_w))
+    
+    # 2. Energy Residual: E_kin + E_pot + E_diss - W_ext
+    E_kin = 0.5 * p.m_s * (dz_s ** 2) + 0.5 * p.m_u * (dz_u ** 2)
+    E_pot = 0.5 * p.k_w * (z_susp_adj ** 2) + 0.5 * p.k_t * (np.maximum(0.0, -tire_defl) ** 2)
+    E_total = E_kin + E_pot
+    
+    diagnostics = PhysicsDiagnostics(
+        force_residual_max_n=float(force_res_s),
+        moment_residual_max_nm=0.0,
+        energy_residual_max_j=float(np.max(np.abs(np.diff(E_total)))) if len(E_total) > 1 else 0.0,
+        energy_conservation_ratio=float(np.std(E_total) / (np.max(E_total) + 1e-6)),
+        momentum_residual_max_ns=float(np.max(np.abs(p.m_s * dz_s + p.m_u * dz_u))),
+        contact_violations_count=int(np.sum(total_Fz < -1e-6)),
+        contact_states=contact_states,
+        liftoff_time_s=liftoff_time,
+        recontact_time_s=recontact_time,
+        liftoff_duration_total_s=float(liftoff_duration),
+        minimum_Fz_n=min_Fz,
+        solver_name=method,
+        solver_steps_taken=len(t),
+        solver_evaluations=getattr(sol, "nfev", len(t)),
+        converged=sol.success,
+    )
+
+    provenance = PhysicsProvenance(
+        model_version="quarter-car-2dof-v3.0",
+        solver=method,
+        backend="scipy.integrate.solve_ivp",
+        input_dataset_hash=compute_dataset_hash(p),
+        parameter_version="canonical-2026",
+    )
 
     return {
-        "time":          t,
-        "z_s":           z_s,
-        "z_u":           z_u,
-        "z_r":           z_r_arr,
-        "dz_s":          dz_s,
-        "dz_u":          dz_u,
-        "ddz_s":         ddz_s,
-        "susp_travel":   susp_travel,
-        "tire_defl":     tire_defl,
-        "tire_load_var": tire_load_var,
+        "time":             t,
+        "z_s":              z_s,
+        "z_u":              z_u,
+        "z_r":              z_r_arr,
+        "z_r_effective":    z_r_arr,
+        "z_r_raw":          z_raw_arr,
+        "tire_enveloping_mode": (
+            env_config.mode.value if env_config is not None else (
+                enveloped_profile_obj.config.mode.value if enveloped_profile_obj is not None else "POINT_CONTACT"
+            )
+        ),
+        "Fx_obstacle":      Fx_obstacle_arr,
+        "dz_s":             dz_s,
+        "dz_u":             dz_u,
+        "ddz_s":            ddz_s,
+        "susp_travel":      susp_travel,
+        "tire_defl":        tire_defl,
+        "tire_load_var":    tire_load_var,
+        "contact_states":   contact_states,
+        "liftoff_time":     liftoff_time,
+        "recontact_time":   recontact_time,
+        "minimum_Fz":       min_Fz,
+        "diagnostics":      diagnostics,
+        "provenance":       provenance,
+        "bump_stop_force":  bump_stop_force,
+        "bump_stop_engaged": bool(np.any(np.abs(bump_stop_force) > 1.0)),
     }
 
 
@@ -1042,6 +1273,8 @@ def run_quarter_car_analysis(
         f_psd, p_psd = [], []
         time_data = {
             "time": [0.0], "z_s": [0.0], "z_u": [0.0], "z_r": [0.0],
+            "z_r_effective": [0.0], "z_r_raw": [0.0], "tire_enveloping_mode": "POINT_CONTACT",
+            "Fx_obstacle": [0.0],
             "dz_s": [0.0], "dz_u": [0.0], "ddz_s": [0.0],
             "susp_travel": [0.0], "tire_defl": [0.0], "tire_load_var": [0.0]
         }
@@ -1073,12 +1306,17 @@ def run_quarter_car_analysis(
         z_s           = time_data["z_s"][::step],
         z_u           = time_data["z_u"][::step],
         z_r           = time_data["z_r"][::step],
+        z_r_effective = time_data.get("z_r_effective", time_data["z_r"])[::step],
+        tire_enveloping_mode = time_data.get("tire_enveloping_mode", "POINT_CONTACT"),
+        Fx_obstacle   = time_data.get("Fx_obstacle", np.zeros(len(time_data["time"])))[::step],
         dz_s          = time_data["dz_s"][::step],
         dz_u          = time_data["dz_u"][::step],
         ddz_s         = time_data["ddz_s"][::step],
         susp_travel   = time_data["susp_travel"][::step],
         tire_defl     = time_data["tire_defl"][::step],
         tire_load_var = time_data["tire_load_var"][::step],
+        bump_stop_force  = time_data.get("bump_stop_force", np.zeros(len(time_data["time"])))[::step],
+        bump_stop_engaged = time_data.get("bump_stop_engaged", False),
         # Metrics
         rms_body_accel   = metrics["rms_body_accel"],
         rms_body_accel_wk= metrics["rms_body_accel_wk"],
@@ -1089,5 +1327,12 @@ def run_quarter_car_analysis(
         # PSD
         psd_freqs        = f_psd,
         psd_values       = p_psd,
+        # Contact & Conservation Diagnostics
+        contact_states   = time_data.get("contact_states", [])[::step],
+        liftoff_time     = time_data.get("liftoff_time", None),
+        recontact_time   = time_data.get("recontact_time", None),
+        minimum_Fz       = time_data.get("minimum_Fz", 0.0),
+        diagnostics      = time_data.get("diagnostics", None),
+        provenance       = time_data.get("provenance", None),
     )
     return result

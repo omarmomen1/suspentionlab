@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name }}-worker
-  namespace: suspensionlab-prod
+  namespace: {{ .Release.Namespace }}
   labels:
     app: suspensionlab
     component: worker
@@ -19,15 +19,23 @@ spec:
         component: worker
     spec:
       serviceAccountName: {{ .Release.Name }}-sa
+      terminationGracePeriodSeconds: 60
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: worker
         image: "{{ .Values.workers.image.repository }}:{{ .Values.workers.image.tag }}"
-        command: ["rq", "worker", "--with-scheduler", "--max-jobs", "3"]
+        command: ["sh", "-c", "rq worker -u \"$REDIS_URL\" --with-scheduler --max-jobs 3 default priority_queue dedicated"]
         securityContext:
           runAsNonRoot: true
           runAsUser: 1001
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: false
+          readOnlyRootFilesystem: true
           capabilities:
             drop:
             - ALL
@@ -38,3 +46,38 @@ spec:
             name: {{ .Release.Name }}-secrets
         resources:
 {{ toYaml .Values.workers.resources | indent 10 }}
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        startupProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import sys, os; sys.exit(0 if os.path.exists('/tmp') else 1)"
+          initialDelaySeconds: 2
+          periodSeconds: 2
+          failureThreshold: 30
+        livenessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import sys, os; sys.exit(0 if os.path.exists('/tmp') else 1)"
+          initialDelaySeconds: 15
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+        readinessProbe:
+          exec:
+            command:
+            - python
+            - -c
+            - "import sys, os; sys.exit(0 if os.path.exists('/tmp') else 1)"
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: tmp
+        emptyDir: {}

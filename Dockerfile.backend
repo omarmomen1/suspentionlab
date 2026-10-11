@@ -5,6 +5,8 @@ WORKDIR /app
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
+    cmake \
+    libeigen3-dev \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
@@ -19,6 +21,12 @@ COPY src/ ./src/
 RUN uv venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 RUN uv pip install -e ".[prod]"
+
+# Compile native C++ kinematics core for Linux target (fails hard if compiler, Eigen, or pybind11 is missing)
+RUN rm -f src/suspensionlab/physics/kinematics_core*.so \
+    && cmake -B /tmp/kinematics_build -S src/kinematics_cpp -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF \
+    && cmake --build /tmp/kinematics_build --config Release \
+    && ls -la src/suspensionlab/physics/kinematics_core*.so
 
 # ── Runtime stage ────────────────────────────────────────────────────────────
 FROM python:3.11-slim
@@ -35,9 +43,10 @@ RUN groupadd --gid 1001 appgroup \
 COPY --from=builder /opt/venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copy application code and migration config
+# Copy application code and migration config from builder
 # Set ownership to appuser so the process can read its own files
-COPY --chown=appuser:appgroup src/ /app/src/
+COPY --chown=appuser:appgroup --from=builder /app/src/ /app/src/
+COPY --chown=appuser:appgroup --from=builder /app/src/suspensionlab/physics/kinematics_core*.so /app/src/suspensionlab/physics/
 COPY --chown=appuser:appgroup alembic/ /app/alembic/
 COPY --chown=appuser:appgroup alembic.ini /app/
 
@@ -46,6 +55,7 @@ ENV PYTHONPATH="/app/src"
 ENV ENVIRONMENT="PROD"
 # Ensure Python output is not buffered (critical for log streaming in K8s)
 ENV PYTHONUNBUFFERED=1
+ENV NUMBA_CACHE_DIR="/tmp"
 
 # P2-INFRA-03: aligned with docker-compose port mapping (8000:8000)
 EXPOSE 8000
@@ -61,4 +71,4 @@ USER appuser
 # multiple pod replicas would simultaneously attempt schema migrations on startup,
 # risking table locks and data corruption.
 CMD ["python", "-m", "uvicorn", "suspensionlab.backend.api.main:app", \
-     "--host", "0.0.0.0", "--port", "7860", "--workers", "2"]
+     "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]

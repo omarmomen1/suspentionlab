@@ -6,7 +6,7 @@ import { useAuth } from "../../../contexts/AuthContext";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 export default function LoginPage() {
-  const { login }   = useAuth();
+  const { login, refreshSession } = useAuth();
   const router      = useRouter();
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
@@ -19,8 +19,14 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await login(email, password);
-      router.push("/quarter-car");
+      const userObj = await login(email, password);
+      const searchParams = typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+      const redirect = searchParams ? searchParams.get("redirect") : null;
+      if (redirect) {
+        router.push(redirect);
+      } else {
+        router.push(userObj?.redirect_url || "/quarter-car");
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
     } finally {
@@ -35,63 +41,88 @@ export default function LoginPage() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-xs font-medium text-gray-400 mb-1.5">Email</label>
-          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
+          <label htmlFor="login-email" className="block text-xs font-medium text-gray-300 mb-1.5">Email</label>
+          <input
+            id="login-email"
+            type="email"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             placeholder="you@company.com"
             className="w-full bg-[#0d0d0f] border border-[#252525] rounded-xl px-3.5 py-2.5 text-sm text-white
-              placeholder:text-gray-700 focus:outline-none focus:border-ansys-yellow/60 focus:ring-1
-              focus:ring-ansys-yellow/15 transition-all" />
+              placeholder:text-gray-500 focus:outline-none focus:border-ansys-yellow/60 focus:ring-1
+              focus:ring-ansys-yellow/15 transition-all"
+          />
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-1.5">
-            <label className="text-xs font-medium text-gray-400">Password</label>
-            <Link href="/auth/forgot" className="text-[10px] text-ansys-yellow hover:underline">
+            <label htmlFor="login-password" className="text-xs font-medium text-gray-300">Password</label>
+            <Link href="/auth/forgot" className="text-xs text-ansys-yellow hover:underline inline-flex items-center min-h-[24px]">
               Forgot password?
             </Link>
           </div>
           <div className="relative">
-            <input type={showPwd ? "text" : "password"} required value={password}
-              onChange={(e) => setPassword(e.target.value)} placeholder="••••••••"
+            <input
+              id="login-password"
+              type={showPwd ? "text" : "password"}
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
               className="w-full bg-[#0d0d0f] border border-[#252525] rounded-xl px-3.5 py-2.5 text-sm text-white
-                placeholder:text-gray-700 focus:outline-none focus:border-ansys-yellow/60 focus:ring-1
-                focus:ring-ansys-yellow/15 transition-all pr-10" />
-            <button type="button" onClick={() => setShowPwd((v) => !v)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-300 transition-colors">
-              {showPwd ? <EyeOff size={14} /> : <Eye size={14} />}
+                placeholder:text-gray-400 focus:outline-none focus:border-ansys-yellow/60 focus:ring-1
+                focus:ring-ansys-yellow/15 transition-all pr-12"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPwd((v) => !v)}
+              aria-label={showPwd ? "Hide password" : "Show password"}
+              aria-pressed={showPwd}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white transition-colors p-2 min-w-[28px] min-h-[28px] flex items-center justify-center rounded-lg"
+            >
+              {showPwd ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           </div>
         </div>
 
         {error && (
-          <div className="text-xs text-red-400 bg-red-950/30 border border-red-900/30 rounded-lg px-3 py-2">
+          <div
+            role="alert"
+            aria-live="assertive"
+            className="text-xs text-red-400 bg-red-950/30 border border-red-900/30 rounded-lg px-3 py-2"
+          >
             {error}
           </div>
         )}
 
-        <button type="submit" disabled={loading}
+        <button
+          type="submit"
+          disabled={loading}
           className="w-full py-2.5 bg-ansys-yellow text-black text-sm font-bold rounded-xl
             hover:brightness-110 transition-all shadow-[0_0_16px_rgba(242,169,0,0.2)]
-            disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+            disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
           {loading ? <><Loader2 size={14} className="animate-spin" /> Signing in…</> : "Sign In"}
         </button>
       </form>
 
-      <p className="text-center text-xs text-gray-600 mt-6">
+      <p className="text-center text-xs text-gray-400 mt-6">
         No account?{" "}
-        <Link href="/auth/register" className="text-ansys-yellow hover:underline font-semibold">
-          Start your free 14-day trial
+        <Link href="/auth/register" className="text-ansys-yellow hover:underline font-semibold inline-flex items-center min-h-[24px]">
+          Create an account
         </Link>
       </p>
 
       {/* Dev quick-fill */}
       {process.env.NODE_ENV === "development" && (
-        <button type="button" onClick={() => { setEmail("demo@suspensionlab.io"); setPassword("demo1234"); }}
+        <button type="button" onClick={() => { setEmail("james@company.com"); setPassword("admin123!"); }}
           className="mt-4 w-full py-1.5 text-[10px] text-gray-700 hover:text-gray-500 border border-dashed
             border-[#1e1e1e] rounded-lg transition-colors">
-          [DEV] Fill demo credentials
+          [DEV] Fill demo credentials (james@company.com)
         </button>
       )}
+
     </div>
   );
 }

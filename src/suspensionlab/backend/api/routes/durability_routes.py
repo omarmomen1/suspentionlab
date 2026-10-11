@@ -7,10 +7,14 @@ from __future__ import annotations
 import numpy as np
 import asyncio
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel, Field
 from typing import Literal
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from suspensionlab.backend.database.core import get_db_dependency
+from suspensionlab.backend.security.auth import verify_api_key
+from suspensionlab.backend.services.simulation_service import SimulationService
 from suspensionlab.physics.quarter_car import QuarterCarParams, RoadProfile, run_quarter_car_analysis
 
 logger = logging.getLogger(__name__)
@@ -268,3 +272,37 @@ async def road_durability_analysis(req: DurabilityRequest):
     except Exception as e:
         logger.exception("Durability analysis error: %s", e)
         raise HTTPException(status_code=500, detail="Durability analysis failed.")
+
+
+class JobResponse(BaseModel):
+    job_id: str
+    status: str
+
+
+@router.post("/durability/async", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+async def road_durability_analysis_async(
+    req: DurabilityRequest,
+    user: dict = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Asynchronous ISO 8608 Road Profile Durability Analyzer.
+    Enqueues durability computation to background RQ worker.
+    """
+    try:
+        user_id = getattr(user, "user_id", str(user.get("user_id") if isinstance(user, dict) else user))
+        plan = getattr(user, "plan", user.get("plan", "PRO") if isinstance(user, dict) else "PRO")
+        team_id = getattr(user, "team_id", user.get("team_id", None) if isinstance(user, dict) else None)
+        job_id = await SimulationService.enqueue_simulation(
+            user_id=user_id,
+            plan=plan,
+            job_type="SIMULATE_DURABILITY",
+            payload=req.model_dump() if hasattr(req, "model_dump") else req.dict(),
+            db=db,
+            team_id=team_id,
+        )
+        return {"job_id": job_id, "status": "PENDING"}
+    except Exception as e:
+        logger.exception("Failed to enqueue durability job: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to enqueue durability analysis.")
+

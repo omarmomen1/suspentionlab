@@ -19,6 +19,7 @@ class User(Base):
         Index("ix_users_api_key",      "api_key", unique=True),
         Index("ix_users_billing_cust",   "billing_customer_id"),
         Index("ix_users_team_id",      "team_id"),
+        Index("ix_users_organization_id", "organization_id"),
     )
 
     id                     = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
@@ -48,6 +49,10 @@ class User(Base):
     # Admin status
     is_admin               = Column(Boolean, default=False)
 
+    # Organization Hierarchy (Multi-Tenancy)
+    organization_id        = Column(UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="SET NULL", use_alter=True), nullable=True)
+    org_role               = Column(String(32), default="MEMBER", nullable=True)  # ORG_ADMIN | BILLING_ADMIN | MEMBER
+
     # Team membership (null = personal account)
     team_id                = Column(UUID(as_uuid=True), ForeignKey("teams.id", ondelete="SET NULL", use_alter=True), nullable=True)
     team_role              = Column(String(20), default="Viewer", nullable=True) # Owner | Admin | Viewer
@@ -57,7 +62,8 @@ class User(Base):
     updated_at             = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
     # Relationships
+    organization = relationship("Organization", back_populates="users", foreign_keys="[User.organization_id]")
     team = relationship("Team", back_populates="members", foreign_keys="[User.team_id]")
-    jobs = relationship("JobRecord", back_populates="user")
-    profiles = relationship("VehicleProfile", back_populates="user")
-    sessions = relationship("SimSession", back_populates="owner")
+    jobs = relationship("JobRecord", back_populates="user", cascade="all, delete-orphan")
+    profiles = relationship("VehicleProfile", back_populates="user", cascade="all, delete-orphan")
+    sessions = relationship("SimSession", back_populates="owner", cascade="all, delete-orphan")

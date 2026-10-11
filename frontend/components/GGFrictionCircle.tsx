@@ -1,11 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 
 
 "use client";
 
-import dynamic from "next/dynamic";
-
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import Plot from "./sim/Plot";
 
 interface GGFrictionCircleProps {
   maxG: number;
@@ -14,6 +12,9 @@ interface GGFrictionCircleProps {
 }
 
 export default function GGFrictionCircle({ maxG, latG, longG }: GGFrictionCircleProps) {
+  const currentTotalG = Math.sqrt(latG * latG + longG * longG);
+  const exploitationPct = maxG > 0 ? ((currentTotalG / maxG) * 100).toFixed(0) : "0";
+
   // We use Plotly shapes to draw the theoretical max G circle
   const circleShape: any = {
     type: "circle" as const,
@@ -21,12 +22,19 @@ export default function GGFrictionCircle({ maxG, latG, longG }: GGFrictionCircle
     y0: -maxG,
     x1: maxG,
     y1: maxG,
-    line: { color: "rgba(242, 169, 0, 0.5)", width: 2, dash: "dot" }, // Ansys Yellow outline
+    line: { color: "rgba(242, 169, 0, 0.5)", width: 2, dash: "dot" },
     fillcolor: "rgba(242, 169, 0, 0.05)"
   };
 
   return (
-    <div className="w-full h-full flex items-center justify-center bg-[#0d0d0f] rounded-xl border border-white/10 p-2">
+    <div
+      role="region"
+      aria-label="G-G Friction Circle"
+      className="w-full h-full flex flex-col items-center justify-center bg-[#0d0d0f] rounded-xl border border-white/10 p-2 relative"
+    >
+      <span className="sr-only">
+        G-G Friction Circle: Current Lateral acceleration is {latG.toFixed(2)} g, Longitudinal acceleration is {longG.toFixed(2)} g. Resultant acceleration {currentTotalG.toFixed(2)} g ({exploitationPct}% of {maxG.toFixed(2)} g tire limit).
+      </span>
       <Plot
         data={[
           {
@@ -34,7 +42,7 @@ export default function GGFrictionCircle({ maxG, latG, longG }: GGFrictionCircle
             y: [longG],
             type: "scatter",
             mode: "markers",
-            marker: { color: "#f2a900", size: 12, symbol: "circle" }, // The actual car dot
+            marker: { color: "#f2a900", size: 12, symbol: "circle" },
             name: "Actual G"
           }
         ]}
@@ -43,18 +51,18 @@ export default function GGFrictionCircle({ maxG, latG, longG }: GGFrictionCircle
           paper_bgcolor: "transparent",
           plot_bgcolor: "transparent",
           xaxis: { 
-            title: { text: "Lat G", font: { color: "#888" } },
+            title: { text: "Lat G", font: { color: "#9ca3af" } },
             range: [-3, 3], 
             gridcolor: "rgba(255,255,255,0.1)", 
             zerolinecolor: "rgba(255,255,255,0.3)",
-            tickfont: { color: "#888" }
+            tickfont: { color: "#9ca3af" }
           },
           yaxis: { 
-            title: { text: "Long G", font: { color: "#888" } },
+            title: { text: "Long G", font: { color: "#9ca3af" } },
             range: [-3, 3], 
             gridcolor: "rgba(255,255,255,0.1)", 
             zerolinecolor: "rgba(255,255,255,0.3)",
-            tickfont: { color: "#888" }
+            tickfont: { color: "#9ca3af" }
           },
           shapes: [circleShape],
           showlegend: false,

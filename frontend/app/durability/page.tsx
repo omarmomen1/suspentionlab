@@ -78,7 +78,7 @@ function ScoreGauge({ score }: { score: number }) {
 }
 
 export default function DurabilityPage() {
-  const { token } = useAuth();
+  const { fetchWithAuth } = useAuth();
   const [roadClass, setRoadClass] = useState("C");
   const [speed, setSpeed] = useState(80);
   const [params, setParams] = useUndoRedo({
@@ -96,12 +96,9 @@ export default function DurabilityPage() {
     setError("");
     setResult(null);
     try {
-      const resp = await fetch(`${API_BASE}/simulate/durability`, {
+      const resp = await fetchWithAuth("/api/v1/simulate/durability", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ road_class: roadClass, speed_kph: speed, ...params }),
       });
       if (!resp.ok) {
@@ -253,19 +250,31 @@ export default function DurabilityPage() {
 
             {/* Component Life Table */}
             <div className="rounded-2xl border border-[#1a1a1a] bg-[#0a0a0a] p-6 space-y-4">
-              <h3 className="text-sm font-semibold text-gray-300">Component Life Predictions</h3>
-              <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-300">Component Life & Fatigue Predictions</h3>
+                  <p className="text-[10px] text-gray-600">Palmgren-Miner cumulative damage hypothesis (D = Σ nᵢ/Nᵢ)</p>
+                </div>
+                <span className="text-[9px] font-mono text-gray-500 bg-[#141416] px-2 py-1 rounded border border-[#252525]">
+                  Basquin S-N Formulation
+                </span>
+              </div>
+              <div className="space-y-3.5">
                 {result.components.map(comp => {
                   const Icon = COMPONENT_ICONS[comp.name] || Wrench;
                   const barPct = Math.min(100, (comp.life_km / 200000) * 100);
+                  const damageFraction = Math.min(1.0, Math.max(0.01, 100000 / Math.max(comp.life_km, 1000)));
                   return (
-                    <div key={comp.name} className="space-y-1.5">
+                    <div key={comp.name} className="space-y-1.5 p-2 rounded-xl bg-[#0e0e10] border border-[#1c1c1f]">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Icon size={13} className="text-gray-600" />
-                          <span className="text-sm text-gray-300">{comp.display_name}</span>
+                          <Icon size={13} className="text-gray-500" />
+                          <span className="text-sm font-medium text-gray-300">{comp.display_name}</span>
                         </div>
                         <div className="flex items-center gap-3">
+                          <span className="text-xs font-mono text-gray-400">
+                            Miner D: <strong className="text-white">{damageFraction.toFixed(3)}/1.0</strong>
+                          </span>
                           <span className="text-sm font-bold text-white">{comp.life_label}</span>
                           <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ color: comp.condition_color, backgroundColor: comp.condition_color + "15" }}>
                             {comp.condition}

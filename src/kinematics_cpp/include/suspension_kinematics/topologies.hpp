@@ -2,6 +2,10 @@
 #include <Eigen/Dense>
 #include <map>
 #include <string>
+#include <vector>
+#include "suspension_kinematics/exceptions.hpp"
+#include "suspension_kinematics/hardpoint_validation.hpp"
+#include "suspension_kinematics/bushing_compliance.hpp"
 
 namespace suspensionlab {
 namespace kinematics {
@@ -19,65 +23,117 @@ public:
     // Returns the number of DOFs (size of state vector)
     virtual int num_states() const = 0;
 
+    // Set multidimensional inputs
+    virtual void set_target_inputs(double heave_mm, double roll_deg = 0.0, double steer_deg = 0.0, double pitch_deg = 0.0) = 0;
+
     // Calculates all kinematic parameters
-    virtual std::map<std::string, double> calculate_kinematics(const Eigen::VectorXd& state, double tire_radius = 0.3) const = 0;
+    virtual std::map<std::string, double> calculate_kinematics(
+        const Eigen::VectorXd& state, 
+        double tire_radius = 0.33,
+        double prev_spring_len = -1.0,
+        double dz_step = 0.0,
+        double cg_height_mm = 350.0,
+        double wheelbase_mm = 2600.0,
+        double brake_bias = 0.60,
+        double drive_bias = 1.00) const = 0;
+
+    // Computes instantaneous spring/damper length
+    virtual double get_spring_length(const Eigen::VectorXd& state) const = 0;
+
+    // Validates topology hardpoint geometry
+    virtual ValidationReport validate(double tire_radius = 0.33) const = 0;
 };
 
 class DoubleWishbone : public ISuspensionTopology {
 public:
-    // Hardpoints expected:
-    // chassis_upper_front, chassis_upper_rear, chassis_lower_front, chassis_lower_rear,
-    // upright_upper, upright_lower, upright_tie_rod, chassis_tie_rod (or rack)
-    DoubleWishbone(const std::map<std::string, Eigen::Vector3d>& hardpoints);
+    explicit DoubleWishbone(const std::map<std::string, Eigen::Vector3d>& hardpoints);
 
     void evaluate_constraints(const Eigen::VectorXd& state, Eigen::VectorXd& residuals) const override;
     void evaluate_jacobian(const Eigen::VectorXd& state, Eigen::MatrixXd& jacobian) const override;
     int num_states() const override { return 7; } // x, y, z, e0, e1, e2, e3
     
-    std::map<std::string, double> calculate_kinematics(const Eigen::VectorXd& state, double tire_radius = 0.3) const override;
+    void set_target_inputs(double heave_mm, double roll_deg = 0.0, double steer_deg = 0.0, double pitch_deg = 0.0) override;
+    void set_heave_target(double z_world_mm);
+    void set_steer_target_deg(double steer_deg);
 
-    // Update the heave target or rack displacement
-    void set_heave_target(double z);
-    
+    std::map<std::string, double> calculate_kinematics(
+        const Eigen::VectorXd& state, 
+        double tire_radius = 0.33,
+        double prev_spring_len = -1.0,
+        double dz_step = 0.0,
+        double cg_height_mm = 350.0,
+        double wheelbase_mm = 2600.0,
+        double brake_bias = 0.60,
+        double drive_bias = 1.00) const override;
+
+    double get_spring_length(const Eigen::VectorXd& state) const override;
+    ValidationReport validate(double tire_radius = 0.33) const override;
+
+    const std::map<std::string, Eigen::Vector3d>& base_hardpoints() const { return base_hp_; }
+
 private:
     std::map<std::string, Eigen::Vector3d> base_hp_;
-    double heave_target_ = 0.0;
+    double heave_target_z_ = 0.0;
+    double steer_target_deg_ = 0.0;
+    double roll_input_deg_ = 0.0;
+    double pitch_input_deg_ = 0.0;
 
-    // Link lengths (squared for efficiency)
-    double l_uca_f_sq_, l_uca_r_sq_;
-    double l_lca_f_sq_, l_lca_r_sq_;
-    double l_tie_sq_;
+    // Reference link lengths squared
+    double l_uca_f_sq_ = 0.0, l_uca_r_sq_ = 0.0;
+    double l_lca_f_sq_ = 0.0, l_lca_r_sq_ = 0.0;
+    double l_tie_sq_   = 0.0;
 
     // Upright local coordinates of the ball joints
-    Eigen::Vector3d up_upper_, up_lower_, up_tie_, up_wc_;
+    Eigen::Vector3d up_upper_, up_lower_, up_tie_, up_pushrod_, up_wc_;
 
-    // Initialization helper
-    void initialize_lengths();
+    // Inboard rocker/pushrod chassis pivot
+    Eigen::Vector3d pri_chassis_;
+    bool has_pushrod_ = false;
+
+    void initialize_geometry();
 };
 
 class MacPherson : public ISuspensionTopology {
 public:
-    MacPherson(const std::map<std::string, Eigen::Vector3d>& hardpoints);
+    explicit MacPherson(const std::map<std::string, Eigen::Vector3d>& hardpoints);
 
     void evaluate_constraints(const Eigen::VectorXd& state, Eigen::VectorXd& residuals) const override;
     void evaluate_jacobian(const Eigen::VectorXd& state, Eigen::MatrixXd& jacobian) const override;
     int num_states() const override { return 8; } // x, y, z, e0, e1, e2, e3, d_strut
     
-    std::map<std::string, double> calculate_kinematics(const Eigen::VectorXd& state, double tire_radius = 0.3) const override;
+    void set_target_inputs(double heave_mm, double roll_deg = 0.0, double steer_deg = 0.0, double pitch_deg = 0.0) override;
+    void set_heave_target(double z_world_mm);
+    void set_steer_target_deg(double steer_deg);
 
-    void set_heave_target(double z);
-    
+    std::map<std::string, double> calculate_kinematics(
+        const Eigen::VectorXd& state, 
+        double tire_radius = 0.33,
+        double prev_spring_len = -1.0,
+        double dz_step = 0.0,
+        double cg_height_mm = 350.0,
+        double wheelbase_mm = 2600.0,
+        double brake_bias = 0.60,
+        double drive_bias = 1.00) const override;
+
+    double get_spring_length(const Eigen::VectorXd& state) const override;
+    ValidationReport validate(double tire_radius = 0.33) const override;
+
+    const std::map<std::string, Eigen::Vector3d>& base_hardpoints() const { return base_hp_; }
+
 private:
     std::map<std::string, Eigen::Vector3d> base_hp_;
-    double heave_target_ = 0.0;
+    double heave_target_z_ = 0.0;
+    double steer_target_deg_ = 0.0;
+    double roll_input_deg_ = 0.0;
+    double pitch_input_deg_ = 0.0;
 
-    double l_lca_f_sq_, l_lca_r_sq_;
-    double l_tie_sq_;
+    double l_lca_f_sq_ = 0.0, l_lca_r_sq_ = 0.0;
+    double l_tie_sq_   = 0.0;
 
     Eigen::Vector3d up_lower_, up_tie_, up_wc_, up_strut_mount_;
     Eigen::Vector3d u_strut_init_;
 
-    void initialize_lengths();
+    void initialize_geometry();
 };
 
 } // namespace kinematics

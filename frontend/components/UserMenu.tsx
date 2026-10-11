@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import Link from "next/link";
-import { Settings, LogOut, CreditCard, Key, ChevronDown } from "lucide-react";
+import { Settings, LogOut, CreditCard, Key, ChevronDown, ShieldCheck } from "lucide-react";
 
 const PLAN_STYLES: Record<string, string> = {
   FREE:       "text-gray-500 bg-[#1e1e1e]",
@@ -36,13 +36,20 @@ export default function UserMenu() {
     return () => { cancelled = true; };
   }, [open, user, fetchWithAuth]);
 
-  // Close on outside click
+  // Close on outside click or Escape key
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
     };
+    const keyHandler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
     document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
+    document.addEventListener("keydown", keyHandler);
+    return () => {
+      document.removeEventListener("mousedown", handler);
+      document.removeEventListener("keydown", keyHandler);
+    };
   }, []);
 
   if (loading) {
@@ -53,7 +60,7 @@ export default function UserMenu() {
     return (
       <div className="flex items-center gap-2">
         <Link href="/auth/login"
-          className="text-xs text-gray-400 hover:text-white transition-colors font-medium">
+          className="text-xs text-gray-300 hover:text-white transition-colors font-medium">
           Sign In
         </Link>
         <Link href="/auth/register"
@@ -75,22 +82,26 @@ export default function UserMenu() {
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-controls="user-account-menu"
         aria-label="User account menu"
         className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
         <div className="w-7 h-7 rounded-full bg-ansys-yellow/20 border border-ansys-yellow/30
           flex items-center justify-center text-[10px] font-bold text-ansys-yellow">
           {initials}
         </div>
-        <ChevronDown size={11} className={`text-gray-600 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown size={11} className={`text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-56 bg-[#0d0d0f] border border-[#252525]
-          rounded-xl shadow-2xl overflow-hidden z-50">
+        <div
+          id="user-account-menu"
+          role="menu"
+          className="absolute right-0 top-full mt-2 w-56 bg-[#0d0d0f] border border-[#252525]
+            rounded-xl shadow-2xl overflow-hidden z-50">
           {/* User info */}
           <div className="px-4 py-3 border-b border-[#1e1e1e]">
             <p className="text-xs font-semibold text-white truncate">{user.name || user.email}</p>
-            <p className="text-[10px] text-gray-600 truncate mt-0.5">{user.email}</p>
+            <p className="text-[10px] text-gray-400 truncate mt-0.5">{user.email}</p>
             <span className={`mt-1.5 inline-flex text-[9px] font-bold uppercase tracking-wider
               px-2 py-0.5 rounded-full ${planBadge}`}>
               {user.plan}
@@ -129,6 +140,7 @@ export default function UserMenu() {
               { href: "/settings",          icon: Settings,    label: "Settings"       },
               { href: "/settings#billing",  icon: CreditCard,  label: "Billing & Plan" },
               { href: "/settings#api-keys", icon: Key,         label: "API Keys"       },
+              { href: "/audit",             icon: ShieldCheck, label: "Audit Ledger"   },
             ].map((item) => {
               const Icon = item.icon;
               return (

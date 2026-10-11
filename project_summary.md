@@ -17,5 +17,5 @@ SuspensionLab is a cloud-native, high-performance vehicle dynamics and suspensio
 ### Throughput Benchmarks
 
 - **Simulated Event**: 5-second dynamic 4-corner road profile.
-- **Monte Carlo Target**: 10,000 independent full-car 14-DOF sweeps with randomly varied parameters.
+- **Monte Carlo Target**: 10,000 independent full-car 7-DOF sweeps with randomly varied parameters.
 - **Validation Throughput**: Reached over **1,300+ Runs-per-Second** on standard multi-core hardware, allowing massive stochastic parameter optimization pipelines that complete in under 8 seconds.

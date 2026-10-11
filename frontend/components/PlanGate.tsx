@@ -25,7 +25,7 @@ const PLAN_COPY = {
 
 export default function PlanGate({ required, children, overlay = false, feature }: PlanGateProps) {
   const { user } = useAuth();
-  const LEVELS = { FREE: 0, PRO: 1, ENTERPRISE: 2 };
+  const LEVELS: Record<string, number> = { FREE: 0, PRO: 1, ENTERPRISE: 2, TRIAL: 1 };
   const userLevel = LEVELS[user?.plan ?? "FREE"] ?? 0;
   const requiredLevel = LEVELS[required] ?? 1;
   const hasAccess = userLevel >= requiredLevel;
@@ -41,13 +41,17 @@ export default function PlanGate({ required, children, overlay = false, feature 
   // server-side API still enforces the plan — this component is UX, not the gate.
   if (overlay) {
     return (
-      <div className="relative min-h-[240px]">
+      <div
+        role="region"
+        aria-label={`${required} Plan required: ${feature || copy.desc}`}
+        className="relative min-h-[240px]"
+      >
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 rounded-xl border border-white/5 backdrop-blur-sm">
           <span className={`text-[10px] font-bold tracking-[0.18em] uppercase border px-2.5 py-1 rounded-full mb-2 ${copy.color}`}>
             {copy.badge}
           </span>
-          {feature && <p className="text-xs text-gray-400 mb-1">{feature}</p>}
-          <p className="text-xs text-gray-500 mb-3 text-center max-w-[180px]">{copy.desc}</p>
+          {feature && <p className="text-xs text-gray-300 mb-1">{feature}</p>}
+          <p className="text-xs text-gray-400 mb-3 text-center max-w-[180px]">{copy.desc}</p>
           <Link href="/pricing"
             className="text-xs font-bold px-3 py-1.5 bg-ansys-yellow text-black rounded-lg hover:brightness-110 transition-all">
             Upgrade Plan
@@ -58,11 +62,15 @@ export default function PlanGate({ required, children, overlay = false, feature 
   }
 
   return (
-    <div className={`flex flex-col items-center justify-center gap-3 p-8 rounded-xl border ${copy.color}`}>
+    <div
+      role="region"
+      aria-label={`${required} Plan required`}
+      className={`flex flex-col items-center justify-center gap-3 p-8 rounded-xl border ${copy.color}`}
+    >
       <span className={`text-[10px] font-bold tracking-[0.18em] uppercase border px-2.5 py-1 rounded-full ${copy.color}`}>
         {copy.badge} REQUIRED
       </span>
-      <p className="text-sm text-gray-400 text-center max-w-sm">{copy.desc}</p>
+      <p className="text-sm text-gray-300 text-center max-w-sm">{copy.desc}</p>
       <Link href="/pricing"
         className="mt-1 text-xs font-bold px-4 py-2 bg-ansys-yellow text-black rounded-xl hover:brightness-110 transition-all">
         View Pricing & Upgrade

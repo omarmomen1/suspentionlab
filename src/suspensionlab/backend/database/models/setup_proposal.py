@@ -52,4 +52,9 @@ class SetupProposal(Base):
     confidence         = Column(Float, nullable=False, default=0.0)
 
     status       = Column(String(16), nullable=False, default="PROPOSED")  # PROPOSED | APPROVED | REJECTED | EXPORTED
+    proposal_hash      = Column(String(64), nullable=True)                  # SHA-256 canonical hash of proposal recommendation payload
+    approved_by_user_id = Column(PG_UUID(as_uuid=True), nullable=True)     # Who signed off
+    approved_by_role   = Column(String(50), nullable=True)                  # Signee seat role
+    approved_at        = Column(DateTime(timezone=True), nullable=True)     # Timestamp of sign-off
+    approval_signature = Column(String(128), nullable=True)                 # HMAC-SHA256 server-verifiable authenticated approval token (tamper-evident)
     created_at   = Column(DateTime(timezone=True), nullable=False, default=_utcnow)

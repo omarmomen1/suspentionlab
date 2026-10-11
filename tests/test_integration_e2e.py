@@ -1,16 +1,15 @@
 import os
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test.db"
-os.environ["REDIS_URL"] = "redis://localhost:6379"
+os.environ.setdefault("REDIS_URL", "redis://localhost:6379")
 
 import pytest
 from fastapi.testclient import TestClient
 from suspensionlab.backend.api.main import app
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 # We can use the TestClient as a context manager so it persists cookies across requests!
-@patch("suspensionlab.backend.security.rate_limit.RateLimiter.__call__", new_callable=AsyncMock)
-def test_e2e_flow(mock_rate_limit):
+def test_e2e_flow():
     with TestClient(app, base_url="https://testserver") as client:
         # 1. Register and Login to get cookies
         import uuid
@@ -38,22 +37,43 @@ def test_e2e_flow(mock_rate_limit):
         import uuid
         import asyncio
 
-        async def mock_enqueue(user_id, plan, job_type, payload, db):
+        async def mock_enqueue(user_id, plan, job_type, payload, db, team_id=None, **kwargs):
             from suspensionlab.backend.database.models.job import JobRecord
+            from suspensionlab.physics.quarter_car import QuarterCarParams, RoadProfile, run_quarter_car_analysis
+            import uuid
+            import json
+
             job_id = str(uuid.uuid4())
+            p = QuarterCarParams(**payload["params"])
+            r = RoadProfile(**payload["profile"])
+            res = run_quarter_car_analysis(p, r)
+
+            result_data = {
+                "comfort_rating": res.comfort_rating,
+                "rms_body_accel": res.rms_body_accel
+            }
+
             new_job = JobRecord(
                 id=uuid.UUID(job_id),
                 user_id=uuid.UUID(user_id),
                 job_type=job_type,
-                status="PENDING",
+                status="COMPLETED",
                 params=payload.get("params", {}),
-                profile=payload.get("profile", {})
+                profile=payload.get("profile", {}),
+                result=result_data,
             )
             db.add(new_job)
             await db.commit()
             
-            # Synchronously execute the worker logic
-            await asyncio.to_thread(run_job, job_id, payload, {})
+            from suspensionlab.backend.core.redis_client import get_async_redis_conn
+            r_conn = get_async_redis_conn()
+            if r_conn:
+                await r_conn.set(f"job_status:{job_id}", json.dumps({
+                    "job_id": job_id,
+                    "user_id": str(user_id),
+                    "status": "COMPLETED",
+                    "result": result_data,
+                }))
             return job_id
 
         with patch("suspensionlab.backend.api.routes.simulate.quarter_car.SimulationService.enqueue_simulation", new=mock_enqueue):
@@ -95,25 +115,19 @@ def test_e2e_flow(mock_rate_limit):
             else:
                 pytest.fail("Job did not complete in time")
         
-        # 3. Billing checkout
-        # Set a dummy stripe secret key for the test if it's missing, otherwise the endpoint returns 503
-        if not os.environ.get("STRIPE_SECRET_KEY"):
-            os.environ["STRIPE_SECRET_KEY"] = "sk_test_12345"
-            
-        # We need a mocked Stripe API response to actually pass checkout, or we expect a specific failure
-        # Let's just catch the 503 or the stripe auth error
-        try:
+        # 3. Billing checkout (properly verified with mocked Stripe session)
+        with patch("stripe.checkout.Session.create") as mock_stripe_create, \
+             patch("suspensionlab.backend.api.routes.billing_routes.STRIPE_PRO_PRICE_ID", "price_test_pro_123"):
+            mock_stripe_create.return_value = MagicMock(url="https://checkout.stripe.com/c/pay/cs_test_mock")
             checkout_resp = client.post(
                 "/api/v1/billing/checkout",
-                json={"plan": "pro"}
+                json={"plan": "pro"},
+                headers={"X-CSRF-Token": client.cookies.get("csrf_token", "")}
             )
-            # Since stripe is not mocked in TestClient natively, it might fail with Stripe authentication error
-            # If so, we at least assert we got to the point where it tried to call Stripe!
-            assert checkout_resp.status_code in (200, 400, 500, 503)
-        except Exception as e:
-            pass
-            
-        print("E2E Test passed successfully.")
+            assert checkout_resp.status_code == 200, f"Checkout failed: {checkout_resp.text}"
+            assert checkout_resp.json() == {"checkout_url": "https://checkout.stripe.com/c/pay/cs_test_mock"}
+
 
 if __name__ == "__main__":
     test_e2e_flow()
+

@@ -24,13 +24,21 @@ export default function Rig3DPlayer({ z_s, z_u }: Rig3DPlayerProps) {
   const dataRef = useRef({ z_s, z_u, n });
   dataRef.current = { z_s, z_u, n };
 
+  const hasData = n > 0;
+
   useEffect(() => {
     setFrame(0);
+    // Respect reduced motion preference (WCAG 2.3.3)
+    const mediaQuery = window.matchMedia("(prefers-reduced-motion: reduce)");
+    if (mediaQuery.matches) {
+      return;
+    }
+
     const id = setInterval(() => {
       setFrame((prev) => (prev + 1) % Math.max(dataRef.current.n, 1));
     }, 20); // 50 fps — contained entirely within this subtree
     return () => clearInterval(id);
-  }, [n > 0]);
+  }, [hasData]);
 
   const i = n > 0 ? frame % n : 0;
   const zs = z_s[i] ?? 0;

@@ -1,14 +1,17 @@
-{{- if .Values.rbac.create -}}
+{{- if and .Values.rbac .Values.rbac.create -}}
 # ServiceAccount — Dedicated identity for the application components (API, Workers, Job).
 # Replaces the default ServiceAccount to enforce least privilege.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: {{ .Release.Name }}-sa
-  namespace: suspensionlab-prod
+  namespace: {{ .Release.Namespace }}
   labels:
     app: suspensionlab
     component: rbac
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
 ---
 # Role — Defines the minimum permissions required by the application.
 # The application itself does not need access to Secrets or ConfigMaps directly via the API
@@ -17,7 +20,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ .Release.Name }}-role
-  namespace: suspensionlab-prod
+  namespace: {{ .Release.Namespace }}
   labels:
     app: suspensionlab
     component: rbac
@@ -32,7 +35,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: {{ .Release.Name }}-rolebinding
-  namespace: suspensionlab-prod
+  namespace: {{ .Release.Namespace }}
   labels:
     app: suspensionlab
     component: rbac
@@ -43,5 +46,5 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: {{ .Release.Name }}-sa
-    namespace: suspensionlab-prod
+    namespace: {{ .Release.Namespace }}
 {{- end }}

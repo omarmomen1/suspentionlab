@@ -12,6 +12,10 @@
 
 environment: production
 
+networkPolicy:
+  enabled: true
+  vpcCidr: "10.0.0.0/16"
+
 rbac:
   create: true
 
@@ -75,9 +79,12 @@ workers:
       memory: 4Gi
   keda:
     enabled: true
-    minReplicaCount: 0
+    minReplicaCount: 1
     maxReplicaCount: 50
     queueLengthTarget: 5
+    queueName: "default"
+    enableTLS: "true"
+    redisAddress: "" # Populated by CI/CD via: terraform output -raw redis_primary_endpoint:6379
 
 ingress:
   enabled: true
@@ -110,6 +117,9 @@ ingress:
 # Production MUST use ONLY the managed AWS services from Terraform.
 redis:
   enabled: false
+  # REQUIRED in production: set via CI/CD from terraform output:
+  #   --set redis.authoritativeAddress=$(terraform output -raw redis_primary_endpoint):6379
+  authoritativeAddress: ""
 
 postgresql:
   enabled: false
@@ -151,9 +161,10 @@ monitoring:
     scrapeTimeout: "10s"
   prometheusRule:
     enabled: true
+  grafanaDashboard:
+    enabled: true
   alertmanager:
     enabled: true
-    # Routing critical alerts to PagerDuty and warnings to Slack
-    pagerdutyIntegrationKey: "REPLACE_WITH_PAGERDUTY_KEY"
-    slackApiUrl: "REPLACE_WITH_SLACK_WEBHOOK_URL"
+    # Alertmanager routing targets (actual webhook secrets are resolved at runtime via ExternalSecrets)
     slackChannel: "#alerts-suspensionlab"
+

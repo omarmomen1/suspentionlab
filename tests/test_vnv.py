@@ -4,7 +4,7 @@ from scipy.linalg import expm
 from suspensionlab.physics.quarter_car import QuarterCarParams, RoadProfile, simulate_time_response, build_state_space
 from suspensionlab.physics.full_car import FullCarParams, calculate_full_car_kpis
 
-def test_quarter_car_analytical_benchmark():
+def test_quarter_car_analytical_benchmark(tmp_path):
     """
     Test quarter car numerical ODE solver vs analytical matrix exponential
     for a step input. Validates RMS error is < 0.01% as required by VnV.
@@ -58,13 +58,14 @@ def test_quarter_car_analytical_benchmark():
     
     assert rms_error < 1e-4, f"RMS Error too high: {rms_error}"
     
-    # Write JSON report
+    # Write JSON report to clean tmp_path
     import json
-    with open("vnv_report.json", "w") as f:
+    with open(tmp_path / "vnv_report.json", "w") as f:
         json.dump({
             "quarter_car_analytical_rms_error": float(rms_error),
             "status": "PASSED" if rms_error < 1e-4 else "FAILED"
         }, f)
+
 
 
 def test_full_car_frequencies():

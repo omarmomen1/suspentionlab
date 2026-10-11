@@ -1,0 +1,287 @@
+{{- if and .Values.networkPolicy .Values.networkPolicy.enabled -}}
+# ── Zero-Trust Network Policy Suite ──────────────────────────────────────────
+# 1. Default Deny: All Ingress and Egress blocked by default across the namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-default-deny-all
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: suspensionlab
+    component: security
+spec:
+  podSelector: {} # Applies to all pods in namespace
+  policyTypes:
+  - Ingress
+  - Egress
+---
+# 2. Cluster DNS: Allow DNS resolution (port 53) for all pods to CoreDNS / kube-dns
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-allow-dns-egress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: suspensionlab
+    component: security
+spec:
+  podSelector: {} # All pods require DNS
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+---
+# 3. API Ingress: Allow traffic from Ingress Controller, UI pods, and Prometheus
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-api-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: suspensionlab
+    component: api
+spec:
+  podSelector:
+    matchLabels:
+      app: suspensionlab
+      component: api
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+  - from:
+    - podSelector:
+        matchLabels:
+          app: suspensionlab
+          component: ui
+    ports:
+    - protocol: TCP
+      port: 8000
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+    ports:
+    - protocol: TCP
+      port: 8000
+---
+# 4. UI Ingress: Allow HTTP from Ingress Controller
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-ui-ingress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: suspensionlab
+    component: ui
+spec:
+  podSelector:
+    matchLabels:
+      app: suspensionlab
+      component: ui
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 3000
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 3000
+---
+# 5. UI Egress: UI can ONLY communicate with API pods (port 8000)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-ui-egress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: suspensionlab
+    component: ui
+spec:
+  podSelector:
+    matchLabels:
+      app: suspensionlab
+      component: ui
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: suspensionlab
+          component: api
+    ports:
+    - protocol: TCP
+      port: 8000
+---
+# 6. Explicit API Egress: API -> RDS PostgreSQL, API -> ElastiCache Redis, API -> External HTTPS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-api-egress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: suspensionlab
+    component: api
+spec:
+  podSelector:
+    matchLabels:
+      app: suspensionlab
+      component: api
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: {{ .Values.networkPolicy.vpcCidr | default "10.0.0.0/16" }}
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - ipBlock:
+        cidr: {{ .Values.networkPolicy.vpcCidr | default "10.0.0.0/16" }}
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 169.254.169.254/32
+        - 169.254.0.0/16
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+---
+# 7. Explicit Worker Egress: Worker -> RDS PostgreSQL, Worker -> ElastiCache Redis, Worker -> S3 HTTPS
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-worker-egress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: suspensionlab
+    component: worker
+spec:
+  podSelector:
+    matchLabels:
+      app: suspensionlab
+      component: worker
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: {{ .Values.networkPolicy.vpcCidr | default "10.0.0.0/16" }}
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - ipBlock:
+        cidr: {{ .Values.networkPolicy.vpcCidr | default "10.0.0.0/16" }}
+    ports:
+    - protocol: TCP
+      port: 6379
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 169.254.169.254/32
+        - 169.254.0.0/16
+        - 10.0.0.0/8
+        - 172.16.0.0/12
+        - 192.168.0.0/16
+    ports:
+    - protocol: TCP
+      port: 443
+---
+# 8. DB Migration Job Egress: DB Migration -> PostgreSQL 5432 only
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-db-migration-egress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: suspensionlab
+    component: db-migration
+spec:
+  podSelector:
+    matchLabels:
+      app: suspensionlab
+      component: db-migration
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: {{ .Values.networkPolicy.vpcCidr | default "10.0.0.0/16" }}
+    ports:
+    - protocol: TCP
+      port: 5432
+---
+# 9. Sweeper CronJob Egress: Sweeper -> PostgreSQL 5432 and Redis 6379
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ .Release.Name }}-sweeper-egress
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: suspensionlab
+    component: sweeper
+spec:
+  podSelector:
+    matchLabels:
+      app: suspensionlab
+      component: sweeper
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - ipBlock:
+        cidr: {{ .Values.networkPolicy.vpcCidr | default "10.0.0.0/16" }}
+    ports:
+    - protocol: TCP
+      port: 5432
+  - to:
+    - ipBlock:
+        cidr: {{ .Values.networkPolicy.vpcCidr | default "10.0.0.0/16" }}
+    ports:
+    - protocol: TCP
+      port: 6379
+{{- end }}

@@ -1,0 +1,242 @@
+{
+  "allowed_final_outcomes": [
+    "MODEL_PARAMETER_DECISION_SUPPORTED",
+    "EFFECT_UNRESOLVED",
+    "HYPOTHESIS_NOT_SUPPORTED",
+    "INSUFFICIENT_EVIDENCE"
+  ],
+  "candidate_generation_algorithm": {
+    "exploratory_preliminary_estimate": {
+      "label": "EXPLORATORY_FIT_ESTIMATE",
+      "qualification": "Discovered during initial unsealed reconnaissance loss sweep on Turn 1. Not a pre-registered candidate.",
+      "s_tire_approx": 0.88
+    },
+    "formal_generation_protocol": {
+      "candidate_setup_id": "SETUP-P3O-CAL",
+      "deterministic_seed": 42,
+      "failure_behavior": "HALT_FAIL_CLOSED_WITHOUT_UNSEALING_HOLDOUTS",
+      "max_iterations": 25,
+      "method": "BOUNDED_1D_OPTIMIZATION",
+      "numerical_rounding_precision": 3,
+      "objective_function": "RMSE_r = sqrt(mean((r_sim - r_meas)^2))",
+      "optimizer_implementation": "scipy.optimize.minimize_scalar",
+      "optimizer_method": "bounded",
+      "partition": "FIT_PARTITION_ONLY",
+      "search_bounds": [
+        0.7,
+        1.3
+      ],
+      "tie_breaking_rule": "Choose candidate value closest to nominal reference 1.000",
+      "tolerance_xatol": 0.005
+    },
+    "optional_sensitivity_grid": {
+      "grid_values": [
+        0.8,
+        0.9,
+        1.1
+      ],
+      "holdout_evaluation_permitted": false,
+      "holdout_evaluation_rule": "BASELINE vs FROZEN SETUP-P3O-CAL ONLY",
+      "role": "FIT_PARTITION_ROBUSTNESS_MAPPING_ONLY"
+    }
+  },
+  "data_partitions": {
+    "cross_maneuver_holdout_partition": {
+      "access_policy": "SEALED_UNTIL_CANDIDATE_FROZEN",
+      "description": "Independent sustained high-G carousel (ay >= 1.0 G, peak 1.14 G, yaw rate 0.504 rad/s, 27% throttle, zero braking).",
+      "end_sample_index": 5999,
+      "role": "CROSS_MANEUVER_BLIND_HOLDOUT",
+      "sample_count": 1200,
+      "start_sample_index": 4800,
+      "t_end_s": 30.0,
+      "t_start_s": 24.0,
+      "window_name": "Turn_2_Carousel"
+    },
+    "fit_partition": {
+      "access_policy": "PERMITTED_DURING_CALIBRATION",
+      "description": "High transient corner entry and sustained apex; peak ay = 0.88 G, peak yaw rate = 0.354 rad/s.",
+      "end_sample_index": 3759,
+      "role": "FIT_ESTIMATION",
+      "sample_count": 960,
+      "start_sample_index": 2800,
+      "t_end_s": 18.8,
+      "t_start_s": 14.0,
+      "window_name": "Turn_1_Complex"
+    },
+    "partition_disjointness_proof": {
+      "fit_cross_disjoint": true,
+      "fit_temporal_disjoint": true,
+      "mathematical_boundary_separation": [
+        "max(fit_index) = 3759 < min(temporal_index) = 3761 (5 ms buffer at index 3760)",
+        "max(temporal_index) = 4599 < min(cross_index) = 4800 (1.0 s gap over indices 4600-4799)"
+      ],
+      "sample_overlap_count": 0,
+      "temporal_cross_disjoint": true
+    },
+    "temporal_holdout_partition": {
+      "access_policy": "SEALED_UNTIL_CANDIDATE_FROZEN",
+      "description": "Corner exit unwinding (steering unwind 7.7 deg to 0 deg, throttle application to 50%); verifies unwinding stability.",
+      "end_sample_index": 4599,
+      "role": "TEMPORAL_HOLDOUT",
+      "sample_count": 839,
+      "start_sample_index": 3761,
+      "t_end_s": 23.0,
+      "t_start_s": 18.805,
+      "window_name": "Turn_1_Exit"
+    }
+  },
+  "dataset_provenance": {
+    "authors": "Daiki Mori, Rohit K. Aggarwal, Nicholas D. Broadbent, Tatsuya Kobayashi, J. Christian Gerdes",
+    "file_path": "data/external/stanford_vw_golf_thunderhill_2023_11.csv",
+    "nominal_dt_s": 0.005,
+    "organization": "Dynamic Design Lab (DDL), Stanford University",
+    "permanent_doi": "10.25740/hh613qz0317",
+    "sampling_rate_hz": 200.0,
+    "sha256": "489adbf01d27da1c281c0fff353554dfd7d07a3f1c48e2744e9dd902546b74d3",
+    "title": "Vehicle Dynamics Dataset for Highly Dynamic Automated Driving",
+    "total_rows": 22304
+  },
+  "epistemic_identifiability_contract": {
+    "classification": "CONDITIONALLY_IDENTIFIABLE_GIVEN_FROZEN_CAMBER_AND_ALIGNMENT",
+    "confounding_audit": {
+      "collinear_parameter": "static_camber_front_deg",
+      "collinearity_reason": "In quasi-steady cornering, tire lateral force capacity is modulated by both contact-patch cornering stiffness (pKy1) and effective camber inclination (gamma) via Pacejka camber thrust and lateral curvature terms.",
+      "correlation_range": "0.734 to 0.832"
+    },
+    "frozen_vehicle_configuration": {
+      "a_m": 1.05,
+      "b_m": 1.59,
+      "c_damper_front_nsm": 2244.46,
+      "c_damper_rear_nsm": 4500.0,
+      "camber_gain_deg_m": 15.0,
+      "cop_fraction_base": 0.44,
+      "drivetrain_layout": "FWD",
+      "k_arb_front_nm": 25000.0,
+      "k_arb_rear_nm": 18000.0,
+      "k_spring_front_nm": 65000.0,
+      "k_spring_rear_nm": 85000.0,
+      "mass_kg": 1530.0,
+      "nominal_tire_pressure_bar": 2.0,
+      "sprung_mass_kg": 1410.0,
+      "static_camber_front_deg": -3.2,
+      "static_camber_rear_deg": -1.8,
+      "steer_ratio": 13.5,
+      "tw_f_m": 1.54,
+      "tw_r_m": 1.52,
+      "unsprung_mass_front_kg": 30.0,
+      "unsprung_mass_rear_kg": 30.0,
+      "wheelbase_m": 2.64
+    },
+    "universal_identifiability_claimed": false
+  },
+  "governance_classification": "FROZEN_PRE_REGISTRATION_PROTOCOL",
+  "metrics_and_governance_rules": {
+    "cross_generalization": {
+      "decision_rule": "CI_upper < 0.0 (95% bootstrap CI strictly excludes zero in improvement direction)",
+      "evaluation_scope": "SETUP-P3O-CAL vs SETUP-P3O-BASE on Turn 2 Carousel ONLY",
+      "failure_status": "GENERALIZATION_NOT_ESTABLISHED",
+      "secondary_significance_criterion": "p < 0.05"
+    },
+    "fit_gate": {
+      "classification": "PRE-REGISTERED ENGINEERING DECISION RULE",
+      "failure_consequence": "ENGINEERING_DECISION_SUPPORTED_PROHIBITED",
+      "rule": "RMSE_fit(SETUP-P3O-CAL) <= 0.97 * RMSE_fit(SETUP-P3O-BASE)",
+      "threshold_relative_pct": 3.0
+    },
+    "primary_metric": {
+      "channel": "yawRate_radps",
+      "formula": "sqrt(mean((r_sim - r_meas)^2))",
+      "name": "Yaw Rate Tracking RMSE",
+      "sensor_type": "3-axis Gyroscope (Oxford RT3000 RTK-GNSS/IMU)",
+      "units": "rad/s"
+    },
+    "secondary_metrics": {
+      "chassis_roll": {
+        "admissibility_limit": "Degradation <= +5.0% relative to baseline",
+        "channel": "rollAngle_rad",
+        "metric": "RMS"
+      },
+      "dynamic_jounce": {
+        "admissibility_limit": "Peak dynamic jounce <= 55.0 mm (clearance buffer >= 5.0 mm to bump stop)",
+        "metric": "Dynamic front spring compression travel"
+      },
+      "lateral_acceleration": {
+        "admissibility_limit": "Degradation <= +5.0% relative to baseline",
+        "channel": "ayCG_mps2",
+        "filter": "5 Hz Butterworth low-pass",
+        "metric": "RMSE"
+      },
+      "sideslip_angle": {
+        "channel": "slipAngle_rad",
+        "classification": "SECONDARY_STABILITY_INDICATOR",
+        "is_direct_transducer": false,
+        "note": "Engineering stability boundary, NOT a statistical measurement-precision claim.",
+        "physical_stability_boundary": "Peak absolute |beta| <= 0.10 rad (5.73 deg)",
+        "provenance": "slipAngle_rad = arctan2(Vy_mps, Vx_mps) derived from integrated GNSS/INS state vector"
+      }
+    },
+    "temporal_non_inferiority": {
+      "bootstrap_configuration": {
+        "algorithm": "STATIONARY_PAIRED_MOVING_BLOCK_BOOTSTRAP",
+        "block_duration_ms": 100.0,
+        "block_length_samples": 20,
+        "confidence_level": 0.95,
+        "percentile_method": "empirical_percentiles [2.5%, 97.5%]",
+        "random_seed": 42,
+        "replicates_B": 1000,
+        "sampling_rate_hz": 200.0
+      },
+      "decision_rule": "CI_upper <= margin_abs",
+      "failure_status": "TEMPORAL_NONINFERIORITY_NOT_ESTABLISHED",
+      "formula": "margin_abs = RMSE_temporal(SETUP-P3O-BASE) * 0.05",
+      "policy": "Only bootstrap-derived confidence intervals are permitted. Zero heuristic confidence intervals are permitted.",
+      "relative_margin_pct": 5.0
+    }
+  },
+  "prohibited_terminology": [
+    "VALIDATED"
+  ],
+  "protected_physics_manifest": {
+    "brake_distribution.py": "15338e921252e35afc9ee543fdb996464e4784b36e1ce18e05c8832e392a57ea",
+    "dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690",
+    "magic_formula.py": "69b182da4d2687e8cf7f9326501fc30c6380023445ea99d04f0f67bbc3d3f76c",
+    "powertrain_lap_sim.py": "45b77e9ac726e5f517564343dbbbbf991c58eb7428fc9aa37d16e9b6ef55d398",
+    "tire_model.py": "da72dea8adf6b83846997fa02c9b1cade1b74272bcaa96f5aa0e2ea389005209"
+  },
+  "protocol_id": "PREREG-P3O-01",
+  "protocol_version": "1.0.0-frozen",
+  "solver_contract": {
+    "canonical_timestep_s": 0.001,
+    "derivative_evaluations_per_step": 4,
+    "integrator_algorithm": "Fixed-step 4th-Order Runge-Kutta (RK4)",
+    "mandatory_substeps_per_sample": 5,
+    "silent_timestep_substitution_prohibited": true,
+    "simulator_class": "DynamicLapSimulator",
+    "simulator_module": "suspensionlab.physics.dynamic_lap_sim",
+    "state_dimension": 22,
+    "telemetry_sampling_dt_s": 0.005
+  },
+  "target_mechanism": {
+    "actionability_demarcation_note": "s_tire is a fully functional simulation model parameter in DynamicLapSimulator. However, no validated physical transfer function connecting s_tire to cold inflation pressure, tire compound, or carcass durometer exists in the repository. It is NOT asserted as an immediately track-installable hardware setting.",
+    "baseline_qualification": "Generic manufacturer default for passenger performance tires in Pacejka MF 5.2. Not a track-measured tire card.",
+    "baseline_semantics": "UNIDENTIFIED_NOMINAL_REFERENCE",
+    "baseline_value": 1.0,
+    "governing_class": "suspensionlab.physics.dynamic_lap_sim.TireCalibrationRecord",
+    "model_parameter_actionability": "SUPPORTED_AS_A_MODEL_VARIABLE",
+    "parameter_name": "DynamicVehicleParams.tire_calibration.s_tire",
+    "physical_track_actionability": "NOT_YET_MAPPED",
+    "production_equation_path": [
+      "DynamicVehicleParams.apply_tire_calibration(s_tire)",
+      "self.tire_coeffs.pKy1 = 15.0 * float(s_tire)",
+      "Ky = pKy1 * Fz0 * sin(2 * arctan(Fz / (pKy2 * Fz0))) * (1 - pKy3 * |gamma|) * lambda_k",
+      "By = Ky / (Cy * Dy + 1e-6)",
+      "Fy0 = Dy * sin(Cy * arctan(By * alpha_y - Ey * (By * alpha_y - arctan(By * alpha_y)))) + Svy",
+      "Fy = Fy0 * Gykappa",
+      "M_z_chassis = a * (Fy_fl + Fy_fr) - b * (Fy_rl + Fy_rr) + ..."
+    ],
+    "target_attribute": "s_tire",
+    "units": "dimensionless [-]"
+  },
+  "target_vehicle": "2017 Volkswagen Golf VII GTI Performance (FWD, MQB Chassis)",
+  "track_venue": "Thunderhill Raceway Park \u2014 West Track (Willows, CA)"
+}

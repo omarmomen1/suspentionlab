@@ -11,7 +11,9 @@ async def security_headers_middleware(request: Request, call_next):
     # FIXED: Wrap in try/finally to ensure security headers are set even on crashes.
     try:
         response = await call_next(request)
-    except Exception:
+    except Exception as exc:
+        import logging
+        logging.exception("security_headers_middleware crash: %s", exc)
         from fastapi.responses import JSONResponse
         response = JSONResponse(status_code=500, content={"detail": "Internal server error"})
     response.headers["X-Content-Type-Options"] = "nosniff"
@@ -69,5 +71,19 @@ async def prometheus_middleware(request: Request, call_next):
         route_path = route_obj.path if route_obj else route
         API_REQUESTS_TOTAL.labels(method=method, route=route_path, status_code=500).inc()
         API_REQUEST_DURATION.labels(method=method, route=route_path).observe(time.time() - start_time)
-        # FIXED: Use bare `raise` to preserve the original traceback, not `raise e`.
         raise
+
+async def payload_size_limit_middleware(request: Request, call_next, max_size_bytes: int = 10 * 1024 * 1024):
+    """Reject requests with payloads exceeding max_size_bytes (default: 10MB) with HTTP 413."""
+    content_length = request.headers.get("Content-Length")
+    if content_length:
+        try:
+            if int(content_length) > max_size_bytes:
+                from fastapi.responses import JSONResponse
+                return JSONResponse(
+                    status_code=413,
+                    content={"error": "payload_too_large", "detail": f"Request body exceeds {max_size_bytes} bytes limit."},
+                )
+        except ValueError:
+            pass
+    return await call_next(request)

@@ -1,8 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 // Full Car Page
 
 "use client";
 import { useState, useRef, Suspense, useMemo, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useJobPolling } from "../../hooks/useJobPolling";
 import { promptModal } from "../../components/sim/ModalHost";
@@ -21,7 +22,8 @@ import VehiclePresets from "../../components/VehiclePresets";
 import SimHistory, { saveSimulationToHistory } from "../../components/SimHistory";
 import { useAuth } from "../../contexts/AuthContext";
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import ModelValidity, { ValidityReport } from "../../components/ModelValidity";
+import Plot from "../../components/sim/Plot";
 import KPICard from "../../components/sim/KPICard";
 import PlotBox from "../../components/sim/PlotBox";
 import { darkLayout, DARK_BASE } from "../../components/sim/theme";
@@ -71,16 +73,18 @@ interface FullCarResults {
 type FullCarState = FullCarResults | { error: boolean; message: string; [key: string]: any };
 
 function FullCarDashboard() {
-  const { authHeader } = useAuth();
+  const searchParams = useSearchParams();
+  const { authHeader, fetchWithAuth } = useAuth();
   const { pollJob } = useJobPolling();
 
   const [isRunning, setIsRunning] = useState(false);
   const [isSaving,  setIsSaving]  = useState(false);
   const [results,   setResults]   = useState<FullCarState | null>(null);
+  const [lastValidResults, setLastValidResults] = useState<FullCarResults | null>(null);
+  const [simError, setSimError] = useState<string | null>(null);
+  const [validity, setValidity] = useState<ValidityReport | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [toast,     setToast]     = useState<Toast | null>(null);
-  
-
 
   const [params, setParams, { undo, redo, reset, canUndo, canRedo }] = useUndoRedo({
     m_s: 1200.0, I_x: 400.0, I_y: 1800.0, m_uf: 40.0, m_ur: 40.0, k_sf: 30000.0, k_sr: 35000.0,
@@ -89,6 +93,20 @@ function FullCarDashboard() {
   });
 
   const showToast = (msg: string, type: Toast["type"]) => { setToast({ msg, type }); setTimeout(() => setToast(null), 3500); };
+
+  useEffect(() => {
+    const profileId = searchParams.get("load");
+    if (!profileId) return;
+    fetchWithAuth(`/api/v1/profiles/${profileId}`)
+      .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
+      .then((data) => {
+        if (data.params) {
+          setParams((prev: any) => ({ ...prev, ...data.params }));
+          showToast(`Loaded "${data.name}" from Garage`, "success");
+        }
+      })
+      .catch(() => showToast("Could not load profile", "error"));
+  }, [searchParams]);
 
   const buildPayload = () => {
     const b = params.L * (params.weight_dist / 100.0);
@@ -99,9 +117,45 @@ function FullCarDashboard() {
     };
   };
 
+  const evaluateFullCarValidity = (res: FullCarResults): ValidityReport => {
+    const maxRollDeg = res.phi ? Math.max(...res.phi.map(p => Math.abs(p * 180 / Math.PI))) : 0;
+    const maxPitchDeg = res.theta ? Math.max(...res.theta.map(t => Math.abs(t * 180 / Math.PI))) : 0;
+    const heaveAccel = res.rms_heave_accel ?? 0;
+    
+    const checks: ValidityReport["checks"] = [
+      {
+        label: "Roll Angle Domain (< 8°)",
+        status: maxRollDeg < 5 ? "pass" : maxRollDeg < 8 ? "warn" : "fail",
+        detail: `Peak roll = ${maxRollDeg.toFixed(2)}° (Linear multi-body suspension assumption)`,
+      },
+      {
+        label: "Pitch Angle Domain (< 6°)",
+        status: maxPitchDeg < 4 ? "pass" : maxPitchDeg < 6 ? "warn" : "fail",
+        detail: `Peak pitch = ${maxPitchDeg.toFixed(2)}° (Small-angle LTI kinematic validity)`,
+      },
+      {
+        label: "Heave Comfort (ISO 2631)",
+        status: heaveAccel < 0.5 ? "pass" : heaveAccel < 1.2 ? "warn" : "fail",
+        detail: `RMS Heave = ${heaveAccel.toFixed(3)} m/s²`,
+      },
+    ];
+
+    const passCount = checks.filter(c => c.status === "pass").length;
+    const warnCount = checks.filter(c => c.status === "warn").length;
+    const score = Math.round((passCount * 100 + warnCount * 50) / checks.length);
+    const band = score >= 80 ? "High" : score >= 50 ? "Medium" : "Low";
+
+    return {
+      score,
+      band,
+      summary: "7-DOF Full Car Multi-Body LTI State-Space Verification",
+      checks,
+    };
+  };
+
   const runSimulation = async () => {
     setIsRunning(true);
-    setResults(null);
+    setSimError(null);
     try {
       const res = await fetch(`${API_BASE}/simulate/full-car`, {
         method: "POST",
@@ -110,37 +164,55 @@ function FullCarDashboard() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setResults({ error: true, message: data.message ?? data.detail ?? "Simulation failed" });
+        const msg = data.message ?? data.detail ?? "Simulation failed";
+        setSimError(msg);
+        showToast(msg, "error");
         setIsRunning(false);
         return;
       }
       
-      const jobId = data.job_id;
-      pollJob({
-        jobId,
-        authHeader,
-        onCompleted: (result) => {
-          setResults(result);
-          saveSimulationToHistory("sl_sim_history_fcar", params, result);
-          setIsRunning(false);
-        },
-        onFailed: (msg) => {
-          setResults({ error: true, message: msg });
-          setIsRunning(false);
-        },
-      });
+      const onCompleted = (result: FullCarResults) => {
+        setResults(result);
+        setLastValidResults(result);
+        setSimError(null);
+        setValidity(evaluateFullCarValidity(result));
+        saveSimulationToHistory("sl_sim_history_fcar", params, result);
+        setIsRunning(false);
+      };
+
+      if (data.job_id) {
+        pollJob({
+          jobId: data.job_id,
+          authHeader,
+          onCompleted,
+          onFailed: (msg) => {
+            setSimError(msg);
+            showToast(msg, "error");
+            setIsRunning(false);
+          },
+        });
+      } else {
+        onCompleted(data);
+      }
     } catch (err) {
-      setResults({ error: true, message: String(err) });
+      const msg = String(err);
+      setSimError(msg);
+      showToast(msg, "error");
       setIsRunning(false);
     }
   };
 
   const saveProfile = async () => {
+    if (isSaving) return;
     const name = await promptModal("Name this Full Car setup:", "Custom 7-DOF Setup");
     if (!name) return;
     setIsSaving(true);
     try {
-      const r = await fetch(`${API_BASE}/profiles`, { method: "POST", headers: { "Content-Type": "application/json", ...authHeader() }, body: JSON.stringify({ name, vehicle_type: "FULL_CAR", params }) });
+      const r = await fetchWithAuth("/api/v1/profiles/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, vehicle_type: "FULL_CAR", params })
+      });
       if (r.ok) showToast("Setup saved to Garage!", "success");
       else showToast("Failed to save", "error");
     } catch { showToast("Failed to save profile", "error"); }
@@ -156,8 +228,9 @@ function FullCarDashboard() {
     };
   }, [results]);
 
-  const hasResults = results && !results.error;
-  const r = results;
+  const activeResult = ((results && !results.error) ? results : lastValidResults) as FullCarResults | null;
+  const hasResults = Boolean(activeResult);
+  const r = activeResult;
 
   return (
     <div className="h-full flex flex-col p-5 pt-3 gap-3 min-h-0">
@@ -177,20 +250,37 @@ function FullCarDashboard() {
           <SimHistory storageKey="sl_sim_history_fcar" renderParams={(p) => [["Mass", p.m_s], ["Ix", p.I_x], ["Iy", p.I_y], ["k_sf", p.k_sf], ["k_sr", p.k_sr], ["Speed", p.speed_kph]]} onRestore={(p) => { setParams(prev => ({ ...prev, ...p })); showToast("Restored from history", "success"); }} />
                     {/* Undo/Redo/Reset Controls */}
           <div className="flex items-center bg-[#141416] border border-[#252525] rounded-lg overflow-hidden mr-2">
-            <button onClick={undo} disabled={!canUndo} title="Undo (Ctrl+Z)"
-              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-gray-400 disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+            <button
+              type="button"
+              onClick={undo}
+              disabled={!canUndo}
+              title="Undo (Ctrl+Z)"
+              aria-label="Undo parameter change"
+              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-gray-400 hover:text-white disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            >
               <Undo2 size={14} />
             </button>
-            <button onClick={redo} disabled={!canRedo} title="Redo (Ctrl+Y)"
-              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-gray-400 border-l border-[#252525] disabled:opacity-30 disabled:hover:bg-transparent transition-colors">
+            <button
+              type="button"
+              onClick={redo}
+              disabled={!canRedo}
+              title="Redo (Ctrl+Y)"
+              aria-label="Redo parameter change"
+              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-gray-400 hover:text-white border-l border-[#252525] disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+            >
               <Redo2 size={14} />
             </button>
-            <button onClick={reset} title="Reset to Defaults"
-              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-red-400/80 hover:text-red-400 border-l border-[#252525] transition-colors">
+            <button
+              type="button"
+              onClick={reset}
+              title="Reset to Defaults"
+              aria-label="Reset parameters to defaults"
+              className="px-2.5 py-1.5 hover:bg-[#1e1e20] text-red-400/80 hover:text-red-400 border-l border-[#252525] transition-colors"
+            >
               <RotateCcw size={14} />
             </button>
           </div>
-<button onClick={saveProfile} disabled={isSaving} className="px-3 py-1.5 bg-[#141416] border border-[#252525] hover:bg-[#1e1e20] rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40">
+          <button onClick={saveProfile} disabled={isSaving} className="px-3 py-1.5 bg-[#141416] border border-[#252525] hover:bg-[#1e1e20] rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40">
             <Save size={13} className="text-ansys-yellow" /> Save Setup
           </button>
           <PDFExport captureId="sim-report" fileName={`FCar_${params.m_s}`} />
@@ -201,6 +291,15 @@ function FullCarDashboard() {
             {isRunning ? <><div className="w-3 h-3 border border-gray-600 border-t-gray-300 rounded-full animate-spin" />Solving…</> : <><Play size={13} fill="currentColor" /> Run Solver</>}
           </button>
         </div>
+      </div>
+
+      {/* Screen Reader Live Solver Announcer */}
+      <div className="sr-only" role="status" aria-live="polite">
+        {isRunning
+          ? "Solving 7-DOF full car LTI system..."
+          : results
+          ? `Simulation completed. Heave frequency: ${(results as any).f_n_heave?.toFixed(2) ?? "N/A"} Hertz, Roll frequency: ${(results as any).f_n_roll?.toFixed(2) ?? "N/A"} Hertz, Pitch frequency: ${(results as any).f_n_pitch?.toFixed(2) ?? "N/A"} Hertz`
+          : ""}
       </div>
 
       <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
@@ -240,7 +339,7 @@ function FullCarDashboard() {
           {!results && !isRunning && (
             <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl flex flex-col items-center justify-center gap-4">
               <div className="w-16 h-16 rounded-2xl bg-ansys-yellow/5 border border-ansys-yellow/10 flex items-center justify-center"><Activity size={32} strokeWidth={1} className="text-ansys-yellow/40" /></div>
-              <div className="text-center"><p className="text-sm font-semibold text-gray-400 mb-1">Configure parameters and click <span className="text-ansys-yellow">Run Solver</span></p><p className="text-xs text-gray-700">7-DOF full car · LTI State-Space · Pitch & Roll</p></div>
+              <div className="text-center"><p className="text-sm font-semibold text-gray-400 mb-1">Configure parameters and click <span className="text-ansys-yellow">Run Solver</span></p><p className="text-xs text-gray-400">7-DOF full car · LTI State-Space · Pitch & Roll</p></div>
             </div>
           )}
 
@@ -251,15 +350,40 @@ function FullCarDashboard() {
             </div>
           )}
 
-          {results && results.error ? (
-            <div className="flex-1 bg-[#111113] border border-red-900/30 rounded-xl flex flex-col items-center justify-center gap-3">
+          {/* Error: only show centered if no prior results */}
+          {!hasResults && (results?.error || simError) && (
+            <div role="alert" aria-live="assertive" className="flex-1 bg-[#111113] border border-red-900/30 rounded-xl flex flex-col items-center justify-center gap-3">
               <AlertTriangle size={44} className="text-red-500 opacity-60" /><p className="text-sm font-semibold text-red-400">Simulation Error</p>
-              <pre className="text-xs text-red-600/70 max-w-sm text-center font-mono bg-red-950/30 px-4 py-2 rounded-lg border border-red-900/20 whitespace-pre-wrap">{results.message as string}</pre>
+              <pre className="text-xs text-red-400 max-w-sm text-center font-mono bg-red-950/30 px-4 py-2 rounded-lg border border-red-900/20 whitespace-pre-wrap">{(results as any)?.message || simError}</pre>
             </div>
-          ) : null}
+          )}
 
           {hasResults && r && (
             <div id="sim-report" className="flex flex-col gap-3 flex-1 overflow-hidden">
+              {/* Floating Non-Destructive Error HUD */}
+              {simError && (
+                <div role="alert" className="bg-red-950/50 border border-red-800/70 rounded-xl p-3 flex items-center justify-between gap-3 text-xs text-red-300 shadow-xl shrink-0 animate-in slide-in-from-top-1">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={15} className="text-red-400 shrink-0" />
+                    <div>
+                      <span className="font-bold text-red-300">Last solve failed:</span> {simError}.
+                      <span className="text-gray-400 ml-1.5 text-[11px]">(Preserving previous valid curves)</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSimError(null)}
+                    aria-label="Dismiss error"
+                    className="text-gray-400 hover:text-white text-xs px-2.5 py-1 rounded bg-black/50 border border-white/10 hover:bg-black/80 transition-colors"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              )}
+
+              {/* Model Domain Validity */}
+              <ModelValidity report={validity} />
+
               <ComparePanel current={r as unknown as React.ComponentProps<typeof ComparePanel>["current"]} />
 
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 shrink-0">
@@ -273,12 +397,22 @@ function FullCarDashboard() {
                 <KPICard label="LLT Front" value={maxOf(r.lateral_load_transfer_f as number[])} unit="N" status="neutral" />
               </div>
 
-              <div className="flex gap-1.5 shrink-0">
+              <div className="flex gap-1.5 shrink-0" role="tablist" aria-label="Full-car simulation views">
                 {TABS.map((tab, i) => {
                   const Icon = tab.icon;
                   return (
-                    <button key={tab.label} onClick={() => setActiveTab(i)} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${activeTab === i ? "bg-ansys-yellow text-black shadow-[0_0_12px_rgba(242,169,0,0.2)]" : "bg-[#111113] border border-[#1e1e1e] text-gray-500 hover:text-gray-300 hover:border-[#2a2a2a]"}`}>
-                      <Icon size={12} /> {tab.label}
+                    <button
+                      key={tab.label}
+                      role="tab"
+                      aria-selected={activeTab === i}
+                      onClick={() => setActiveTab(i)}
+                      className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                        activeTab === i
+                          ? "bg-ansys-yellow text-black shadow-[0_0_12px_rgba(242,169,0,0.2)]"
+                          : "bg-[#111113] border border-[#1e1e1e] text-gray-400 hover:text-white hover:border-[#2a2a2a]"
+                      }`}
+                    >
+                      <Icon size={12} aria-hidden="true" /> {tab.label}
                     </button>
                   );
                 })}

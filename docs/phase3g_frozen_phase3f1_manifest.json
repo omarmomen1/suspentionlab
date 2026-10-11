@@ -1,0 +1,25 @@
+{
+  "phase": "Phase 3F.1 Frozen Baseline",
+  "git_sha": "fbe3d045762d8c216922630ca5c3b0da1d589a31",
+  "dataset_hash": "489adbf01d27da1c281c0fff353554dfd7d07a3f1c48e2744e9dd902546b74d3",
+  "calibration_version": "golf_gti_phase3d_cal_v1",
+  "tire_scale_factor_s_tire": 1.16,
+  "steering_compliance_k_delta": 0.000451,
+  "physics_file_hashes": {
+    "src/suspensionlab/physics/dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690",
+    "src/suspensionlab/physics/magic_formula.py": "69b182da4d2687e8cf7f9326501fc30c6380023445ea99d04f0f67bbc3d3f76c",
+    "src/suspensionlab/physics/tire_model.py": "da72dea8adf6b83846997fa02c9b1cade1b74272bcaa96f5aa0e2ea389005209",
+    "src/suspensionlab/physics/wheel_dynamics.py": "0740079a6ab8001295c11e1f45da677c0755e9d23fa8e4d8e927098547d5b012",
+    "src/suspensionlab/physics/kinematics.py": "3b4fd3d715472fb993d150810ae626c042a3e83c8bd875133614d8c62509782f",
+    "src/suspensionlab/physics/half_car.py": "70958d0a1d4655c9fa3998131524a452a205549c5b03c9e6b3694e09114ea4d0",
+    "src/suspensionlab/physics/quarter_car.py": "9f8a0f8b42c6c51768d259674372dbb892420da8a79f892690b450785ca92547",
+    "src/suspensionlab/physics/contracts.py": "afb71fc4b9f7bc4a50e0c8eb544a83047bb1f084870a223443d6b12c9b05dbfe"
+  },
+  "baseline_test_suite_count": 104,
+  "baseline_test_pass_count": 104,
+  "frozen_timestamp_iso": "2026-09-26T05:35:00Z",
+  "governance": {
+    "status": "FROZEN_FOR_PHASE_3G",
+    "replay_path_preservation": "Mandatory - zero changes to existing 4-corner actuator replay pipeline."
+  }
+}

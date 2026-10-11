@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import { useUndoRedo } from "../../hooks/useUndoRedo";
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import Plot from "../../components/sim/Plot";
 
 const DARK_BASE = {
   paper_bgcolor: "transparent",

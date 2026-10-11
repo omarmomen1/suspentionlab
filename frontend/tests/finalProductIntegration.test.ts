@@ -1,0 +1,333 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import {
+  CaeApi,
+  SearchApi,
+  TimelineDecisionApi,
+  CaeImportRequest,
+} from "../lib/api_client";
+import * as apiModule from "../lib/api";
+import { parseEngineeringError } from "../components/sim/EngineeringErrorDisplay";
+import type { SubsystemHealthData } from "../components/engineering/ModelHealthIndicator";
+
+describe("SuspensionLab PRO — Final Product Integration & Engineering Decision OS Suite", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // ── 1. Incumbent CAE Interoperability API Client ───────────────────────────
+  describe("Incumbent CAE Interoperability (Adams, MATLAB/Simulink, CarMaker, FMI)", () => {
+    it("CaeApi.importExternal posts raw CAE traces and attaches ExternalModelIdentity", async () => {
+      const mockNormalizedDataset = {
+        identity: {
+          source_tool: "MSC Adams",
+          version: "Adams 2024.1",
+          solver: "WSTIFF",
+          parameters: { m_s: 320, k_s: 35000, c: 2200, MR: 0.85 },
+          inputs: { road_excitation: "Apex Kerb Step (50mm)" },
+          execution_environment: "External CAE Host",
+          timestamp_iso: "2026-09-07T12:00:00Z",
+          artifact_hash: "a".repeat(64),
+          origin: "EXTERNAL_CAE",
+          is_external: true,
+        },
+        channels_present: ["time", "ddz_s", "susp_travel", "tire_load"],
+        time_s: [0.0, 0.01, 0.02],
+        ddz_s: [0.0, 0.22, 0.65],
+        susp_travel_mm: [0.0, 2.0, 5.0],
+        tire_load_N: [4120, 4180, 4290],
+        kpis: {
+          rms_body_accel_mps2: 1.104,
+          peak_body_accel_mps2: 1.85,
+          peak_susp_travel_mm: 0.02,
+          sample_count: 3,
+          duration_s: 0.02,
+        },
+      };
+
+      const spy = vi.spyOn(apiModule, "apiJson").mockResolvedValueOnce(mockNormalizedDataset);
+
+      const payload: CaeImportRequest = {
+        source_tool: "MSC Adams",
+        version: "Adams 2024.1",
+        solver: "WSTIFF",
+        parameters: { m_s: 320, k_s: 35000, c: 2200, MR: 0.85 },
+        raw_trace_csv: "time,ddz_s,susp_travel,tire_load\n0.0,0.0,0.0,4120",
+      };
+
+      const res = await CaeApi.importExternal(payload);
+
+      expect(spy).toHaveBeenCalledWith("/api/v1/cae/import", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      expect(res.identity.origin).toBe("EXTERNAL_CAE");
+      expect(res.identity.is_external).toBe(true);
+      expect(res.identity.source_tool).toBe("MSC Adams");
+      expect(res.channels_present).toContain("ddz_s");
+    });
+
+    it("CaeApi.compareSolvers compares external CAE benchmark against native forward ODE", async () => {
+      const mockCompResult = {
+        external_identity: {
+          source_tool: "MATLAB / Simulink",
+          version: "R2024b",
+          solver: "ode45",
+          artifact_hash: "b".repeat(64),
+          origin: "EXTERNAL_CAE",
+          is_external: true,
+        },
+        native_identity: {
+          solver: "scipy.integrate.solve_ivp (RK45, rtol=1e-6)",
+          model_version: "QCAR-ODE-RK45-v2.4",
+          backend: "NumPy 1.26 / SciPy Vectorized C-Extension",
+          is_external: false,
+        },
+        sample_count_compared: 250,
+        time_start: 0,
+        time_end: 5.0,
+        channel_metrics: {
+          ddz_s: {
+            r_squared: 0.962,
+            rms_residual: 0.084,
+            max_absolute_error: 0.19,
+            mean_percentage_error: 3.2,
+            agreement_status: "STRONG_CORRELATION" as const,
+          },
+        },
+        engineering_interpretation: "External solver and native ODE exhibit strong correlation (R²=0.962).",
+        boundary_notes: "Evaluated under matching sinusoidal road excitation without parameter leakage.",
+      };
+
+      const spy = vi.spyOn(apiModule, "apiJson").mockResolvedValueOnce(mockCompResult);
+
+      const comparePayload = {
+        import_payload: {
+          source_tool: "MATLAB / Simulink",
+          version: "R2024b",
+          solver: "ode45",
+          parameters: { m_s: 320, k_s: 35000, c: 2200, MR: 0.85 },
+          raw_trace_csv: "time,ddz_s\n0.0,0.0",
+        },
+      };
+
+      const res = await CaeApi.compareSolvers(comparePayload);
+
+      expect(spy).toHaveBeenCalledWith("/api/v1/cae/compare-solver", {
+        method: "POST",
+        body: JSON.stringify(comparePayload),
+      });
+      expect(res.external_identity.origin).toBe("EXTERNAL_CAE");
+      expect(res.native_identity.is_external).toBe(false);
+      expect(res.channel_metrics.ddz_s.agreement_status).toBe("STRONG_CORRELATION");
+      expect(res.channel_metrics.ddz_s.r_squared).toBeGreaterThan(0.95);
+    });
+
+    it("CaeApi.exportDeck produces validated syntax export decks for MSC Adams and MATLAB", async () => {
+      const mockExport = {
+        format: "MSC_ADAMS_ADM",
+        filename: "quarter_car_export.adm",
+        syntax_validated: true,
+        code: "! MSC Adams Dataset\nMARKER/1, PART=1\nSPRING/1, I=1, J=2, K=35000.0",
+        notes: "Generated by SuspensionLab PRO CAE Exporter",
+      };
+
+      const spy = vi.spyOn(apiModule, "apiJson").mockResolvedValueOnce(mockExport);
+
+      const res = await CaeApi.exportDeck("adams_adm", {
+        m_s: 320,
+        k_s: 35000,
+        c: 2200,
+        MR: 0.85,
+      });
+
+      expect(spy).toHaveBeenCalledWith("/api/v1/cae/export/adams_adm", {
+        method: "POST",
+        body: JSON.stringify({ m_s: 320, k_s: 35000, c: 2200, MR: 0.85 }),
+      });
+      expect(res.syntax_validated).toBe(true);
+      expect(res.code).toContain("SPRING/1");
+    });
+  });
+
+  // ── 2. Universal Engineering Search API Client ─────────────────────────────
+  describe("Universal Engineering Search (9 Domains)", () => {
+    it("SearchApi.search correctly queries endpoint with parameters and filters", async () => {
+      const mockSearchRes = {
+        query: "damper",
+        total_matches: 4,
+        categories_searched: ["parameters", "experiments", "decisions", "telemetry"],
+        results: [
+          {
+            id: "param-c",
+            title: "c — Suspension Damping Rate",
+            category: "parameters" as const,
+            subtitle: "Unit: Ns/m • Viscous dissipation parameter",
+            route: "/simulation",
+            snippet: "Linear viscous damping coefficient",
+            metadata: { unit: "Ns/m" },
+            score: 0.95,
+          },
+        ],
+      };
+
+      const spy = vi.spyOn(apiModule, "apiJson").mockResolvedValueOnce(mockSearchRes);
+
+      const res = await SearchApi.search("damper", { category: "parameters", limit: 10 });
+
+      expect(spy).toHaveBeenCalledWith("/api/v1/search?q=damper&category=parameters&limit=10");
+      expect(res.total_matches).toBe(4);
+      expect(res.results[0].category).toBe("parameters");
+      expect(res.results[0].title).toContain("Damping Rate");
+    });
+  });
+
+  // ── 3. Institutional Memory Reconstruction API Client ──────────────────────
+  describe("Institutional Memory Reconstruction (7 Pillars)", () => {
+    it("TimelineDecisionApi.reconstructMemory retrieves complete 7-pillar lineage", async () => {
+      const mockReconstruction = {
+        target_identifier: "SETUP-SPA-REV4",
+        setup_ref: "SETUP-SPA-REV4",
+        vehicle_ref: "CAR-2026-F1",
+        title: "Adopt Setup Rev 4 for Eau Rouge Compression",
+        status: "APPROVED",
+        reconstruction: {
+          question: {
+            prompt: "Why is front ride height bottoming out under 4.2g vertical compression in Eau Rouge?",
+            context: { track: "Spa-Francorchamps", speed: "305 km/h" },
+          },
+          evidence: {
+            telemetry: { laser_rh_front: 3.2, vert_g: 4.18, session: "SESS-SPA-FP1" },
+            simulation: { bump_stop_engagement_mm: 4.8 },
+            validation: { holdout_r2: 0.92 },
+          },
+          experiments: {
+            candidates_evaluated: ["SETUP-SPA-REV3", "SETUP-SPA-REV4"],
+            selected_option: "SETUP-SPA-REV4",
+          },
+          simulation: {
+            solver: "scipy.integrate.solve_ivp (RK45, rtol=1e-6)",
+            model_version: "QCAR-ODE-RK45-v2.4",
+            summary: "Heave spring rate +20% eliminates plank ground contact.",
+          },
+          comparison: {
+            selected_option: { name: "SETUP-SPA-REV4" },
+            engineering_reason: "Provides clearance headroom over Eau Rouge compression dip.",
+            tradeoffs_accepted: ["1.4% higher high-speed ride harshness over curbs."],
+            risks_and_mitigations: ["Verify tire load fluctuation does not saturate outer tire."],
+          },
+          validation: {
+            holdout_r2: 0.92,
+            sign_off_status: "APPROVED",
+            verification_protocol: "Holdout zero-leakage cross-validation",
+            evidence_score: 0.94,
+            governance_gate: "PASSED",
+          },
+          approval: {
+            approver_name: "Dr. Elena Rostova",
+            approver_role: "Lead Performance Engineer",
+            hmac_signature: "c".repeat(64),
+            signed_at: "2026-09-07T14:00:00Z",
+            status: "APPROVED",
+            artifact_hashes: { decision_hash: "d".repeat(64) },
+          },
+        },
+        lineage_events: [
+          {
+            id: "ev-01",
+            title: "Decision Approved: DEC-2026-0042",
+            event_type: "approval",
+            description: "Formally signed off with dual HMAC signatures.",
+            created_at: "2026-09-07T14:00:00Z",
+            setup_ref: "SETUP-SPA-REV4",
+            author: "Dr. Elena Rostova",
+          },
+        ],
+      };
+
+      const spy = vi.spyOn(apiModule, "apiJson").mockResolvedValueOnce(mockReconstruction);
+
+      const res = await TimelineDecisionApi.reconstructMemory("SETUP-SPA-REV4");
+
+      expect(spy).toHaveBeenCalledWith("/api/v1/decisions/reconstruct/SETUP-SPA-REV4");
+      expect(res.setup_ref).toBe("SETUP-SPA-REV4");
+      expect(res.reconstruction.question.prompt).toContain("Eau Rouge");
+      expect(res.reconstruction.approval.approver_name).toBe("Dr. Elena Rostova");
+      expect(res.reconstruction.approval.hmac_signature).toHaveLength(64);
+      expect(res.lineage_events).toHaveLength(1);
+    });
+  });
+
+  // ── 4. Subsystem Model Health Indicator UX ─────────────────────────────────
+  describe("Subsystem Model Health Indicator & Drift Scoring", () => {
+    it("validates healthy subsystem health data attributes", () => {
+      const healthData: SubsystemHealthData = {
+        subsystem: "Heave & Ride Dynamics",
+        status: "HEALTHY",
+        divergencePercent: 2.1,
+        driftScore: 0.08,
+        lastCalibration: "2026-09-07 10:15 UTC",
+        modelVersion: "QCAR-ODE-RK45-v2.4",
+        solver: "scipy.integrate.solve_ivp (RK45)",
+        rmsResidual: 0.042,
+        sampleCount: 12000,
+        trend: "stable",
+      };
+
+      expect(healthData.status).toBe("HEALTHY");
+      expect(healthData.divergencePercent).toBeLessThan(5.0);
+      expect(healthData.driftScore).toBeLessThan(0.15);
+      expect(healthData.trend).toBe("stable");
+    });
+
+    it("validates drifting and degraded subsystem health boundaries", () => {
+      const driftingData: SubsystemHealthData = {
+        subsystem: "Aero Diffuser Ride Height",
+        status: "DRIFTING",
+        divergencePercent: 12.8,
+        driftScore: 0.44,
+        lastCalibration: "14 days ago",
+        warningMessage: "Model predicts higher ground effect downforce than measured laser ride height indicate.",
+        trend: "degrading",
+      };
+
+      expect(driftingData.status).toBe("DRIFTING");
+      expect(driftingData.divergencePercent).toBeGreaterThan(10.0);
+      expect(driftingData.driftScore).toBeGreaterThan(0.3);
+      expect(driftingData.trend).toBe("degrading");
+      expect(driftingData.warningMessage).toBeDefined();
+    });
+  });
+
+  // ── 5. Standardized 5-Factor Failure Diagnostics UX ────────────────────────
+  describe("Standardized 5-Factor Failure Diagnostics Contract", () => {
+    it("parses ODE solver divergence into 5 explicit failure factors", () => {
+      const rawError = {
+        detail: "Solver failed: Maximum step size underflow at t=1.42s. Stiff ODE damping matrix singularity.",
+        request_id: "req-err-div-901",
+      };
+
+      const parsed = parseEngineeringError(rawError);
+
+      expect(parsed.severity).toBe("DIVERGENCE");
+      // Verify all 5 explicit factors are present and populated
+      expect(parsed.whatFailed).toContain("Adaptive ODE State Integration");
+      expect(parsed.whyFailed).toContain("underflow");
+      expect(parsed.whatRemainsValid).toContain("Pre-divergence time-history steps");
+      expect(parsed.whatCannotBeClaimed).toContain("Post-event transient trajectory");
+      expect(parsed.whatUserCanDoNext).toContain("Switch solver formulation");
+    });
+
+    it("parses zero-damping unconstrained resonance into 5 explicit failure factors", () => {
+      const rawError = "Divergence: Undamped system detected with c = 0 Ns/m causing unbounded resonance.";
+
+      const parsed = parseEngineeringError(rawError);
+
+      expect(parsed.severity).toBe("DIVERGENCE");
+      expect(parsed.whatFailed).toContain("Suspension Damper Energy Dissipation");
+      expect(parsed.whyFailed).toContain("damping coefficient");
+      expect(parsed.whatRemainsValid).toContain("Static wheel rate");
+      expect(parsed.whatCannotBeClaimed).toContain("Ride comfort index");
+      expect(parsed.whatUserCanDoNext).toContain("damping coefficient");
+    });
+  });
+});

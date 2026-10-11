@@ -35,10 +35,15 @@ export default async function proxy(request: NextRequest) {
 
   const token = request.cookies.get("sl_token")?.value;
   let authed = false;
+  let isTrial = false;
   if (token) {
       try {
-          await jwtVerify(token as string, JWT_SECRET);
+          const verified = await jwtVerify(token as string, JWT_SECRET);
           authed = true;
+          const payload = verified.payload as Record<string, any>;
+          if (payload?.is_trial || payload?.plan === "TRIAL") {
+              isTrial = true;
+          }
       } catch (err) {
           console.error("JWT Verify Error in proxy.ts:", err);
           authed = false;

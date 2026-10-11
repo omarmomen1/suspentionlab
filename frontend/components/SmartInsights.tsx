@@ -34,12 +34,19 @@ interface QuarterCarResult {
   [key: string]: unknown;
 }
 
-interface Insight {
+export interface Insight {
   severity: "critical" | "warning" | "good" | "info";
   category: string;
   finding: string;
   action: string;
   value: string;
+  patch?: Record<string, number>;
+  patchLabel?: string;
+}
+
+export interface SmartInsightsProps {
+  result: QuarterCarResult | null;
+  onApplyRecommendation?: (patch: Record<string, number>) => void;
 }
 
 const SEVERITY_CONFIG = {
@@ -71,6 +78,8 @@ const SEVERITY_CONFIG = {
 
 function analyzeResults(r: QuarterCarResult): Insight[] {
   const insights: Insight[] = [];
+  const cCrit = (r.c_crit_s as number) || 4500;
+  const currentKs = (r.k_s as number) || (r.k_w as number) || 25000;
 
   // ── 1. Ride Comfort (ISO 2631-1) ──────────────────────────────────────────
   const wkRms = r.rms_body_accel_wk ?? r.rms_body_accel;
@@ -81,6 +90,8 @@ function analyzeResults(r: QuarterCarResult): Insight[] {
       finding: `Wk-weighted RMS = ${wkRms.toFixed(3)} m/s² — ISO 2631-1 classifies this as "Very Uncomfortable". Human subjects report nausea above 2.0 m/s².`,
       action: "Increase spring rate by 15–25% OR increase damping ratio to 0.35–0.45. Consider softer tire (reduce k_t by 10%).",
       value: `${wkRms.toFixed(3)} m/s²`,
+      patch: { c: Math.round(cCrit * 0.35) },
+      patchLabel: `Set Damping to ζ = 0.35 (${Math.round(cCrit * 0.35)} N·s/m)`,
     });
   } else if (wkRms > 1.0) {
     insights.push({
@@ -89,6 +100,8 @@ function analyzeResults(r: QuarterCarResult): Insight[] {
       finding: `Wk RMS = ${wkRms.toFixed(3)} m/s² — "Uncomfortable" per ISO 2631-1. Threshold for road cars is typically < 0.8 m/s².`,
       action: "Reduce spring rate by 10–15% and increase damping (target ζ = 0.30–0.40).",
       value: `${wkRms.toFixed(3)} m/s²`,
+      patch: { k_s: Math.round(currentKs * 0.88), c: Math.round(cCrit * 0.33) },
+      patchLabel: `Tune Spring & Damper for Comfort (${Math.round(currentKs * 0.88)} N/m, ${Math.round(cCrit * 0.33)} N·s/m)`,
     });
   } else if (wkRms < 0.315) {
     insights.push({
@@ -109,6 +122,8 @@ function analyzeResults(r: QuarterCarResult): Insight[] {
       finding: `Sprung damping ratio ζ = ${zeta.toFixed(3)} — Severely underdamped. Expect prolonged oscillation (settling time > 5 cycles). Risk of tire lift over consecutive bumps.`,
       action: `Increase damping coefficient by at least ${Math.round((0.25 - zeta) * 100)}% of critical. Target ζ = 0.25–0.35 for road, 0.35–0.45 for race.`,
       value: `ζ = ${zeta.toFixed(3)}`,
+      patch: { c: Math.round(cCrit * 0.30) },
+      patchLabel: `Set Damping to Target ζ = 0.30 (${Math.round(cCrit * 0.30)} N·s/m)`,
     });
   } else if (zeta > 0.7) {
     insights.push({
@@ -117,6 +132,8 @@ function analyzeResults(r: QuarterCarResult): Insight[] {
       finding: `ζ = ${zeta.toFixed(3)} — Overdamped. Suspension will feel "wooden". Slow response to road perturbations, poor dynamic tire contact.`,
       action: "Reduce damping by 20–30%. Check motion ratio — high MR amplifies effective damping at wheel.",
       value: `ζ = ${zeta.toFixed(3)}`,
+      patch: { c: Math.round(cCrit * 0.38) },
+      patchLabel: `Reduce Damping to ζ = 0.38 (${Math.round(cCrit * 0.38)} N·s/m)`,
     });
   } else if (zeta >= 0.25 && zeta <= 0.5) {
     insights.push({
@@ -137,6 +154,8 @@ function analyzeResults(r: QuarterCarResult): Insight[] {
       finding: `Peak travel = ${peakTravMM.toFixed(1)} mm — Exceeds typical bump stop clearance for road cars (100–130 mm). Bump stop contact likely.`,
       action: "Increase spring rate (k_s +20%) OR reduce bump amplitude in test profile. Check motion ratio.",
       value: `${peakTravMM.toFixed(1)} mm`,
+      patch: { k_s: Math.round(currentKs * 1.20) },
+      patchLabel: `Stiffen Spring (+20% to ${Math.round(currentKs * 1.20)} N/m)`,
     });
   } else if (peakTravMM > 80) {
     insights.push({
@@ -145,6 +164,8 @@ function analyzeResults(r: QuarterCarResult): Insight[] {
       finding: `Peak travel = ${peakTravMM.toFixed(1)} mm — Moderate. Approaching typical road-car bump stop at 100 mm. Race cars typically target < 50 mm.`,
       action: "Consider stiffening spring rate by 10% or adding progressive bump stop.",
       value: `${peakTravMM.toFixed(1)} mm`,
+      patch: { k_s: Math.round(currentKs * 1.10) },
+      patchLabel: `Stiffen Spring (+10% to ${Math.round(currentKs * 1.10)} N/m)`,
     });
   } else {
     insights.push({
@@ -167,6 +188,8 @@ function analyzeResults(r: QuarterCarResult): Insight[] {
       finding: `Sprung frequency f_n = ${fn_s.toFixed(2)} Hz — Below typical comfort range (1–2 Hz). May excite human vestibular sensitivity. Common in luxury long-travel setups.`,
       action: "Increase spring rate or reduce sprung mass. Target f_n ≥ 1.0 Hz for most vehicles.",
       value: `${fn_s.toFixed(2)} Hz`,
+      patch: { k_s: Math.round(currentKs * 1.30) },
+      patchLabel: `Increase Spring Rate to Target f_n ~ 1.1 Hz (${Math.round(currentKs * 1.30)} N/m)`,
     });
   } else if (fn_s > 4.0) {
     insights.push({
@@ -175,6 +198,8 @@ function analyzeResults(r: QuarterCarResult): Insight[] {
       finding: `Sprung frequency f_n = ${fn_s.toFixed(2)} Hz — High. Race-car territory (>3 Hz). Road noise and harshness will be elevated for road use.`,
       action: "Accept if targeting track performance. For road use, reduce k_s to achieve f_n 1.5–2.5 Hz.",
       value: `${fn_s.toFixed(2)} Hz`,
+      patch: { k_s: Math.round(currentKs * 0.70) },
+      patchLabel: `Soften Spring Rate for Road (${Math.round(currentKs * 0.70)} N/m)`,
     });
   }
 
@@ -217,6 +242,8 @@ function analyzeResults(r: QuarterCarResult): Insight[] {
       finding: `Peak TX = ${tx.toFixed(2)} at ${r.freq_at_peak_tx.toFixed(2)} Hz — Resonance amplification is severe (>4×). Body acceleration at resonance will be 4× the road excitation.`,
       action: "Increase damping immediately. Current ζ = " + zeta.toFixed(3) + ". Target ζ ≥ 0.30 to reduce peak TX below 2.5.",
       value: `${tx.toFixed(2)}×`,
+      patch: { c: Math.round(cCrit * 0.32) },
+      patchLabel: `Increase Damping to Suppress Resonance (${Math.round(cCrit * 0.32)} N·s/m)`,
     });
   } else if (tx > 2.5) {
     insights.push({
@@ -225,12 +252,13 @@ function analyzeResults(r: QuarterCarResult): Insight[] {
       finding: `Peak TX = ${tx.toFixed(2)} — Moderate resonance amplification. Acceptable for performance cars; marginal for road use.`,
       action: "Consider increasing damping ratio by 0.05–0.10 to reduce peak TX.",
       value: `${tx.toFixed(2)}×`,
+      patch: { c: Math.round(cCrit * (zeta + 0.08)) },
+      patchLabel: `Increase Damping by +0.08 ζ (${Math.round(cCrit * (zeta + 0.08))} N·s/m)`,
     });
   }
 
   // ── 7. Tire Load Variation ────────────────────────────────────────────────
   const tireLoad = r.rms_tire_load;
-  
   if (tireLoad > 1500) {
     insights.push({
       severity: "warning",
@@ -241,18 +269,13 @@ function analyzeResults(r: QuarterCarResult): Insight[] {
     });
   }
 
-  // Sort: critical first, then warning, then good, then info
   const order = { critical: 0, warning: 1, good: 2, info: 3 };
   insights.sort((a, b) => order[a.severity] - order[b.severity]);
 
   return insights;
 }
 
-interface SmartInsightsProps {
-  result: QuarterCarResult | null;
-}
-
-export default function SmartInsights({ result }: SmartInsightsProps) {
+export default function SmartInsights({ result, onApplyRecommendation }: SmartInsightsProps) {
   const insights = useMemo(() => {
     if (!result) return [];
     return analyzeResults(result);
@@ -264,15 +287,16 @@ export default function SmartInsights({ result }: SmartInsightsProps) {
 
   if (!result) {
     return (
-      <div className="flex items-center justify-center h-32 text-gray-700 text-xs">
-        Run a simulation to see engineering insights.
+      <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-[#111113] border border-[#1e1e1e] rounded-xl">
+        <Zap size={24} className="text-gray-700 mb-2" />
+        <p className="text-xs text-gray-500 font-medium">Run simulation to generate engineering insights</p>
+        <p className="text-[10px] text-gray-700 mt-1">Evaluates ISO 2631 comfort, Dixon damping bands, and frequency separation automatically</p>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-3 h-full overflow-y-auto custom-scrollbar pr-1">
-      {/* Summary bar */}
       <div className="flex items-center gap-3 shrink-0 bg-[#141416] border border-[#252525] rounded-xl px-4 py-2.5">
         <div className="flex items-center gap-1.5">
           <Zap size={12} className="text-ansys-yellow" />
@@ -302,7 +326,6 @@ export default function SmartInsights({ result }: SmartInsightsProps) {
         </div>
       </div>
 
-      {/* Insight cards */}
       <div className="flex flex-col gap-2">
         {insights.map((insight, idx) => {
           const cfg = SEVERITY_CONFIG[insight.severity];
@@ -325,6 +348,16 @@ export default function SmartInsights({ result }: SmartInsightsProps) {
                 <ChevronRight size={11} className="text-gray-600 mt-0.5 shrink-0" />
                 <p className="text-[11px] text-gray-600 leading-relaxed">{insight.action}</p>
               </div>
+
+              {insight.patch && onApplyRecommendation && (
+                <button
+                  onClick={() => onApplyRecommendation(insight.patch!)}
+                  className="mt-2 self-start flex items-center gap-1.5 px-3 py-1.5 bg-ansys-yellow/10 border border-ansys-yellow/30 hover:bg-ansys-yellow/20 text-ansys-yellow rounded-lg text-[10px] font-bold transition-all shadow-sm group"
+                >
+                  <Zap size={11} className="group-hover:scale-110 transition-transform" />
+                  {insight.patchLabel || "Apply Recommendation & Re-Solve"}
+                </button>
+              )}
             </div>
           );
         })}

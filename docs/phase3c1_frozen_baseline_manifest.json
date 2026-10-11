@@ -1,0 +1,102 @@
+{
+  "audit_phase": "PHASE_3C_1",
+  "audit_title": "Validation Integrity, Anti-Tautology & Evidence-Governance Audit",
+  "audit_timestamp": "2026-09-22T02:29:00Z",
+  "physics_frozen": true,
+  "system_provenance": {
+    "git_commit_sha": "fbe3d045762d8c216922630ca5c3b0da1d589a31",
+    "git_branch": "master",
+    "git_working_tree_clean": false,
+    "operating_system": "Windows-11-10.0.26200-SP0",
+    "python_version": "3.14.4 (tags/v3.14.4:23116f9, Apr  7 2026, 14:10:54) [MSC v.1944 64 bit (AMD64)]",
+    "packages": {
+      "numpy": "2.4.6",
+      "scipy": "1.17.1",
+      "pandas": "3.0.3",
+      "pytest": "9.1.1"
+    }
+  },
+  "model_provenance": {
+    "model_version": "dynamic-transient-14dof-v3.2",
+    "engine_class": "DynamicLapSimulator",
+    "physics_source_file": "src/suspensionlab/physics/dynamic_lap_sim.py",
+    "physics_source_sha256": "86c36d2968797b47879c3950b3c608580a6d69f00caf6329872ccce889e4643c",
+    "physics_source_bytes": 142782
+  },
+  "dataset_provenance": {
+    "dataset_identifier": "Stanford SDR hh613qz0317 / 2023-11.csv",
+    "dataset_doi": "10.25740/hh613qz0317",
+    "dataset_purl": "https://purl.stanford.edu/hh613qz0317",
+    "dataset_license": "Creative Commons Attribution Share Alike 4.0 International (CC BY-SA 4.0)",
+    "local_path": "data/external/stanford_vw_golf_thunderhill_2023_11.csv",
+    "file_size_bytes": 16934088,
+    "sha256": "489adbf01d27da1c281c0fff353554dfd7d07a3f1c48e2744e9dd902546b74d3",
+    "sample_count": 22304,
+    "channel_count": 58,
+    "sample_rate_hz": 200.0,
+    "total_duration_s": 111.52
+  },
+  "calibration_parameters": {
+    "parameters": {
+      "s_tire": 1.3161,
+      "s_susp": 0.9807,
+      "k_steer_compliance_rad_per_mps2": 0.000451,
+      "phi_mount_bias_rad": -0.0293,
+      "phi_mount_bias_deg": -1.68,
+      "rolling_radius_m": 0.3198,
+      "potentiometer_datum_offsets_cm": {
+        "FL": 9.78072,
+        "FR": 10.08356,
+        "RL": 7.90360
+      }
+    },
+    "calibration_window": {
+      "maneuver": "Turn 1 Complex 60% Split",
+      "t_start_s": 14.0,
+      "t_end_s": 18.8,
+      "sample_count": 960
+    },
+    "parameter_sha256": "78ceaa596ec40bbf46a1575971480f2beea9ce83d6a3666b6cfaef92cf8c51e0"
+  },
+  "validation_script_provenance": {
+    "phase3b_runner": {
+      "path": "scripts/run_phase3b_expansion_validation.py",
+      "sha256": "1d5241035c3cbcb1dd51c2ce736134afd592430ebd85f16779addcaef446e24e",
+      "bytes": 35258
+    },
+    "phase3c_runner": {
+      "path": "scripts/run_phase3c_multimaneuver_validation.py",
+      "sha256": "5177bcf1c36f797f3acda6c90fdcacce097b04f95d9ea6c69abce5f3d5a8d098",
+      "bytes": 47014
+    }
+  },
+  "prior_validation_artifacts_preserved": {
+    "phase3_results_json": {
+      "path": "data/phase3_validation_results.json",
+      "sha256": "1b43b25ed0c5b8d33451b5042d8e94d8c5491dcde422ee320f83931b76ee0dfe",
+      "bytes": 8768
+    },
+    "phase3b_results_json": {
+      "path": "data/phase3b_expansion_validation_results.json",
+      "sha256": "cf96ed6fb2c5da2cf4564656f2b54d00829d58b7b70ea6e4c4866f41f4769431",
+      "bytes": 16938
+    },
+    "phase3c_results_json": {
+      "path": "data/phase3c_validation_results.json",
+      "sha256": "02478aa4ef13aeb99c22a10a4f8f3687acf1f78e21c6665bfa085e17284b8b61",
+      "bytes": 72582
+    },
+    "manifest_markdown": {
+      "path": "docs/phase3_dataset_manifest.md",
+      "sha256": "a660e2dbdf6f6abd82a10f92940781575084a2940f2df9d0bfc9926b7bdc180b",
+      "bytes": 21563
+    }
+  },
+  "test_suite_baseline": {
+    "test_file": "tests/test_real_vehicle_dynamics_and_lap_sim.py",
+    "tests_total": 11,
+    "tests_passed": 11,
+    "tests_failed": 0,
+    "execution_time_s": 25.37
+  }
+}

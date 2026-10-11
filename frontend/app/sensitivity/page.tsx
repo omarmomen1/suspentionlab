@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+
 "use client";
 import { useState, useRef, Suspense, useEffect } from "react";
 import dynamic from "next/dynamic";
@@ -10,7 +10,7 @@ import {
 import { useUndoRedo } from "../../hooks/useUndoRedo";
 import { useAuth } from "../../contexts/AuthContext";
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import Plot from "../../components/sim/Plot";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const DARK_BASE = {
@@ -83,19 +83,23 @@ function SensitivitySweepDashboard() {
         return;
       }
       
-      const jobId = data.job_id;
-      pollJob({
-        jobId,
-        authHeader,
-        onCompleted: (result) => {
-          setResults(result);
-          setIsRunning(false);
-        },
-        onFailed: (msg) => {
-          setResults({ error: true, message: msg });
-          setIsRunning(false);
-        },
-      });
+      if (data.job_id) {
+        pollJob({
+          jobId: data.job_id,
+          authHeader,
+          onCompleted: (result) => {
+            setResults(result);
+            setIsRunning(false);
+          },
+          onFailed: (msg) => {
+            setResults({ error: true, message: msg });
+            setIsRunning(false);
+          },
+        });
+      } else {
+        setResults(data);
+        setIsRunning(false);
+      }
     } catch (err) {
       setResults({ error: true, message: String(err) });
       setIsRunning(false);
@@ -127,24 +131,24 @@ function SensitivitySweepDashboard() {
           <div className="p-4 space-y-5">
             <ParamSection title="Axis Mapping">
               <div className="flex flex-col gap-1.5 mb-2">
-                <label className="text-[11px] text-gray-500">X-Axis Variable</label>
-                <select value={params.var_x} onChange={(e) => setParams({ ...params, var_x: e.target.value })} className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-ansys-yellow/60 w-full">
+                <label htmlFor="sensitivity-var-x" className="text-[11px] text-gray-400">X-Axis Variable</label>
+                <select id="sensitivity-var-x" aria-label="X-Axis Variable" value={params.var_x} onChange={(e) => setParams({ ...params, var_x: e.target.value })} className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-ansys-yellow/60 w-full">
                   <option>Spring Rate (ks)</option>
                   <option>Damping (c)</option>
                   <option>Tire Stiffness (kt)</option>
                 </select>
               </div>
               <div className="flex flex-col gap-1.5 mb-2">
-                <label className="text-[11px] text-gray-500">Y-Axis Variable</label>
-                <select value={params.var_y} onChange={(e) => setParams({ ...params, var_y: e.target.value })} className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-ansys-yellow/60 w-full">
+                <label htmlFor="sensitivity-var-y" className="text-[11px] text-gray-400">Y-Axis Variable</label>
+                <select id="sensitivity-var-y" aria-label="Y-Axis Variable" value={params.var_y} onChange={(e) => setParams({ ...params, var_y: e.target.value })} className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-ansys-yellow/60 w-full">
                   <option>Spring Rate (ks)</option>
                   <option>Damping (c)</option>
                   <option>Tire Stiffness (kt)</option>
                 </select>
               </div>
               <div className="flex flex-col gap-1.5 mb-2">
-                <label className="text-[11px] font-bold text-[#00aeff]">Z-Axis Objective</label>
-                <select value={params.objective} onChange={(e) => setParams({ ...params, objective: e.target.value })} className="bg-[#0d0d0d] border border-[#00aeff]/40 text-[11px] rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-[#00aeff]/80 w-full">
+                <label htmlFor="sensitivity-objective" className="text-[11px] font-bold text-[#00aeff]">Z-Axis Objective</label>
+                <select id="sensitivity-objective" aria-label="Z-Axis Objective" value={params.objective} onChange={(e) => setParams({ ...params, objective: e.target.value })} className="bg-[#0d0d0d] border border-[#00aeff]/40 text-[11px] rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-[#00aeff]/80 w-full">
                   <option>Balanced (Comfort + Grip)</option>
                   <option>Ride Comfort (ISO RMS)</option>
                   <option>Grip (Tire RMS)</option>

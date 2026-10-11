@@ -2,18 +2,60 @@ apiVersion: batch/v1
 kind: CronJob
 metadata:
   name: {{ .Release.Name }}-sweeper
-  namespace: suspensionlab-prod
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: suspensionlab
+    component: sweeper
 spec:
-  schedule: "* * * * *"
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
   jobTemplate:
     spec:
+      activeDeadlineSeconds: 120
       template:
+        metadata:
+          labels:
+            app: suspensionlab
+            component: sweeper
         spec:
+          serviceAccountName: {{ .Release.Name }}-sa
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1001
+            runAsGroup: 1001
+            fsGroup: 1001
+            seccompProfile:
+              type: RuntimeDefault
           containers:
           - name: sweeper
             image: "{{ .Values.workers.image.repository }}:{{ .Values.workers.image.tag }}"
             command: ["python", "-m", "suspensionlab.backend.workers.sweeper"]
+            securityContext:
+              runAsNonRoot: true
+              runAsUser: 1001
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
             envFrom:
             - configMapRef:
                 name: {{ .Release.Name }}-config
+            - secretRef:
+                name: {{ .Release.Name }}-secrets
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 256Mi
+            volumeMounts:
+            - name: tmp
+              mountPath: /tmp
           restartPolicy: OnFailure
+          volumes:
+          - name: tmp
+            emptyDir: {}

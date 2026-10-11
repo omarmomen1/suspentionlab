@@ -1,12 +1,13 @@
 {{- if .Values.monitoring.prometheusRule.enabled }}
 # PrometheusRule — defines alerting rules for the SuspensionLab platform.
 # Requires kube-prometheus-stack with Alertmanager configured to route to
-# PagerDuty/Slack/email. These alerts cover the most critical failure modes.
+# PagerDuty/Slack/email. All suspensionlab_* metric names match the canonical
+# registry in src/suspensionlab/backend/metrics_registry.py.
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
   name: {{ .Release.Name }}-alerts
-  namespace: suspensionlab-prod
+  namespace: {{ .Release.Namespace }}
   labels:
     app: suspensionlab
     release: kube-prometheus-stack
@@ -19,9 +20,9 @@ spec:
         - alert: APIHighErrorRate
           expr: |
             (
-              sum(rate(http_requests_total{job="suspensionlab-api", status=~"5.."}[5m]))
+              sum(rate(suspensionlab_api_requests_total{status_code=~"5.."}[5m]))
               /
-              sum(rate(http_requests_total{job="suspensionlab-api"}[5m]))
+              sum(rate(suspensionlab_api_requests_total[5m]))
             ) > 0.05
           for: 2m
           labels:
@@ -29,27 +30,27 @@ spec:
             team: platform
           annotations:
             summary: "SuspensionLab API error rate > 5%"
-            description: "API 5xx error rate is {{ $value | humanizePercentage }} over the last 5 minutes. Possible causes: database connectivity, unhandled exceptions, OOM."
+            description: "API 5xx error rate is {{ "{{ $value | humanizePercentage }}" }} over the last 5 minutes. Possible causes: database connectivity, unhandled exceptions, OOM."
             runbook_url: "https://wiki.suspensionlab.pro/runbooks/api-high-error-rate"
 
         - alert: APIHighLatencyP99
           expr: |
             histogram_quantile(0.99,
-              sum(rate(http_request_duration_seconds_bucket{job="suspensionlab-api"}[5m])) by (le)
-            ) > 3
+              sum(rate(suspensionlab_api_request_duration_seconds_bucket[5m])) by (le)
+            ) > 3.0
           for: 5m
           labels:
             severity: warning
             team: platform
           annotations:
             summary: "SuspensionLab API P99 latency > 3s"
-            description: "P99 latency is {{ $value | humanizeDuration }}. Physics simulation endpoints may be slow or a downstream dependency is degraded."
+            description: "P99 latency is {{ "{{ $value | humanizeDuration }}" }}. Physics simulation endpoints may be slow or a downstream dependency is degraded."
 
         - alert: APIPodsNotReady
           expr: |
             kube_deployment_status_replicas_ready{
               deployment="{{ .Release.Name }}-api",
-              namespace="suspensionlab-prod"
+              namespace="{{ .Release.Namespace }}"
             } < 2
           for: 1m
           labels:
@@ -57,28 +58,30 @@ spec:
             team: platform
           annotations:
             summary: "SuspensionLab API has fewer than 2 ready replicas"
-            description: "Ready replicas: {{ $value }}. Immediate action required — users are being load-balanced to a degraded pod set."
+            description: "Ready replicas: {{ "{{ $value }}" }}. Immediate action required — users are being load-balanced to a degraded pod set."
 
-    # ── Worker Health ─────────────────────────────────────────────────────────
+    # ── Worker Health & Saturation ─────────────────────────────────────────────
     - name: suspensionlab.workers.health
-      interval: 60s
+      interval: 30s
       rules:
-        - alert: WorkerQueueDepthHigh
+        - alert: WorkerQueueBacklog
           expr: |
-            suspensionlab_rq_queue_length{queue="default"} > 100
+            suspensionlab_queue_depth > 100
           for: 5m
           labels:
             severity: warning
             team: platform
           annotations:
-            summary: "RQ worker queue depth > 100 jobs"
-            description: "Queue depth: {{ $value }}. KEDA should be scaling workers, but autoscaling may be lagging. Simulation jobs are being delayed."
+            summary: "RQ worker queue backlog > 100 jobs"
+            description: "Queue depth: {{ "{{ $value }}" }}. KEDA should be scaling workers, but autoscaling may be lagging. Simulation jobs are being delayed."
 
         - alert: WorkerOOMKilled
           expr: |
+            increase(suspensionlab_worker_oom_kills_total[5m]) > 0
+            or
             kube_pod_container_status_last_terminated_reason{
               reason="OOMKilled",
-              namespace="suspensionlab-prod",
+              namespace="{{ .Release.Namespace }}",
               container="worker"
             } == 1
           for: 0m
@@ -87,22 +90,55 @@ spec:
             team: platform
           annotations:
             summary: "SuspensionLab worker pod OOMKilled"
-            description: "Pod {{ $labels.pod }} was OOMKilled. Physics simulation exceeded memory limits. Consider increasing worker memory limits or optimizing simulation batch size."
+            description: "Worker process exceeded container memory limit. Consider increasing worker memory limits or optimizing simulation batch size."
 
-    # ── Database Health ────────────────────────────────────────────────────────
-    - name: suspensionlab.database.health
-      interval: 60s
-      rules:
-        - alert: DatabaseConnectionPoolExhausted
+        - alert: WorkerCrashDetected
           expr: |
-            suspensionlab_db_pool_checked_out / suspensionlab_db_pool_size > 0.9
+            increase(suspensionlab_worker_crashes_total[5m]) > 0
+          for: 0m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "SuspensionLab worker crashed unexpectedly"
+            description: "Worker crash detected. Check worker logs with trace_id and job_id for segmentation fault or fatal exception."
+
+    # ── Database & Dependency Health ──────────────────────────────────────────
+    - name: suspensionlab.database.health
+      interval: 30s
+      rules:
+        - alert: DatabaseSaturation
+          expr: |
+            suspensionlab_db_connection_pool_active / suspensionlab_db_connection_pool_size > 0.85
           for: 2m
           labels:
             severity: critical
             team: platform
           annotations:
-            summary: "Database connection pool >90% utilised"
-            description: "Pool utilisation: {{ $value | humanizePercentage }}. Risk of connection timeout errors under load. Review slow queries or scale RDS instance."
+            summary: "Database connection pool >85% saturated"
+            description: "Pool utilisation: {{ "{{ $value | humanizePercentage }}" }}. Risk of connection timeout errors under load. Review slow queries or scale RDS instance."
+
+        - alert: DatabaseDown
+          expr: |
+            suspensionlab_db_connected == 0
+          for: 30s
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "PostgreSQL database connectivity failure"
+            description: "Database ping failed from application backend. Check RDS cluster status and failover state."
+
+        - alert: RedisOutage
+          expr: |
+            suspensionlab_redis_connected == 0
+          for: 30s
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: "Redis cache / task queue connectivity failure"
+            description: "Redis ping failed. Background queue processing and fast polling cache are impaired."
 
         - alert: ReadinessProbeFailure
           expr: |
@@ -116,7 +152,50 @@ spec:
             team: platform
           annotations:
             summary: "SuspensionLab readiness probe failing"
-            description: "The /ready endpoint is returning failure, indicating the database is unreachable. Check RDS status in AWS Console."
+            description: "The /ready endpoint is returning failure, indicating core dependencies (DB or Redis) are unreachable."
+
+    # ── Physics & Solver Observability ────────────────────────────────────────
+    - name: suspensionlab.physics.health
+      interval: 60s
+      rules:
+        - alert: SolverFailureSpike
+          expr: |
+            (
+              sum(rate(suspensionlab_solver_runs_total{outcome!="converged"}[5m]))
+              /
+              clamp_min(sum(rate(suspensionlab_solver_runs_total[5m])), 0.001)
+            ) > 0.10
+          for: 3m
+          labels:
+            severity: critical
+            team: simulation
+          annotations:
+            summary: "Physics solver failure rate > 10%"
+            description: "Non-converging simulations exceeded 10% over the last 5 minutes. Check solver stiffness and numerical tolerance configs."
+
+        - alert: PhysicsValidationRegression
+          expr: |
+            suspensionlab_model_validity_score < 70
+            or
+            suspensionlab_physics_validation_score < 70
+          for: 2m
+          labels:
+            severity: warning
+            team: simulation
+          annotations:
+            summary: "Physics validation score regression detected (<70)"
+            description: "Observed physics model validity score dropped below 70. Potential numerical drift or invalid parameter inputs."
+
+        - alert: PhysicsFailureSpike
+          expr: |
+            sum(rate(suspensionlab_physics_failures_total[5m])) > 5
+          for: 2m
+          labels:
+            severity: warning
+            team: simulation
+          annotations:
+            summary: "Spike in physics failure events (contact loss, NaN/Inf, out-of-domain)"
+            description: "High rate of physical anomaly detections: {{ "{{ $value }}" }} events/sec."
 
     # ── Certificate Expiry ─────────────────────────────────────────────────────
     - name: suspensionlab.tls
@@ -125,7 +204,7 @@ spec:
         - alert: TLSCertificateExpiringSoon
           expr: |
             certmanager_certificate_expiration_timestamp_seconds{
-              namespace="suspensionlab-prod"
+              namespace="{{ .Release.Namespace }}"
             } - time() < 86400 * 14
           for: 1h
           labels:
@@ -133,5 +212,5 @@ spec:
             team: platform
           annotations:
             summary: "TLS certificate expiring in less than 14 days"
-            description: "Certificate {{ $labels.name }} expires in {{ $value | humanizeDuration }}. cert-manager should be auto-renewing — check cert-manager logs."
+            description: "Certificate {{ "{{ $labels.name }}" }} expires in {{ "{{ $value | humanizeDuration }}" }}. cert-manager should be auto-renewing — check cert-manager logs."
 {{- end }}

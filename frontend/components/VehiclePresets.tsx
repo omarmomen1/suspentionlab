@@ -87,8 +87,8 @@ interface VehiclePresetsProps {
 
 export default function VehiclePresets({ onSelect }: VehiclePresetsProps) {
   const [open, setOpen] = useState(false);
-  // WCAG 2.4.3: focus trap — keep Tab cycling inside the open dialog
   const dialogRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -103,6 +103,11 @@ export default function VehiclePresets({ onSelect }: VehiclePresetsProps) {
     focusables()[0]?.focus();
 
     const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setOpen(false);
+        return;
+      }
       if (e.key !== "Tab") return;
       const items = focusables();
       if (items.length === 0) return;
@@ -116,18 +121,25 @@ export default function VehiclePresets({ onSelect }: VehiclePresetsProps) {
         first.focus();
       }
     };
-    dialog.addEventListener("keydown", onKeyDown);
-    return () => dialog.removeEventListener("keydown", onKeyDown);
+    const triggerEl = triggerRef.current;
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      triggerEl?.focus();
+    };
   }, [open]);
-  // P1-PERF-06: hover styling moved to CSS (:hover) — the previous
-  // onMouseEnter/onMouseLeave useState pattern re-rendered the whole list
-  // on every mouse movement.
 
   return (
     <div className="relative">
-      <button onClick={() => setOpen(true)}
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
         className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-[#141416] border border-[#252525]
-          hover:bg-[#1e1e20] hover:border-ansys-yellow/30 rounded-lg text-xs font-bold transition-all shadow-sm">
+          hover:bg-[#1e1e20] hover:border-ansys-yellow/30 rounded-lg text-xs font-bold transition-all shadow-sm"
+      >
         <Zap size={14} className="text-ansys-yellow" /> Vehicle Library
       </button>
 
@@ -141,8 +153,10 @@ export default function VehiclePresets({ onSelect }: VehiclePresetsProps) {
         >
           <div className="w-full max-w-[360px] bg-[#0d0d0f] border border-[#252525] rounded-xl shadow-2xl overflow-hidden relative">
             <button 
+              type="button"
               onClick={() => setOpen(false)}
-              className="absolute top-3 right-3 text-gray-500 hover:text-white"
+              aria-label="Close vehicle preset library"
+              className="absolute top-3 right-3 text-gray-400 hover:text-white p-1 rounded focus-visible:ring-1 focus-visible:ring-ansys-yellow"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
@@ -151,7 +165,7 @@ export default function VehiclePresets({ onSelect }: VehiclePresetsProps) {
                 <Zap size={14} className="text-ansys-yellow" />
                 Vehicle Preset Library
               </h3>
-              <p className="text-[11px] text-gray-500 mt-1">Select a configuration to load parameters. Then run the solver.</p>
+              <p className="text-[11px] text-gray-400 mt-1">Select a configuration to load parameters. Then run the solver.</p>
             </div>
             <div className="max-h-[500px] overflow-y-auto custom-scrollbar py-1">
               {VEHICLE_PRESETS.map((preset) => (

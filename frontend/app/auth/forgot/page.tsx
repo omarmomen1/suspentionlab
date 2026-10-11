@@ -50,11 +50,15 @@ export default function ForgotPasswordPage() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         {message && (
-          <div className={`p-3 border rounded-md text-sm text-center ${
-            isSuccess
-              ? "bg-emerald-900/30 border-emerald-700/40 text-emerald-300"
-              : "bg-red-900/30 border-red-700/40 text-red-300"
-          }`}>
+          <div
+            role="alert"
+            aria-live="polite"
+            className={`p-3 border rounded-md text-sm text-center ${
+              isSuccess
+                ? "bg-emerald-900/30 border-emerald-700/40 text-emerald-300"
+                : "bg-red-900/30 border-red-700/40 text-red-300"
+            }`}
+          >
             {message}
           </div>
         )}

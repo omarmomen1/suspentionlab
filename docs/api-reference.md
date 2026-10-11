@@ -30,7 +30,7 @@ Hitting a rate limit will immediately result in an HTTP 429 response.
 `GET /health`
 Returns the operational status of the backend API.
 - **Auth Required:** No
-- **Response Format:** `{"status": "ok"}`
+- **Response Format:** `{"status": "alive", "timestamp": 1720000000.0}`
 - **Example cURL:**
   ```bash
   curl -X GET https://api.suspensionlab.pro/health
@@ -74,7 +74,7 @@ Executes an immediate RK45 solver run over a specific bump profile.
 
 ### Start Optimizer
 `POST /optimize`
-Submits an AI genetic algorithm job to find the optimal spring/damper parameters for the provided mass and road constraints. Subject to tier concurrency limits.
+Submits a constrained numerical optimization job (SciPy COBYLA / L-BFGS-B) to find the optimal spring and damper parameters for the provided mass and road constraints. Subject to tier concurrency limits.
 - **Auth Required:** Yes (Rate limited)
 - **Request Body:** JSON matching `OptimizeRequest` constraints.
 - **Response Format:** `{"job_id": "job_123..."}`

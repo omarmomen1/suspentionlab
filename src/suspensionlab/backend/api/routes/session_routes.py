@@ -41,21 +41,23 @@ async def get_session(
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid session ID")
         
-    result = await db.execute(select(SimSession).where(SimSession.id == session_uuid))
+    result = await db.execute(
+        select(SimSession)
+        .options(selectinload(SimSession.comments))
+        .where(SimSession.id == session_uuid)
+    )
     session = result.scalar_one_or_none()
     
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
         
-    # Team members or owner can access
-    user_team = user.team_id
-    if str(session.owner_id) != user.user_id and str(session.team_id) != user_team:
-        raise HTTPException(status_code=403, detail="Not authorized to view this session")
+    # Team members or owner can access; foreign sessions return uniform 404 anti-enumeration
+    user_team = getattr(user, "team_id", None) or (user.get("team_id") if isinstance(user, dict) else None)
+    uid = getattr(user, "user_id", None) or (user.get("user_id") if isinstance(user, dict) else None)
+    if str(session.owner_id) != str(uid) and (not user_team or str(session.team_id) != str(user_team)):
+        raise HTTPException(status_code=404, detail="Session not found")
         
-    comments_result = await db.execute(
-        select(SessionComment).where(SessionComment.session_id == session_uuid).order_by(SessionComment.created_at)
-    )
-    comments = comments_result.scalars().all()
+    comments = sorted(session.comments, key=lambda c: c.created_at) if session.comments else []
     
     return {
         "session_id": str(session.id),
@@ -92,8 +94,9 @@ async def join_session(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
         
-    user_team = user.team_id
-    if str(session.owner_id) != user.user_id and str(session.team_id) != user_team:
-        raise HTTPException(status_code=403, detail="Not authorized to join this session")
+    user_team = getattr(user, "team_id", None) or (user.get("team_id") if isinstance(user, dict) else None)
+    uid = getattr(user, "user_id", None) or (user.get("user_id") if isinstance(user, dict) else None)
+    if str(session.owner_id) != str(uid) and (not user_team or str(session.team_id) != str(user_team)):
+        raise HTTPException(status_code=404, detail="Session not found")
         
     return {"status": "joined", "session_id": str(session.id)}

@@ -17,12 +17,109 @@ export function getCsrfToken(): string {
   return match ? match[2] : "";
 }
 
+export function getAuthToken(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return localStorage.getItem("sl_token") || sessionStorage.getItem("sl_token") || "";
+  } catch {
+    return "";
+  }
+}
+
+export const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
+
+export function normalizeApiUrl(url: string): string {
+  if (url.startsWith("http://") || url.startsWith("https://")) {
+    return url;
+  }
+  const cleanUrl = url.startsWith("/") ? url : `/${url}`;
+  if (!API_BASE) {
+    return cleanUrl;
+  }
+  if (cleanUrl === API_BASE || cleanUrl.startsWith(`${API_BASE}/`)) {
+    return cleanUrl;
+  }
+  if (API_BASE.endsWith("/api/v1") && cleanUrl.startsWith("/api/v1")) {
+    const basePrefix = API_BASE.slice(0, -"/api/v1".length);
+    return `${basePrefix}${cleanUrl}`;
+  }
+  if (API_BASE.endsWith("/api") && cleanUrl.startsWith("/api/")) {
+    const basePrefix = API_BASE.slice(0, -"/api".length);
+    return `${basePrefix}${cleanUrl}`;
+  }
+  return `${API_BASE}${cleanUrl}`;
+}
+
+let apiRefreshPromise: Promise<string | null> | null = null;
+
+async function tryRefreshToken(): Promise<string | null> {
+  if (typeof window === "undefined") return null;
+  if (apiRefreshPromise) return apiRefreshPromise;
+
+  apiRefreshPromise = (async () => {
+    try {
+      const refreshUrl = normalizeApiUrl("/api/v1/auth/refresh");
+      const res = await fetch(refreshUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.token) {
+          try {
+            localStorage.setItem("sl_token", data.token);
+          } catch {}
+          return data.token as string;
+        }
+      }
+      return null;
+    } catch {
+      return null;
+    } finally {
+      apiRefreshPromise = null;
+    }
+  })();
+
+  return apiRefreshPromise;
+}
+
 export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
-  const headers = {
+  const fullUrl = normalizeApiUrl(url);
+  const token = getAuthToken();
+
+  const headers: Record<string, string> = {
     "X-CSRF-Token": getCsrfToken(),
-    ...(options.headers ?? {}),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(options.headers as Record<string, string> ?? {}),
   };
-  return fetch(url, { ...options, credentials: "include", headers });
+  
+  let res = await fetch(fullUrl, { ...options, credentials: "include", headers });
+
+  const isAuthEndpoint =
+    fullUrl.includes("/auth/login") ||
+    fullUrl.includes("/auth/refresh") ||
+    fullUrl.includes("/auth/clear-cookie");
+
+  if (res.status === 401 && !isAuthEndpoint) {
+    const refreshedToken = await tryRefreshToken();
+    if (refreshedToken) {
+      const retryHeaders: Record<string, string> = {
+        ...headers,
+        Authorization: `Bearer ${refreshedToken}`,
+      };
+      res = await fetch(fullUrl, { ...options, credentials: "include", headers: retryHeaders });
+    } else {
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.removeItem("sl_token");
+        } catch {}
+      }
+    }
+  }
+
+  return res;
 }
 
 /** JSON helper: apiFetch + parse + typed result, throws on !ok. */

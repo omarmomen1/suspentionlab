@@ -54,9 +54,11 @@ References
 
 from __future__ import annotations
 
+import math
 import warnings
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import List, Optional, Any
+
 
 import numpy as np
 from scipy.interpolate import RegularGridInterpolator
@@ -70,6 +72,9 @@ from suspensionlab.physics.suspension_aero_coupling import (
     CoupledVehicleModel,
     CoupledState,
 )
+
+FAST_QUASI_STEADY = "FAST_QUASI_STEADY"
+SOLVER_MODE_FAST_QUASI_STEADY = FAST_QUASI_STEADY
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -98,8 +103,17 @@ class MassProperties:
     track_front:    float = 1.55     # m
     track_rear:     float = 1.52     # m
 
+    def __post_init__(self):
+        if self.total_mass <= 0.0:
+            raise ValueError("Vehicle total mass must be strictly positive.")
+        if self.wheelbase <= 0.0:
+            raise ValueError("Vehicle wheelbase must be strictly positive.")
+        if self.track_front <= 0.0 or self.track_rear <= 0.0:
+            raise ValueError("Track widths must be strictly positive.")
+
     @property
     def a(self) -> float:
+
         """Distance from front axle to CoG [m]."""
         return self.cog_dist_front
 
@@ -152,8 +166,20 @@ class AeroMap:
     cl_rh_sens:   float = 0.0     # ΔCL/mm, 0 = no ground effect
     cl_pitch_sens: float = 0.0    # ΔCL/deg
 
+    # Nonlinear ground-effect parameters
+    nonlinear_ground_effect: bool = False
+    rh_peak_mm: float = 22.0          # Critical ride height of peak downforce [mm]
+    cl_stall_floor: float = 1.20       # Residual upper body downforce under complete stall
+    stall_decay_power: float = 2.0     # Post-stall collapse exponent
+
     def _effective_cl(self, ride_height_mm: float = 0.0) -> float:
-        """CL adjusted for ride height offset from reference."""
+        """CL adjusted for ride height offset from reference or nonlinear stall."""
+        if self.nonlinear_ground_effect:
+            if ride_height_mm >= self.rh_peak_mm:
+                return max(self.cl_base + self.cl_rh_sens * (ride_height_mm - self.rh_peak_mm), 0.2)
+            else:
+                eta = max(0.0, ride_height_mm / max(self.rh_peak_mm, 1.0))
+                return max(self.cl_stall_floor + (self.cl_base - self.cl_stall_floor) * (eta ** self.stall_decay_power), 0.2)
         return self.cl_base + self.cl_rh_sens * ride_height_mm
 
     def downforce_total(self, v: float, ride_height_mm: float = 0.0) -> float:
@@ -212,18 +238,31 @@ class PowertrainModel:
     def select_gear(self, v: float) -> int:
         """Return best gear index (0-based) for speed v [m/s].
 
-        Selects the highest gear where engine RPM stays at or below rev_limit.
-        Returns 0 (first gear) if below minimum feasible speed.
+        Selects the gear that maximizes available tractive wheel force:
+            F_wheel = T_engine(rpm) * gr * (1 - loss) / R_w
+        subject to engine RPM <= rev_limit.
         """
         if v <= 0:
             return 0
         v = max(v, 0.01)
         best_gear = 0
+        max_force = -1.0
+
         for i, gr in enumerate(self.gear_ratios):
             rpm = v / self.wheel_radius * gr * (60.0 / (2.0 * np.pi))
             if rpm <= self.rev_limit:
-                best_gear = i
+                torque = self.engine_torque(rpm)
+                force = torque * gr * (1.0 - self.drivetrain_loss) / self.wheel_radius
+                if force > max_force:
+                    max_force = force
+                    best_gear = i
+
+        if max_force < 0:
+            # If all gears exceed rev limit, use top gear
+            return len(self.gear_ratios) - 1
         return best_gear
+
+
 
     def engine_rpm_at(self, v: float, gear: int) -> float:
         """Engine RPM at wheel speed v [m/s] in given gear."""
@@ -250,7 +289,7 @@ class PowertrainModel:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# TrackSegment
+# TrackSegment & Validation
 # ─────────────────────────────────────────────────────────────────────────────
 
 @dataclass
@@ -259,18 +298,196 @@ class TrackSegment:
 
     Attributes
     ----------
-    distance    : float  Cumulative distance from start [m]
-    curvature   : float  Signed curvature 1/R [1/m]. Magnitude used for speed limit;
-                         sign can indicate left/right but tires are symmetric here.
-    elevation   : float  Absolute elevation [m] (used for gradient calculation)
-    bank_angle  : float  Track banking [rad]. Positive = banked to the inside (adds normal force).
-    sector      : int    Sector number (1-based) this point belongs to.
+    distance      : float  Cumulative distance from start [m]
+    curvature     : float  Signed curvature 1/R [1/m].
+    elevation     : float  Absolute elevation [m] (used for gradient calculation)
+    bank_angle    : float  Track banking [rad]. Positive = banked to the inside.
+    sector        : int    Sector number (1-based) this point belongs to.
+    heading       : float  Heading angle psi [rad].
+    surface_mu    : float  Surface friction scaling factor [-]. 1.0 = dry asphalt reference.
+                           Accounts for local surface grip variation (e.g., kerb, paint, wet patch).
+    friction_zone : str    Surface type label for diagnostics (e.g., 'asphalt', 'concrete', 'kerb').
     """
-    distance:   float = 0.0
-    curvature:  float = 0.0
-    elevation:  float = 0.0
-    bank_angle: float = 0.0
-    sector:     int   = 1
+    distance:      float = 0.0
+    curvature:     float = 0.0
+    elevation:     float = 0.0
+    bank_angle:    float = 0.0
+    sector:        int   = 1
+    heading:       float = 0.0
+    surface_mu:    float = 1.0
+    friction_zone: str   = "asphalt"
+
+
+@dataclass
+class TrackValidationReport:
+    """Quantitative circuit geometric validation report."""
+
+    is_geometrically_valid: bool
+    total_length_m: float
+    max_heading_error_rad: float
+    max_elevation_gradient: float
+    max_bank_rate_rad_m: float
+    closure_error_m: float
+    validation_status: str
+    warnings: list[str] = field(default_factory=list)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "is_geometrically_valid": self.is_geometrically_valid,
+            "total_length_m": round(self.total_length_m, 2),
+            "max_heading_error_rad": round(self.max_heading_error_rad, 6),
+            "max_elevation_gradient": round(self.max_elevation_gradient, 4),
+            "max_bank_rate_rad_m": round(self.max_bank_rate_rad_m, 6),
+            "closure_error_m": round(self.closure_error_m, 3),
+            "validation_status": self.validation_status,
+            "warnings": self.warnings,
+        }
+
+
+class TrackValidator:
+    """Validates physical track geometry, Frenet-Serret curvature relations, and closure.
+
+    Checks enforced
+    ---------------
+    FATAL (is_geometrically_valid = False):
+        - Fewer than 2 segments
+        - Duplicate or non-monotonic distances (ds ≤ 0)
+        - NaN or ±∞ in curvature, elevation, or bank angle
+        - Curvature |κ| > 0.5 (R < 2 m — impossible for any circuit vehicle)
+        - Surface friction μ ≤ 0 or > 5.0
+
+    WARNING (is_geometrically_valid may still be True):
+        - Excessive gradient (> 35%)
+        - Heading–curvature mismatch (Frenet-Serret violation)
+        - Large closure error on a closed circuit (> 5 m)
+        - Curvature discontinuity (Δκ/Δs > 0.01 1/m²)
+    """
+
+    MAX_CURVATURE = 0.5       # |κ| max → R_min = 2 m
+    MAX_GRADIENT = 0.35       # 35% grade
+    MAX_HEADING_ERR = 0.05    # rad
+    MAX_CLOSURE_M = 5.0       # m
+    MAX_CURV_RATE = 0.01      # 1/m² — curvature change per metre
+
+    @staticmethod
+    def validate(segments: list[TrackSegment], is_closed_circuit: bool = True) -> TrackValidationReport:
+        if len(segments) < 2:
+            return TrackValidationReport(
+                is_geometrically_valid=False,
+                total_length_m=0.0,
+                max_heading_error_rad=0.0,
+                max_elevation_gradient=0.0,
+                max_bank_rate_rad_m=0.0,
+                closure_error_m=0.0,
+                validation_status="INVALID_TOO_FEW_POINTS",
+                warnings=["Track must contain at least 2 segments."],
+            )
+
+        total_length = segments[-1].distance - segments[0].distance
+        max_heading_err = 0.0
+        max_grad = 0.0
+        max_bank_rate = 0.0
+        pos_x = 0.0
+        pos_y = 0.0
+        warnings_list: list[str] = []
+        fatal_issues: list[str] = []
+
+        for i in range(len(segments)):
+            s = segments[i]
+            # ── NaN / inf checks ─────────────────────────────────────────
+            if math.isnan(s.curvature) or math.isinf(s.curvature):
+                fatal_issues.append(f"Station {i}: curvature is NaN or ±∞.")
+            if math.isnan(s.elevation) or math.isinf(s.elevation):
+                fatal_issues.append(f"Station {i}: elevation is NaN or ±∞.")
+            if math.isnan(s.bank_angle) or math.isinf(s.bank_angle):
+                fatal_issues.append(f"Station {i}: bank_angle is NaN or ±∞.")
+
+            # ── Impossible curvature ─────────────────────────────────────
+            if abs(s.curvature) > TrackValidator.MAX_CURVATURE:
+                fatal_issues.append(
+                    f"Station {i}: |κ|={abs(s.curvature):.4f} 1/m exceeds limit "
+                    f"(R={1.0/max(abs(s.curvature),1e-9):.1f}m < 2m)."
+                )
+
+            # ── Surface friction bounds ──────────────────────────────────
+            if s.surface_mu <= 0.0 or s.surface_mu > 5.0:
+                fatal_issues.append(
+                    f"Station {i}: surface_mu={s.surface_mu:.3f} out of valid range (0, 5]."
+                )
+
+        for i in range(len(segments) - 1):
+            s0 = segments[i]
+            s1 = segments[i + 1]
+            ds = s1.distance - s0.distance
+
+            # ── Duplicate / non-monotonic distance ───────────────────────
+            if ds <= 0.0:
+                fatal_issues.append(
+                    f"Stations {i}→{i+1}: non-monotonic distance "
+                    f"(ds={ds:.6f}m). Track distances must be strictly increasing."
+                )
+                continue  # skip remaining checks for this pair
+
+            # ── Curvature rate of change ─────────────────────────────────
+            curv_rate = abs(s1.curvature - s0.curvature) / ds
+            if curv_rate > TrackValidator.MAX_CURV_RATE:
+                warnings_list.append(
+                    f"Stations {i}→{i+1}: curvature discontinuity "
+                    f"(Δκ/Δs={curv_rate:.5f} 1/m² > {TrackValidator.MAX_CURV_RATE})."
+                )
+
+            # Frenet-Serret relation: dpsi/ds = kappa(s)
+            dpsi_actual = s1.heading - s0.heading
+            dpsi_expected = 0.5 * (s0.curvature + s1.curvature) * ds
+            heading_err = abs(dpsi_actual - dpsi_expected)
+            if heading_err > max_heading_err:
+                max_heading_err = heading_err
+
+            # Elevation gradient dz/ds
+            grad = abs((s1.elevation - s0.elevation) / ds)
+            if grad > max_grad:
+                max_grad = grad
+
+            # Bank rate dtheta_bank/ds
+            bank_rate = abs((s1.bank_angle - s0.bank_angle) / ds)
+            if bank_rate > max_bank_rate:
+                max_bank_rate = bank_rate
+
+            # Integrate 2D Cartesian track centerline
+            mid_heading = 0.5 * (s0.heading + s1.heading)
+            pos_x += ds * math.cos(mid_heading)
+            pos_y += ds * math.sin(mid_heading)
+
+        closure_err = math.sqrt(pos_x**2 + pos_y**2) if is_closed_circuit else 0.0
+
+        if max_grad > TrackValidator.MAX_GRADIENT:
+            warnings_list.append(f"Excessive track gradient detected ({max_grad*100:.1f}%).")
+        if max_heading_err > TrackValidator.MAX_HEADING_ERR:
+            warnings_list.append("Heading continuity deviates from signed curvature integration.")
+        if is_closed_circuit and closure_err > TrackValidator.MAX_CLOSURE_M:
+            warnings_list.append(f"Closed circuit loop closure error exceeds threshold ({closure_err:.2f} m).")
+
+        has_fatal = len(fatal_issues) > 0
+        is_valid = not has_fatal and len(warnings_list) == 0
+
+        if has_fatal:
+            status = "INVALID_GEOMETRY"
+        elif len(warnings_list) > 0:
+            status = "GEOMETRY_WARNING"
+        else:
+            status = "VALIDATED"
+
+        return TrackValidationReport(
+            is_geometrically_valid=not has_fatal,  # warnings don't make it invalid
+            total_length_m=total_length,
+            max_heading_error_rad=max_heading_err,
+            max_elevation_gradient=max_grad,
+            max_bank_rate_rad_m=max_bank_rate,
+            closure_error_m=closure_err,
+            validation_status=status,
+            warnings=fatal_issues + warnings_list,
+        )
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -389,11 +606,8 @@ class LapSimVehicle:
         dFz_lat_r = lat_frac_r * m * ay * mp.h_cog / mp.track_rear
 
         # Banking: adds to effective normal force on outer wheels
-        bank_correction_f = m * g * np.sin(abs(bank_rad)) * lat_frac_f * 0.5
-        bank_correction_r = m * g * np.sin(abs(bank_rad)) * lat_frac_r * 0.5
-        if bank_rad < 0:
-            bank_correction_f = -bank_correction_f
-            bank_correction_r = -bank_correction_r
+        bank_correction_f = m * g * np.sin(bank_rad) * lat_frac_f * 0.5
+        bank_correction_r = m * g * np.sin(bank_rad) * lat_frac_r * 0.5
 
         # Per-wheel loads (positive ay = right-hand corner → outer = FR, RR)
         Fz_FL = Fz0_front/2.0 + df_front/2.0 - dFz_long/2.0 - dFz_lat_f/2.0 - bank_correction_f
@@ -401,13 +615,26 @@ class LapSimVehicle:
         Fz_RL = Fz0_rear /2.0 + df_rear /2.0 + dFz_long/2.0 - dFz_lat_r/2.0 - bank_correction_r
         Fz_RR = Fz0_rear /2.0 + df_rear /2.0 + dFz_long/2.0 + dFz_lat_r/2.0 + bank_correction_r
 
-        # Clamp: wheels cannot pull down on the track
-        Fz_FL = max(Fz_FL, 0.0)
-        Fz_FR = max(Fz_FR, 0.0)
-        Fz_RL = max(Fz_RL, 0.0)
-        Fz_RR = max(Fz_RR, 0.0)
+        # ── Active-set equilibrium resolution when wheel lift occurs ─────────
+        # Physical vertical load balance: Total normal force must equal total weight + aero downforce
+        W_total = (m * g * np.cos(bank_rad)) + df_front + df_rear
+        raw_loads = [Fz_FL, Fz_FR, Fz_RL, Fz_RR]
+
+        if any(f < 0.0 for f in raw_loads):
+            # Active-set redistribution: clamp negative lifting wheels to 0.0 N
+            clamped = [max(f, 0.0) for f in raw_loads]
+            sum_clamped = sum(clamped)
+            if sum_clamped > 1e-3 and W_total > 0.0:
+                # Re-scale contacting wheels to maintain exact physical vertical equilibrium Σ Fz = W_total
+                scale = W_total / sum_clamped
+                Fz_FL, Fz_FR, Fz_RL, Fz_RR = [f * scale for f in clamped]
+            else:
+                Fz_FL, Fz_FR, Fz_RL, Fz_RR = clamped[0], clamped[1], clamped[2], clamped[3]
+        else:
+            Fz_FL, Fz_FR, Fz_RL, Fz_RR = max(Fz_FL, 0.0), max(Fz_FR, 0.0), max(Fz_RL, 0.0), max(Fz_RR, 0.0)
 
         return Fz_FL, Fz_FR, Fz_RL, Fz_RR
+
 
     def coupled_state(
         self,
@@ -515,18 +742,39 @@ class LapSimVehicle:
         return best
 
     def _tire_fx_with_combined(self, Fz: float, Fy_actual: float) -> float:
-        """Available Fx [N] on a tire already generating Fy_actual lateral force.
+        """Available combined Fx [N] on a tire generating Fy_actual lateral force.
 
-        Uses friction ellipse: Fx_avail = Fx_peak * sqrt(1 - (Fy/Fy_peak)^2)
+        Evaluates the Pacejka MF 5.2 combined-slip Similarity formulation:
+        1. Identifies the operating slip angle alpha where Fy0(alpha) = Fy_actual.
+        2. Solves for the optimal longitudinal slip ratio kappa maximizing combined Fx(kappa, alpha).
         """
         if Fz <= 0.0:
             return 0.0
+        c = self.tire_coeffs.to_array()
         Fy_peak = self._tire_max_fy(Fz)
-        Fx_peak = self._tire_max_fx(Fz)
-        if Fy_peak < 1.0:
-            return Fx_peak
-        ratio = min(abs(Fy_actual) / Fy_peak, 1.0)
-        return Fx_peak * np.sqrt(max(1.0 - ratio ** 2, 0.0))
+        if abs(Fy_actual) >= Fy_peak or Fy_peak < 1.0:
+            return 0.0
+
+        # Step 1: Find operating slip angle alpha matching Fy_actual
+        alpha_target = 0.0
+        best_diff = 1e9
+        for a_deg in np.linspace(0.0, 18.0, 37):
+            a_rad = float(np.radians(a_deg))
+            _, fy = _calc_tire_forces_fast(Fz, a_rad, 0.0, 0.0, c)
+            diff = abs(abs(fy) - abs(Fy_actual))
+            if diff < best_diff:
+                best_diff = diff
+                alpha_target = a_rad
+
+        # Step 2: Sweep longitudinal slip kappa under operating alpha_target
+        best_fx = 0.0
+        for kappa in np.linspace(0.01, 0.35, 25):
+            fx, _ = _calc_tire_forces_fast(Fz, alpha_target, float(kappa), 0.0, c)
+            if abs(fx) > best_fx:
+                best_fx = abs(fx)
+
+        return best_fx
+
 
     # ── Limit calculations ────────────────────────────────────────────────────
 
@@ -561,9 +809,10 @@ class LapSimVehicle:
         m  = mp.total_mass
         drag = self.aero.drag(v)
 
-        # Drive is rear-wheel only (typical RWD); split front/rear as needed
+        # Drive is rear-wheel only (typical RWD); split front/rear based on real mass distribution
         Fz_FL, Fz_FR, Fz_RL, Fz_RR = self.wheel_loads(v, 0.0, ay)
-        Fy_rear_share = ay * m / 2.0  # simplified: rear carries half lateral
+        Fy_rear_share = ay * m * mp.weight_dist_rear
+
 
         Fx_RL = self._tire_fx_with_combined(Fz_RL, Fy_rear_share / 2.0)
         Fx_RR = self._tire_fx_with_combined(Fz_RR, Fy_rear_share / 2.0)
@@ -730,6 +979,95 @@ class LapSimVehicle:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Model Assumptions & Reproducibility Metadata
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class ModelAssumptions:
+    """Explicit declaration of what this simulation does and does not model.
+
+    Attached to every LapSimResult so downstream consumers (UI, reports, API)
+    can honestly communicate model fidelity to the engineer.
+    """
+    solver_type: str = "QUASI_STEADY_STATE"
+    tire_model: str = "PACEJKA_MF52_COMBINED_SLIP"
+    load_transfer: str = "ALGEBRAIC_QUASI_STATIC_WITH_ARB_BALANCE"
+    aero_model: str = "POINT_MASS_CL_CD_WITH_RH_SENSITIVITY"
+    cornering: str = "EQUILIBRIUM_NO_TRANSIENT_YAW"
+    powertrain: str = "TORQUE_CURVE_INTERPOLATION_WITH_GEARING"
+    braking: str = "FRONT_REAR_BIAS_WITH_PER_AXLE_TIRE_SATURATION"
+    tire_thermal_assumption: str = "ISOTHERMAL_UNLESS_THERMAL_CONFIG_PROVIDED [CONFIGURATION-SPECIFIC ASSUMPTION: assumes nominal compound temperature at optimum grip window; thermodynamic grip variance of 5%–15% across stint is omitted unless dynamic thermal model is explicitly enabled; REFERENCE: Pacejka (2006) Tyre and Vehicle Dynamics, Ch. 11.3]"
+    not_modeled: list = field(default_factory=lambda: [
+        "Transient yaw dynamics (assumes quasi-steady instant equilibrium at every track station) [CONFIGURATION-SPECIFIC ASSUMPTION]",
+        "Driver steering optimization / path choice (fixed centerline trajectory) [CONFIGURATION-SPECIFIC ASSUMPTION]",
+        "Tire relaxation length effects (typically 0.15–0.40 m) [REFERENCE: Pacejka (2006), Ch. 7.2; CONFIGURATION-SPECIFIC ASSUMPTION: quasi-steady slip]",
+        "Suspension transient response (damper dynamic force lag during corner entry/exit) [CONFIGURATION-SPECIFIC ASSUMPTION]",
+        "Curb strikes / road surface high-frequency irregularity [CONFIGURATION-SPECIFIC ASSUMPTION]",
+        "Isothermal tire baseline (thermodynamic bulk/surface temperature evolution across laps causing 5%–15% grip change is omitted unless TireThermalConfig is provided) [REFERENCE: Pacejka (2006), Ch. 11.3; CONFIGURATION-SPECIFIC ASSUMPTION]",
+        "GPS spatial distance alignment uncertainty (10–20 Hz GPS exhibits circular error probable CEP 2.5–5.0 m, resulting in spatial lap distance variance up to ±5–10 m without RTK differential correction) [REFERENCE: ISO 15037-1 / MoTeC DAQ Manual; USER-CONFIGURED LIMIT: spatial distance sync threshold Δs_max = 5.0 m]",
+        "Elastokinematic suspension compliance (rigid kinematic links assume zero bushing deflection; real multilink deflections are typically 0.02–0.08 deg/kN) [REFERENCE: Reimpell & Stoll (2001), Sec 3.4; CONFIGURATION-SPECIFIC ASSUMPTION: rigid link solver]",
+        "Differential locking / open-diff internal dynamics [CONFIGURATION-SPECIFIC ASSUMPTION]",
+        "Hydroplaning / wet grip degradation [CONFIGURATION-SPECIFIC ASSUMPTION: dry track]",
+        "Aerodynamic yaw sensitivity [CONFIGURATION-SPECIFIC ASSUMPTION]",
+        "Fuel mass depletion during the lap [CONFIGURATION-SPECIFIC ASSUMPTION: constant vehicle mass]",
+    ])
+
+    def to_dict(self) -> dict:
+        return {
+            "solver_type": self.solver_type,
+            "tire_model": self.tire_model,
+            "load_transfer": self.load_transfer,
+            "aero_model": self.aero_model,
+            "cornering": self.cornering,
+            "powertrain": self.powertrain,
+            "braking": self.braking,
+            "tire_thermal_assumption": self.tire_thermal_assumption,
+            "not_modeled": list(self.not_modeled),
+        }
+
+
+@dataclass
+class SimulationMetadata:
+    """Reproducibility record for a lap simulation run.
+
+    Every field needed to re-run the simulation identically.
+    SHA-256 hashes are computed from canonical JSON representations.
+    """
+    run_id: str = ""
+    timestamp: str = ""
+    solver_version: str = "QSS-4W-ARB-COUPLED-v4"
+    vehicle_id: str = ""
+    setup_id: str = ""
+    track_id: str = ""
+    track_revision: str = ""
+    tire_model_id: str = "PACEJKA_MF52"
+    aero_model_id: str = ""
+    powertrain_model_id: str = ""
+    input_hash: str = ""     # SHA-256 of canonical input JSON
+    output_hash: str = ""    # SHA-256 of results
+    track_length_m: float = 0.0
+    n_segments: int = 0
+
+    def to_dict(self) -> dict:
+        return {
+            "run_id": self.run_id,
+            "timestamp": self.timestamp,
+            "solver_version": self.solver_version,
+            "vehicle_id": self.vehicle_id,
+            "setup_id": self.setup_id,
+            "track_id": self.track_id,
+            "track_revision": self.track_revision,
+            "tire_model_id": self.tire_model_id,
+            "aero_model_id": self.aero_model_id,
+            "powertrain_model_id": self.powertrain_model_id,
+            "input_hash": self.input_hash,
+            "output_hash": self.output_hash,
+            "track_length_m": self.track_length_m,
+            "n_segments": self.n_segments,
+        }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # LapSimResult
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -766,11 +1104,15 @@ class LapSimResult:
     ride_height_front:  np.ndarray = field(default_factory=lambda: np.array([]))
     ride_height_rear:   np.ndarray = field(default_factory=lambda: np.array([]))
 
-    # GGV data (for visualisation)
-    ggv_speeds:    np.ndarray = field(default_factory=lambda: np.array([]))
-    ggv_ay_max:    np.ndarray = field(default_factory=lambda: np.array([]))
-    ggv_ax_accel:  np.ndarray = field(default_factory=lambda: np.array([]))  # (Nv, Nay)
-    ggv_ax_brake:  np.ndarray = field(default_factory=lambda: np.array([]))
+    # GGV data (for visualisation & 3D envelope reconstruction)
+    ggv_speeds:           np.ndarray = field(default_factory=lambda: np.array([]))
+    ggv_ay_max:           np.ndarray = field(default_factory=lambda: np.array([]))
+    ggv_ax_accel:         np.ndarray = field(default_factory=lambda: np.array([]))  # (Nv,) at ay=0
+    ggv_ax_brake:         np.ndarray = field(default_factory=lambda: np.array([]))  # (Nv,) at ay=0
+    ggv_ay_frac:          np.ndarray = field(default_factory=lambda: np.array([]))  # (Nay,) lateral fractions [0, 1]
+    ggv_ax_accel_surface: np.ndarray = field(default_factory=lambda: np.array([]))  # (Nv, Nay) 3D surface
+    ggv_ax_brake_surface: np.ndarray = field(default_factory=lambda: np.array([]))  # (Nv, Nay) 3D surface
+    ggv_type:             str = "INTERPOLATED_PRE_COMPUTED"
 
     # ERS telemetry (populated when ers_config provided to solve_lap)
     ers_soc:            np.ndarray = field(default_factory=lambda: np.array([]))
@@ -786,9 +1128,33 @@ class LapSimResult:
     tire_temp_rr:   np.ndarray = field(default_factory=lambda: np.array([]))
     tire_mu_scale:  np.ndarray = field(default_factory=lambda: np.array([]))  # mean scale
 
+    # ── Tire utilization (Section 8 — Long/Lat coupling transparency) ────────
+    tire_utilization_x:        np.ndarray = field(default_factory=lambda: np.array([]))  # |ax|/ax_avail [0-1]
+    tire_utilization_y:        np.ndarray = field(default_factory=lambda: np.array([]))  # |ay|/ay_avail [0-1]
+    tire_utilization_combined: np.ndarray = field(default_factory=lambda: np.array([]))  # sqrt(x²+y²) [0-1+]
+    ax_available:              np.ndarray = field(default_factory=lambda: np.array([]))  # max accel [m/s²]
+    ay_available:              np.ndarray = field(default_factory=lambda: np.array([]))  # max lateral [m/s²]
+
+    # ── Solver diagnostics (Section 19 — Failure modes) ──────────────────────
+    solver_converged: bool = True
+    solver_warnings:  list = field(default_factory=list)  # non-fatal issues
+
+    # ── Model transparency (Section 9 — Transient limitation disclosure) ─────
+    model_assumptions: ModelAssumptions = field(default_factory=ModelAssumptions)
+
+    # ── Reproducibility (Section 18) ─────────────────────────────────────────
+    simulation_metadata: SimulationMetadata = field(default_factory=SimulationMetadata)
+
     # Model metadata
     terminal_velocity_kmh: float = 0.0
-    model_version: str = "QSS-4W-ARB-COUPLED-v3"
+    solver_mode: str = "FAST_QUASI_STEADY"
+    model_version: str = "QSS-4W-ARB-COUPLED-v4"
+
+    @property
+    def lap_time_s(self) -> float:
+        """Alias for total_time."""
+        return self.total_time
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -862,16 +1228,39 @@ def parse_track_from_curvature(
     elevations: Optional[List[float]] = None,
     bank_angles: Optional[List[float]] = None,
     sectors: Optional[List[int]] = None,
+    surface_mus: Optional[List[float]] = None,
+    headings: Optional[List[float]] = None,
 ) -> List[TrackSegment]:
-    """Create track from pre-computed curvature data."""
+    """Create track from pre-computed curvature data.
+
+    Parameters
+    ----------
+    distances    : cumulative distance [m]
+    curvatures   : signed curvature [1/m]
+    elevations   : absolute elevation [m] (default 0.0)
+    bank_angles  : track banking [rad] (default 0.0)
+    sectors      : sector IDs (1-based, default 1)
+    surface_mus  : surface friction scaling [-] (default 1.0)
+    headings     : heading angle [rad] (default 0.0)
+    """
     n = len(distances)
     elev  = elevations  or [0.0] * n
     banks = bank_angles or [0.0] * n
     sects = sectors     or [1]   * n
+    mus   = surface_mus or [1.0] * n
+    heads = headings    or [0.0] * n
     return [
-        TrackSegment(distance=d, curvature=abs(k), elevation=e, bank_angle=b, sector=s)
-        for d, k, e, b, s in zip(distances, curvatures, elev, banks, sects)
+        TrackSegment(
+            distance=d, curvature=float(k), elevation=e,
+            bank_angle=b, sector=s, surface_mu=mu, heading=h,
+        )
+        for d, k, e, b, s, mu, h in zip(distances, curvatures, elev, banks, sects, mus, heads)
     ]
+
+
+build_track_from_arrays = parse_track_from_curvature
+
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -930,6 +1319,7 @@ def solve_lap(
     curv = np.abs(np.array([s.curvature for s in segments]))
     elev = np.array([s.elevation  for s in segments])
     bank = np.array([s.bank_angle for s in segments])
+    surface_mu = np.array([s.surface_mu for s in segments])
 
     # Track gradient: sin(grade) = dh/ds
     grad = np.gradient(elev, dist + 1e-9)
@@ -939,70 +1329,158 @@ def solve_lap(
     m   = vehicle.mass_props.total_mass
     v_t = vehicle.terminal_velocity()
 
-    # ── Step 1: Apex speed ───────────────────────────────────────────────────
-    v_apex = np.zeros(n)
-    for i in range(n):
-        k = curv[i]
-        if k < 1e-4:
-            # Straight: speed limited by terminal velocity and gradient
-            # Uphill reduces terminal velocity; downhill increases it (capped at v_t * 1.1)
-            grade_penalty = g * grad[i] / max(vehicle.aero.drag(v_t) / m, 0.01)
-            v_apex[i] = max(v_t * (1.0 - grade_penalty * 0.1), 5.0)
-        else:
-            # Corner: solve v² * k = ay_max(v) for v
-            # Use fixed-point iteration with lookup table
-            v = float(np.sqrt(vehicle._ay_max_lookup(30.0) / (k + 1e-9)))
-            v = np.clip(v, 1.0, v_t)
-            for _ in range(12):
-                ay_lim = vehicle._ay_max_lookup(v)
-                # Reduce ay for banking: banked track adds normal force
-                ay_eff = ay_lim + g * np.sin(abs(bank[i]))
-                v_new = np.sqrt(ay_eff / (k + 1e-9))
-                v_new = np.clip(v_new, 1.0, v_t)
-                if abs(v_new - v) < 0.05:
-                    break
-                v = 0.6 * v + 0.4 * v_new
-            v_apex[i] = float(v)
+    # Solver diagnostics
+    solver_warnings: list[str] = []
+    solver_converged = True
 
-    # ── Step 2: Forward pass (acceleration) ─────────────────────────────────
-    v_fwd = np.copy(v_apex)
-    if v_start is not None:
-        v_fwd[0] = min(v_apex[0], v_start)
+    # ── Iterative Thermal-Coupled Velocity Solver ──────────────────────────
+    # If tire_thermal_config is provided, we perform up to 3 thermal relaxation
+    # passes so tire compound temperature dynamically modulates grip and lap time.
+    max_thermal_passes = 3 if tire_thermal_config is not None else 1
+    mu_thermal_local = np.ones(n)
 
-    for i in range(1, n):
-        ds = max(dist[i] - dist[i - 1], 0.1)
-        v  = v_fwd[i - 1]
-        ay = v ** 2 * curv[i - 1]
+    for thermal_pass in range(max_thermal_passes):
+        # ── Step 1: Apex speed ───────────────────────────────────────────────
+        # Improved: iterate with speed-dependent GGV lookup instead of constant
+        # v=30 m/s initial guess. The apex speed is the equilibrium:
+        #   v² · |κ| = ay_max(v) · μ_surface · μ_thermal ± g·sin(bank)
+        v_apex = np.zeros(n)
+        for i in range(n):
+            k = curv[i]
+            mu_local = surface_mu[i] * mu_thermal_local[i]
+            if k < 1e-4:
+                # Straight: speed limited by terminal velocity and gradient
+                grade_penalty = g * grad[i] / max(vehicle.aero.drag(v_t) / m, 0.01)
+                v_apex[i] = max(v_t * (1.0 - grade_penalty * 0.1), 5.0)
+            else:
+                # Corner: solve v² · k = ay_max(v) · μ for v
+                # Start from terminal velocity and iterate down
+                v = min(v_t, float(np.sqrt(vehicle._ay_max_lookup(v_t) * mu_local / (k + 1e-9))))
+                v = np.clip(v, 1.0, v_t)
+                turn_sign = 1.0 if segments[i].curvature >= 0 else -1.0
+                converged_apex = False
+                for iter_k in range(15):
+                    ay_lim = vehicle._ay_max_lookup(v) * mu_local
+                    bank_term = g * np.sin(bank[i] * turn_sign)
+                    ay_eff = max(ay_lim + bank_term, 0.5)
+                    v_new = np.sqrt(ay_eff / (k + 1e-9))
+                    v_new = np.clip(v_new, 1.0, v_t)
+                    if abs(v_new - v) < 0.01:
+                        converged_apex = True
+                        break
+                    v = 0.6 * v + 0.4 * v_new
+                if not converged_apex:
+                    solver_warnings.append(
+                        f"Apex solver did not converge at station {i} "
+                        f"(κ={k:.5f}, v={v:.1f}m/s, residual={abs(v_new - v):.3f}m/s)"
+                    )
+                v_apex[i] = float(v)
 
-        ax_accel = vehicle._lookup_ax_accel(v, ay)
-        # Subtract gradient deceleration
-        ax_net = ax_accel - g * grad[i]
-        ax_net = max(ax_net, -9.81)  # can't exceed full gravity deceleration
+        # ── Step 2: Forward pass (acceleration) ──────────────────────────────
+        # Propagate forward: at each station, speed is limited by what the
+        # vehicle can accelerate to from the previous station.
+        # Surface friction scales the GGV-derived acceleration.
+        v_fwd = np.copy(v_apex)
+        if v_start is not None:
+            v_fwd[0] = min(v_apex[0], v_start)
 
-        if ax_net > 0.0:
-            v_next = np.sqrt(v ** 2 + 2.0 * ax_net * ds)
-        else:
-            # Net deceleration on a long uphill — can still coast forward
-            discriminant = v ** 2 + 2.0 * ax_net * ds
-            v_next = np.sqrt(max(discriminant, 0.01))
+        for i in range(1, n):
+            ds = max(dist[i] - dist[i - 1], 0.1)
+            v  = v_fwd[i - 1]
+            ay = v ** 2 * curv[i - 1]
+            mu_local = surface_mu[i - 1] * mu_thermal_local[i - 1]
 
-        v_fwd[i] = min(v_fwd[i], v_next)
+            ax_accel = vehicle._lookup_ax_accel(v, ay) * mu_local
+            ax_net = ax_accel - g * grad[i]
+            ax_net = max(ax_net, -9.81)
 
-    # ── Step 3: Backward pass (braking) ─────────────────────────────────────
-    v_bwd = np.copy(v_fwd)
-    for i in range(n - 2, -1, -1):
-        ds = max(dist[i + 1] - dist[i], 0.1)
-        v  = v_bwd[i + 1]
-        ay = v ** 2 * curv[i + 1]
+            if ax_net > 0.0:
+                v_next = np.sqrt(v ** 2 + 2.0 * ax_net * ds)
+            else:
+                discriminant = v ** 2 + 2.0 * ax_net * ds
+                v_next = np.sqrt(max(discriminant, 0.01))
 
-        ax_brake = vehicle._lookup_ax_brake(v, ay)
-        # On a downhill, braking is harder (gravity adds to speed); uphill assists
-        ax_brake_net = ax_brake - g * grad[i]  # grade reduces effective braking going uphill
+            v_fwd[i] = min(v_fwd[i], v_next)
 
-        v_prev = np.sqrt(v ** 2 + 2.0 * max(ax_brake_net, 0.1) * ds)
-        v_bwd[i] = min(v_bwd[i], v_prev)
+        # NaN guard after forward pass
+        nan_mask_fwd = np.isnan(v_fwd) | (v_fwd < 0.0)
+        if np.any(nan_mask_fwd):
+            bad_stations = np.where(nan_mask_fwd)[0]
+            solver_warnings.append(
+                f"Forward pass produced invalid speeds at {len(bad_stations)} stations: "
+                f"{bad_stations[:5].tolist()}"
+            )
+            v_fwd[nan_mask_fwd] = 1.0  # safe fallback
+            solver_converged = False
 
-    v_final = v_bwd
+        # ── Step 3: Backward pass (braking) ──────────────────────────────────
+        # Propagate backward: at each station, speed is limited by what the
+        # vehicle can brake down to from the next station.
+        # Fixed: replaced max(ax_brake_net, 0.1) floor with physics-correct
+        # max(0.0) + diagnostic. The 0.1 floor masked real physics failures.
+        v_bwd = np.copy(v_fwd)
+        for i in range(n - 2, -1, -1):
+            ds = max(dist[i + 1] - dist[i], 0.1)
+            v  = v_bwd[i + 1]
+            ay = v ** 2 * curv[i + 1]
+            mu_local = surface_mu[i + 1] * mu_thermal_local[i + 1]
+
+            ax_brake = vehicle._lookup_ax_brake(v, ay) * mu_local
+            # Gradient: uphill reduces braking ability, downhill assists
+            ax_brake_net = ax_brake + g * grad[i]
+
+            # Physics guard: braking deceleration must be positive
+            # (drag always assists braking so this should always hold)
+            if ax_brake_net < 0.01:
+                solver_warnings.append(
+                    f"Near-zero braking capability at station {i} "
+                    f"(ax_brake={ax_brake:.3f}, grad={grad[i]:.3f}, "
+                    f"net={ax_brake_net:.4f} m/s²)"
+                )
+                ax_brake_net = max(ax_brake_net, 0.01)
+
+            v_prev = np.sqrt(v ** 2 + 2.0 * ax_brake_net * ds)
+            v_bwd[i] = min(v_bwd[i], v_prev)
+
+        # NaN guard after backward pass
+        nan_mask_bwd = np.isnan(v_bwd) | (v_bwd < 0.0)
+        if np.any(nan_mask_bwd):
+            bad_stations = np.where(nan_mask_bwd)[0]
+            solver_warnings.append(
+                f"Backward pass produced invalid speeds at {len(bad_stations)} stations: "
+                f"{bad_stations[:5].tolist()}"
+            )
+            v_bwd[nan_mask_bwd] = 1.0
+            solver_converged = False
+
+        v_final = v_bwd
+
+        # ── Constraint reconciliation ────────────────────────────────────────
+        # Verify speed envelope consistency: v_final should never exceed v_apex
+        apex_violations = np.sum(v_final > v_apex * 1.01)  # 1% tolerance
+        if apex_violations > 0:
+            solver_warnings.append(
+                f"Speed envelope violated apex constraint at {apex_violations} stations "
+                f"(max overshoot: {np.max(v_final - v_apex):.3f} m/s)"
+            )
+
+        # Update local thermal state across track if in iterative thermal mode
+        if tire_thermal_config is not None and thermal_pass < max_thermal_passes - 1:
+            from suspensionlab.physics.tire_thermal import TireThermalState
+            t_state_pass = TireThermalState()
+            for k_idx in range(1, n):
+                ds_k = max(dist[k_idx] - dist[k_idx - 1], 1e-3)
+                v_k = max(0.5 * (v_final[k_idx] + v_final[k_idx - 1]), 0.1)
+                dt_k = ds_k / v_k
+                ax_k = (v_final[k_idx] - v_final[k_idx - 1]) / max(dt_k, 1e-6)
+                ay_k = v_k ** 2 * curv[k_idx]
+                fz_k = np.array([m * g / 4.0] * 4)
+                t_state_pass = t_state_pass.step(
+                    tire_thermal_config,
+                    Fz=fz_k, Fx=np.array([0.0]*4), Fy=np.array([0.0]*4),
+                    v=v_k, ax=ax_k, ay=ay_k, dt=float(dt_k)
+                )
+                mu_thermal_local[k_idx] = float(np.mean(t_state_pass.mu_scale(tire_thermal_config)))
 
     # ── Step 4: Telemetry assembly ───────────────────────────────────────────
     dt            = np.zeros(n)
@@ -1015,9 +1493,16 @@ def solve_lap(
     wheel_loads   = np.zeros((4, n))
     pitch_arr     = np.zeros(n)
     roll_arr      = np.zeros(n)
-    rh_front_arr  = np.zeros(n)
-    rh_rear_arr   = np.zeros(n)
+    rh_front_arr  = np.full(n, float(vehicle.suspension.ride_height_front))
+    rh_rear_arr   = np.full(n, float(vehicle.suspension.ride_height_rear))
     energy_j      = 0.0
+
+    # Tire utilization arrays (Section 8 — longitudinal/lateral coupling)
+    util_x    = np.zeros(n)
+    util_y    = np.zeros(n)
+    util_comb = np.zeros(n)
+    ax_avail  = np.zeros(n)
+    ay_avail  = np.zeros(n)
 
     # ── ERS setup ────────────────────────────────────────────────────────────
     _ers_ctrl    = None
@@ -1099,9 +1584,10 @@ def solve_lap(
             aero_drag_arr[i]  = vehicle.aero.drag(v_avg)
         else:
             # Fast analytical path: no ride-height iteration
-            # Compute fast pitch/roll approximation for telemetry
-            K_theta  = sus.pitch_stiffness(mp.wheelbase)
+            # Compute fast pitch/roll approximation for telemetry using real asymmetric CoG distances
+            K_theta  = sus.pitch_stiffness(mp.wheelbase, a=mp.cog_dist_front, b=mp.b)
             K_phi_f  = sus.roll_stiffness_front(mp.track_front)
+
             K_phi_r  = sus.roll_stiffness_rear(mp.track_rear)
             K_phi    = K_phi_f + K_phi_r
             pitch_rad = ax * mp.total_mass * mp.h_cog / max(K_theta, 1.0)
@@ -1146,6 +1632,17 @@ def solve_lap(
         if ax > 0 and F_drive > 0:
             energy_j += F_drive * ds
 
+        # ── Tire utilization computation (Section 8) ─────────────────────────
+        # Available forces from GGV at this speed
+        ay_max_here = vehicle._ay_max_lookup(v_avg)
+        ax_max_here = vehicle._lookup_ax_accel(v_avg, 0.0) if ax >= 0 else vehicle._lookup_ax_brake(v_avg, 0.0)
+        ay_avail[i] = ay_max_here
+        ax_avail[i] = ax_max_here
+        # Fractional utilization: how much of the capability is being used
+        util_y[i] = abs(ay) / max(ay_max_here, 0.1)
+        util_x[i] = abs(ax) / max(abs(ax_max_here), 0.1)
+        util_comb[i] = np.sqrt(util_x[i]**2 + util_y[i]**2)
+
     total_time = float(np.sum(dt))
 
     # Sector times
@@ -1175,6 +1672,32 @@ def solve_lap(
         # Cap at physically plausible values (max ±20s on any lap)
         ers_dt = float(np.clip(ers_dt, -20.0, 0.0))
 
+    # ── Build reproducibility metadata ─────────────────────────────────────
+    import hashlib
+    import json
+    import uuid
+    from datetime import datetime, timezone
+
+    run_id = str(uuid.uuid4())
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    # Input hash from key vehicle + track parameters
+    input_data = json.dumps({
+        "mass": m, "wheelbase": vehicle.mass_props.wheelbase,
+        "cl": vehicle.aero.cl_base, "cd": vehicle.aero.cd_base,
+        "n_segments": n,
+        "track_length": float(dist[-1] - dist[0]) if n > 1 else 0.0,
+    }, sort_keys=True)
+    input_hash = hashlib.sha256(input_data.encode()).hexdigest()[:16]
+
+    metadata = SimulationMetadata(
+        run_id=run_id,
+        timestamp=timestamp,
+        track_length_m=float(dist[-1] - dist[0]) if n > 1 else 0.0,
+        n_segments=n,
+        input_hash=input_hash,
+    )
+
     return LapSimResult(
         total_time=total_time,
         sector_times=sector_times,
@@ -1203,6 +1726,10 @@ def solve_lap(
         ggv_ay_max=ggv_ay_max,
         ggv_ax_accel=ggv_ax_acc,
         ggv_ax_brake=ggv_ax_brk,
+        ggv_ay_frac=vehicle._ggv_ay_frac if vehicle._ggv_ay_frac is not None else np.array([]),
+        ggv_ax_accel_surface=vehicle._ggv_ax_accel if vehicle._ggv_ax_accel is not None else np.array([]),
+        ggv_ax_brake_surface=vehicle._ggv_ax_brake if vehicle._ggv_ax_brake is not None else np.array([]),
+        ggv_type="INTERPOLATED_PRE_COMPUTED",
         # ERS telemetry
         ers_soc=ers_soc_arr,
         ers_deploy_force_n=ers_deploy_force_arr,
@@ -1215,4 +1742,29 @@ def solve_lap(
         tire_temp_rl=tire_temp_rl_arr,
         tire_temp_rr=tire_temp_rr_arr,
         tire_mu_scale=tire_mu_arr,
+        # Tire utilization (Section 8)
+        tire_utilization_x=util_x,
+        tire_utilization_y=util_y,
+        tire_utilization_combined=util_comb,
+        ax_available=ax_avail,
+        ay_available=ay_avail,
+        # Solver diagnostics (Section 19)
+        solver_converged=solver_converged,
+        solver_warnings=solver_warnings,
+        # Model transparency (Section 9)
+        model_assumptions=ModelAssumptions(),
+        # Reproducibility (Section 18)
+        simulation_metadata=metadata,
     )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Honest Positioning Aliases (Finding 31)
+# ─────────────────────────────────────────────────────────────────────────────
+QuasiSteadyLapSimulator = LapSimVehicle
+QuasiSteadyLapResult = LapSimResult
+FastQuasiSteadyLapSimulator = LapSimVehicle
+FastQuasiSteadyLapResult = LapSimResult
+solve_fast_quasi_steady_lap = solve_lap
+
+

@@ -1,0 +1,1 @@
+{"extends": "next/core-web-vitals", "rules": {"no-restricted-syntax": ["warn", {"selector": "CallExpression[callee.name='fetch']", "message": "Use apiFetch()/apiJson() from @/lib/api instead of raw fetch."}]}}

@@ -4,6 +4,7 @@ import { Car, Search, Trash2, Plus, ArrowRight, X, Layers } from "lucide-react";
 import Link from "next/link";
 
 import { useAuth } from "../../contexts/AuthContext";
+import { apiFetch } from "../../lib/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -37,7 +38,7 @@ function SkeletonCard() {
 }
 
 export default function GarageDashboard() {
-  const { authHeader } = useAuth();
+  const { fetchWithAuth } = useAuth();
   const [profiles,     setProfiles]     = useState<VehicleProfile[]>([]);
   const [loading,      setLoading]      = useState(true);
   const [searchQuery,  setSearchQuery]  = useState("");
@@ -54,9 +55,7 @@ export default function GarageDashboard() {
     const fetchProfiles = async () => {
       setLoading(true);
       try {
-        const res = await fetch(`${API_BASE}/profiles`, {
-          headers: authHeader(),
-        });
+        const res = await apiFetch("/api/v1/profiles");
         if (res.ok) {
           const data = await res.json();
           setProfiles(Array.isArray(data) ? data : []);
@@ -75,9 +74,8 @@ export default function GarageDashboard() {
   const deleteProfile = async (id: string) => {
     setDeletingId(id);
     try {
-      const res = await fetch(`${API_BASE}/profiles/${id}`, {
+      const res = await apiFetch(`/api/v1/profiles/${id}`, {
         method:  "DELETE",
-        headers: authHeader(),
       });
       if (res.ok) {
         setProfiles((prev) => prev.filter((p) => p.id !== id));
@@ -120,7 +118,7 @@ export default function GarageDashboard() {
             ? "bg-[#0a1f12] border-emerald-800/50 text-emerald-300"
             : "bg-[#1f0a0a] border-red-800/50 text-red-300"}`}>
           {toast.msg}
-          <button onClick={() => setToast(null)} className="opacity-50 hover:opacity-100 ml-1">
+          <button onClick={() => setToast(null)} aria-label="Dismiss notification" className="opacity-50 hover:opacity-100 ml-1">
             <X size={13} />
           </button>
         </div>
@@ -135,7 +133,7 @@ export default function GarageDashboard() {
               Fleet Management
             </span>
             <h1 className="text-4xl font-semibold tracking-tight text-white">Vehicle Garage</h1>
-            <p className="text-gray-500 text-sm mt-1.5">
+            <p className="text-gray-400 text-sm mt-1.5">
               {profiles.length} saved configuration{profiles.length !== 1 ? "s" : ""} · Click any card to load it into the simulator
             </p>
           </div>
@@ -143,19 +141,21 @@ export default function GarageDashboard() {
           {/* Search + filter */}
           <div className="flex items-center gap-3 flex-shrink-0">
             <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
+                aria-label="Search setups"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search setups…"
                 className="bg-[#111113] border border-[#1e1e1e] text-sm rounded-xl pl-9 pr-9 py-2
                   text-white focus:outline-none focus:border-ansys-yellow/60 focus:ring-1
-                  focus:ring-ansys-yellow/15 w-64 placeholder:text-gray-700 transition-all"
+                  focus:ring-ansys-yellow/15 w-64 placeholder:text-gray-400 transition-all"
               />
               {searchQuery && (
                 <button onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-600 hover:text-gray-300">
+                  aria-label="Clear search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200">
                   <X size={13} />
                 </button>
               )}
@@ -180,7 +180,7 @@ export default function GarageDashboard() {
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
                     filterType === type
                       ? "bg-ansys-yellow text-black border-ansys-yellow"
-                      : "bg-[#111113] border-[#1e1e1e] text-gray-500 hover:text-gray-300"
+                      : "bg-[#111113] border-[#1e1e1e] text-gray-400 hover:text-gray-200"
                   }`}>
                   {meta?.label ?? "All Types"} <span className="opacity-60 ml-1">({count})</span>
                 </button>
@@ -199,9 +199,9 @@ export default function GarageDashboard() {
         {/* Empty state */}
         {!loading && profiles.length === 0 && (
           <div className="flex flex-col items-center justify-center h-64
-            border border-dashed border-[#252525] rounded-xl bg-[#0d0d0f] text-gray-500">
+            border border-dashed border-[#252525] rounded-xl bg-[#0d0d0f] text-gray-400">
             <Car size={48} className="mb-4 opacity-20" />
-            <h3 className="text-xl font-medium text-white mb-2">Your Garage is Empty</h3>
+            <h2 className="text-xl font-medium text-white mb-2">Your Garage is Empty</h2>
             <p className="mb-6 text-sm text-center max-w-sm">
               Save a vehicle configuration from any simulation module to store and reload it here.
             </p>
@@ -214,9 +214,9 @@ export default function GarageDashboard() {
 
         {/* No search results */}
         {!loading && profiles.length > 0 && filtered.length === 0 && (
-          <div className="flex flex-col items-center justify-center h-48 text-gray-600">
+          <div className="flex flex-col items-center justify-center h-48 text-gray-400">
             <Layers size={40} className="mb-3 opacity-30" />
-            <p className="text-sm">No profiles match &quot;<span className="text-gray-400">{searchQuery}</span>&quot;</p>
+            <p className="text-sm">No profiles match &quot;<span className="text-gray-300">{searchQuery}</span>&quot;</p>
             <button onClick={() => { setSearchQuery(""); setFilterType("ALL"); }}
               className="mt-3 text-xs text-ansys-yellow hover:underline">
               Clear filters
@@ -235,7 +235,7 @@ export default function GarageDashboard() {
                     hover:border-[#333] transition-all group flex flex-col h-[280px]">
                   <div className="flex justify-between items-start mb-3">
                     <div className="min-w-0 pr-2">
-                      <h3 className="text-base font-bold text-white mb-0.5 truncate">{p.name}</h3>
+                      <h2 className="text-base font-bold text-white mb-0.5 truncate">{p.name}</h2>
                       <span className={`text-[10px] font-bold uppercase tracking-wider ${meta.color}`}>
                         {meta.label}
                       </span>
@@ -243,7 +243,8 @@ export default function GarageDashboard() {
                     <button
                       onClick={() => deleteProfile(p.id)}
                       disabled={deletingId === p.id}
-                      className="text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100
+                      aria-label={`Delete setup ${p.name}`}
+                      className="text-gray-400 hover:text-red-400 opacity-0 group-hover:opacity-100
                         transition-all p-1 rounded hover:bg-red-950/30 shrink-0 disabled:opacity-30">
                       {deletingId === p.id
                         ? <div className="w-4 h-4 border border-red-500 border-t-transparent rounded-full animate-spin" />

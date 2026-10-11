@@ -1,0 +1,56 @@
+syntax = "proto3";
+
+package suspensionlab.telemetry;
+
+enum QualityCode {
+  QUALITY_GOOD = 0;
+  QUALITY_DEGRADED = 1;
+  QUALITY_BAD = 2;
+  QUALITY_OUT_OF_RANGE = 3;
+}
+
+enum ChannelId {
+  CH_UNKNOWN = 0;
+  CH_SPEED_MS = 1;
+  CH_LAT_G = 2;
+  CH_LONG_G = 3;
+  CH_VERT_G = 4;
+  CH_STEER_RAD = 5;
+  CH_SUSP_TRAVEL_FL = 6;
+  CH_SUSP_TRAVEL_FR = 7;
+  CH_SUSP_TRAVEL_RL = 8;
+  CH_SUSP_TRAVEL_RR = 9;
+  CH_BRAKE_PRESS_F = 10;
+  CH_THROTTLE_POS = 11;
+  CH_ENGINE_RPM = 12;
+  CH_YAW_RATE = 13;
+}
+
+enum GripStatusCode {
+  GRIP_UNKNOWN = 0;
+  GRIP_OPTIMAL = 1;
+  GRIP_UNDER_UTILISING = 2;
+  GRIP_EXCEEDING_LIMIT = 3;
+}
+
+message ChannelSample {
+  ChannelId channel_id = 1;
+  float value = 2;
+  QualityCode quality = 3;
+}
+
+message DigitalTwinState {
+  float theoretical_max_lat_g = 1;
+  float actual_lat_g = 2;
+  float divergence_pct = 3;
+  GripStatusCode grip_status = 4;
+}
+
+message TelemetryFrame {
+  uint32 sequence_number = 1;
+  double timestamp = 2;
+  string org_id = 3;
+  string session_id = 4;
+  repeated ChannelSample samples = 5;
+  DigitalTwinState twin = 6;
+}

@@ -1,0 +1,71 @@
+{
+  "baseline_version": "phase3f_prechange_baseline_v1",
+  "timestamp_iso": "2026-09-26T00:21:14.713376+00:00",
+  "git_commit_sha": "fbe3d045762d8c216922630ca5c3b0da1d589a31",
+  "freeze_policy": {
+    "status": "PRE_PHASE3F_FROZEN_BASELINE",
+    "previous_phase": "Phase 3E / 3E.1 Complete",
+    "authoritative_test_counts": {
+      "phase3_suites_count": 59,
+      "grand_total_with_foundation_dynamics": 70
+    },
+    "exact_test_commands": [
+      "pytest tests/test_phase3*.py",
+      "pytest tests/test_phase3*.py tests/test_real_vehicle_dynamics_and_lap_sim.py"
+    ]
+  },
+  "calibrated_parameters_baseline": {
+    "s_tire_scale": 1.16,
+    "steering_compliance_k_delta": 0.000451,
+    "brake_max_torque_nm": 4800.0,
+    "brake_front_bias": 0.62,
+    "brake_actuator_pressure_breakpoints_bar": [
+      0.0,
+      15.0,
+      40.0,
+      80.0,
+      120.0
+    ],
+    "brake_actuator_demand_breakpoints": [
+      0.0,
+      0.18,
+      0.52,
+      1.0,
+      1.0
+    ]
+  },
+  "file_integrity_ledger": {
+    "src/suspensionlab/physics/dynamic_lap_sim.py": {
+      "sha256": "eacf373c379fe6ab04e375dede75007a052d56a58ec05242c4c76ff55019c682",
+      "size_bytes": 150607
+    },
+    "src/suspensionlab/physics/telemetry_dataset.py": {
+      "sha256": "8696d83bb53aebb4113d232887bb706b8514ed9c2834478c39a2896a9bec2e12",
+      "size_bytes": 51114
+    },
+    "src/suspensionlab/physics/magic_formula.py": {
+      "sha256": "69b182da4d2687e8cf7f9326501fc30c6380023445ea99d04f0f67bbc3d3f76c",
+      "size_bytes": 24403
+    },
+    "data/external/stanford_vw_golf_thunderhill_2023_11.csv": {
+      "sha256": "489adbf01d27da1c281c0fff353554dfd7d07a3f1c48e2744e9dd902546b74d3",
+      "size_bytes": 16934088
+    },
+    "docs/phase3e_frozen_phase3d_manifest.json": {
+      "sha256": "587b7728a396975579fc9432448be8a9536f00c9119d360adcc71587cd5ea571",
+      "size_bytes": 3535
+    },
+    "data/phase3e_blind_validation.json": {
+      "sha256": "e018cb21a0f81abf099738fdf2ba47b0f47cdef758dbac80c7f7807ad16c4557",
+      "size_bytes": 195320
+    },
+    "data/phase3e1_longitudinal_forensic_audit.json": {
+      "sha256": "effd7dfbb2631d403902f836f356327d9655b37c1b54c45f8b22c1212482a34f",
+      "size_bytes": 61770
+    },
+    "data/phase3f_preflight_consistency.json": {
+      "sha256": "15b29f3108a9d7eb22a0a1cdbfee5378a69ddfd95c3bc44cd0f76bb12a29dec9",
+      "size_bytes": 3604
+    }
+  }
+}

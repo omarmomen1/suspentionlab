@@ -30,9 +30,12 @@ import { useQuarterCarSimulation } from "../../hooks/useQuarterCarSimulation";
 import SmartInsights from "../../components/SmartInsights";
 import SensitivityTornado from "../../components/SensitivityTornado";
 import ModelValidity, { ValidityReport } from "../../components/ModelValidity";
-import { Brain, FlaskConical } from "lucide-react";
+import EngineeringDecisionCard from "../../components/sim/EngineeringDecisionCard";
+import EngineeringErrorDisplay from "../../components/sim/EngineeringErrorDisplay";
+import { SyncChartProvider, useSyncChart } from "../../components/sim/SyncChartContext";
+import { Brain, FlaskConical, Loader2 } from "lucide-react";
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import Plot from "../../components/sim/Plot";
 import KPICard from "../../components/sim/KPICard";
 import PlotBox from "../../components/sim/PlotBox";
 import { darkLayout, DARK_BASE } from "../../components/sim/theme";
@@ -71,7 +74,7 @@ type SimResult =
 
 // ————————————————— Types ————————————————————————————————————————————————————————
 type Status = "good" | "warn" | "bad" | "neutral";
-type Toast  = { msg: string; type: "success" | "error" };
+type Toast  = { msg: string; type: "success" | "error" | "info" };
 
 // ————————————————— KPI helpers —————————————————————————————————————————————————
 function getDampingStatus(z: number): Status {
@@ -97,7 +100,7 @@ function getTXStatus(tx: number): Status {
 // ————————————————— Main dashboard —————————————————————————————————————————————
 function QuarterCarDashboard() {
   const searchParams = useSearchParams();
-  const { authHeader } = useAuth();
+  const { authHeader, fetchWithAuth } = useAuth();
 
   const [isSaving,  setIsSaving]  = useState<boolean>(false);
   const [isTuning,  setIsTuning]  = useState<boolean>(false);
@@ -115,13 +118,46 @@ function QuarterCarDashboard() {
   // P1-ARCH-01: simulation domain logic lives in the hook
   const {
     isRunning, setIsRunning,
+    loadingStage,
+    cancelSimulation,
+    retrySimulation,
+    retryCount,
     results, setResults,
+    simError, setSimError,
     validity,
     simParams,
     params, setParams,
     buildPayload,
     runSimulation,
   } = useQuarterCarSimulation({ authHeader, showToast, autoRun });
+
+  const { cursorTime, setTelemetryCursor } = useSyncChart();
+  const cursorShape = useMemo(() => {
+    if (cursorTime === null) return [];
+    return [
+      {
+        type: "line" as const,
+        x0: cursorTime,
+        x1: cursorTime,
+        y0: 0,
+        y1: 1,
+        yref: "paper" as const,
+        line: { color: "#f2a900", width: 1.5, dash: "dot" as const },
+      },
+    ];
+  }, [cursorTime]);
+
+  const onTimePlotHover = (ev: any) => {
+    const pt = ev.points?.[0];
+    if (pt && typeof pt.x === "number") {
+      let phase = "Steady Equilibrium";
+      if (pt.x < 0.1) phase = "Pre-Excitation";
+      else if (pt.x < 0.5) phase = "Curb Strike / Bump Transient";
+      else if (pt.x < 1.2) phase = "Rebound Oscillation";
+      else if (pt.x < 2.5) phase = "Damper Dissipation Phase";
+      setTelemetryCursor(pt.x, phase, pt.x * (params.speed_mps || 20));
+    }
+  };
 
   // MIN-07: Dismiss toast on Escape key
   useEffect(() => {
@@ -133,7 +169,7 @@ function QuarterCarDashboard() {
   useEffect(() => {
     const profileId = searchParams.get("load");
     if (!profileId) return;
-    fetch(`${API_BASE}/profiles/${profileId}`, { headers: authHeader() })
+    fetchWithAuth(`/api/v1/profiles/${profileId}`)
       .then((r) => { if (!r.ok) throw new Error(); return r.json(); })
       .then((data) => {
         if (data.params) {
@@ -145,13 +181,14 @@ function QuarterCarDashboard() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveProfile = async () => {
-    const name = await promptModal("Name this Quarter Car setup:", "Custom 2-DOF Setup");
+    if (isSaving) return;
+    const name = await promptModal("Enter a name for this configuration:", "My Setup");
     if (!name) return;
     setIsSaving(true);
     try {
-      const r = await fetch(`${API_BASE}/profiles`, {
+      const r = await fetchWithAuth("/api/v1/profiles/", {
         method:  "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
+        headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ name, vehicle_type: "QUARTER_CAR", params }),
       });
       if (r.ok) showToast("Setup saved to Garage!", "success");
@@ -164,16 +201,22 @@ function QuarterCarDashboard() {
   const [magicGoal, setMagicGoal] = useState("");
 
   const autoTune = async () => {
-    if (!magicGoal.trim()) return;
+    if (!magicGoal.trim() || isTuning) return;
     setIsTuning(true);
     try {
-      const res  = await fetch(`${API_BASE}/api/v1/ai/optimize-setup`, {
+      const res = await fetchWithAuth("/api/v1/ai/chat", {
         method:  "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
-        body:    JSON.stringify({ goal: magicGoal, current_params: params }),
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ problem: magicGoal.trim(), params }),
       });
       const data = await res.json();
       if (res.ok) {
+        const recMap: Record<string, number> = {};
+        (data.best_feasible || data.recommendations || []).forEach((item: any) => {
+          if (item.parameter && typeof item.recommended_value === "number") {
+            recMap[item.parameter] = item.recommended_value;
+          }
+        });
         setParams((prev) => ({ 
           ...prev, 
           m_s: data.m_s, 
@@ -249,13 +292,28 @@ function QuarterCarDashboard() {
           shadow-2xl border text-sm font-medium transition-all
           ${toast.type === "success"
             ? "bg-[#0a1f12] border-emerald-800/50 text-emerald-300"
-            : "bg-[#1f0a0a] border-red-800/50 text-red-300"}`}>
+            : "bg-[#1f0a0a] border-red-800/50 text-red-300"}`}
+        >
           {toast.msg}
-          <button onClick={() => setToast(null)} className="opacity-50 hover:opacity-100 ml-1">
+          <button
+            onClick={() => setToast(null)}
+            aria-label="Dismiss notification"
+            className="opacity-50 hover:opacity-100 ml-1 p-0.5"
+          >
             <X size={13} />
           </button>
         </div>
       )}
+
+      {/* Screen Reader Live Solver Announcer */}
+      <div className="sr-only" role="status" aria-live="polite">
+        {isRunning
+          ? "Solving 2-DOF quarter car ODE system..."
+          : results && !("error" in results && results.error)
+          ? `Simulation completed. Natural frequency: ${(results as any).metrics?.fn_hz?.toFixed(2) ?? "N/A"} Hertz, damping ratio: ${(results as any).metrics?.zeta_s?.toFixed(2) ?? "N/A"}`
+          : ""}
+      </div>
+
 
       {/* Toolbar */}
       <div className="flex items-center justify-between shrink-0 pb-3 border-b border-[#1e1e1e]">
@@ -277,7 +335,7 @@ function QuarterCarDashboard() {
           <PDFExport captureId="sim-report" fileName={`QCar_${Math.round(params.k_s)}_${Math.round(params.c)}`} />
           <DataExport results={results} fileName={`QCar_${Math.round(params.k_s)}_${Math.round(params.c)}`} />
 
-          <button id="btn-run" onClick={runSimulation} disabled={isRunning}
+          <button id="btn-run" onClick={() => runSimulation()} disabled={isRunning}
             className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
               isRunning
                 ? "bg-[#222] text-gray-500 cursor-not-allowed"
@@ -313,26 +371,45 @@ function QuarterCarDashboard() {
 
       {/* Magic Wand Modal */}
       {isMagicModalOpen ? (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div
+          className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="autotune-modal-title"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") setIsMagicModalOpen(false);
+          }}
+        >
           <div className="w-full max-w-lg bg-[#111113] border border-[#222] rounded-2xl p-6 shadow-2xl">
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-2">
+            <h3 id="autotune-modal-title" className="text-lg font-semibold text-white flex items-center gap-2 mb-2">
               <Sparkles className="text-[#5e17eb]" size={20} /> Generative AI Auto-Tuner
             </h3>
             <p className="text-sm text-gray-400 mb-4">
               Describe the vehicle dynamics problem you want to solve in plain English. The AI will mathematically optimize your parameters and re-run the simulation.
             </p>
+            <label htmlFor="magic-goal-input" className="sr-only">Optimization goal description</label>
             <textarea 
+              id="magic-goal-input"
               autoFocus
-              className="w-full h-24 bg-[#0d0d0f] border border-[#2a2a2a] rounded-xl p-3 text-sm text-white placeholder-gray-600 focus:outline-none focus:border-[#5e17eb] focus:ring-1 focus:ring-[#5e17eb]/30 mb-4"
+              className="w-full h-24 bg-[#0d0d0f] border border-[#2a2a2a] rounded-xl p-3 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#5e17eb] focus:ring-1 focus:ring-[#5e17eb]/30 mb-4"
               placeholder="e.g., 'Make the ride much softer over this bumpy road without letting the suspension bottom out.'"
               value={magicGoal}
               onChange={(e) => setMagicGoal(e.target.value)}
             />
             <div className="flex justify-end gap-3">
-              <button onClick={() => setIsMagicModalOpen(false)} className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">
+              <button
+                type="button"
+                onClick={() => setIsMagicModalOpen(false)}
+                className="px-4 py-2 text-sm text-gray-300 hover:text-white transition-colors"
+              >
                 Cancel
               </button>
-              <button onClick={autoTune} disabled={isTuning || !magicGoal.trim()} className="px-5 py-2 bg-[#5e17eb] hover:bg-[#7c3aed] text-white rounded-xl text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-[0_0_15px_rgba(94,23,235,0.4)]">
+              <button
+                type="button"
+                onClick={autoTune}
+                disabled={isTuning || !magicGoal.trim()}
+                className="px-5 py-2 bg-[#5e17eb] hover:bg-[#7c3aed] text-white rounded-xl text-sm font-bold flex items-center gap-2 transition-colors disabled:opacity-50 shadow-[0_0_15px_rgba(94,23,235,0.4)]"
+              >
                 {isTuning ? "Optimizing..." : "Optimize Setup"} <Sparkles size={14} />
               </button>
             </div>
@@ -370,8 +447,8 @@ function QuarterCarDashboard() {
             </ParamSection>
             <ParamSection title="Road Profile">
               <div className="flex justify-between items-center gap-2">
-                <label className="text-[11px] text-gray-500 flex-1">Profile</label>
-                <select value={params.road_profile} onChange={(e) => setParams({ ...params, road_profile: e.target.value })}
+                <label htmlFor="qcar-road-profile" className="text-[11px] text-gray-400 flex-1">Profile</label>
+                <select id="qcar-road-profile" aria-label="Road Profile Type" value={params.road_profile} onChange={(e) => setParams({ ...params, road_profile: e.target.value })}
                   className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white w-[7.5rem]
                     focus:outline-none focus:border-ansys-yellow/60 focus:ring-1 focus:ring-ansys-yellow/15">
                   {ROAD_PROFILES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
@@ -386,8 +463,10 @@ function QuarterCarDashboard() {
               {params.road_profile === "iso8608" && (
                 <>
                   <div className="flex justify-between items-center gap-2">
-                    <label className="text-[11px] text-gray-500 flex-1">Road Class</label>
+                    <label htmlFor="qcar-iso-class" className="text-[11px] text-gray-400 flex-1">Road Class</label>
                     <select
+                      id="qcar-iso-class"
+                      aria-label="ISO 8608 Road Class"
                       value={params.iso_class}
                       onChange={(e) => setParams({ ...params, iso_class: e.target.value as IsoClass })}
                       className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white w-[7.5rem] focus:outline-none focus:border-ansys-yellow/60">
@@ -461,34 +540,65 @@ function QuarterCarDashboard() {
               </div>
               <div className="flex-1 min-h-0 bg-[#111113] border border-[#1e1e1e] rounded-xl flex items-center justify-center relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-b from-[#111113] to-[#0a0a0c] animate-pulse" />
-                <div className="flex flex-col items-center gap-4 z-10">
-                  <div className="w-8 h-8 border-2 border-ansys-yellow/20 border-t-ansys-yellow rounded-full animate-spin" />
-                  <p className="text-xs text-gray-500 font-mono tracking-widest">SOLVING IMPLICIT ODE</p>
+                <div className="flex flex-col items-center gap-3 z-10">
+                  <Loader2 size={36} className="text-ansys-yellow animate-spin" />
+                  <p className="text-xs text-ansys-yellow font-mono tracking-widest font-bold">
+                    {loadingStage === "VALIDATING" && "VALIDATING PARAMETERS & BOUNDS"}
+                    {loadingStage === "DISPATCHING" && "DISPATCHING TO PHYSICS CORE"}
+                    {loadingStage === "SOLVING_ODE" && "SOLVING ADAPTIVE RK45 ODE SYSTEM"}
+                    {loadingStage === "COMPUTING_PSD" && "COMPUTING ISO 8608 PSD & FREQUENCY RESPONSE"}
+                    {loadingStage === "EVALUATING_KPIS" && "EVALUATING ISO 2631-1 KPIS"}
+                    {!loadingStage && "SOLVING IMPLICIT ODE"}
+                  </p>
+                  <p className="text-[11px] text-gray-400 font-mono">Real-time state integration in progress</p>
+                  <button
+                    type="button"
+                    onClick={cancelSimulation}
+                    className="mt-2 px-3 py-1 bg-red-950/60 border border-red-500/40 hover:bg-red-900/80 text-red-200 rounded-lg text-xs font-mono transition-all flex items-center gap-1.5"
+                  >
+                    <X size={13} /> Cancel Simulation
+                  </button>
                 </div>
               </div>
             </div>
           )}
 
-
-
-          {/* Error */}
-          {Boolean(results?.error) && (
-            <div className="flex-1 bg-[#111113] border border-red-900/30 rounded-xl flex flex-col items-center justify-center gap-3">
-              <AlertTriangle size={44} className="text-red-500 opacity-60" />
-              <p className="text-sm font-semibold text-red-400">Simulation Error</p>
-              <pre className="text-xs text-red-600/70 max-w-sm text-center font-mono
-                bg-red-950/30 px-4 py-2 rounded-lg border border-red-900/20 whitespace-pre-wrap">
-                {results?.message as string}
-              </pre>
+          {/* Error: only show centered full error if no previous valid results exist */}
+          {!hasResults && Boolean(results?.error || simError) && (
+            <div className="flex-1 bg-[#111113] border border-red-900/30 rounded-xl p-6 flex flex-col items-center justify-center">
+              <EngineeringErrorDisplay
+                error={(results as any)?.message || simError}
+                onRetry={retrySimulation}
+                onDismiss={() => setSimError(null)}
+                retryCount={retryCount}
+              />
             </div>
           )}
 
           {/* Results */}
           {hasResults && r && (
-            <div id="sim-report" className="flex flex-col gap-3 flex-1 overflow-hidden">
+            <div id="sim-report" className="flex flex-col gap-3 flex-1 overflow-y-auto min-h-0 custom-scrollbar pr-1">
+
+              {/* Floating Non-Destructive Error HUD */}
+              {simError && (
+                <EngineeringErrorDisplay
+                  error={simError}
+                  onRetry={retrySimulation}
+                  onDismiss={() => setSimError(null)}
+                  retryCount={retryCount}
+                />
+              )}
 
               {/* Issue 16: MODEL VALIDITY — how much to trust this result */}
               <ModelValidity report={validity} />
+
+              {/* 5 Primary User Questions: Engineering Decision Engine */}
+              <EngineeringDecisionCard
+                currentParams={params}
+                baselineParams={simParams}
+                results={r}
+                validity={validity}
+              />
 
               {/* Trace manager */}
               <TraceManager currentResult={r as any} currentParams={params} traces={traces} setTraces={setTraces} deltaMode={deltaMode} setDeltaMode={setDeltaMode} />
@@ -506,41 +616,69 @@ function QuarterCarDashboard() {
               <PlotTabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
 
               {/* Plot area */}
-              <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-hidden min-h-0">
+              <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-hidden min-h-[480px]">
 
                 {/* ── TAB 0: TIME DOMAIN — 2×2 grid ── */}
                 {activeTab === 0 && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 auto-rows-[350px] gap-px bg-[#181818] overflow-y-auto custom-scrollbar h-full">
                     {/* Displacement */}
-                    <PlotBox>
+                    <PlotBox
+                      title="Displacement"
+                      description="Chassis sprung mass and wheel unsprung mass displacement time histories"
+                      summaryData={[
+                        { label: "Max Body Disp.", value: `${(maxOf(r.z_s) * 1000).toFixed(1)} mm` },
+                        { label: "Min Body Disp.", value: `${(minOf(r.z_s) * 1000).toFixed(1)} mm` },
+                        { label: "Max Wheel Disp.", value: `${(maxOf(r.z_u) * 1000).toFixed(1)} mm` },
+                      ]}
+                    >
                       <Plot
                         data={bDisp(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Displacement", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
                           yaxis: { ...DARK_BASE.yaxis, title: { text: "Displacement (mm)", font: { color: "#444", size: 10 } } },
+                          shapes: [...cursorShape],
                         })}
+                        onHover={onTimePlotHover}
                         useResizeHandler style={{ width: "100%", height: "100%" }}
                         config={{ responsive: true, displayModeBar: true }}
                       />
                     </PlotBox>
 
                     {/* Velocity */}
-                    <PlotBox>
+                    <PlotBox
+                      title="Velocity"
+                      description="Chassis sprung mass and wheel unsprung mass velocity time histories"
+                      summaryData={[
+                        { label: "Peak Body Vel.", value: `${(maxOf(r.dz_s) * 1000).toFixed(1)} mm/s` },
+                        { label: "Min Body Vel.", value: `${(minOf(r.dz_s) * 1000).toFixed(1)} mm/s` },
+                        { label: "Peak Wheel Vel.", value: `${(maxOf(r.dz_u) * 1000).toFixed(1)} mm/s` },
+                      ]}
+                    >
                       <Plot
                         data={bVel(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Velocity", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
                           yaxis: { ...DARK_BASE.yaxis, title: { text: "Velocity (mm/s)", font: { color: "#444", size: 10 } } },
+                          shapes: [...cursorShape],
                         })}
+                        onHover={onTimePlotHover}
                         useResizeHandler style={{ width: "100%", height: "100%" }}
                         config={{ responsive: true, displayModeBar: true }}
                       />
                     </PlotBox>
 
                     {/* Acceleration */}
-                    <PlotBox>
+                    <PlotBox
+                      title="Sprung Acceleration"
+                      description="Chassis sprung mass vertical acceleration compared to ISO 2631-1 comfortable threshold"
+                      summaryData={[
+                        { label: "Peak Acceleration", value: `${maxOf(r.ddz_s).toFixed(2)} m/s²` },
+                        { label: "Min Acceleration", value: `${minOf(r.ddz_s).toFixed(2)} m/s²` },
+                        { label: "ISO RMS", value: `${r.rms_body_accel.toFixed(3)} m/s²` },
+                      ]}
+                    >
                       <Plot
                         data={bAccel(r, traces, deltaMode)}
                         layout={darkLayout({
@@ -550,24 +688,44 @@ function QuarterCarDashboard() {
                           shapes: [
                             { type: "line", x0: 0, x1: 1, xref: "paper", y0:  0.315, y1:  0.315, line: { color: "rgba(52,211,153,0.3)", dash: "dot", width: 1 } },
                             { type: "line", x0: 0, x1: 1, xref: "paper", y0: -0.315, y1: -0.315, line: { color: "rgba(52,211,153,0.3)", dash: "dot", width: 1 } },
+                            ...cursorShape,
                           ],
                           annotations: [{ x: 0.02, xref: "paper", y: 0.315, yref: "y",
                             text: "ISO 0.315 m/s²", showarrow: false, font: { color: "#22c55e80", size: 9 }, xanchor: "left" }],
                         })}
+                        onHover={onTimePlotHover}
                         useResizeHandler style={{ width: "100%", height: "100%" }}
                         config={{ responsive: true, displayModeBar: true }}
                       />
                     </PlotBox>
 
                     {/* Suspension Travel + Tire Deflection */}
-                    <PlotBox>
+                    <PlotBox
+                      title="Suspension & Tire Deflection"
+                      description="Relative suspension travel and tire deflection with bump and droop stops"
+                      summaryData={[
+                        { label: "Max Susp Travel", value: `${(maxOf(r.susp_travel) * 1000).toFixed(1)} mm` },
+                        { label: "Max Tire Deflection", value: `${(maxOf(r.tire_defl) * 1000).toFixed(1)} mm` },
+                        { label: "Jounce Stop Limit", value: "+60 mm" },
+                      ]}
+                    >
                       <Plot
                         data={bTravel(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Suspension & Tire Deflection", font: { color: "#888", size: 11 } },
                           xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
                           yaxis: { ...DARK_BASE.yaxis, title: { text: "Deflection (mm)", font: { color: "#444", size: 10 } } },
+                          shapes: [
+                            { type: "line", x0: 0, x1: 1, xref: "paper", y0:  60, y1:  60, line: { color: "rgba(245,158,11,0.4)", dash: "dash", width: 1 } },
+                            { type: "line", x0: 0, x1: 1, xref: "paper", y0: -40, y1: -40, line: { color: "rgba(245,158,11,0.4)", dash: "dash", width: 1 } },
+                            ...cursorShape,
+                          ],
+                          annotations: [
+                            { x: 0.02, xref: "paper", y: 60, yref: "y", text: "Jounce Stop (+60mm)", showarrow: false, font: { color: "#f59e0b90", size: 8.5 }, xanchor: "left" },
+                            { x: 0.02, xref: "paper", y: -40, yref: "y", text: "Rebound Stop (-40mm)", showarrow: false, font: { color: "#f59e0b90", size: 8.5 }, xanchor: "left" },
+                          ],
                         })}
+                        onHover={onTimePlotHover}
                         useResizeHandler style={{ width: "100%", height: "100%" }}
                         config={{ responsive: true, displayModeBar: true }}
                       />
@@ -690,6 +848,10 @@ function QuarterCarDashboard() {
                           shapes: [
                             { type: "line", x0: 0, x1: 0, y0: 0, y1: 1, yref: "paper", line: { color: "#2a2a2a", width: 1 } },
                             { type: "line", x0: 0, x1: 1, xref: "paper", y0: 0, y1: 0, line: { color: "#2a2a2a", width: 1 } },
+                          ],
+                          annotations: [
+                            { x: 0.95, y: 0.95, xref: "paper", yref: "paper", text: "COMPRESSION (BUMP +)", showarrow: false, font: { color: "#ffffff18", size: 11, weight: "bold" } },
+                            { x: 0.05, y: 0.05, xref: "paper", yref: "paper", text: "EXTENSION (REBOUND -)", showarrow: false, font: { color: "#ffffff18", size: 11, weight: "bold" } },
                           ],
                           margin: { ...DARK_BASE.margin, b: 60 },
                         })}
@@ -928,13 +1090,22 @@ function QuarterCarDashboard() {
                 {/* ── TAB 5: SMART ENGINEERING INSIGHTS ── */}
                 {activeTab === 5 && (
                   <div className="p-4 h-full overflow-y-auto custom-scrollbar">
-                    <SmartInsights result={r} />
+                    <SmartInsights 
+                      result={r} 
+                      onApplyRecommendation={(patch) => {
+                        setParams(prev => ({ ...prev, ...patch }));
+                        showToast("Applied recommended setup parameters!", "success");
+                        setTimeout(() => {
+                          document.getElementById("btn-run")?.click();
+                        }, 300);
+                      }}
+                    />
                   </div>
                 )}
 
                 {/* ── TAB 6: PARAMETRIC SENSITIVITY ANALYSIS ── */}
                 {activeTab === 6 && (
-                  <div className="p-4 h-full">
+                  <div className="p-4 h-full overflow-y-auto custom-scrollbar">
                     <SensitivityTornado
                       payload={buildPayload()}
                       authHeader={authHeader}
@@ -949,8 +1120,10 @@ function QuarterCarDashboard() {
           {/* 3D Viewport Split */}
           {hasResults && r && (
             <div className="h-64 shrink-0 bg-[#0d0d0f] border border-[#1e1e1e] rounded-xl overflow-hidden relative">
-               <div className="absolute top-2 left-3 z-10 text-[10px] font-mono text-gray-500 uppercase tracking-widest">
-                 Live Telemetry
+               <div className="absolute top-2 left-3 z-10 text-[10px] font-mono text-gray-500 uppercase tracking-widest flex items-center gap-2">
+                 <span>Live Telemetry</span>
+                 <span className="text-gray-700">·</span>
+                 <span className="text-ansys-yellow/80">2-DOF Corner (Symmetric Visualization)</span>
                </div>
                {/* Live Telemetry: Quarter-car has ONE unsprung mass (z_u).
                    All 4 corners receive the same z_u since the model is 2-DOF.
@@ -973,7 +1146,9 @@ export default function Page() {
         </div>
       }
     >
-      <QuarterCarDashboard />
+      <SyncChartProvider>
+        <QuarterCarDashboard />
+      </SyncChartProvider>
     </Suspense>
   );
 }

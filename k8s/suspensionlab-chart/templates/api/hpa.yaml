@@ -1,9 +1,12 @@
-{{- if .Values.api.autoscaling.enabled }}
+{{- if and .Values.api.autoscaling .Values.api.autoscaling.enabled }}
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
   name: {{ .Release.Name }}-api-hpa
-  namespace: suspensionlab-prod
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: suspensionlab
+    component: api
 spec:
   scaleTargetRef:
     apiVersion: apps/v1

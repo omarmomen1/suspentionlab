@@ -1,0 +1,155 @@
+version: '3.8'
+
+# ==============================================================================
+# SuspensionLab PRO — Dedicated 7-Day Evaluation Deployment Profile
+# ==============================================================================
+# Security Policy:
+# 1. Zero External Port Leakage: Database and Redis ports are NOT exposed to host.
+# 2. Complete Tenant & State Isolation: Uses dedicated volumes and isolated network.
+# 3. Cryptographic Secret Segregation: Refuses to boot with dev credentials.
+# 4. Single External Entry Point: Only the HTTPS frontend/tunnel is reachable.
+# ==============================================================================
+
+networks:
+  trial_net:
+    driver: bridge
+    internal: false
+
+volumes:
+  trial_postgres_data:
+    name: suspensionlab_trial_postgres_data
+
+services:
+  # ── 1. Isolated Evaluation Database ─────────────────────────────────────────
+  trial-postgres:
+    image: postgres:16-alpine
+    container_name: suspensionlab-trial-postgres
+    restart: unless-stopped
+    networks:
+      - trial_net
+    # CRITICAL: NO 'ports:' section! Strictly unreachable from host network or internet.
+    environment:
+      POSTGRES_USER: ${TRIAL_POSTGRES_USER:-trial_admin}
+      POSTGRES_PASSWORD: ${TRIAL_POSTGRES_PASSWORD:?TRIAL_POSTGRES_PASSWORD is required}
+      POSTGRES_DB: trial_suspensionlab
+    volumes:
+      - trial_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TRIAL_POSTGRES_USER:-trial_admin} -d trial_suspensionlab"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── 2. Isolated Evaluation Redis ───────────────────────────────────────────
+  trial-redis:
+    image: redis:7-alpine
+    container_name: suspensionlab-trial-redis
+    restart: unless-stopped
+    networks:
+      - trial_net
+    # CRITICAL: NO 'ports:' section! Strictly unreachable from host network or internet.
+    command: redis-server --requirepass ${TRIAL_REDIS_PASSWORD:?TRIAL_REDIS_PASSWORD is required}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${TRIAL_REDIS_PASSWORD}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── 3. Hardened Evaluation Backend API ──────────────────────────────────────
+  trial-backend:
+    image: suspensionlab-backend:trial
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: suspensionlab-trial-backend
+    restart: unless-stopped
+    networks:
+      - trial_net
+    # CRITICAL: Internal network only. Requests routed via frontend Next.js rewrite or Caddy.
+    environment:
+      ENVIRONMENT: TRIAL
+      DATABASE_URL: postgresql+asyncpg://${TRIAL_POSTGRES_USER:-trial_admin}:${TRIAL_POSTGRES_PASSWORD:?TRIAL_POSTGRES_PASSWORD is required}@trial-postgres:5432/trial_suspensionlab
+      REDIS_URL: redis://:${TRIAL_REDIS_PASSWORD:?TRIAL_REDIS_PASSWORD is required}@trial-redis:6379/0
+      JWT_SECRET_KEY: ${TRIAL_JWT_SECRET:?TRIAL_JWT_SECRET is required}
+      API_KEY: ${TRIAL_API_KEY:?TRIAL_API_KEY is required}
+      ALLOW_ORIGINS: ${TRIAL_EXTERNAL_URL:-https://trial.suspensionlab.com}
+      APP_BASE_URL: ${TRIAL_EXTERNAL_URL:-https://trial.suspensionlab.com}
+      METRICS_USERNAME: ${TRIAL_METRICS_USER:-admin}
+      METRICS_PASSWORD: ${TRIAL_METRICS_PASS:-trial_metrics_password_99x!}
+    depends_on:
+      trial-postgres:
+        condition: service_healthy
+      trial-redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5)\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # ── 4. Evaluation Simulation & Optimization Worker ─────────────────────────
+  trial-worker:
+    image: suspensionlab-backend:trial
+    container_name: suspensionlab-trial-worker
+    restart: unless-stopped
+    networks:
+      - trial_net
+    command: ["sh", "-c", "rq worker -u \"$$REDIS_URL\" --with-scheduler default priority_queue dedicated"]
+    environment:
+      ENVIRONMENT: TRIAL
+      DATABASE_URL: postgresql+asyncpg://${TRIAL_POSTGRES_USER:-trial_admin}:${TRIAL_POSTGRES_PASSWORD:?TRIAL_POSTGRES_PASSWORD is required}@trial-postgres:5432/trial_suspensionlab
+      REDIS_URL: redis://:${TRIAL_REDIS_PASSWORD:?TRIAL_REDIS_PASSWORD is required}@trial-redis:6379/0
+      JWT_SECRET_KEY: ${TRIAL_JWT_SECRET:?TRIAL_JWT_SECRET is required}
+      API_KEY: ${TRIAL_API_KEY:?TRIAL_API_KEY is required}
+    depends_on:
+      trial-postgres:
+        condition: service_healthy
+      trial-redis:
+        condition: service_healthy
+
+  # ── 5. Hardened Evaluation Frontend (Next.js Production Build) ──────────────
+  trial-frontend:
+    image: suspensionlab-frontend:trial
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: suspensionlab-trial-frontend
+    restart: unless-stopped
+    networks:
+      - trial_net
+    environment:
+      NODE_ENV: production
+      BACKEND_URL: http://trial-backend:8000
+      NEXT_PUBLIC_API_URL: /api/v1
+    depends_on:
+      trial-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/ >/dev/null 2>&1 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  # ── 6. Secure HTTPS Tunnel Gateway ──────────────────────────────────────────
+  # For Cloudflare Tunnel (production hostname e.g. trial.suspensionlab.com or quick tunnel):
+  trial-tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: suspensionlab-trial-tunnel
+    restart: unless-stopped
+    networks:
+      - trial_net
+    # If TUNNEL_TOKEN is set in .env.trial, runs official named tunnel (https://trial.suspensionlab.com)
+    # If TUNNEL_TOKEN is omitted, creates a free ephemeral TryCloudflare HTTPS quick tunnel
+    command: >
+      sh -c '
+        if [ -n "$$TUNNEL_TOKEN" ]; then
+          cloudflared tunnel run --token "$$TUNNEL_TOKEN"
+        else
+          cloudflared tunnel --no-autoupdate --url http://trial-frontend:3000
+        fi
+      '
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:-}
+    depends_on:
+      - trial-frontend

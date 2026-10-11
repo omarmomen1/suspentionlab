@@ -57,16 +57,46 @@ class ERSConfig:
     min_speed_deploy_ms   : float  Minimum speed for deployment [m/s]
     min_ax_regen_ms2      : float  Minimum braking deceleration to trigger regen [m/s²]
     """
-    mgu_k_max_power_w:      float = 350_000.0   # W
-    mgu_k_max_regen_w:      float = 200_000.0   # W
-    battery_capacity_j:     float = 4_000_000.0  # J (4 MJ)
+    mgu_k_max_power_w:      float = 350_000.0   # W (2026: 350 kW primary)
+    mgu_k_secondary_power_w:float = 250_000.0   # W (2026: 250 kW secondary)
+    mgu_k_max_regen_w:      float = 250_000.0   # W
+    battery_capacity_j:     float = 4_000_000.0  # J (4 MJ deployable store)
+    max_lap_recharge_j:     float = 7_000_000.0  # J (2026 FIA 7 MJ recharge ceiling)
     battery_soc_max:        float = 0.95
     battery_soc_min:        float = 0.05
     battery_soc_initial:    float = 0.50
-    regen_efficiency:       float = 0.85
-    deploy_efficiency:      float = 0.92
+    regen_efficiency:       float = 0.88
+    deploy_efficiency:      float = 0.94
     min_speed_deploy_ms:    float = 20.0         # m/s (~72 km/h)
     min_ax_regen_ms2:       float = 3.0          # m/s² braking to regen
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ERSThermalState
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class ERSThermalState:
+    """Thermal operational state of battery and MGU-K."""
+    battery_temp_c:     float = 45.0
+    mguk_temp_c:        float = 65.0
+    max_battery_temp_c: float = 60.0
+    max_mguk_temp_c:    float = 120.0
+    is_derated:         bool  = False
+
+    def update(self, deploy_kw: float, regen_kw: float, dt: float) -> None:
+        """Update thermal state with Joule heating and cooling."""
+        p_total = deploy_kw + regen_kw
+        p_heat_bat = 0.003 * p_total
+        p_cool_bat = 0.02 * (self.battery_temp_c - 30.0)
+        self.battery_temp_c += (p_heat_bat - p_cool_bat) * dt
+        
+        p_heat_mguk = 0.015 * p_total
+        p_cool_mguk = 0.05 * (self.mguk_temp_c - 30.0)
+        self.mguk_temp_c += (p_heat_mguk - p_cool_mguk) * dt
+        
+        self.is_derated = (self.battery_temp_c > self.max_battery_temp_c) or (self.mguk_temp_c > self.max_mguk_temp_c)
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -75,26 +105,19 @@ class ERSConfig:
 
 @dataclass
 class ERSState:
-    """Instantaneous ERS operational state.
-
-    Attributes
-    ----------
-    soc                : float  Battery state of charge [0–1]
-    deploy_power_w     : float  Current deployment power [W] (positive = deploying)
-    regen_power_w      : float  Current regen power [W] (positive = harvesting)
-    energy_deployed_j  : float  Cumulative energy deployed this lap [J]
-    energy_harvested_j : float  Cumulative energy harvested this lap [J]
-    """
+    """Instantaneous ERS operational state."""
     soc:                float = 0.50
     deploy_power_w:     float = 0.0
     regen_power_w:      float = 0.0
     energy_deployed_j:  float = 0.0
     energy_harvested_j: float = 0.0
+    thermal:            ERSThermalState = field(default_factory=ERSThermalState)
 
     @property
     def net_energy_j(self) -> float:
         """Net energy balance this lap [J]. Negative = net drain."""
         return self.energy_harvested_j - self.energy_deployed_j
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -131,6 +154,7 @@ class ERSDeploymentController:
         curvature: float,
         dt: float,
         deploy_permitted: bool = True,
+        vehicle_mass_kg: float = 800.0,
     ) -> tuple[float, ERSState]:
         """Compute ERS action for one time/distance step.
 
@@ -143,6 +167,7 @@ class ERSDeploymentController:
         curvature        : track curvature [1/m]
         dt               : time step [s]
         deploy_permitted : override flag (False = never deploy this segment)
+        vehicle_mass_kg  : total vehicle mass [kg] for regen power estimation
 
         Returns
         -------
@@ -174,9 +199,10 @@ class ERSDeploymentController:
 
         # Regeneration
         if can_regen:
-            # Available braking power from deceleration (m=800 kg typical)
-            P_brake_avail = abs(ax) * 800.0 * v * 0.4  # rough split to rear axle
+            # Available braking power from deceleration using configured vehicle mass
+            P_brake_avail = abs(ax) * vehicle_mass_kg * v * 0.4  # rough split to rear axle
             P_regen = min(P_brake_avail * config.regen_efficiency, config.mgu_k_max_regen_w)
+
             # Clamp by remaining battery headroom
             energy_headroom = (config.battery_soc_max - soc) * config.battery_capacity_j
             P_regen = min(P_regen, energy_headroom / max(dt, 1e-6))
@@ -190,6 +216,19 @@ class ERSDeploymentController:
             # Force at wheel
             F_ers = P_deploy / max(v, 1.0)
 
+        # Thermal update and derating
+        thermal_st = ERSThermalState(
+            battery_temp_c=state.thermal.battery_temp_c,
+            mguk_temp_c=state.thermal.mguk_temp_c,
+            max_battery_temp_c=state.thermal.max_battery_temp_c,
+            max_mguk_temp_c=state.thermal.max_mguk_temp_c,
+            is_derated=state.thermal.is_derated,
+        )
+        thermal_st.update(P_deploy / 1000.0, P_regen / 1000.0, dt)
+        if thermal_st.is_derated and P_deploy > 0:
+            P_deploy *= 0.65  # Thermal derating under overheating
+            F_ers = P_deploy / max(v, 1.0)
+
         # SOC update
         delta_energy = (P_regen - P_deploy) * dt  # J (positive = charging)
         new_soc = np.clip(soc + delta_energy / config.battery_capacity_j,
@@ -201,6 +240,7 @@ class ERSDeploymentController:
             regen_power_w=P_regen,
             energy_deployed_j=state.energy_deployed_j + P_deploy * dt,
             energy_harvested_j=state.energy_harvested_j + P_regen * dt,
+            thermal=thermal_st,
         )
         return float(F_ers), new_state
 
@@ -295,27 +335,27 @@ class ERSLapAnalyzer:
             # Optimal strategy: only deploy on fastest straights
             deploy_ok = (self.strategy != "optimal") or (v >= speed_threshold)
 
-            F_ers, state = controller.compute(state, cfg, v, ax, curv, dt, deploy_ok)
+            F_ers, state = controller.compute(
+                state, cfg, v, ax, curv, dt, deploy_ok, vehicle_mass_kg=self.m
+            )
 
             soc_hist[i]     = state.soc
             deploy_force[i] = F_ers
             deploy_power[i] = state.deploy_power_w / 1000.0   # kW
             regen_power[i]  = state.regen_power_w  / 1000.0   # kW
 
-        # Lap time delta: ERS reduces lap time proportionally to power delivered
-        # Δt ≈ -∫ (F_ers / F_drive_total) dt  (simplified: extra force / existing)
-        # More precisely: ΔE_kinetic contribution over each segment
+        # Lap time delta: ERS increases forward acceleration by a_ers = F_ers / m
+        # Over segment of length ds at entry speed v, Δt ≈ -0.5 * (a_ers * dt_seg²) / v
         lap_time_delta = 0.0
         for i in range(1, n):
             ds   = float(distances[i] - distances[i - 1])
             v    = max(float(speeds_ms[i]), 0.1)
             F_e  = deploy_force[i]
             if F_e > 0:
-                # Time saving: Δt = -F_ers * ds / (m * v²) in the energy sense
-                # Equivalent to: Δt ≈ -(F_ers / (m * a_avail)) * dt_segment
                 a_ers = F_e / self.m
                 dt_seg = ds / v
-                lap_time_delta -= 0.5 * a_ers / max(v / dt_seg, 1.0) * dt_seg ** 2
+                lap_time_delta -= 0.5 * (a_ers * dt_seg ** 2) / max(v, 0.1)
+
 
         deploy_zones = [i for i in range(n) if deploy_force[i] > 0]
         regen_zones  = [i for i in range(n) if regen_power[i] > 0.1]

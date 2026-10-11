@@ -20,11 +20,13 @@ def setup_test_data():
     return user_id, team_id
 
 def test_features():
-    user_id, team_id = uuid.uuid4(), uuid.uuid4()
-    
-    # Mocking the authentication dependencies
-    app.dependency_overrides = {}
-    from suspensionlab.backend.security.auth import verify_api_key, require_plan
+    initial_overrides = dict(app.dependency_overrides)
+    try:
+        user_id, team_id = uuid.uuid4(), uuid.uuid4()
+        
+        # Mocking the authentication dependencies
+        app.dependency_overrides = {}
+        from suspensionlab.backend.security.auth import verify_api_key, require_plan
     
     async def mock_require_plan():
         return {
@@ -112,8 +114,9 @@ def test_features():
     print("ISO Report Status:", resp_iso.status_code)
     if resp_iso.status_code == 200:
         print("  Content starts with:", repr(resp_iso.text[:100]))
-    else:
-        print("  Failed:", resp_iso.text)
+    finally:
+        app.dependency_overrides.clear()
+        app.dependency_overrides.update(initial_overrides)
         
 if __name__ == "__main__":
     test_features()

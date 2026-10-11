@@ -11,17 +11,25 @@ GET  /kinematics/info    — Backend info (C++ vs Python fallback)
 from __future__ import annotations
 
 import logging
-from typing import Optional
+import uuid
+from datetime import datetime, timezone
+from typing import Optional, Dict, Any, List
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends, Response
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from suspensionlab.backend.database.core import get_db_dependency
+from suspensionlab.backend.security.auth import require_permission, UserContext
+from suspensionlab.backend.security.permissions import Permission
 from suspensionlab.physics.kinematics import (
-    solve_kinematics,
     backend_info,
     DEFAULT_HARDPOINTS,
     KinematicsCurves,
+    compute_kinematic_derivatives,
+    compute_geometry_hash,
 )
+from suspensionlab.physics.kinematics_facade import solve_kinematics
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/kinematics", tags=["kinematics"])
@@ -114,6 +122,10 @@ class KinematicsSolveRequest(BaseModel):
         description="Maximum wheel travel (bump, positive) [mm]")
     n_steps:  int   = Field(default=33, ge=5, le=201,
         description="Number of evaluation steps (5–201)")
+    backend:  str   = Field(default="auto",
+        description="Requested backend solver: auto, cpp, or python")
+    strict_mode: bool = Field(default=False,
+        description="Strict mode: require requested backend, forbid silent fallbacks")
 
 
 class KinematicsResponse(BaseModel):
@@ -130,7 +142,221 @@ class KinematicsResponse(BaseModel):
     converged:             list[bool]
     n_points:              int
     backend:               str
+    requested_backend:     str
+    available_backend:     bool
+    selected_backend:      str
+    active_backend:        str
+    fallback_reason:       Optional[str] = None
+    solver_version:        str
+    native_library_version: Optional[str] = None
+    build_identifier:      str
     all_converged:         bool
+    ic_y_mm:               list[float] = Field(default_factory=list)
+    ic_z_mm:               list[float] = Field(default_factory=list)
+    ic_sv_x_mm:            list[float] = Field(default_factory=list)
+    ic_sv_z_mm:            list[float] = Field(default_factory=list)
+    rc_y_mm:               list[float] = Field(default_factory=list)
+    roll_center_lateral_mm: list[float] = Field(default_factory=list)
+    geometry_steps:        list[dict] = Field(default_factory=list)
+    validation_report:     Optional[dict] = None
+    derivatives:           dict = Field(default_factory=dict)
+    point_diagnostics:     list[dict] = Field(default_factory=list)
+    reproducibility:       Optional[dict] = None
+    model_validity:        Optional[dict] = None
+    model_assumptions:     dict = Field(default_factory=dict)
+    benchmarks:            list[dict] = Field(default_factory=list)
+    numerical_status:      str = Field(default="PASS")
+    physical_status:       str = Field(default="PASS")
+    overall_model_status:  str = Field(default="PASS")
+    convergence_summary:   str = Field(default="")
+    physical_issues:       list[str] = Field(default_factory=list)
+    run_id:                str = Field(default="")
+    geometry_hash:         str = Field(default="")
+    timestamp:             str = Field(default="")
+    metadata:              dict = Field(default_factory=dict)
+
+
+class KinematicsCompareRequest(BaseModel):
+    setup_a: dict = Field(..., description="Setup A (Baseline) dictionary")
+    setup_b: dict = Field(..., description="Setup B (Candidate) dictionary")
+    z_min_mm: float = Field(default=-50.0, ge=-200.0, le=0.0)
+    z_max_mm: float = Field(default= 50.0, ge=0.0, le=200.0)
+    n_steps:  int   = Field(default=33, ge=5, le=201)
+    backend:  str   = Field(default="auto")
+    vehicle_id: str = Field(default="corner_multibody")
+
+
+class KinematicsSensitivityRequest(BaseModel):
+    hardpoints: dict[str, list[float]] = Field(..., description="Suspension corner hardpoints in mm")
+    target_hardpoints: Optional[list[str]] = Field(default=None, description="Subset of hardpoints to perturb")
+    axes: Optional[list[str]] = Field(default=None, description="Axes to perturb (X, Y, Z)")
+    step_size_mm: float = Field(default=1.0, ge=0.1, le=5.0, description="Finite difference step size in mm")
+    z_min_mm: float = Field(default=-35.0, ge=-100.0, le=0.0)
+    z_max_mm: float = Field(default=35.0, ge=0.0, le=100.0)
+    n_steps: int = Field(default=15, ge=5, le=51)
+
+
+class KinematicsRecommendRequest(BaseModel):
+    hardpoints: dict[str, list[float]] = Field(..., description="Baseline suspension corner hardpoints")
+    question_preset_id: Optional[str] = Field(default=None, description="Preset question ID")
+    custom_objective: Optional[dict[str, Any]] = None
+    custom_constraints: Optional[dict[str, Any]] = None
+    custom_candidates: Optional[list[str]] = None
+    perturbation_steps_mm: Optional[list[float]] = None
+    z_min_mm: float = Field(default=-35.0)
+    z_max_mm: float = Field(default=35.0)
+    n_steps: int = Field(default=15)
+
+
+class KinematicsOptimizeRequest(BaseModel):
+    hardpoints: dict[str, list[float]] = Field(..., description="Baseline suspension corner hardpoints")
+    target_hardpoints: list[str] = Field(..., description="Hardpoints allowed to vary")
+    allowed_axes: list[str] = Field(default=["Y", "Z"], description="Axes allowed to vary (X, Y, Z)")
+    hardpoint_bounds_mm: float = Field(default=10.0, ge=1.0, le=30.0, description="Max deviation +/- bound in mm")
+    objectives: Optional[list[dict[str, Any]]] = None
+    constraints: Optional[list[dict[str, Any]]] = None
+    n_samples: int = Field(default=40, ge=10, le=100)
+    z_min_mm: float = Field(default=-35.0)
+    z_max_mm: float = Field(default=35.0)
+    n_steps: int = Field(default=15)
+
+
+class KinematicsApplyToExperimentRequest(BaseModel):
+    baseline_hardpoints: dict[str, list[float]]
+    candidate_hardpoints: dict[str, list[float]]
+    question: str = Field(default="Kinematics Hardpoint Optimization")
+    hypothesis: Optional[str] = None
+    candidate_id: Optional[str] = None
+    optimization_id: Optional[str] = None
+
+
+class KinematicsExportRequest(BaseModel):
+    sweep_data: dict = Field(..., description="Sweep result dictionary containing curves and metadata")
+    format: str = Field(default="csv", description="Export format: 'csv' or 'json'")
+
+
+class KinematicsSaveSetupRequest(BaseModel):
+    setup_id: str = Field(..., description="Unique setup identifier")
+    name: str = Field(..., description="Human-readable setup title")
+    hardpoints: dict = Field(..., description="Hardpoint coordinates in mm")
+    category: str = Field(default="Custom")
+    description: str = Field(default="")
+    wheel_travel_range: list[float] = Field(default=[-50.0, 50.0])
+    tire_radius_m: float = Field(default=0.33)
+
+
+class KinematicsSinglePointRequest(BaseModel):
+    hardpoints: HardpointSetInput = Field(default_factory=HardpointSetInput)
+    dz_mm: float = Field(default=0.0)
+    roll_deg: float = Field(default=0.0)
+    steer_deg: float = Field(default=0.0)
+    pitch_deg: float = Field(default=0.0)
+    tire_radius_m: float = Field(default=0.33)
+    backend: str = Field(default="auto")
+    strict_mode: bool = Field(default=False)
+
+
+class KinematicPointResponse(BaseModel):
+    wheel_travel_mm:       float
+    camber_deg:            float
+    toe_deg:               float
+    caster_deg:            float
+    kpi_deg:               float
+    track_change_mm:       float
+    wheelbase_change_mm:   float
+    roll_center_height_mm: float
+    motion_ratio:          float
+    scrub_radius_mm:       float
+    converged:             bool
+    anti_dive_pct:         float = 0.0
+    anti_squat_pct:        float = 0.0
+    anti_lift_pct:         float = 0.0
+    jacking_force_coeff:   float = 0.0
+    ic_y_mm:               float = 0.0
+    ic_z_mm:               float = 0.0
+    ic_sv_x_mm:            float = 0.0
+    ic_sv_z_mm:            float = 0.0
+    geometry:              dict[str, list[float]] = Field(default_factory=dict)
+    metadata:              dict = Field(default_factory=dict)
+
+
+class HardpointValidationRequest(BaseModel):
+    topology: str = Field(default="double_wishbone")
+    hardpoints: HardpointSetInput = Field(default_factory=HardpointSetInput)
+    tire_radius_m: float = Field(default=0.33)
+
+
+BENCHMARK_PRESETS = {
+    "formula_sae": {
+        "id": "formula_sae",
+        "name": "Formula SAE / Student Prototype",
+        "description": "Agile open-wheel formula car with aggressive camber recovery, low roll center, and direct pushrod actuation.",
+        "category": "Open Wheel Formula",
+        "wheel_travel_range": [-30.0, 30.0],
+        "tire_radius_m": 0.254,
+        "half_track_mm": 600.0,
+        "hardpoints": {
+            "UWI_fwd": [-50.0, 100.0, 240.0],
+            "UWI_aft": [ 50.0, 100.0, 240.0],
+            "UWO":     [  0.0, 520.0, 230.0],
+            "LWI_fwd": [-80.0, 100.0, 110.0],
+            "LWI_aft": [ 80.0, 100.0, 110.0],
+            "LWO":     [  0.0, 560.0, 100.0],
+            "TRI":     [  0.0, 120.0, 160.0],
+            "TRO":     [-15.0, 550.0, 150.0],
+            "WC":      [  0.0, 600.0, 230.0],
+            "CP":      [  0.0, 600.0,   0.0],
+            "PRI":     [-20.0, 220.0, 320.0],
+            "PRO":     [-15.0, 530.0, 170.0],
+        },
+    },
+    "gt3_touring": {
+        "id": "gt3_touring",
+        "name": "GT3 Touring / Sports Car",
+        "description": "Production-derived GT3 racecar double wishbone geometry with long control arms for high-speed stability and linear tire wear.",
+        "category": "GT / Sports Car",
+        "wheel_travel_range": [-50.0, 50.0],
+        "tire_radius_m": 0.330,
+        "half_track_mm": 760.0,
+        "hardpoints": {
+            "UWI_fwd": [-50.0,  80.0, 300.0],
+            "UWI_aft": [ 50.0,  80.0, 300.0],
+            "UWO":     [  0.0, 650.0, 295.0],
+            "LWI_fwd": [-80.0,  80.0, 155.0],
+            "LWI_aft": [ 80.0,  80.0, 155.0],
+            "LWO":     [  0.0, 720.0, 145.0],
+            "TRI":     [  0.0, 150.0, 220.0],
+            "TRO":     [-15.0, 710.0, 205.0],
+            "WC":      [  0.0, 760.0, 220.0],
+            "CP":      [  0.0, 760.0,   0.0],
+            "PRI":     [-20.0, 300.0, 390.0],
+            "PRO":     [-15.0, 690.0, 250.0],
+        },
+    },
+    "lmp_prototype": {
+        "id": "lmp_prototype",
+        "name": "LMP / Hypercar Prototype",
+        "description": "High-downforce endurance sports prototype with stiff kinematics, low scrub radius to minimize steering torque, and tight kinematic packaging.",
+        "category": "Endurance Prototype",
+        "wheel_travel_range": [-35.0, 35.0],
+        "tire_radius_m": 0.340,
+        "half_track_mm": 820.0,
+        "hardpoints": {
+            "UWI_fwd": [-60.0,  90.0, 270.0],
+            "UWI_aft": [ 60.0,  90.0, 270.0],
+            "UWO":     [  0.0, 720.0, 260.0],
+            "LWI_fwd": [-90.0,  90.0, 120.0],
+            "LWI_aft": [ 90.0,  90.0, 120.0],
+            "LWO":     [  0.0, 780.0, 110.0],
+            "TRI":     [  0.0, 140.0, 190.0],
+            "TRO":     [-15.0, 770.0, 175.0],
+            "WC":      [  0.0, 820.0, 220.0],
+            "CP":      [  0.0, 820.0,   0.0],
+            "PRI":     [-25.0, 280.0, 370.0],
+            "PRO":     [-15.0, 740.0, 210.0],
+        },
+    },
+}
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -141,20 +367,31 @@ class KinematicsResponse(BaseModel):
              summary="Solve double-wishbone corner kinematics")
 async def solve(
     req: KinematicsSolveRequest,
+    user: UserContext = Depends(require_permission(Permission.SIMULATION_RUN)),
+    db: AsyncSession = Depends(get_db_dependency),
 ) -> KinematicsResponse:
     """
     Solve kinematics for a double-wishbone corner over a wheel-travel sweep.
 
     Returns camber, toe, caster, KPI, track change, wheelbase change,
     roll-centre height, motion ratio, and scrub radius — all as arrays
-    indexed by wheel travel.
+    indexed by wheel travel with authoritative solver execution provenance,
+    3D geometric hardpoints, and comprehensive validation status.
     """
+    if user and getattr(user, "is_trial", False):
+        from suspensionlab.backend.services.trial_service import TrialService
+        await TrialService.assert_trial_access(db, user, action="simulate", delta=1)
+        await TrialService.record_trial_usage(db, user, action="simulate", delta=1)
+
+    hp_dict = req.hardpoints.to_dict()
     try:
-        curves: KinematicsCurves = solve_kinematics(
-            hardpoints=req.hardpoints.to_dict(),
+        curves = solve_kinematics(
+            hardpoints=hp_dict,
             z_min_mm=req.z_min_mm,
             z_max_mm=req.z_max_mm,
             n_steps=req.n_steps,
+            mode=req.backend,
+            strict_mode=req.strict_mode,
         )
     except Exception as exc:
         logger.exception("Kinematics solver error")
@@ -166,7 +403,27 @@ async def solve(
         n_fail = sum(1 for c in d["converged"] if not c)
         logger.warning("Kinematics: %d/%d steps did not fully converge", n_fail, req.n_steps)
 
-    info = backend_info()
+    from suspensionlab.physics.kinematics import (
+        validate_hardpoints_py,
+        compute_kinematic_derivatives,
+        compute_geometry_hash,
+    )
+    val_report = validate_hardpoints_py("double_wishbone", hp_dict)
+    derivatives = compute_kinematic_derivatives(d)
+    geom_hash = compute_geometry_hash(hp_dict)
+    run_id = f"swp-{uuid.uuid4().hex[:12]}"
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    n_conv = sum(1 for c in d["converged"] if c)
+    n_total = len(d["converged"])
+    conv_summary = f"{n_conv} / {n_total} converged" if n_conv == n_total else f"{n_conv} / {n_total} converged, {n_total - n_conv} failed"
+
+    val_eval = d.get("model_validity") or {}
+    num_status = val_eval.get("numerical_status", "PASS" if all_conv else "FAIL")
+    phys_status = val_eval.get("physical_status", "PASS")
+    overall_status = val_eval.get("overall_status", "PASS" if all_conv else "FAIL")
+    phys_issues = val_eval.get("issues", [])
+
     return KinematicsResponse(
         wheel_travel_mm       = d["wheel_travel_mm"],
         camber_deg            = d["camber_deg"],
@@ -180,9 +437,135 @@ async def solve(
         scrub_radius_mm       = d["scrub_radius_mm"],
         converged             = d["converged"],
         n_points              = len(d["wheel_travel_mm"]),
-        backend               = info["backend"],
+        backend               = curves.active_backend,
+        requested_backend     = curves.requested_backend,
+        available_backend     = curves.available_backend,
+        selected_backend      = curves.selected_backend,
+        active_backend        = curves.active_backend,
+        fallback_reason       = curves.fallback_reason,
+        solver_version        = curves.solver_version,
+        native_library_version = curves.native_library_version,
+        build_identifier      = curves.build_identifier,
         all_converged         = all_conv,
+        ic_y_mm               = d.get("ic_y_mm", []),
+        ic_z_mm               = d.get("ic_z_mm", []),
+        ic_sv_x_mm            = d.get("ic_sv_x_mm", []),
+        ic_sv_z_mm            = d.get("ic_sv_z_mm", []),
+        rc_y_mm               = d.get("rc_y_mm", [0.0] * len(d["wheel_travel_mm"])),
+        roll_center_lateral_mm = d.get("roll_center_lateral_mm", [0.0] * len(d["wheel_travel_mm"])),
+        geometry_steps        = d.get("geometry_steps", []),
+        validation_report     = val_report,
+        derivatives           = derivatives,
+        point_diagnostics     = d.get("point_diagnostics", []),
+        reproducibility       = d.get("reproducibility"),
+        model_validity        = val_eval,
+        model_assumptions     = val_eval.get("model_assumptions", {
+            "rigid_body_links": True,
+            "bushing_compliance": "NOT_MODELED_RIGID_SPHERICAL_JOINTS",
+            "structural_compliance": "NOT_MODELED_INFINITELY_STIFF_LINKS_AND_UPRIGHT",
+            "disclaimer": "Kinematic solver assumes rigid links and ideal spherical joints without elastokinematic deflection.",
+        }),
+        benchmarks            = d.get("benchmarks", []),
+        numerical_status      = num_status,
+        physical_status       = phys_status,
+        overall_model_status  = overall_status,
+        convergence_summary   = conv_summary,
+        physical_issues       = phys_issues,
+        run_id                = run_id,
+        geometry_hash         = geom_hash,
+        timestamp             = now_iso,
+        metadata              = curves.metadata,
     )
+
+
+@router.post("/benchmarks", response_model=list[dict],
+             summary="Evaluate 5 canonical vehicle dynamics kinematics benchmarks")
+async def evaluate_benchmarks(
+    req: KinematicsSolveRequest,
+    user: UserContext = Depends(require_permission(Permission.SIMULATION_RUN)),
+) -> list[dict]:
+    """Evaluate vehicle dynamics benchmarks against literature references."""
+    from suspensionlab.physics.kinematics import get_kinematics_benchmarks
+    from suspensionlab.physics.kinematics_facade import KinematicsBackendFactory
+    backend = KinematicsBackendFactory.create(
+        mode=req.backend,
+        topology="double_wishbone",
+        strict_mode=req.strict_mode,
+    )
+    hp_dict = req.hardpoints.to_dict()
+    curves = backend.sweep(
+        hp_dict,
+        z_min_mm=req.z_min_mm,
+        z_max_mm=req.z_max_mm,
+        n_steps=req.n_steps,
+    )
+    d = curves.to_dict()
+    return get_kinematics_benchmarks(hp_dict, d)
+
+
+@router.post("/solve-point", response_model=KinematicPointResponse,
+             summary="Fast single-point kinematics solve for interactive travel slider")
+async def solve_point(
+    req: KinematicsSinglePointRequest,
+    user: UserContext = Depends(require_permission(Permission.SIMULATION_RUN)),
+) -> KinematicPointResponse:
+    """Solve kinematics at a single wheel travel position, returning full 3D nodal coordinates."""
+    from suspensionlab.physics.kinematics_facade import KinematicsBackendFactory
+    backend = KinematicsBackendFactory.create(
+        mode=req.backend,
+        topology="double_wishbone",
+        strict_mode=req.strict_mode,
+    )
+    pt = backend.solve_single(
+        hardpoints=req.hardpoints.to_dict(),
+        dz_mm=req.dz_mm,
+        roll_deg=req.roll_deg,
+        steer_deg=req.steer_deg,
+        pitch_deg=req.pitch_deg,
+        tire_radius_m=req.tire_radius_m,
+    )
+    return KinematicPointResponse(
+        wheel_travel_mm       = pt.wheel_travel_mm,
+        camber_deg            = pt.camber_deg,
+        toe_deg               = pt.toe_deg,
+        caster_deg            = pt.caster_deg,
+        kpi_deg               = pt.kpi_deg,
+        track_change_mm       = pt.track_change_mm,
+        wheelbase_change_mm   = pt.wheelbase_change_mm,
+        roll_center_height_mm = pt.roll_center_height_mm,
+        motion_ratio          = pt.motion_ratio,
+        scrub_radius_mm       = pt.scrub_radius_mm,
+        converged             = pt.converged,
+        anti_dive_pct         = pt.anti_dive_pct,
+        anti_squat_pct        = pt.anti_squat_pct,
+        anti_lift_pct         = pt.anti_lift_pct,
+        jacking_force_coeff   = pt.jacking_force_coeff,
+        ic_y_mm               = pt.ic_y_mm,
+        ic_z_mm               = pt.ic_z_mm,
+        ic_sv_x_mm            = pt.ic_sv_x_mm,
+        ic_sv_z_mm            = pt.ic_sv_z_mm,
+        geometry              = pt.geometry,
+        metadata              = pt.metadata,
+    )
+
+
+@router.post("/validate", summary="CAE hardpoint admissibility check with diagnostic remediation")
+async def validate_geometry(
+    req: HardpointValidationRequest,
+) -> dict:
+    """Check geometric feasibility and return actionable engineering remediation."""
+    from suspensionlab.physics.kinematics import validate_hardpoints_py
+    return validate_hardpoints_py(
+        topology=req.topology,
+        hardpoints=req.hardpoints.to_dict(),
+        tire_radius_m=req.tire_radius_m,
+    )
+
+
+@router.get("/benchmarks", summary="Standard motorsport/automotive benchmark geometries")
+async def get_benchmarks() -> dict:
+    """Return catalog of validated benchmark vehicle geometries."""
+    return BENCHMARK_PRESETS
 
 
 @router.get("/default",
@@ -205,3 +588,193 @@ async def get_defaults() -> dict:
 async def get_info() -> dict:
     """Return backend info: whether the C++ extension is active."""
     return backend_info()
+
+
+@router.post("/compare", summary="A/B Comparative Kinematic Analysis & Causal Attribution")
+async def compare_setups_endpoint(
+    req: KinematicsCompareRequest,
+    user: UserContext = Depends(require_permission(Permission.SIMULATION_RUN)),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> dict:
+    """
+    Run independent sweeps for Setup A and Setup B and compute:
+    1. Direct hardpoint & link length differences.
+    2. Overlaid curves & rate metrics.
+    3. Channel statistics: max diff, static diff, bump diff, droop diff, RMS diff.
+    4. Causal attribution categorized into [DIRECTLY COMPUTED], [INFERRED], and [HYPOTHESIZED].
+    5. Comparison provenance.
+    """
+    if user and getattr(user, "is_trial", False):
+        from suspensionlab.backend.services.trial_service import TrialService
+        await TrialService.assert_trial_access(db, user, action="simulate", delta=1)
+        await TrialService.record_trial_usage(db, user, action="simulate", delta=1)
+
+    from suspensionlab.backend.services.kinematics_study_service import KinematicsStudyService
+    return KinematicsStudyService.compare(
+        setup_a=req.setup_a,
+        setup_b=req.setup_b,
+        sweep_config={
+            "z_min_mm": req.z_min_mm,
+            "z_max_mm": req.z_max_mm,
+            "n_steps": req.n_steps,
+            "backend": req.backend,
+            "vehicle_id": req.vehicle_id,
+        },
+    )
+
+
+@router.post("/export/csv", summary="Export Kinematic Sweep Data as RFC-4180 CSV")
+async def export_sweep_csv_endpoint(
+    req: KinematicsExportRequest,
+) -> Response:
+    """Generate downloadable CSV containing sweep channels, rates, and provenance headers."""
+    from suspensionlab.backend.services.kinematics_study_service import KinematicsStudyService
+    csv_content = KinematicsStudyService.export_csv(req.sweep_data)
+    run_id = req.sweep_data.get("run_id", "sweep")
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="kinematics_{run_id}.csv"'},
+    )
+
+
+@router.post("/export/json", summary="Export Kinematic Sweep Data as Canonical JSON")
+async def export_sweep_json_endpoint(
+    req: KinematicsExportRequest,
+) -> dict:
+    """Generate structured JSON schema dictionary containing sweep data and metadata."""
+    from suspensionlab.backend.services.kinematics_study_service import KinematicsStudyService
+    return KinematicsStudyService.export_json(req.sweep_data)
+
+
+@router.get("/setups", summary="List Available Persisted Setups and Benchmarks")
+async def list_setups_endpoint() -> list[dict]:
+    """Retrieve catalog of standard benchmarks and user-saved setups."""
+    from suspensionlab.backend.services.kinematics_study_service import KinematicsStudyService
+    return KinematicsStudyService.get_all_setups()
+
+
+@router.post("/setups/save", summary="Persist Named Kinematic Setup")
+async def save_setup_endpoint(
+    req: KinematicsSaveSetupRequest,
+    user: UserContext = Depends(require_permission(Permission.SIMULATION_RUN)),
+) -> dict:
+    """Save custom hardpoint set to persisted catalog."""
+    from suspensionlab.backend.services.kinematics_study_service import KinematicsStudyService
+    return KinematicsStudyService.save_setup(
+        setup_id=req.setup_id,
+        name=req.name,
+        hardpoints=req.hardpoints,
+        category=req.category,
+        description=req.description,
+        wheel_travel_range=req.wheel_travel_range,
+        tire_radius_m=req.tire_radius_m,
+    )
+
+
+@router.post("/sensitivity", summary="Compute Real Hardpoint Finite-Difference Jacobian Sensitivity Matrix")
+async def compute_sensitivity_endpoint(
+    req: KinematicsSensitivityRequest,
+    user: UserContext = Depends(require_permission(Permission.SIMULATION_RUN)),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> dict:
+    """
+    Computes finite-difference sensitivities (dOutput/dHardpoint) for selected hardpoints and axes
+    using real kinematics solver executions.
+    """
+    if user and getattr(user, "is_trial", False):
+        from suspensionlab.backend.services.trial_service import TrialService
+        await TrialService.assert_trial_access(db, user, action="simulate", delta=1)
+        await TrialService.record_trial_usage(db, user, action="simulate", delta=1)
+
+    from suspensionlab.backend.services.kinematics_optimization_service import KinematicsOptimizationService
+    return KinematicsOptimizationService.compute_sensitivity(
+        hardpoints=req.hardpoints,
+        target_hardpoints=req.target_hardpoints,
+        axes=req.axes,
+        step_size_mm=req.step_size_mm,
+        z_min_mm=req.z_min_mm,
+        z_max_mm=req.z_max_mm,
+        n_steps=req.n_steps,
+    )
+
+
+@router.post("/recommend", summary="Evaluate Engineering Question with Sensitivity-Based Recommendations")
+async def recommend_hardpoints_endpoint(
+    req: KinematicsRecommendRequest,
+    user: UserContext = Depends(require_permission(Permission.SIMULATION_RUN)),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> dict:
+    """
+    Answers natural engineering questions by testing real perturbations on candidate hardpoints,
+    ranking candidates, and providing physical causal mechanism explanations.
+    """
+    if user and getattr(user, "is_trial", False):
+        from suspensionlab.backend.services.trial_service import TrialService
+        await TrialService.assert_trial_access(db, user, action="simulate", delta=1)
+        await TrialService.record_trial_usage(db, user, action="simulate", delta=1)
+
+    from suspensionlab.backend.services.kinematics_optimization_service import KinematicsOptimizationService
+    return KinematicsOptimizationService.answer_engineering_question(
+        hardpoints=req.hardpoints,
+        question_preset_id=req.question_preset_id,
+        custom_objective=req.custom_objective,
+        custom_constraints=req.custom_constraints,
+        custom_candidates=req.custom_candidates,
+        perturbation_steps_mm=req.perturbation_steps_mm,
+        z_min_mm=req.z_min_mm,
+        z_max_mm=req.z_max_mm,
+        n_steps=req.n_steps,
+    )
+
+
+@router.post("/optimize", summary="Bounded Hardpoint Multi-Objective Optimization & Pareto View")
+async def optimize_hardpoints_endpoint(
+    req: KinematicsOptimizeRequest,
+    user: UserContext = Depends(require_permission(Permission.SIMULATION_RUN)),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> dict:
+    """
+    Bounded multi-objective optimization using the real kinematics engine.
+    Extracts non-dominated Pareto frontier and explicitly computes best compromise.
+    """
+    if user and getattr(user, "is_trial", False):
+        from suspensionlab.backend.services.trial_service import TrialService
+        await TrialService.assert_trial_access(db, user, action="simulate", delta=1)
+        await TrialService.record_trial_usage(db, user, action="simulate", delta=1)
+
+    from suspensionlab.backend.services.kinematics_optimization_service import KinematicsOptimizationService
+    return KinematicsOptimizationService.run_optimization(
+        hardpoints=req.hardpoints,
+        target_hardpoints=req.target_hardpoints,
+        allowed_axes=req.allowed_axes,
+        hardpoint_bounds_mm=req.hardpoint_bounds_mm,
+        objectives=req.objectives,
+        constraints=req.constraints,
+        n_samples=req.n_samples,
+        z_min_mm=req.z_min_mm,
+        z_max_mm=req.z_max_mm,
+        n_steps=req.n_steps,
+    )
+
+
+@router.post("/apply-to-experiment", summary="Transfer Optimized Candidate to Scientific Experiment Pipeline")
+async def apply_to_experiment_endpoint(
+    req: KinematicsApplyToExperimentRequest,
+    user: UserContext = Depends(require_permission(Permission.SIMULATION_RUN)),
+) -> dict:
+    """
+    Seamlessly transfers an optimized hardpoint candidate into the scientific Experiment system,
+    preserving full provenance, SHA-256 geometry hashes, and parameter deltas.
+    """
+    from suspensionlab.backend.services.kinematics_optimization_service import KinematicsOptimizationService
+    return KinematicsOptimizationService.apply_candidate_to_experiment(
+        baseline_hardpoints=req.baseline_hardpoints,
+        candidate_hardpoints=req.candidate_hardpoints,
+        question=req.question,
+        hypothesis=req.hypothesis,
+        candidate_id=req.candidate_id,
+        optimization_id=req.optimization_id,
+        author=getattr(user, "username", "Lead Kinematics CAE Engineer"),
+    )
+

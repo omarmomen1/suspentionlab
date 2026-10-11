@@ -1,4 +1,33 @@
-from .client import SuspensionLabClient
+"""
+SuspensionLab PRO — Enterprise Python SDK
+"""
 
-__version__ = "0.1.0"
-__all__ = ["SuspensionLabClient"]
+from .client import SuspensionLabClient
+from .streaming import SuspensionLabStreamingClient
+from .models import (
+    QuarterCarParams,
+    FullCarParams,
+    RoadProfile,
+    SimulationResponse,
+    MonteCarloResponse,
+    JobInfo,
+    JobStatus,
+    TelemetryFrame,
+    PaginatedResponse,
+)
+
+__all__ = [
+    "SuspensionLabClient",
+    "SuspensionLabStreamingClient",
+    "QuarterCarParams",
+    "FullCarParams",
+    "RoadProfile",
+    "SimulationResponse",
+    "MonteCarloResponse",
+    "JobInfo",
+    "JobStatus",
+    "TelemetryFrame",
+    "PaginatedResponse",
+]
+
+__version__ = "2.0.0"

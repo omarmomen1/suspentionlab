@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useCallback, useRef } from "react";
 import dynamic from "next/dynamic";
@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import Plot from "../../components/sim/Plot";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -104,7 +104,7 @@ function ParamInput({ label, value, onChange, min, max, step = 0.1, unit = "" }:
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function YawDynamicsPage() {
-  const { authHeader } = useAuth();
+  const { fetchWithAuth } = useAuth();
 
   const [params, setParams] = useState({
     mass:           800.0,
@@ -133,13 +133,17 @@ export default function YawDynamicsPage() {
     setLoading(true);
     setError(null);
     try {
-      const h = { "Content-Type": "application/json", ...authHeader() }; // P0-SEC-03: call the function, do not spread it
       const body = { params, v_ms: simParams.v_ms, n_beta: 31, n_delta: 13 };
 
       const [yawRes, transRes] = await Promise.all([
-        fetch(`${API}/api/v1/intelligence/yaw`, { method: "POST", headers: h, body: JSON.stringify(body) }),
-        fetch(`${API}/api/v1/intelligence/yaw/transient`, {
-          method: "POST", headers: h,
+        fetchWithAuth("/api/v1/intelligence/yaw", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        }),
+        fetchWithAuth("/api/v1/intelligence/yaw/transient", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ params, v_ms: simParams.v_ms, radius_m: simParams.radius_m, t_total_s: simParams.t_total_s, dt_s: 0.005 }),
         }),
       ]);
@@ -158,7 +162,7 @@ export default function YawDynamicsPage() {
     } finally {
       setLoading(false);
     }
-  }, [params, simParams, authHeader]);
+  }, [params, simParams, fetchWithAuth]);
 
   // ── MMM chart data ────────────────────────────────────────────────────────
   const mmmData = mmmResult
@@ -361,7 +365,7 @@ export default function YawDynamicsPage() {
               ) : (
                 <div className="h-80 flex flex-col items-center justify-center gap-2 text-gray-600">
                   <BarChart3 size={24} />
-                  <span className="text-[11px]">Click "Compute MMM" to run analysis</span>
+                  <span className="text-[11px]">Click &quot;Compute MMM&quot; to run analysis</span>
                 </div>
               )}
             </Card>

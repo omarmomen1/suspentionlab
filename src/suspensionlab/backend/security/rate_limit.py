@@ -81,17 +81,17 @@ class RateLimiter:
                 if payload and payload.get("sub"):
                     user_id = payload.get("sub")
 
-        if not user_id:
-            api_key = request.headers.get("X-API-Key")
-            if api_key:
-                user_id = api_key
-
-        if not user_id:
-            # Rely on direct client host to prevent trivial X-Forwarded-For IP spoofing
-            user_id = request.client.host if request.client else "unknown"
+        if user_id:
+            redis_key = f"rate_limit:{self.limit_config_key}:user:{user_id}"
+            audit_id = user_id
+        else:
+            # For unauthenticated requests (e.g. login, register, forgot-password, public endpoints),
+            # rate limit strictly by client IP to prevent header-spoofing brute force bypasses.
+            client_ip = request.client.host if request.client else "unknown"
+            redis_key = f"rate_limit:{self.limit_config_key}:ip:{client_ip}"
+            audit_id = None
 
         now = time.time()
-        redis_key = f"rate_limit:{self.limit_config_key}:{user_id}"
 
         # ── Redis path (preferred) ────────────────────────────────────────────
         if async_redis_conn is not None:
@@ -114,7 +114,7 @@ class RateLimiter:
                     from suspensionlab.backend.security.audit import log_audit_event
                     log_audit_event(
                         "RATE_LIMIT_VIOLATION",
-                        user_id=user_id if getattr(request.state, "user_id", None) else None,
+                        user_id=audit_id,
                         ip=request.client.host if request.client else "unknown",
                         metadata={"route": request.url.path, "limit_key": self.limit_config_key}
                     )
@@ -134,7 +134,7 @@ class RateLimiter:
         # Billing endpoints get a tighter fallback to prevent financial abuse
         path = request.url.path
         is_billing = path.startswith("/billing")
-        fallback_limit = min(limit_count, 50) if is_billing else min(limit_count, 200)
+        fallback_limit = min(limit_count, 50) if is_billing else limit_count
 
         try:
             current_count = _in_memory_check(redis_key, fallback_limit, window_seconds)
@@ -146,7 +146,7 @@ class RateLimiter:
         except RateLimitExceededError:
             logger.warning(
                 "In-memory rate limit exceeded for %s on %s",
-                user_id, path
+                redis_key, path
             )
             response.headers["Retry-After"] = str(window_seconds)
             raise

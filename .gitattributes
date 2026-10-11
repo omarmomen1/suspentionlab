@@ -1,0 +1,20 @@
+# Git attributes and export-ignore rules for clean distribution archives
+
+# Text and line endings
+* text=auto eol=lf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+
+# Exclude internal development, test, and build artifacts from git archive exports
+.github export-ignore
+.gitignore export-ignore
+.gitattributes export-ignore
+.dockerignore export-ignore
+.env export-ignore
+.env.local export-ignore
+*.log export-ignore
+*.zip export-ignore
+scratch/ export-ignore
+playwright-report/ export-ignore
+test-results/ export-ignore
+build/ export-ignore

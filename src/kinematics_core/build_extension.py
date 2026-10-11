@@ -30,10 +30,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent / "kinematics_cpp"
 PROJECT_ROOT = ROOT.parent.parent
 PHYSICS_DIR  = PROJECT_ROOT / "src" / "suspensionlab" / "physics"
-BUILD_DIR    = ROOT / "_build"
+BUILD_DIR    = ROOT / "build"
 
 
 def run(cmd: list[str], **kwargs) -> int:
@@ -42,38 +42,41 @@ def run(cmd: list[str], **kwargs) -> int:
     return result.returncode
 
 
-def check_prereqs():
-    missing = []
-    for pkg in ("pybind11", "cmake", "ninja"):
-        try:
-            __import__(pkg)
-        except ImportError:
-            missing.append(pkg)
-    if missing:
-        print(f"[error] Missing Python packages: {missing}")
-        print(f"        Fix: pip install {' '.join(missing)}")
-        sys.exit(1)
-    print("[ok] pybind11, cmake, ninja found via pip")
+import shutil
 
+def check_prereqs():
+    pass
 
 def find_cmake() -> str:
-    import cmake  # type: ignore
-    cmake_bin = Path(cmake.__file__).parent / "data" / "bin" / "cmake.exe"
-    if not cmake_bin.exists():
-        cmake_bin = Path(cmake.__file__).parent / "data" / "bin" / "cmake"
-    if cmake_bin.exists():
-        return str(cmake_bin)
-    # Fallback: python -m cmake
-    return f"{sys.executable} -m cmake"
-
+    try:
+        import cmake
+        cmake_bin = Path(cmake.__file__).parent / "data" / "bin" / "cmake.exe"
+        if cmake_bin.exists():
+            return str(cmake_bin)
+    except Exception:
+        pass
+    w = shutil.which("cmake")
+    if w:
+        return w
+    local_cmake = Path(os.environ.get("LOCALAPPDATA", "")) / "python" / "pythoncore-3.14-64" / "Lib" / "site-packages" / "cmake" / "data" / "bin" / "cmake.exe"
+    if local_cmake.exists():
+        return str(local_cmake)
+    return "cmake"
 
 def find_ninja() -> str:
-    import ninja  # type: ignore
-    ninja_bin = Path(ninja.__file__).parent / "data" / "bin" / "ninja.exe"
-    if not ninja_bin.exists():
-        ninja_bin = Path(ninja.__file__).parent / "data" / "bin" / "ninja"
-    if ninja_bin.exists():
-        return str(ninja_bin)
+    try:
+        import ninja
+        ninja_bin = Path(ninja.__file__).parent / "data" / "bin" / "ninja.exe"
+        if ninja_bin.exists():
+            return str(ninja_bin)
+    except Exception:
+        pass
+    w = shutil.which("ninja")
+    if w:
+        return w
+    local_ninja = Path(os.environ.get("LOCALAPPDATA", "")) / "python" / "pythoncore-3.14-64" / "Scripts" / "ninja.exe"
+    if local_ninja.exists():
+        return str(local_ninja)
     return "ninja"
 
 
@@ -114,8 +117,12 @@ def build():
         else:
             print(f"[ok] Found MSVC: {vcvars}")
             # Activate MSVC environment variables
-            vcvars_cmd = f'cmd /c ""{vcvars}" x64 && set"'
-            result = subprocess.run(vcvars_cmd, shell=True, capture_output=True, text=True)
+            result = subprocess.run(
+                ["cmd.exe", "/c", f'"{vcvars}" x64 && set'],
+                shell=False,
+                capture_output=True,
+                text=True,
+            )
             for line in result.stdout.splitlines():
                 if "=" in line:
                     k, _, v = line.partition("=")
@@ -124,7 +131,7 @@ def build():
 
     # CMake configure
     rc = run(
-        [sys.executable, "-m", "cmake",
+        [cmake_exe,
          "-S", str(ROOT),
          "-B", str(BUILD_DIR),
          f"-DCMAKE_BUILD_TYPE=Release",
@@ -139,7 +146,7 @@ def build():
 
     # CMake build
     rc = run(
-        [sys.executable, "-m", "cmake",
+        [cmake_exe,
          "--build", str(BUILD_DIR),
          "--config", "Release",
          "--parallel",

@@ -63,8 +63,10 @@ async def revoke_session(jti: str, request: Request, db: AsyncSession = Depends(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
         
+    from datetime import timezone
     from suspensionlab.backend.api.routes.auth_routes import _blacklist_jti
-    await _blacklist_jti({"jti": jti, "sub": str(user_id), "exp": session.expires_at.timestamp()}, reason="user_revoked")
+    exp_ts = session.expires_at.replace(tzinfo=timezone.utc).timestamp() if session.expires_at.tzinfo is None else session.expires_at.timestamp()
+    await _blacklist_jti({"jti": jti, "sub": str(user_id), "exp": exp_ts}, reason="user_revoked")
     
     await db.execute(delete(UserSession).where(UserSession.jti == jti))
     await db.commit()
@@ -87,11 +89,13 @@ async def revoke_all_other_sessions(request: Request, db: AsyncSession = Depends
     result = await db.execute(select(UserSession).where(UserSession.user_id == user_id))
     sessions = result.scalars().all()
     
+    from datetime import timezone
     from suspensionlab.backend.api.routes.auth_routes import _blacklist_jti
     for session in sessions:
         if current_jti and session.jti == current_jti:
             continue
-        await _blacklist_jti({"jti": session.jti, "sub": str(user_id), "exp": session.expires_at.timestamp()}, reason="user_revoked_all")
+        exp_ts = session.expires_at.replace(tzinfo=timezone.utc).timestamp() if session.expires_at.tzinfo is None else session.expires_at.timestamp()
+        await _blacklist_jti({"jti": session.jti, "sub": str(user_id), "exp": exp_ts}, reason="user_revoked_all")
         await db.execute(delete(UserSession).where(UserSession.jti == session.jti))
         
     await db.commit()

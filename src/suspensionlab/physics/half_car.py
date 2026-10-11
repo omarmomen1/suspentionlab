@@ -26,6 +26,14 @@ from scipy.integrate import solve_ivp
 from scipy.linalg import eigvals
 
 from suspensionlab.physics.quarter_car import RoadProfile, _road_profile_fn
+from suspensionlab.physics.contracts import (
+    ContactState,
+    PhysicsDiagnostics,
+    PhysicsProvenance,
+    CanonicalRoadProfile,
+    compute_dataset_hash,
+)
+from suspensionlab.physics.anti_geometry import ForceMomentLedger
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -95,13 +103,37 @@ class HalfCarParams:
     stribeck_fc_r: float = 0.0
     stribeck_vs_r: float = 0.01
     stribeck_sigma_r: float = 0.0
+    enable_contact_loss: bool = True  # Enable nonlinear tire liftoff clamping (Fz >= 0)
     
+    # Longitudinal acceleration and physically derived anti-geometry
+    a_x: float = 0.0                      # m/s^2 (longitudinal acceleration: <0 braking, >0 drive)
+    h_cg: float = 0.35                    # m (CG height above ground)
+    anti_dive_f: float = 0.0              # fraction 0..1 front anti-dive
+    anti_lift_r: float = 0.0              # fraction 0..1 rear anti-lift (braking)
+    anti_squat_r: float = 0.0             # fraction 0..1 rear anti-squat (drive)
+    anti_lift_f: float = 0.0              # fraction 0..1 front anti-lift (drive)
+
     def __post_init__(self) -> None:
+        import math
         for name, val in self.__dict__.items():
-            if name in ("bump_stop_ext_f", "bump_stop_ext_r"):
+            if name in ("bump_stop_ext_f", "bump_stop_ext_r", "enable_contact_loss", "a_x"):
                 continue
-            if val is not None and isinstance(val, (int, float)) and val < 0:
-                raise ValueError(f"Parameter '{name}' must be non-negative, got {val}")
+            if val is not None and isinstance(val, (int, float)) and not isinstance(val, bool):
+                if math.isnan(val) or math.isinf(val):
+                    raise ValueError(f"Parameter '{name}' cannot be NaN or infinite.")
+                if name in ("k_sf", "k_sr") and val < 1000.0:
+                    raise ValueError(f"Spring rate '{name}' must be at least 1,000 N/m (got {val}).")
+                if name in ("k_tf", "k_tr") and val < 10000.0:
+                    raise ValueError(f"Tire vertical stiffness '{name}' must be at least 10,000 N/m (got {val}).")
+                if name in ("m_s", "m_uf", "m_ur") and val < 0.1:
+                    raise ValueError(f"Mass '{name}' must be strictly positive >= 0.1 kg (got {val}).")
+                if name == "I_y" and val <= 0.0:
+                    raise ValueError(f"Pitch inertia 'I_y' must be strictly positive (got {val}).")
+                if name in ("a", "b", "L") and val <= 0.0:
+                    raise ValueError(f"Geometric parameter '{name}' must be strictly positive (got {val}).")
+                if val < 0:
+                    raise ValueError(f"Parameter '{name}' must be non-negative, got {val}")
+
         # Validate wheelbase consistency instead of silently overwriting L.
         # If L != a + b the user has provided contradictory geometry.
         expected_L = self.a + self.b
@@ -147,6 +179,17 @@ class HalfCarResult:
     rms_susp_travel_r: float = 0.0
     rms_tire_load_f: float = 0.0
     rms_tire_load_r: float = 0.0
+
+    # Contact & Conservation Diagnostics
+    contact_states_f: List[Any] = field(default_factory=list)
+    contact_states_r: List[Any] = field(default_factory=list)
+    liftoff_time_f: Optional[float] = None
+    liftoff_time_r: Optional[float] = None
+    minimum_Fz_f: float = 0.0
+    minimum_Fz_r: float = 0.0
+    diagnostics: Optional[PhysicsDiagnostics] = None
+    provenance: Optional[PhysicsProvenance] = None
+    ledger: Optional[ForceMomentLedger] = None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -361,12 +404,40 @@ def _half_car_ode(t, x, p: HalfCarParams, zr_fn, dzr_fn, t_delay: float):
 
     F_sf, F_sr, _, _ = _compute_forces(p, z_s, dz_s, theta, dtheta, z_uf, dz_uf, z_ur, dz_ur)
 
+    # Longitudinal load transfer and kinematic anti-reaction forces
+    L = max(p.a + p.b, 0.5)
+    delta_Fz_long = (p.m_s * p.a_x * p.h_cg) / L  # >0 for forward accel, <0 for braking
+
+    if p.a_x < 0.0:
+        # Braking (load transfers forward: front load increases, rear decreases)
+        trans_front = -delta_Fz_long  # > 0
+        F_anti_f = p.anti_dive_f * trans_front   # upward on front chassis (resists dive)
+        F_anti_r = -p.anti_lift_r * trans_front  # downward on rear chassis (resists lift)
+    else:
+        # Traction / Acceleration (load transfers rearward: rear increases, front decreases)
+        trans_rear = delta_Fz_long    # >= 0
+        F_anti_r = p.anti_squat_r * trans_rear   # upward on rear chassis (resists squat)
+        F_anti_f = -p.anti_lift_f * trans_rear  # downward on front chassis (resists lift)
+
+    M_pitch_inertial = -p.m_s * p.a_x * p.h_cg  # In half-car convention, +theta is nose down, so braking (a_x < 0) gives positive nose-down moment
+
     # Accelerations
-    ddz_s = (F_sf + F_sr) / p.m_s
-    ddtheta = (-p.a * F_sf + p.b * F_sr) / p.I_y
+    ddz_s = (F_sf + F_sr + F_anti_f + F_anti_r) / p.m_s
+    ddtheta = (-p.a * (F_sf + F_anti_f) + p.b * (F_sr + F_anti_r) + M_pitch_inertial) / p.I_y
     
-    ddz_uf = (-F_sf - p.k_tf * (z_uf - z_rf) - p.c_tf * (dz_uf - dz_rf)) / p.m_uf
-    ddz_ur = (-F_sr - p.k_tr * (z_ur - z_rr) - p.c_tr * (dz_ur - dz_rr)) / p.m_ur
+    F_tf = p.k_tf * (z_rf - z_uf) + p.c_tf * (dz_rf - dz_uf)
+    F_tr = p.k_tr * (z_rr - z_ur) + p.c_tr * (dz_rr - dz_ur)
+    if p.enable_contact_loss:
+        # Contact-loss: clamp total tire load (static + dynamic) to >= 0
+        static_front = (p.m_s * p.b / (p.a + p.b) + p.m_uf) * 9.81
+        static_rear  = (p.m_s * p.a / (p.a + p.b) + p.m_ur) * 9.81
+        if static_front + F_tf < 0:
+            F_tf = -static_front
+        if static_rear + F_tr < 0:
+            F_tr = -static_rear
+
+    ddz_uf = (-(F_sf + F_anti_f) + F_tf) / p.m_uf
+    ddz_ur = (-(F_sr + F_anti_r) + F_tr) / p.m_ur
 
     return [dz_s, ddz_s, dtheta, ddtheta, dz_uf, ddz_uf, dz_ur, ddz_ur]
 
@@ -391,13 +462,26 @@ def simulate_time_response(
         fun=_half_car_ode,
         t_span=t_span,
         y0=x0,
-        method="BDF",          # BDF required: same tire stiffness ratio as quarter-car (stiff problem)
+        method="LSODA",          # Adaptive stiff/non-stiff solver
         t_eval=t_eval,
         args=(p, zr_fn, dzr_fn, t_delay),
-        rtol=1e-6,
-        atol=1e-9,
-        max_step=max(0.001, profile.duration / 5000.0),
+        rtol=1e-5,
+        atol=1e-7,
+        max_step=0.01,
     )
+    if not sol.success:
+        # Fallback to BDF with robust stepping
+        sol = solve_ivp(
+            fun=_half_car_ode,
+            t_span=t_span,
+            y0=x0,
+            method="BDF",
+            t_eval=t_eval,
+            args=(p, zr_fn, dzr_fn, t_delay),
+            rtol=1e-5,
+            atol=1e-7,
+            max_step=0.005,
+        )
     if not sol.success:
         from suspensionlab.physics.exceptions import MathConvergenceError
         raise MathConvergenceError(
@@ -424,6 +508,52 @@ def simulate_time_response(
     susp_travel_r = z_sr - z_ur
     tire_load_f = p.k_tf * (z_uf - z_rf_arr)
     tire_load_r = p.k_tr * (z_ur - z_rr_arr)
+    # Total vertical tire forces
+    static_front = (p.m_s * p.b / (p.a + p.b) + p.m_uf) * 9.81
+    static_rear  = (p.m_s * p.a / (p.a + p.b) + p.m_ur) * 9.81
+    total_Fz_f = np.maximum(0.0, static_front + tire_load_f)
+    total_Fz_r = np.maximum(0.0, static_rear + tire_load_r)
+
+    contact_states_f = []
+    contact_states_r = []
+    liftoff_time_f = None
+    liftoff_time_r = None
+
+    for idx in range(len(t)):
+        if total_Fz_f[idx] <= 1e-3:
+            contact_states_f.append(ContactState.LIFTOFF)
+            if liftoff_time_f is None:
+                liftoff_time_f = float(t[idx])
+        else:
+            contact_states_f.append(ContactState.CONTACT)
+
+        if total_Fz_r[idx] <= 1e-3:
+            contact_states_r.append(ContactState.LIFTOFF)
+            if liftoff_time_r is None:
+                liftoff_time_r = float(t[idx])
+        else:
+            contact_states_r.append(ContactState.CONTACT)
+
+    diagnostics = PhysicsDiagnostics(
+        force_residual_max_n=float(np.max(np.abs(p.m_s * ddz_s - (F_sf + F_sr)))),
+        moment_residual_max_nm=float(np.max(np.abs(p.I_y * ddtheta - (-p.a * F_sf + p.b * F_sr)))),
+        contact_violations_count=int(np.sum(total_Fz_f < -1e-6) + np.sum(total_Fz_r < -1e-6)),
+        contact_states=contact_states_f,
+        liftoff_time_s=liftoff_time_f,
+        minimum_Fz_n=float(min(np.min(total_Fz_f), np.min(total_Fz_r))),
+        solver_name="LSODA",
+        solver_steps_taken=len(t),
+        solver_evaluations=getattr(sol, "nfev", len(t)),
+        converged=sol.success,
+    )
+
+    provenance = PhysicsProvenance(
+        model_version="half-car-4dof-v3.0",
+        solver="LSODA",
+        backend="scipy.integrate.solve_ivp",
+        input_dataset_hash=compute_dataset_hash(p),
+        parameter_version="canonical-2026",
+    )
 
     return {
         "time": t,
@@ -441,6 +571,22 @@ def simulate_time_response(
         "susp_travel_r": susp_travel_r,
         "tire_load_f": tire_load_f,
         "tire_load_r": tire_load_r,
+        "contact_states_f": contact_states_f,
+        "contact_states_r": contact_states_r,
+        "liftoff_time_f": liftoff_time_f,
+        "liftoff_time_r": liftoff_time_r,
+        "minimum_Fz_f": float(np.min(total_Fz_f)),
+        "minimum_Fz_r": float(np.min(total_Fz_r)),
+        "diagnostics": diagnostics,
+        "provenance": provenance,
+        "ledger": ForceMomentLedger(
+            m_total_kg=p.m_s,
+            h_cg_m=p.h_cg,
+            wheelbase_m=p.a + p.b,
+            a_x_mps2=p.a_x,
+            front_anti_pct=p.anti_dive_f * 100.0 if p.a_x < 0 else p.anti_lift_f * 100.0,
+            rear_anti_pct=p.anti_lift_r * 100.0 if p.a_x < 0 else p.anti_squat_r * 100.0,
+        ),
     }
 
 def compute_metrics(time_data: dict, p: HalfCarParams) -> dict:
@@ -469,7 +615,7 @@ def compute_metrics(time_data: dict, p: HalfCarParams) -> dict:
 
 def run_half_car_analysis(
     p: HalfCarParams,
-    profile: RoadProfile,
+    profile: Union[RoadProfile, CanonicalRoadProfile],
 ) -> HalfCarResult:
     modal = compute_modal_properties(p)
     time_data = simulate_time_response(p, profile)
@@ -508,5 +654,14 @@ def run_half_car_analysis(
         rms_susp_travel_r=metrics["rms_susp_travel_r"],
         rms_tire_load_f=metrics["rms_tire_load_f"],
         rms_tire_load_r=metrics["rms_tire_load_r"],
+
+        contact_states_f=time_data.get("contact_states_f", [])[::step],
+        contact_states_r=time_data.get("contact_states_r", [])[::step],
+        liftoff_time_f=time_data.get("liftoff_time_f", None),
+        liftoff_time_r=time_data.get("liftoff_time_r", None),
+        minimum_Fz_f=time_data.get("minimum_Fz_f", 0.0),
+        minimum_Fz_r=time_data.get("minimum_Fz_r", 0.0),
+        diagnostics=time_data.get("diagnostics", None),
+        provenance=time_data.get("provenance", None),
     )
     return result

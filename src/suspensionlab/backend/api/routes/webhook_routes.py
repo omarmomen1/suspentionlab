@@ -50,7 +50,7 @@ class CreateWebhookRequest(BaseModel):
 @router.get("")
 async def list_webhooks(user=Depends(inline_compute_guard), db: AsyncSession = Depends(get_db_dependency)):
     result = await db.execute(
-        select(WebhookEndpoint).where(WebhookEndpoint.user_id == user.user_id)
+        select(WebhookEndpoint).where(WebhookEndpoint.user_id == _uuid.UUID(str(user.user_id)))
     )
     return {"endpoints": [_serialize(ep) for ep in result.scalars().all()]}
 
@@ -65,15 +65,22 @@ async def create_webhook(
     if not events:
         raise HTTPException(status_code=400, detail=f"events must include at least one of {VALID_EVENTS}.")
 
+    from suspensionlab.backend.services.webhooks import validate_webhook_url
+    try:
+        validate_webhook_url(str(req.url))
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=f"Invalid webhook URL (SSRF protection): {err}")
+
     count_result = await db.execute(
-        select(WebhookEndpoint).where(WebhookEndpoint.user_id == user.user_id)
+        select(WebhookEndpoint).where(WebhookEndpoint.user_id == _uuid.UUID(str(user.user_id)))
     )
+
     if len(count_result.scalars().all()) >= MAX_ENDPOINTS:
         raise HTTPException(status_code=400, detail=f"Maximum {MAX_ENDPOINTS} webhook endpoints per account.")
 
     secret = "whsec_" + _secrets.token_hex(24)
     ep = WebhookEndpoint(
-        user_id=_uuid.UUID(user.user_id),
+        user_id=_uuid.UUID(str(user.user_id)),
         url=str(req.url),
         secret=secret,
         events=",".join(events),

@@ -2,10 +2,14 @@ apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
   name: {{ .Release.Name }}-workers-pdb
-  namespace: suspensionlab-prod
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: suspensionlab
+    component: worker
 spec:
-  minAvailable: 1
+  maxUnavailable: 1
   selector:
     matchLabels:
       app: suspensionlab
-      component: workers
+      component: worker
+

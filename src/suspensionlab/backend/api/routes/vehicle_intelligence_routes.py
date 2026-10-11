@@ -53,13 +53,16 @@ async def yaw_analysis(
     )
 
     raw = request_data.get("params", {})
+    a = float(raw.get("a", raw.get("cog_dist_front", 1.35)))
+    b = float(raw.get("b", 1.35))
+    wheelbase = float(raw.get("wheelbase", a + b))
     p = BicycleModelParams(
-        mass=float(raw.get("mass",           800.0)),
-        Iz=float(raw.get("Iz",              1200.0)),
-        wheelbase=float(raw.get("wheelbase",  2.70)),
-        cog_dist_front=float(raw.get("cog_dist_front", 1.35)),
-        C_alpha_front=float(raw.get("C_alpha_front",  120_000.0)),
-        C_alpha_rear=float(raw.get("C_alpha_rear",    140_000.0)),
+        mass=float(raw.get("m", raw.get("mass", 800.0))),
+        Iz=float(raw.get("I_z", raw.get("Iz", 1200.0))),
+        wheelbase=wheelbase,
+        cog_dist_front=a,
+        C_alpha_front=float(raw.get("C_f", raw.get("C_alpha_front", 120_000.0))),
+        C_alpha_rear=float(raw.get("C_r", raw.get("C_alpha_rear", 140_000.0))),
     )
 
     v          = float(request_data.get("v_ms", 50.0))
@@ -117,13 +120,16 @@ async def yaw_transient(
     from suspensionlab.physics.yaw_dynamics import BicycleModelParams, TransientYawSolver
 
     raw = request_data.get("params", {})
+    a = float(raw.get("a", raw.get("cog_dist_front", 1.35)))
+    b = float(raw.get("b", 1.35))
+    wheelbase = float(raw.get("wheelbase", a + b))
     p = BicycleModelParams(
-        mass=float(raw.get("mass",          800.0)),
-        Iz=float(raw.get("Iz",             1200.0)),
-        wheelbase=float(raw.get("wheelbase", 2.70)),
-        cog_dist_front=float(raw.get("cog_dist_front", 1.35)),
-        C_alpha_front=float(raw.get("C_alpha_front", 120_000.0)),
-        C_alpha_rear=float(raw.get("C_alpha_rear",  140_000.0)),
+        mass=float(raw.get("m", raw.get("mass", 800.0))),
+        Iz=float(raw.get("I_z", raw.get("Iz", 1200.0))),
+        wheelbase=wheelbase,
+        cog_dist_front=a,
+        C_alpha_front=float(raw.get("C_f", raw.get("C_alpha_front", 120_000.0))),
+        C_alpha_rear=float(raw.get("C_r", raw.get("C_alpha_rear", 140_000.0))),
     )
 
     v        = float(request_data.get("v_ms",      50.0))
@@ -327,11 +333,17 @@ async def pareto_optimization(
 
     # Road profile
     rp = request_data.get("road_profile", {})
+    # Map psd_type shorthand (e.g. "iso_c") to RoadProfile fields
+    psd_raw = str(rp.get("psd_type", "iso_c")).lower()
+    iso_class_map = {"iso_a": "A", "iso_b": "B", "iso_c": "C", "iso_d": "D",
+                     "iso_e": "E", "iso_f": "F", "iso_g": "G", "iso_h": "H"}
+    iso_class = iso_class_map.get(psd_raw, psd_raw.upper() if len(psd_raw) == 1 else "C")
     try:
         profile = RoadProfile(
-            v_ms=float(rp.get("v_ms", 30.0)),
-            psd_type=str(rp.get("psd_type", "iso_b")),
-            length_m=float(rp.get("length_m", 1000.0)),
+            profile_type="iso8608",
+            iso_class=iso_class,
+            speed_mps=float(rp.get("speed_mps", rp.get("v_ms", 30.0))),
+            duration=float(rp.get("duration", 5.0)),
         )
     except Exception as e:
         raise HTTPException(422, f"Invalid road_profile: {e}")

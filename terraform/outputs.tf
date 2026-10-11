@@ -44,3 +44,30 @@ output "waf_web_acl_arn" {
   description = "WAFv2 Web ACL ARN — attached to the ALB by the EKS ingress controller annotation."
   value       = var.waf_enabled ? aws_wafv2_web_acl.main[0].arn : null
 }
+
+output "eks_secondary_cluster_name" {
+  description = "Secondary Standby EKS cluster name for DR failover."
+  value       = var.enable_multi_region ? module.eks_secondary[0].cluster_name : null
+}
+
+output "rds_secondary_endpoint" {
+  description = "RDS PostgreSQL secondary replica endpoint for DR failover."
+  value       = var.enable_multi_region ? module.db_secondary[0].db_instance_endpoint : null
+  sensitive   = true
+}
+
+output "redis_secondary_endpoint" {
+  description = "ElastiCache Redis secondary endpoint for DR failover."
+  value       = var.enable_multi_region ? aws_elasticache_replication_group.redis_secondary[0].primary_endpoint_address : null
+  sensitive   = true
+}
+
+output "s3_artifacts_bucket_arn" {
+  description = "Primary S3 artifacts bucket ARN."
+  value       = aws_s3_bucket.artifacts.arn
+}
+
+output "s3_artifacts_secondary_bucket_arn" {
+  description = "Secondary DR S3 artifacts bucket ARN."
+  value       = var.enable_multi_region ? aws_s3_bucket.artifacts_secondary[0].arn : null
+}

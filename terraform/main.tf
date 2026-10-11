@@ -1,11 +1,12 @@
 terraform {
+  required_version = ">= 1.7.0, < 2.0.0"
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
   }
-}
   # NOTE: backend config is in backend.tf (S3 + DynamoDB)
 }
 
@@ -65,11 +66,11 @@ module "vpc" {
   }
 
   public_subnet_tags = {
-  public_subnet_tags = {
     "kubernetes.io/cluster/suspensionlab-prod" = "shared"
     "kubernetes.io/role/elb"                   = "1"
   }
 }
+
 
 # ── Secondary VPC (Standby Region) ────────────────────────────────────────────
 module "vpc_secondary" {
@@ -78,7 +79,7 @@ module "vpc_secondary" {
   providers = {
     aws = aws.secondary
   }
-  
+
   count = var.enable_multi_region ? 1 : 0
 
   name = "suspensionlab-vpc-${var.environment}-secondary"
@@ -219,7 +220,21 @@ resource "aws_ecr_lifecycle_policy" "frontend" {
   policy     = aws_ecr_lifecycle_policy.backend.policy
 }
 
-# ── EKS Cluster ───────────────────────────────────────────────────────────────
+# ECR Cross-Region Replication for Disaster Recovery
+resource "aws_ecr_replication_configuration" "cross_region" {
+  count = var.enable_multi_region ? 1 : 0
+
+  replication_configuration {
+    rule {
+      destination {
+        region      = var.aws_secondary_region
+        registry_id = data.aws_caller_identity.current.account_id
+      }
+    }
+  }
+}
+
+# ── EKS Cluster (Primary Region: us-east-1) ──────────────────────────────────
 module "eks" {
   source          = "terraform-aws-modules/eks/aws"
   version         = "19.15.3"
@@ -230,9 +245,10 @@ module "eks" {
   subnet_ids               = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.private_subnets
 
-  # Enable private endpoint access; restrict public access to known CIDR if needed
-  cluster_endpoint_private_access = true
-  cluster_endpoint_public_access  = true
+  # Control plane access: private & restricted public with authorized CIDR/OIDC CI/CD
+  cluster_endpoint_private_access      = true
+  cluster_endpoint_public_access       = var.eks_cluster_endpoint_public_access
+  cluster_endpoint_public_access_cidrs = var.eks_public_access_cidrs
 
   # Enable cluster-level encryption of Secrets
   cluster_encryption_config = {
@@ -266,6 +282,52 @@ module "eks" {
   }
 }
 
+# ── Secondary EKS Cluster (Standby Region: us-west-2 Pilot Light) ────────────
+module "eks_secondary" {
+  source  = "terraform-aws-modules/eks/aws"
+  version = "19.15.3"
+  providers = {
+    aws = aws.secondary
+  }
+  count = var.enable_multi_region ? 1 : 0
+
+  cluster_name    = "suspensionlab-prod-secondary"
+  cluster_version = var.eks_cluster_version
+
+  vpc_id                   = module.vpc_secondary[0].vpc_id
+  subnet_ids               = module.vpc_secondary[0].private_subnets
+  control_plane_subnet_ids = module.vpc_secondary[0].private_subnets
+
+  cluster_endpoint_private_access      = true
+  cluster_endpoint_public_access       = var.eks_cluster_endpoint_public_access
+  cluster_endpoint_public_access_cidrs = var.eks_public_access_cidrs
+
+  cluster_encryption_config = {
+    resources = ["secrets"]
+  }
+
+  eks_managed_node_groups = {
+    system = {
+      min_size       = 1
+      max_size       = 2
+      desired_size   = 1
+      instance_types = ["t3.medium"]
+      labels = {
+        role = "system"
+      }
+    }
+    standby = {
+      min_size       = 1
+      max_size       = 10
+      desired_size   = 1
+      instance_types = ["c6i.large"]
+      labels = {
+        role = "standby"
+      }
+    }
+  }
+}
+
 # ── RDS PostgreSQL ────────────────────────────────────────────────────────────
 # FIXED: multi_az = true, instance class upgraded, deletion protection, backups.
 # The original config had multi_az = false (SPOF) and db.t4g.small (undersized).
@@ -280,7 +342,7 @@ module "db" {
   engine_version       = "15"
   family               = "postgres15"
   major_engine_version = "15"
-  instance_class       = var.db_instance_class  # Validated minimum: db.t4g.medium
+  instance_class       = var.db_instance_class # Validated minimum: db.t4g.medium
 
   allocated_storage     = 50
   max_allocated_storage = 500
@@ -330,19 +392,19 @@ module "db_secondary" {
   identifier = "suspensionlab-db-${var.environment}-secondary"
 
   # Replica configuration
-  replicate_source_db    = module.db.db_instance_arn
-  instance_class         = var.db_instance_class
-  multi_az               = true
-  
+  replicate_source_db = module.db.db_instance_arn
+  instance_class      = var.db_instance_class
+  multi_az            = true
+
   # Network
   db_subnet_group_name   = module.vpc_secondary[0].database_subnet_group_name
   create_db_subnet_group = true
   subnet_ids             = module.vpc_secondary[0].private_subnets
-  
+
   # Backups are required on replica for promoting to primary
   backup_retention_period = var.db_backup_retention_days
   storage_encrypted       = true
-  
+
   skip_final_snapshot = true
 }
 
@@ -372,7 +434,6 @@ resource "aws_elasticache_replication_group" "redis" {
   # Encryption at rest and in transit
   at_rest_encryption_enabled = true
   transit_encryption_enabled = true
-  auth_token_enabled         = true
 
   # Automated snapshot for DR
   snapshot_retention_limit = 3
@@ -408,14 +469,14 @@ resource "aws_elasticache_replication_group" "redis_secondary" {
   provider = aws.secondary
   count    = var.enable_multi_region ? 1 : 0
 
-  replication_group_id          = "suspensionlab-redis-${var.environment}-sec"
-  description                   = "SuspensionLab Redis — Secondary Region"
-  global_replication_group_id   = aws_elasticache_global_replication_group.global_redis[0].global_replication_group_id
-  
+  replication_group_id        = "suspensionlab-redis-${var.environment}-sec"
+  description                 = "SuspensionLab Redis — Secondary Region"
+  global_replication_group_id = aws_elasticache_global_replication_group.global_redis[0].global_replication_group_id
+
   num_cache_clusters = 2
   multi_az_enabled   = true
-  
-  subnet_group_name  = aws_elasticache_subnet_group.redis_secondary[0].name
+
+  subnet_group_name = aws_elasticache_subnet_group.redis_secondary[0].name
 }
 
 resource "aws_elasticache_subnet_group" "redis_secondary" {
@@ -445,7 +506,9 @@ resource "aws_wafv2_web_acl" "main" {
   rule {
     name     = "AWSManagedRulesCommonRuleSet"
     priority = 1
-    override_action { none {} }
+    override_action {
+      none {}
+    }
     statement {
       managed_rule_group_statement {
         name        = "AWSManagedRulesCommonRuleSet"
@@ -463,7 +526,9 @@ resource "aws_wafv2_web_acl" "main" {
   rule {
     name     = "AWSManagedRulesKnownBadInputsRuleSet"
     priority = 2
-    override_action { none {} }
+    override_action {
+      none {}
+    }
     statement {
       managed_rule_group_statement {
         name        = "AWSManagedRulesKnownBadInputsRuleSet"
@@ -481,7 +546,9 @@ resource "aws_wafv2_web_acl" "main" {
   rule {
     name     = "AWSManagedRulesSQLiRuleSet"
     priority = 3
-    override_action { none {} }
+    override_action {
+      none {}
+    }
     statement {
       managed_rule_group_statement {
         name        = "AWSManagedRulesSQLiRuleSet"
@@ -499,7 +566,9 @@ resource "aws_wafv2_web_acl" "main" {
   rule {
     name     = "RateLimitPerIP"
     priority = 4
-    action { block {} }
+    action {
+      block {}
+    }
     statement {
       rate_based_statement {
         limit              = 2000
@@ -532,7 +601,7 @@ resource "aws_cloudwatch_log_group" "eks_cluster" {
 }
 
 # ── AWS Secrets Manager ───────────────────────────────────────────────────────
-# Placeholder secrets — actual values populated post-apply via CI/CD or manually.
+# Secrets populated via var.app_secrets. Placeholders strictly rejected in prod.
 # The RDS master password is auto-managed by the RDS module above.
 
 resource "aws_secretsmanager_secret" "app_secrets" {
@@ -543,16 +612,192 @@ resource "aws_secretsmanager_secret" "app_secrets" {
 
 resource "aws_secretsmanager_secret_version" "app_secrets" {
   secret_id = aws_secretsmanager_secret.app_secrets.id
-  secret_string = jsonencode({
-    JWT_SECRET_KEY               = "REPLACE_WITH_GENERATED_SECRET"
-    LEMON_SQUEEZY_API_KEY        = "REPLACE_WITH_REAL_KEY"
-    LEMON_SQUEEZY_WEBHOOK_SECRET = "REPLACE_WITH_REAL_SECRET"
-    GEMINI_API_KEY               = "REPLACE_WITH_REAL_KEY"
-  })
+  secret_string = length(var.app_secrets) > 0 ? jsonencode(var.app_secrets) : (
+    var.environment == "prod" ? jsonencode({
+      # In production, explicit secrets must be provided. Precondition guarantees validity.
+      JWT_SECRET_KEY               = "SECURE_AUTH_PROD_KEY_REQUIRED_SET_VIA_VAR"
+      LEMON_SQUEEZY_API_KEY        = "SECURE_BILLING_KEY_REQUIRED_SET_VIA_VAR"
+      LEMON_SQUEEZY_WEBHOOK_SECRET = "SECURE_WEBHOOK_SECRET_REQUIRED_SET_VIA_VAR"
+      GEMINI_API_KEY               = "SECURE_AI_KEY_REQUIRED_SET_VIA_VAR"
+      }) : jsonencode({
+      JWT_SECRET_KEY               = "dev-jwt-secret-key-non-prod-32-chars-ok"
+      LEMON_SQUEEZY_API_KEY        = "dev-lemonsqueezy-api-key"
+      LEMON_SQUEEZY_WEBHOOK_SECRET = "dev-lemonsqueezy-webhook-secret"
+      GEMINI_API_KEY               = "dev-gemini-api-key"
+    })
+  )
 
   lifecycle {
-    # Prevent Terraform from overwriting secrets that have been populated externally
     ignore_changes = [secret_string]
+    precondition {
+      condition = var.environment != "prod" || (
+        length(var.app_secrets) > 0 && alltrue([
+          for k, v in var.app_secrets : !can(regex("(?i)(REPLACE_WITH_|changeme|default|example)", v))
+        ])
+      )
+      error_message = "Production deployment requires authoritative secrets. Placeholders (REPLACE_WITH_, changeme, default, example) are rejected."
+    }
+  }
+}
+
+# ── Object Storage (S3) & Cross-Region Replication for DR ─────────────────────
+resource "aws_s3_bucket" "artifacts" {
+  bucket_prefix = "${var.s3_artifacts_bucket_prefix}-${var.environment}-"
+  force_destroy = var.environment != "prod"
+
+  tags = {
+    Name = "SuspensionLab Artifacts Primary"
+  }
+}
+
+resource "aws_s3_bucket_versioning" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "artifacts" {
+  bucket = aws_s3_bucket.artifacts.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# Secondary S3 Bucket (DR region)
+resource "aws_s3_bucket" "artifacts_secondary" {
+  provider      = aws.secondary
+  count         = var.enable_multi_region ? 1 : 0
+  bucket_prefix = "${var.s3_artifacts_bucket_prefix}-${var.environment}-sec-"
+  force_destroy = var.environment != "prod"
+
+  tags = {
+    Name = "SuspensionLab Artifacts DR Standby"
+  }
+}
+
+resource "aws_s3_bucket_versioning" "artifacts_secondary" {
+  provider = aws.secondary
+  count    = var.enable_multi_region ? 1 : 0
+  bucket   = aws_s3_bucket.artifacts_secondary[0].id
+
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "artifacts_secondary" {
+  provider = aws.secondary
+  count    = var.enable_multi_region ? 1 : 0
+  bucket   = aws_s3_bucket.artifacts_secondary[0].id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "artifacts_secondary" {
+  provider = aws.secondary
+  count    = var.enable_multi_region ? 1 : 0
+  bucket   = aws_s3_bucket.artifacts_secondary[0].id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# S3 Replication IAM Role
+resource "aws_iam_role" "s3_replication" {
+  count = var.enable_multi_region ? 1 : 0
+  name  = "suspensionlab-s3-replication-${var.environment}"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "s3.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_policy" "s3_replication" {
+  count = var.enable_multi_region ? 1 : 0
+  name  = "suspensionlab-s3-replication-policy-${var.environment}"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "s3:GetReplicationConfiguration",
+          "s3:ListBucket"
+        ]
+        Effect   = "Allow"
+        Resource = aws_s3_bucket.artifacts.arn
+      },
+      {
+        Action = [
+          "s3:GetObjectVersionForReplication",
+          "s3:GetObjectVersionAcl",
+          "s3:GetObjectVersionTagging"
+        ]
+        Effect   = "Allow"
+        Resource = "${aws_s3_bucket.artifacts.arn}/*"
+      },
+      {
+        Action = [
+          "s3:ReplicateObject",
+          "s3:ReplicateDelete",
+          "s3:ReplicateTags"
+        ]
+        Effect   = "Allow"
+        Resource = "${aws_s3_bucket.artifacts_secondary[0].arn}/*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "s3_replication" {
+  count      = var.enable_multi_region ? 1 : 0
+  role       = aws_iam_role.s3_replication[0].name
+  policy_arn = aws_iam_policy.s3_replication[0].arn
+}
+
+resource "aws_s3_bucket_replication_configuration" "replication" {
+  count      = var.enable_multi_region ? 1 : 0
+  depends_on = [aws_s3_bucket_versioning.artifacts, aws_s3_bucket_versioning.artifacts_secondary]
+
+  role   = aws_iam_role.s3_replication[0].arn
+  bucket = aws_s3_bucket.artifacts.id
+
+  rule {
+    id     = "replicate-all"
+    status = "Enabled"
+
+    destination {
+      bucket        = aws_s3_bucket.artifacts_secondary[0].arn
+      storage_class = "STANDARD"
+    }
   }
 }
 
@@ -616,7 +861,7 @@ resource "aws_route53_health_check" "primary" {
   resource_path     = "/health"
   failure_threshold = 3
   request_interval  = 30
-  
+
   tags = {
     Name = "SuspensionLab-Primary-HealthCheck"
   }
@@ -638,6 +883,7 @@ resource "aws_route53_record" "app_primary" {
 }
 
 resource "aws_route53_record" "app_secondary" {
+  count   = var.enable_multi_region ? 1 : 0
   zone_id = data.aws_route53_zone.main.zone_id
   name    = "app.suspensionlab.pro"
   type    = "CNAME"

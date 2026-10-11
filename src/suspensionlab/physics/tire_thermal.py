@@ -76,6 +76,17 @@ class TireThermalConfig:
     k_slip:     float = 0.70     # [-]
     T_initial:  float = 25.0     # °C
 
+    # 3-Layer thermal parameters
+    m_surf:     float = 1.5      # kg (tread surface layer)
+    m_bulk:     float = 7.0      # kg (carcass bulk structure)
+    m_gas:      float = 0.5      # kg (internal air/nitrogen cavity)
+    c_p_gas:    float = 1005.0   # J/(kg·K) specific heat of dry air
+    h_surf_bulk:float = 350.0    # W/(m²·K) conduction surface -> bulk
+    h_bulk_gas: float = 120.0    # W/(m²·K) convection bulk -> inner gas
+    h_gas_rim:  float = 80.0     # W/(m²·K) convection gas -> wheel rim
+    T_rim:      float = 40.0     # °C (brake drum/rim temperature)
+    p_cold_bar: float = 1.90     # bar (inflation pressure at T_ambient)
+
     def mu_scale_at(self, T_c: float) -> float:
         """Friction scaling factor at temperature T_c [°C].
 
@@ -93,6 +104,160 @@ class TireThermalConfig:
         """
         exponent = -0.5 * ((T_c - self.T_opt) / max(self.sigma_T, 1e-6)) ** 2
         return self.mu_cold + (1.0 - self.mu_cold) * math.exp(exponent)
+
+    def dynamic_pressure_bar(self, T_gas_c: float) -> float:
+        """Compute thermodynamic inflation pressure via Ideal Gas Law [bar].
+
+        p(T) = p_cold * (T_gas + 273.15) / (T_ambient + 273.15)
+        """
+        t_amb_k = max(self.T_ambient + 273.15, 1.0)
+        t_gas_k = max(T_gas_c + 273.15, 1.0)
+        return float(self.p_cold_bar * (t_gas_k / t_amb_k))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Multi-Layer Tire Thermal State
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class MultiLayerTireThermalState:
+    """3-Layer thermal state for 4 tires: Surface (tread), Bulk (carcass), Cavity Gas."""
+    # Tread surface temperatures [FL, FR, RL, RR] in °C
+    T_surf: np.ndarray = field(default_factory=lambda: np.array([25.0, 25.0, 25.0, 25.0]))
+    # Bulk carcass temperatures [FL, FR, RL, RR] in °C
+    T_bulk: np.ndarray = field(default_factory=lambda: np.array([25.0, 25.0, 25.0, 25.0]))
+    # Cavity gas temperatures [FL, FR, RL, RR] in °C
+    T_gas: np.ndarray = field(default_factory=lambda: np.array([25.0, 25.0, 25.0, 25.0]))
+
+    def pressures_bar(self, config: TireThermalConfig) -> np.ndarray:
+        """Compute inflation pressure for all 4 tires [bar]."""
+        t_amb_k = max(config.T_ambient + 273.15, 1.0)
+        t_gas_k = np.maximum(self.T_gas + 273.15, 1.0)
+        return config.p_cold_bar * (t_gas_k / t_amb_k)
+
+    def step(
+        self,
+        config: TireThermalConfig,
+        Fz: np.ndarray,
+        Fx: np.ndarray,
+        Fy: np.ndarray,
+        v_slip_x: np.ndarray,
+        v_slip_y: np.ndarray,
+        v_vehicle: float,
+        dt: float,
+    ) -> "MultiLayerTireThermalState":
+        """Advance 3-layer thermodynamic state by dt seconds via coupled ODE integration."""
+        Fz_arr = np.maximum(np.asarray(Fz, dtype=float), 0.0)
+        Fx_arr = np.asarray(Fx, dtype=float)
+        Fy_arr = np.asarray(Fy, dtype=float)
+        vsx = np.asarray(v_slip_x, dtype=float)
+        vsy = np.asarray(v_slip_y, dtype=float)
+
+        # 1. Surface layer: Frictional flash heat generation from mechanical slip work
+        # P_fric = |Fx * vsx| + |Fy * vsy|
+        P_fric = config.k_slip * (np.abs(Fx_arr * vsx) + np.abs(Fy_arr * vsy))
+        
+        # Convective cooling from tread surface to ambient air (speed dependent: h_air * (1 + 0.05 * v))
+        h_air_dyn = config.h_air * (1.0 + 0.04 * max(v_vehicle, 0.0))
+        Q_surf_air = h_air_dyn * config.A_surf * (self.T_surf - config.T_ambient)
+        
+        # Conductive cooling to road surface during contact
+        Q_surf_road = config.h_road * config.A_contact * (self.T_surf - config.T_road)
+        
+        # Conduction between surface tread and bulk carcass
+        Q_surf_bulk = config.h_surf_bulk * config.A_surf * (self.T_surf - self.T_bulk)
+        
+        # Tread surface temperature rate
+        cap_surf = max(config.m_surf * config.c_p, 1e-3)
+        dT_surf = (P_fric - Q_surf_air - Q_surf_road - Q_surf_bulk) / cap_surf * dt
+
+        # 2. Bulk carcass layer: Hysteretic deflection heating + conduction from tread
+        # P_hyst ~ rolling resistance deflection work: f_rr * Fz * v
+        P_hyst = 0.012 * Fz_arr * max(v_vehicle, 0.1) * 0.5
+        Q_bulk_gas = config.h_bulk_gas * config.A_surf * (self.T_bulk - self.T_gas)
+        
+        cap_bulk = max(config.m_bulk * config.c_p, 1e-3)
+        dT_bulk = (Q_surf_bulk + P_hyst - Q_bulk_gas) / cap_bulk * dt
+
+        # 3. Inner gas cavity layer: Heat exchange with carcass bulk and wheel rim
+        Q_gas_rim = config.h_gas_rim * config.A_surf * (self.T_gas - config.T_rim)
+        cap_gas = max(config.m_gas * config.c_p_gas, 1e-3)
+        dT_gas = (Q_bulk_gas - Q_gas_rim) / cap_gas * dt
+
+        new_surf = np.clip(self.T_surf + dT_surf, config.T_ambient, 220.0)
+        new_bulk = np.clip(self.T_bulk + dT_bulk, config.T_ambient, 180.0)
+        new_gas = np.clip(self.T_gas + dT_gas, config.T_ambient, 150.0)
+
+        return MultiLayerTireThermalState(
+            T_surf=new_surf,
+            T_bulk=new_bulk,
+            T_gas=new_gas,
+        )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Single Tire Multi-Layer Thermal State
+# ─────────────────────────────────────────────────────────────────────────────
+
+@dataclass
+class SingleTireThermalState:
+    """3-Layer thermal state for an individual tire: Tread Surface, Bulk Carcass, Cavity Gas."""
+    T_surf: float = 25.0        # Tread surface temperature [°C]
+    T_bulk: float = 25.0        # Carcass bulk temperature [°C]
+    T_gas: float = 25.0         # Cavity gas temperature [°C]
+    p_bar: float = 2.0          # Current inflation pressure [bar]
+
+    def step(
+        self,
+        config: TireThermalConfig,
+        Fz: float,
+        Fx: float,
+        Fy: float,
+        v_slip_x: float,
+        v_slip_y: float,
+        v_vehicle: float,
+        dt: float,
+    ) -> "SingleTireThermalState":
+        """Advance single tire thermal state by dt seconds."""
+        fz = max(0.0, float(Fz))
+        fx = float(Fx)
+        fy = float(Fy)
+        vsx = float(v_slip_x)
+        vsy = float(v_slip_y)
+        v = max(0.0, float(v_vehicle))
+
+        # 1. Surface layer: Frictional mechanical work
+        p_fric = config.k_slip * (abs(fx * vsx) + abs(fy * vsy))
+        h_air_dyn = config.h_air * (1.0 + 0.04 * v)
+        q_air = h_air_dyn * config.A_surf * (self.T_surf - config.T_ambient)
+        q_road = config.h_road * config.A_contact * (self.T_surf - config.T_road)
+        q_bulk = config.h_surf_bulk * config.A_surf * (self.T_surf - self.T_bulk)
+
+        cap_surf = max(config.m_surf * config.c_p, 1e-3)
+        dT_surf = (p_fric - q_air - q_road - q_bulk) / cap_surf * dt
+
+        # 2. Bulk carcass layer: Hysteretic deflection heating + conduction
+        p_hyst = 0.012 * fz * max(v, 0.1) * 0.5
+        q_gas = config.h_bulk_gas * config.A_surf * (self.T_bulk - self.T_gas)
+        cap_bulk = max(config.m_bulk * config.c_p, 1e-3)
+        dT_bulk = (q_bulk + p_hyst - q_gas) / cap_bulk * dt
+
+        # 3. Cavity gas layer: Heat exchange with rim
+        q_rim = config.h_gas_rim * config.A_surf * (self.T_gas - config.T_rim)
+        cap_gas = max(config.m_gas * config.c_p_gas, 1e-3)
+        dT_gas = (q_gas - q_rim) / cap_gas * dt
+
+        new_surf = float(np.clip(self.T_surf + dT_surf, config.T_ambient, 220.0))
+        new_bulk = float(np.clip(self.T_bulk + dT_bulk, config.T_ambient, 180.0))
+        new_gas = float(np.clip(self.T_gas + dT_gas, config.T_ambient, 150.0))
+        new_p = float(config.dynamic_pressure_bar(new_gas))
+
+        return SingleTireThermalState(
+            T_surf=new_surf,
+            T_bulk=new_bulk,
+            T_gas=new_gas,
+            p_bar=new_p,
+        )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -113,6 +278,10 @@ class TireThermalState:
     T_FR: float = 25.0  # °C
     T_RL: float = 25.0  # °C
     T_RR: float = 25.0  # °C
+    T_gas_FL: float = 25.0
+    T_gas_FR: float = 25.0
+    T_gas_RL: float = 25.0
+    T_gas_RR: float = 25.0
 
     # ── Accessors ─────────────────────────────────────────────────────────────
 

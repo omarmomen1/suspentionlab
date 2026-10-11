@@ -11,7 +11,7 @@ Pass your API key via the `X-API-Key` header.
 
 ### 1. Optimize Setup (Quarter Car)
 `POST /optimize`
-Run the AI genetic algorithm to find the optimal spring/damper parameters for a given road profile.
+Run the constrained numerical optimization solver (COBYLA / L-BFGS-B) to find the optimal spring/damper parameters for a given road profile.
 
 **Payload:**
 ```json

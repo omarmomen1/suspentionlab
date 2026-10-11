@@ -1425,6 +1425,169 @@ export class LineageApi {
   }
 }
 
+// ── Evidence Graph API (Phase 4.2 / 4.4 Canonical Read Layer) ─────────────────
+
+export interface EvidenceGraphEdgeDTO {
+  id: string;
+  source_type: string;
+  source_id: string;
+  relationship: string;
+  target_type: string;
+  target_id: string;
+  source_artifact_hash?: string | null;
+  target_artifact_hash?: string | null;
+  metadata: Record<string, any>;
+  edge_hash: string;
+  created_at: string;
+}
+
+export interface EvidenceGraphNodeDTO {
+  entity_type: string;
+  entity_id: string;
+  depth: number;
+}
+
+export interface EvidenceGraphTraversalMetadataDTO {
+  direction: "FORWARD" | "BACKWARD";
+  max_depth: number;
+  nodes_returned: number;
+  edges_returned: number;
+  limit_reached: boolean;
+  limit_type?: string | null;
+}
+
+export interface EvidenceGraphTraversalResponse {
+  root: {
+    entity_type: string;
+    entity_id: string;
+  };
+  nodes: EvidenceGraphNodeDTO[];
+  edges: EvidenceGraphEdgeDTO[];
+  traversal: EvidenceGraphTraversalMetadataDTO;
+}
+
+export interface EvidenceGraphPathExplanationResponse {
+  path_found: boolean;
+  length: number;
+  source: {
+    entity_type: string;
+    entity_id: string;
+  };
+  target: {
+    entity_type: string;
+    entity_id: string;
+  };
+  nodes: EvidenceGraphNodeDTO[];
+  edges: EvidenceGraphEdgeDTO[];
+}
+
+export interface EvidenceGraphEdgeListResponse {
+  edges: EvidenceGraphEdgeDTO[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface EvidenceGraphTraversalParams {
+  root_type: string;
+  root_id: string;
+  direction?: "FORWARD" | "BACKWARD";
+  max_depth?: number;
+  max_nodes?: number;
+  max_edges?: number;
+  relationship?: string;
+  entity_type?: string;
+}
+
+export interface EvidenceGraphListParams {
+  source_type?: string;
+  source_id?: string;
+  target_type?: string;
+  target_id?: string;
+  relationship?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface EvidenceGraphPathParams {
+  source_type: string;
+  source_id: string;
+  target_type: string;
+  target_id: string;
+  max_depth?: number;
+}
+
+export class EvidenceGraphApi {
+  /**
+   * Direct lookup for a single Evidence Graph edge with cryptographic integrity.
+   */
+  static async getEvidenceEdge(edgeId: string): Promise<EvidenceGraphEdgeDTO> {
+    return apiJson<EvidenceGraphEdgeDTO>(`/api/v1/evidence-graph/edges/${encodeURIComponent(edgeId)}`);
+  }
+
+  /**
+   * Lists tenant-scoped edges with bounded pagination and deterministic ordering.
+   */
+  static async listEvidenceEdges(params?: EvidenceGraphListParams): Promise<EvidenceGraphEdgeListResponse> {
+    const q = new URLSearchParams();
+    if (params?.source_type) q.set("source_type", params.source_type);
+    if (params?.source_id) q.set("source_id", params.source_id);
+    if (params?.target_type) q.set("target_type", params.target_type);
+    if (params?.target_id) q.set("target_id", params.target_id);
+    if (params?.relationship) q.set("relationship", params.relationship);
+    if (params?.limit !== undefined) q.set("limit", String(params.limit));
+    if (params?.offset !== undefined) q.set("offset", String(params.offset));
+    const queryStr = q.toString() ? `?${q.toString()}` : "";
+    return apiJson<EvidenceGraphEdgeListResponse>(`/api/v1/evidence-graph/edges${queryStr}`);
+  }
+
+  /**
+   * Executes bounded, deterministic, cycle-safe recursive traversal from root entity.
+   */
+  static async traverseEvidenceGraph(params: EvidenceGraphTraversalParams): Promise<EvidenceGraphTraversalResponse> {
+    const q = new URLSearchParams();
+    q.set("root_type", params.root_type);
+    q.set("root_id", params.root_id);
+    if (params.direction) q.set("direction", params.direction);
+    if (params.max_depth !== undefined) q.set("max_depth", String(params.max_depth));
+    if (params.max_nodes !== undefined) q.set("max_nodes", String(params.max_nodes));
+    if (params.max_edges !== undefined) q.set("max_edges", String(params.max_edges));
+    if (params.relationship) q.set("relationship", params.relationship);
+    if (params.entity_type) q.set("entity_type", params.entity_type);
+    return apiJson<EvidenceGraphTraversalResponse>(`/api/v1/evidence-graph/traverse?${q.toString()}`);
+  }
+
+  /**
+   * Subgraph query endpoint returning deduplicated connected component rooted at entity.
+   */
+  static async getEvidenceSubgraph(params: EvidenceGraphTraversalParams): Promise<EvidenceGraphTraversalResponse> {
+    const q = new URLSearchParams();
+    q.set("root_type", params.root_type);
+    q.set("root_id", params.root_id);
+    if (params.direction) q.set("direction", params.direction);
+    if (params.max_depth !== undefined) q.set("max_depth", String(params.max_depth));
+    if (params.max_nodes !== undefined) q.set("max_nodes", String(params.max_nodes));
+    if (params.max_edges !== undefined) q.set("max_edges", String(params.max_edges));
+    if (params.relationship) q.set("relationship", params.relationship);
+    if (params.entity_type) q.set("entity_type", params.entity_type);
+    return apiJson<EvidenceGraphTraversalResponse>(`/api/v1/evidence-graph/subgraph?${q.toString()}`);
+  }
+
+  /**
+   * Reconstructs the shortest deterministic directed provenance path from source to target.
+   */
+  static async explainEvidencePath(params: EvidenceGraphPathParams): Promise<EvidenceGraphPathExplanationResponse> {
+    const q = new URLSearchParams();
+    q.set("source_type", params.source_type);
+    q.set("source_id", params.source_id);
+    q.set("target_type", params.target_type);
+    q.set("target_id", params.target_id);
+    if (params.max_depth !== undefined) q.set("max_depth", String(params.max_depth));
+    return apiJson<EvidenceGraphPathExplanationResponse>(`/api/v1/evidence-graph/path?${q.toString()}`);
+  }
+}
+
+
 // ── Digital Twin & Proposal API ───────────────────────────────────────────────
 
 export interface DigitalTwinState {
@@ -2675,4 +2838,850 @@ export class HandlingApi {
   }
 }
 
+// ── BLIND ENGINEERING SESSION TYPES & API (PHASE 5.1) ─────────────────────────
+
+export interface BlindSessionDTO {
+  id: string;
+  status: "DRAFT" | "ARMED" | "BLIND_ACTIVE" | "SUBMISSION_LOCKED" | "READY_FOR_REVEAL" | "REVEALED" | "COMPLETED" | "ABORTED";
+  name: string;
+  root_entity_type: string;
+  root_entity_id: string;
+  visibility_summary: {
+    hidden_outcome_withheld: boolean;
+    visible_relationships_count?: number;
+    visible_entities_count?: number;
+  };
+  has_submission: boolean;
+  submission_id?: string | null;
+  submission_hash?: string | null;
+  has_comparison?: boolean;
+  comparison_id?: string | null;
+  comparison_hash?: string | null;
+  session_hash: string;
+  visible_context_hash?: string | null;
+  created_at: string;
+  locked_at?: string | null;
+  revealed_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface VisibleContextDTO {
+  session_id: string;
+  status: string;
+  root_entity: Record<string, any>;
+  visible_entities: Array<Record<string, any>>;
+  visible_edges: Array<{
+    source_type: string;
+    source_id: string;
+    relationship: string;
+    target_type: string;
+    target_id: string;
+    edge_hash?: string;
+  }>;
+  visible_context_hash: string;
+  accessed_at: string;
+}
+
+export interface BlindSubmissionDTO {
+  id: string;
+  session_id: string;
+  submitted_by_user_id: string;
+  submission_hash: string;
+  submitted_at: string;
+  status: string;
+}
+
+// ── PREDICTION CONTRACT TYPES (PHASE 5.2) ──────────────────────────────────
+
+export type PredictionType = "CATEGORICAL" | "DIRECTIONAL" | "QUANTITATIVE" | "ENGINEERING_DECISION";
+
+export type ExpectedDirection = "INCREASE" | "DECREASE" | "NEUTRAL" | "CONSTANT";
+
+export interface PredictionTarget {
+  entity_type: string;
+  entity_id: string;
+  metric: string;
+  aggregation?: string;
+}
+
+export interface ExpectedEffect {
+  metric: string;
+  direction: ExpectedDirection;
+  expected_delta?: number;
+  unit?: string;
+}
+
+export interface PredictionContractPayload {
+  schema_version: "1";
+  prediction_type: PredictionType;
+  target: PredictionTarget;
+  confidence: number;
+  predicted_value?: number;
+  unit?: string;
+  predicted_category?: string;
+  allowed_categories?: string[];
+  expected_direction?: ExpectedDirection;
+  expected_delta?: number;
+  selected_candidate_id?: string;
+  rationale?: string;
+  assumptions?: string[];
+  expected_effect?: ExpectedEffect;
+  visible_context_hash?: string;
+}
+
+export interface CreateBlindSessionRequest {
+  name: string;
+  root_entity_type: string;
+  root_entity_id: string;
+  hidden_outcome_type: string;
+  hidden_outcome_id: string;
+  configuration?: Record<string, any>;
+}
+
+export class BlindEngineeringApi {
+  static async createSession(data: CreateBlindSessionRequest): Promise<BlindSessionDTO> {
+    return apiJson("/api/v1/blind-sessions", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  }
+
+  static async getSession(sessionId: string): Promise<BlindSessionDTO> {
+    return apiJson(`/api/v1/blind-sessions/${encodeURIComponent(sessionId)}`);
+  }
+
+  static async getVisibleContext(sessionId: string): Promise<VisibleContextDTO> {
+    return apiJson(`/api/v1/blind-sessions/${encodeURIComponent(sessionId)}/context`);
+  }
+
+  static async armSession(sessionId: string): Promise<BlindSessionDTO> {
+    return apiJson(`/api/v1/blind-sessions/${encodeURIComponent(sessionId)}/arm`, {
+      method: "POST",
+    });
+  }
+
+  static async activateSession(sessionId: string): Promise<BlindSessionDTO> {
+    return apiJson(`/api/v1/blind-sessions/${encodeURIComponent(sessionId)}/activate`, {
+      method: "POST",
+    });
+  }
+
+  static async submitPrediction(sessionId: string, payload: PredictionContractPayload | Record<string, any>): Promise<BlindSubmissionDTO> {
+    return apiJson(`/api/v1/blind-sessions/${encodeURIComponent(sessionId)}/submit`, {
+      method: "POST",
+      body: JSON.stringify({ submission_payload: payload }),
+    });
+  }
+
+  static async lockSubmission(sessionId: string, payload: PredictionContractPayload | Record<string, any>): Promise<BlindSubmissionDTO> {
+    return apiJson(`/api/v1/blind-sessions/${encodeURIComponent(sessionId)}/lock`, {
+      method: "POST",
+      body: JSON.stringify({ submission_payload: payload }),
+    });
+  }
+
+  static async prepareReveal(sessionId: string): Promise<BlindSessionDTO> {
+    return apiJson(`/api/v1/blind-sessions/${encodeURIComponent(sessionId)}/prepare-reveal`, {
+      method: "POST",
+    });
+  }
+
+  static async abortSession(sessionId: string, reason?: string): Promise<BlindSessionDTO> {
+    return apiJson(`/api/v1/blind-sessions/${encodeURIComponent(sessionId)}/abort`, {
+      method: "POST",
+      body: JSON.stringify({ reason: reason || "User requested abort" }),
+    });
+  }
+
+  static async revealSession(sessionId: string): Promise<BlindComparisonDTO> {
+    return apiJson(`/api/v1/blind-sessions/${encodeURIComponent(sessionId)}/reveal`, {
+      method: "POST",
+    });
+  }
+
+  static async getComparison(sessionId: string): Promise<BlindComparisonDTO> {
+    return apiJson(`/api/v1/blind-sessions/${encodeURIComponent(sessionId)}/comparison`);
+  }
+
+  static async getReveal(sessionId: string): Promise<RevealedOutcomeDTO> {
+    return apiJson(`/api/v1/blind-sessions/${encodeURIComponent(sessionId)}/reveal`);
+  }
+}
+
+// ── BLIND COMPARISON & REVEALED OUTCOME TYPES (PHASE 5.3) ─────────────────
+
+export interface BlindComparisonDTO {
+  id: string;
+  session_id: string;
+  submission_id: string;
+  outcome_identity: Record<string, any>;
+  prediction_schema_version: string;
+  comparison_policy_version: string;
+  comparison_type: string;
+  verdict: string;
+  comparison_metrics: Record<string, any>;
+  tolerance_applied?: Record<string, any> | null;
+  interpretation: string;
+  comparison_hash: string;
+  computed_at: string;
+  prediction_payload?: Record<string, any> | null;
+}
+
+export interface RevealedOutcomeDTO {
+  session_id: string;
+  status: string;
+  outcome_entity_type: string;
+  outcome_entity_id: string;
+  outcome_identity: Record<string, any>;
+  outcome_hash: string;
+  revealed_at?: string | null;
+}
+
+
+// ── Parameter Trust Map API (Phase 6.1) ───────────────────────────────────────
+
+export type ParameterTrustState =
+  | "UNASSESSED"
+  | "SUPPORTED"
+  | "VALIDATED"
+  | "HIGH_CONFIDENCE"
+  | "PROVISIONAL"
+  | "CONFLICTED"
+  | "STALE"
+  | "INSUFFICIENT_EVIDENCE"
+  | "REJECTED";
+
+export type ValidationCoverage =
+  | "NO_VALIDATION"
+  | "PARTIAL_VALIDATION"
+  | "VALIDATED"
+  | "CONFLICTING_VALIDATION";
+
+export interface ParameterIdentityDTO {
+  entity_type: string;
+  entity_id: string;
+  parameter_name: string;
+  parameter_path: string;
+}
+
+export interface ValueReferenceDTO {
+  value: any;
+  value_identity: string;
+  unit: string;
+  source_entity: string;
+}
+
+export interface ParameterTrustEvidenceDTO {
+  id?: string;
+  evidence_type: string;
+  evidence_id: string;
+  artifact_hash: string;
+  relationship: string;
+  timestamp?: string | null;
+  evidence_timestamp?: string | null;
+  metadata?: Record<string, any>;
+}
+
+export interface ParameterTrustConflictDTO {
+  conflict_type: string;
+  source_a: string;
+  value_a?: any;
+  verdict_a?: string | null;
+  source_b: string;
+  value_b?: any;
+  verdict_b?: string | null;
+  delta?: number | null;
+  delta_pct?: number | null;
+  detail: string;
+}
+
+export interface ParameterTrustRecencyDTO {
+  recency_policy_version?: string;
+  recency_condition?: string;
+  reassessment_recommended?: boolean;
+  reassessment_reason?: string | null;
+  is_validity_expired?: boolean;
+  is_superseded?: boolean;
+  evidence_timestamp?: string | null;
+  validation_timestamp?: string | null;
+  source_version?: string | null;
+  latest_supporting_validation?: string | null;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  age_days?: number | null;
+  advisory_threshold_days?: number;
+  epistemic_aging_note?: string;
+  reference_time?: string;
+}
+
+export interface ParameterTrustExplanationDTO {
+  state: string;
+  reasons: string[];
+  supporting_evidence: ParameterTrustEvidenceDTO[];
+  conflicts: ParameterTrustConflictDTO[];
+  scope: Record<string, any>;
+  limitations: string[];
+}
+
+export interface ParameterTrustResponseDTO {
+  parameter_identity: ParameterIdentityDTO;
+  value_reference: ValueReferenceDTO;
+  unit: string;
+  current_trust_state: ParameterTrustState;
+  policy_version: string;
+  scope: Record<string, any>;
+  supporting_evidence: ParameterTrustEvidenceDTO[];
+  validation_coverage: ValidationCoverage;
+  recency: ParameterTrustRecencyDTO;
+  conflicts: ParameterTrustConflictDTO[];
+  explanation: ParameterTrustExplanationDTO;
+  assessment_hash: string;
+}
+
+export interface ParameterTrustExplanationResponseDTO {
+  parameter_identity: ParameterIdentityDTO;
+  trust_state: string;
+  policy_version: string;
+  assessment_hash: string;
+  explanation: ParameterTrustExplanationDTO;
+}
+
+export interface ParameterTrustHistoryItemDTO {
+  id: string;
+  trust_state: ParameterTrustState;
+  validation_coverage: ValidationCoverage;
+  policy_version: string;
+  assessment_hash: string;
+  value_identity: string;
+  supporting_evidence_hashes: string[];
+  explanation: Record<string, any>;
+  conflicts: ParameterTrustConflictDTO[];
+  recency_metadata: Record<string, any>;
+  created_at: string;
+}
+
+export interface ParameterTrustHistoryResponseDTO {
+  parameter_identity: ParameterIdentityDTO;
+  history: ParameterTrustHistoryItemDTO[];
+  total: number;
+}
+
+// ── Phase 6.2 Ingestion & Sweep Analysis DTOs ───────────────────────────────
+
+export interface BatchEntityItemDTO {
+  entity_type: string;
+  entity_id: string;
+}
+
+export interface BatchIngestRequestDTO {
+  entities: BatchEntityItemDTO[];
+  force_reassess?: boolean;
+}
+
+export interface BatchIngestProfileSummaryDTO {
+  entity_type: string;
+  entity_id: string;
+  parameter_name: string;
+  trust_state: ParameterTrustState;
+  validation_coverage: ValidationCoverage;
+  assessment_hash: string;
+  unit: string;
+  has_conflicts: boolean;
+  recency_condition: string;
+}
+
+export interface BatchIngestSummaryDTO {
+  batch_id: string;
+  batch_hash: string;
+  policy_version: string;
+  recency_policy_version: string;
+  discovered_entities: number;
+  discovered_parameters: number;
+  new_profiles: number;
+  refreshed_assessments: number;
+  unchanged_assessments: number;
+  linked_evidence_count: number;
+  conflicts_found: number;
+  skipped_entities: Array<{ entity_type: string; entity_id: string; reason: string; detail?: string }>;
+  errors: Array<{ entity_type: string; entity_id: string; reason: string; detail?: string }>;
+  profiles: BatchIngestProfileSummaryDTO[];
+}
+
+export interface ParameterSweepCandidateDTO {
+  entity_type: string;
+  entity_id: string;
+}
+
+export interface ParameterSweepAnalysisRequestDTO {
+  parameter_name: string;
+  candidates: ParameterSweepCandidateDTO[];
+  baseline_candidate?: ParameterSweepCandidateDTO;
+}
+
+export interface ParameterSweepObservationDTO {
+  entity_type: string;
+  entity_id: string;
+  value: any;
+  numeric_value?: number | null;
+  unit: string;
+  trust_state: ParameterTrustState;
+  validation_coverage: ValidationCoverage;
+  provenance_class: string;
+  assessment_hash: string;
+  is_comparable: boolean;
+  exclusion_reason?: string | null;
+  scope: Record<string, any>;
+  conflicts_count: number;
+}
+
+export interface ParameterSweepMetricsDTO {
+  min?: number | null;
+  max?: number | null;
+  delta?: number | null;
+  mean?: number | null;
+  spread?: number | null;
+  unit: string;
+}
+
+export interface ParameterSweepEvidenceGapsDTO {
+  unvalidated_candidates: string[];
+  validated_candidates: string[];
+  coverage_pct: number;
+}
+
+export interface ParameterSweepAnalysisResponseDTO {
+  parameter_name: string;
+  policy_version: string;
+  canonical_unit: string;
+  sweep_hash: string;
+  total_observations: number;
+  comparable_count: number;
+  excluded_count: number;
+  baseline_value?: number | null;
+  baseline_unit?: string | null;
+  summary_metrics: ParameterSweepMetricsDTO;
+  validation_coverage_breakdown: Record<string, number>;
+  trust_state_breakdown: Record<string, number>;
+  evidence_gaps: ParameterSweepEvidenceGapsDTO;
+  observations: ParameterSweepObservationDTO[];
+  excluded_observations: any[];
+  conflicts: any[];
+  outcome_associations: any[];
+}
+
+// ── Phase 6.3 Fleet-Wide Trust Synchronization & Sensitivity Propagation DTOs ──
+
+export interface FleetMemberLocatorDTO {
+  entity_type: string;
+  entity_id: string;
+}
+
+export interface FleetCompareRequestDTO {
+  fleet_id: string;
+  parameter_name: string;
+  members: FleetMemberLocatorDTO[];
+  canonical_unit?: string | null;
+  persist_report?: boolean;
+}
+
+export interface FleetSynchronizationResponseDTO {
+  fleet_id: string;
+  parameter_name: string;
+  policy_version: string;
+  canonical_unit?: string | null;
+  report_hash: string;
+  cohort_size: number;
+  comparable_count: number;
+  excluded_count: number;
+  missing_count: number;
+  summary_metrics: {
+    min?: number | null;
+    max?: number | null;
+    delta?: number | null;
+    spread?: number | null;
+    mean?: number | null;
+    median?: number | null;
+    unit: string;
+    sample_count: number;
+    missing_count: number;
+    excluded_count: number;
+  };
+  comparable_instances: any[];
+  excluded_instances: any[];
+  missing_instances: any[];
+  conflicts: any[];
+  outliers: any[];
+  validation_coverage_breakdown: Record<string, number>;
+  trust_state_breakdown: Record<string, number>;
+  provenance_distribution: Record<string, number>;
+}
+
+export interface FleetSummaryItemDTO {
+  id: string;
+  fleet_id: string;
+  parameter_name: string;
+  canonical_unit?: string | null;
+  report_hash: string;
+  cohort_size: number;
+  comparable_count: number;
+  excluded_count: number;
+  missing_count: number;
+  summary_metrics: Record<string, any>;
+  created_at: string;
+}
+
+export interface FleetSummaryResponseDTO {
+  fleet_id: string;
+  reports: FleetSummaryItemDTO[];
+  total: number;
+}
+
+export interface AssemblyImpactAssessmentResponseDTO {
+  vehicle_id: string;
+  parameter_name: string;
+  assembly_name?: string | null;
+  component_name?: string | null;
+  policy_version: string;
+  impact_hash?: string | null;
+  can_propagate: boolean;
+  reason?: string | null;
+  dependency_path?: string[] | null;
+  direct_trust_assessment?: {
+    trust_state: string;
+    validation_coverage: string;
+    conflicts_count: number;
+    assessment_hash?: string | null;
+  } | null;
+  sensitivity_evidence?: any;
+  impact_assessment?: {
+    impact_classification: string;
+    impact_summary: string;
+    downstream_metrics: any[];
+    evidence_gaps: string[];
+    threshold_provenance?: string;
+    threshold_metadata?: any;
+    deployment_safety_inferred?: boolean;
+    deployment_authorization?: string;
+    deployment_safety_notice?: string;
+  } | null;
+  threshold_provenance?: string;
+  deployment_safety_inferred?: boolean;
+  lineage_note?: string | null;
+}
+
+export interface SensitivityEvidenceResponseDTO {
+  status: string;
+  input_parameter: string;
+  source_type?: string | null;
+  source_id?: string | null;
+  artifact_hash?: string | null;
+  downstream_metrics?: any[] | null;
+  method?: string | null;
+  model_version?: string | null;
+  solver_version?: string | null;
+  operating_regime?: string | null;
+  created_at?: string | null;
+  warning?: string | null;
+}
+
+export class ParameterTrustApi {
+  /**
+   * Retrieves authoritative trust posture for a specific engineering parameter.
+   */
+  static async getParameterTrust(
+    entityType: string,
+    entityId: string,
+    parameter: string
+  ): Promise<ParameterTrustResponseDTO> {
+    return apiJson<ParameterTrustResponseDTO>(
+      `/api/v1/parameter-trust/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}/${encodeURIComponent(parameter)}`
+    );
+  }
+
+  /**
+   * Returns supporting evidence references linking this parameter to authoritative engineering artifacts.
+   */
+  static async getParameterEvidence(
+    entityType: string,
+    entityId: string,
+    parameter: string
+  ): Promise<ParameterTrustEvidenceDTO[]> {
+    return apiJson<ParameterTrustEvidenceDTO[]>(
+      `/api/v1/parameter-trust/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}/${encodeURIComponent(parameter)}/evidence`
+    );
+  }
+
+  /**
+   * Returns the deterministic, auditable explanation object for this parameter's trust state.
+   */
+  static async explainParameterTrust(
+    entityType: string,
+    entityId: string,
+    parameter: string
+  ): Promise<ParameterTrustExplanationResponseDTO> {
+    return apiJson<ParameterTrustExplanationResponseDTO>(
+      `/api/v1/parameter-trust/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}/${encodeURIComponent(parameter)}/explain`
+    );
+  }
+
+  /**
+   * Returns chronological assessment history for this parameter.
+   */
+  static async getParameterTrustHistory(
+    entityType: string,
+    entityId: string,
+    parameter: string
+  ): Promise<ParameterTrustHistoryResponseDTO> {
+    return apiJson<ParameterTrustHistoryResponseDTO>(
+      `/api/v1/parameter-trust/${encodeURIComponent(entityType)}/${encodeURIComponent(entityId)}/${encodeURIComponent(parameter)}/history`
+    );
+  }
+
+  /**
+   * Ingests all parameters for a single authoritative entity.
+   */
+  static async ingestEntity(
+    entityType: string,
+    entityId: string,
+    forceReassess?: boolean
+  ): Promise<BatchIngestSummaryDTO> {
+    return apiJson<BatchIngestSummaryDTO>("/api/v1/parameter-trust/ingest/entity", {
+      method: "POST",
+      body: JSON.stringify({ entity_type: entityType, entity_id: entityId, force_reassess: !!forceReassess }),
+    });
+  }
+
+  /**
+   * Performs idempotent batch ingestion across multiple authoritative entities.
+   */
+  static async ingestBatch(
+    payload: BatchIngestRequestDTO
+  ): Promise<BatchIngestSummaryDTO> {
+    return apiJson<BatchIngestSummaryDTO>("/api/v1/parameter-trust/ingest/batch", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Analyzes parameter sweep comparability, range, validation coverage, and conflicts.
+   */
+  static async analyzeSweep(
+    payload: ParameterSweepAnalysisRequestDTO
+  ): Promise<ParameterSweepAnalysisResponseDTO> {
+    return apiJson<ParameterSweepAnalysisResponseDTO>("/api/v1/parameter-trust/sweep/analyze", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Synchronizes and compares parameter values and trust across a fleet cohort.
+   */
+  static async compareFleet(
+    payload: FleetCompareRequestDTO
+  ): Promise<FleetSynchronizationResponseDTO> {
+    return apiJson<FleetSynchronizationResponseDTO>("/api/v1/parameter-trust/fleet/compare", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Retrieves historical fleet cohort reports.
+   */
+  static async getFleetSummary(
+    fleetId: string,
+    parameterName?: string
+  ): Promise<FleetSummaryResponseDTO> {
+    const q = new URLSearchParams();
+    if (parameterName) q.set("parameter_name", parameterName);
+    return apiJson<FleetSummaryResponseDTO>(`/api/v1/parameter-trust/fleet/${encodeURIComponent(fleetId)}/summary?${q.toString()}`);
+  }
+
+  /**
+   * Assesses assembly-level propagated impact under SENSITIVITY_PROPAGATION_POLICY_V1.
+   */
+  static async getAssemblyImpact(
+    vehicleId: string,
+    parameterName: string,
+    assemblyName?: string,
+    componentName?: string
+  ): Promise<AssemblyImpactAssessmentResponseDTO> {
+    const q = new URLSearchParams({
+      vehicle_id: vehicleId,
+      parameter_name: parameterName,
+    });
+    if (assemblyName) q.set("assembly_name", assemblyName);
+    if (componentName) q.set("component_name", componentName);
+    return apiJson<AssemblyImpactAssessmentResponseDTO>(`/api/v1/parameter-trust/assembly/impact?${q.toString()}`);
+  }
+
+  /**
+   * Resolves authoritative sensitivity evidence for a parameter.
+   */
+  static async getSensitivityEvidence(
+    parameterName: string,
+    vehicleId?: string,
+    setupId?: string
+  ): Promise<SensitivityEvidenceResponseDTO> {
+    const q = new URLSearchParams({ parameter_name: parameterName });
+    if (vehicleId) q.set("vehicle_id", vehicleId);
+    if (setupId) q.set("setup_id", setupId);
+    return apiJson<SensitivityEvidenceResponseDTO>(`/api/v1/parameter-trust/sensitivity/evidence?${q.toString()}`);
+  }
+}
+
+// ── Blind Engineering Calibration & Longitudinal Track Record (Phase 5.4) ─────
+
+export interface OutcomeStatisticsDTO {
+  total_completed_evaluations: number;
+  comparable_evaluations: number;
+  uncomparable_evaluations: number;
+  metrics_only_evaluations: number;
+  binary_evaluated_count: number;
+  correct_outcomes: number;
+  incorrect_outcomes: number;
+  observed_accuracy?: number | null;
+  observed_accuracy_ci?: [number, number] | null;
+  comparison_coverage?: number | null;
+  excluded_counts: Record<string, number>;
+  cohort_breakdown: Record<string, any>;
+}
+
+export interface BrierScoreDTO {
+  brier_score?: number | null;
+  eligible_sample_size: number;
+  status: "AVAILABLE" | "INSUFFICIENT_SAMPLE";
+  excluded_count: number;
+  excluded_reasons: Record<string, number>;
+  interpretation: string;
+}
+
+export interface CalibrationBinDTO {
+  bin_index: number;
+  range: [number, number];
+  label: string;
+  sample_count: number;
+  positive_count: number;
+  mean_forecast_probability?: number | null;
+  observed_frequency?: number | null;
+  uncertainty_interval?: [number, number] | null;
+  is_empty: boolean;
+}
+
+export interface CalibrationCurveResponseDTO {
+  status: "AVAILABLE" | "INSUFFICIENT_SAMPLE" | "NO_DATA";
+  status_message: string;
+  total_eligible_samples: number;
+  excluded_observations_count: number;
+  bins: CalibrationBinDTO[];
+  policy_version: string;
+  binning_method: string;
+  uncertainty_method: string;
+  aggregate_hash?: string;
+  cohort_definition?: Record<string, any>;
+}
+
+export interface CalibrationSummaryResponseDTO {
+  calibration_policy_version: string;
+  calibration_policy_hash: string;
+  aggregate_hash: string;
+  cohort_definition: Record<string, any>;
+  outcome_statistics: OutcomeStatisticsDTO;
+  brier_score: BrierScoreDTO;
+  calibration_curve_summary: {
+    status: string;
+    status_message: string;
+    total_eligible_samples: number;
+  };
+  source_comparisons_count: number;
+  source_comparison_ids: string[];
+}
+
+export interface EvaluationHistoryItemDTO {
+  comparison_id: string;
+  comparison_hash: string;
+  comparison_policy_version: string;
+  comparison_type: string;
+  verdict: string;
+  interpretation: string;
+  comparison_metrics: Record<string, any>;
+  computed_at?: string | null;
+  session_id: string;
+  session_name: string;
+  session_status: string;
+  root_entity_type: string;
+  root_entity_id: string;
+  revealed_at?: string | null;
+  submission_id: string;
+  submission_hash: string;
+  submitted_at?: string | null;
+  prediction_payload: Record<string, any>;
+  outcome_identity: Record<string, any>;
+  eligibility: Record<string, any>;
+}
+
+export interface CalibrationHistoryResponseDTO {
+  calibration_policy_version: string;
+  total_count: number;
+  limit: number;
+  offset: number;
+  evaluations: EvaluationHistoryItemDTO[];
+}
+
+export class BlindCalibrationApi {
+  static async getMySummary(params?: {
+    prediction_type?: string;
+    window_start?: string;
+    window_end?: string;
+  }): Promise<CalibrationSummaryResponseDTO> {
+    const q = new URLSearchParams();
+    if (params?.prediction_type) q.set("prediction_type", params.prediction_type);
+    if (params?.window_start) q.set("window_start", params.window_start);
+    if (params?.window_end) q.set("window_end", params.window_end);
+    const qs = q.toString() ? `?${q.toString()}` : "";
+    return apiJson<CalibrationSummaryResponseDTO>(`/api/v1/blind-calibration/me${qs}`);
+  }
+
+  static async getMyCurve(params?: {
+    prediction_type?: string;
+  }): Promise<CalibrationCurveResponseDTO> {
+    const q = new URLSearchParams();
+    if (params?.prediction_type) q.set("prediction_type", params.prediction_type);
+    const qs = q.toString() ? `?${q.toString()}` : "";
+    return apiJson<CalibrationCurveResponseDTO>(`/api/v1/blind-calibration/me/curve${qs}`);
+  }
+
+  static async getMyHistory(params?: {
+    limit?: number;
+    offset?: number;
+    prediction_type?: string;
+  }): Promise<CalibrationHistoryResponseDTO> {
+    const q = new URLSearchParams();
+    if (params?.limit !== undefined) q.set("limit", String(params.limit));
+    if (params?.offset !== undefined) q.set("offset", String(params.offset));
+    if (params?.prediction_type) q.set("prediction_type", params.prediction_type);
+    const qs = q.toString() ? `?${q.toString()}` : "";
+    return apiJson<CalibrationHistoryResponseDTO>(`/api/v1/blind-calibration/me/history${qs}`);
+  }
+
+  static async getTeamSummary(
+    teamId: string,
+    params?: {
+      prediction_type?: string;
+      window_start?: string;
+      window_end?: string;
+    }
+  ): Promise<CalibrationSummaryResponseDTO> {
+    const q = new URLSearchParams();
+    if (params?.prediction_type) q.set("prediction_type", params.prediction_type);
+    if (params?.window_start) q.set("window_start", params.window_start);
+    if (params?.window_end) q.set("window_end", params.window_end);
+    const qs = q.toString() ? `?${q.toString()}` : "";
+    return apiJson<CalibrationSummaryResponseDTO>(
+      `/api/v1/blind-calibration/team/${encodeURIComponent(teamId)}${qs}`
+    );
+  }
+}
 

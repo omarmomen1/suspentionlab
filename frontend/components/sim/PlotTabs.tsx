@@ -10,7 +10,7 @@ import React from "react";
 
 export interface PlotTabDef {
   label: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  
   icon: React.ComponentType<any>;
 }
 
@@ -21,25 +21,58 @@ interface PlotTabsProps {
 }
 
 export default function PlotTabs({ tabs, activeTab, onChange }: PlotTabsProps) {
+  const tabRefs = React.useRef<(HTMLButtonElement | null)[]>([]);
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    let nextIndex = activeTab;
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      nextIndex = (activeTab + 1) % tabs.length;
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      nextIndex = (activeTab - 1 + tabs.length) % tabs.length;
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      nextIndex = 0;
+    } else if (e.key === "End") {
+      e.preventDefault();
+      nextIndex = tabs.length - 1;
+    }
+
+    if (nextIndex !== activeTab) {
+      onChange(nextIndex);
+      tabRefs.current[nextIndex]?.focus();
+    }
+  };
+
   return (
-    <div className="flex gap-1.5 shrink-0 overflow-x-auto custom-scrollbar" role="tablist">
+    <div
+      className="flex gap-1.5 shrink-0 overflow-x-auto custom-scrollbar"
+      role="tablist"
+      aria-label="Simulation Analysis Views"
+      onKeyDown={handleKeyDown}
+    >
       {tabs.map((tab, i) => {
         const Icon = tab.icon;
         const active = i === activeTab;
         return (
           <button
             key={tab.label}
+            ref={(el) => { tabRefs.current[i] = el; }}
+            id={`sim-tab-${i}`}
+            aria-controls={`sim-tabpanel-${i}`}
             onClick={() => onChange(i)}
+            tabIndex={active ? 0 : -1}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all ${
               active
                 ? "bg-ansys-yellow/15 text-ansys-yellow border border-ansys-yellow/40"
-                : "bg-[#141416] text-gray-500 border border-[#252525] hover:text-gray-300 hover:border-[#3a3a3a]"
+                : "bg-[#141416] text-gray-400 border border-[#252525] hover:text-white hover:border-[#3a3a3a]"
             }`}
             aria-selected={active}
             role="tab"
           >
-            <Icon size={13} />
-            {tab.label}
+            <Icon size={13} aria-hidden="true" />
+            <span>{tab.label}</span>
           </button>
         );
       })}

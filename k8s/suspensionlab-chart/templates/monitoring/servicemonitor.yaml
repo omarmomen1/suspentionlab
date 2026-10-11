@@ -10,7 +10,7 @@ apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   name: {{ .Release.Name }}-api-metrics
-  namespace: suspensionlab-prod
+  namespace: {{ .Release.Namespace }}
   labels:
     app: suspensionlab
     component: api
@@ -23,7 +23,7 @@ spec:
       component: api
   namespaceSelector:
     matchNames:
-      - suspensionlab-prod
+      - {{ .Release.Namespace }}
   endpoints:
     - port: http
       path: /metrics

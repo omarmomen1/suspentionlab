@@ -1,10 +1,15 @@
+{{- if and .Values.workers .Values.workers.keda .Values.workers.keda.enabled }}
 apiVersion: keda.sh/v1alpha1
 kind: TriggerAuthentication
 metadata:
   name: {{ .Release.Name }}-keda-redis-auth
-  namespace: suspensionlab-prod
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: suspensionlab
+    component: keda-auth
 spec:
   secretTargetRef:
   - parameter: password
     name: {{ .Release.Name }}-secrets
     key: REDIS_PASSWORD
+{{- end }}

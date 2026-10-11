@@ -7,30 +7,26 @@ interface NavItemProps {
   label: string;
 }
 
-/**
- * Client component so we can use usePathname() for active route highlighting.
- * The parent layout stays a server component — only this leaf is a client component.
- */
 export default function NavItem({ href, label }: NavItemProps) {
   const pathname = usePathname();
-  // Highlight exact match OR any sub-path (e.g. /quarter-car/settings)
   const isActive = pathname === href || pathname.startsWith(href + "/");
 
   return (
     <Link
       href={href}
+      prefetch={true}
       aria-current={isActive ? "page" : undefined}
-      className={`relative text-xs font-normal tracking-wide transition-colors duration-200 group whitespace-nowrap ${
-        isActive ? "text-white" : "text-gray-500 hover:text-gray-200"
+      className={`relative text-xs font-normal tracking-wide transition-all duration-150 group whitespace-nowrap px-1.5 py-0.5 rounded ${
+        isActive ? "text-white font-medium" : "text-gray-400 hover:text-gray-200"
       }`}
     >
       {label}
-      {/* Active indicator line */}
       <span
         className={`absolute -bottom-1 left-0 h-px w-full bg-ansys-yellow transition-all duration-200 ${
-          isActive ? "opacity-100" : "opacity-0 group-hover:opacity-30"
+          isActive ? "opacity-100 scale-x-100" : "opacity-0 scale-x-50 group-hover:opacity-40 group-hover:scale-x-100"
         }`}
       />
     </Link>
   );
 }
+

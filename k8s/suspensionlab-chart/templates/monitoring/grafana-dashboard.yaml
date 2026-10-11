@@ -1,0 +1,130 @@
+{{- if .Values.monitoring.grafanaDashboard.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Release.Name }}-grafana-dashboard
+  namespace: {{ .Release.Namespace }}
+  labels:
+    grafana_dashboard: "1"
+    app: suspensionlab
+data:
+  suspensionlab-overview.json: |-
+    {
+      "annotations": { "list": [] },
+      "editable": false,
+      "fiscalYearStartMonth": 0,
+      "graphTooltip": 1,
+      "id": null,
+      "title": "SuspensionLab PRO — Enterprise SRE & Physics Observability",
+      "tags": ["suspensionlab", "sre", "physics"],
+      "timezone": "browser",
+      "schemaVersion": 38,
+      "version": 1,
+      "refresh": "10s",
+      "panels": [
+        {
+          "title": "API Request Rate (req/sec)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+          "targets": [
+            {
+              "expr": "sum(rate(suspensionlab_api_requests_total[1m])) by (method, route)",
+              "legendFormat": "{{ "{{method}} {{route}}" }}"
+            }
+          ]
+        },
+        {
+          "title": "API Error Rate (5xx %)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 0 },
+          "targets": [
+            {
+              "expr": "sum(rate(suspensionlab_api_requests_total{status_code=~\"5..\"}[1m])) / sum(rate(suspensionlab_api_requests_total[1m]))",
+              "legendFormat": "5xx error ratio"
+            }
+          ]
+        },
+        {
+          "title": "API P99 Latency (s)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 0 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(suspensionlab_api_request_duration_seconds_bucket[5m])) by (le))",
+              "legendFormat": "P99 latency"
+            }
+          ]
+        },
+        {
+          "title": "Queue Depth (Jobs Pending)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 8 },
+          "targets": [
+            {
+              "expr": "suspensionlab_queue_depth",
+              "legendFormat": "Queue: {{ "{{queue}}" }}"
+            }
+          ]
+        },
+        {
+          "title": "Worker Job Processing Rate",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 8 },
+          "targets": [
+            {
+              "expr": "sum(rate(suspensionlab_worker_jobs_total[1m])) by (status)",
+              "legendFormat": "Status: {{ "{{status}}" }}"
+            }
+          ]
+        },
+        {
+          "title": "DB Connection Pool Active vs Size",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 8 },
+          "targets": [
+            {
+              "expr": "suspensionlab_db_connection_pool_active",
+              "legendFormat": "Active Connections"
+            },
+            {
+              "expr": "suspensionlab_db_connection_pool_size",
+              "legendFormat": "Pool Capacity"
+            }
+          ]
+        },
+        {
+          "title": "Solver Run Outcomes",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 16 },
+          "targets": [
+            {
+              "expr": "sum(rate(suspensionlab_solver_runs_total[5m])) by (model, outcome)",
+              "legendFormat": "{{ "{{model}} - {{outcome}}" }}"
+            }
+          ]
+        },
+        {
+          "title": "Physics Anomaly & Failure Events",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 16 },
+          "targets": [
+            {
+              "expr": "sum(rate(suspensionlab_physics_failures_total[5m])) by (model, failure_type)",
+              "legendFormat": "{{ "{{model}}: {{failure_type}}" }}"
+            }
+          ]
+        },
+        {
+          "title": "Model Validity Score (0-100)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 16 },
+          "targets": [
+            {
+              "expr": "suspensionlab_model_validity_score",
+              "legendFormat": "{{ "{{model}}" }}"
+            }
+          ]
+        }
+      ]
+    }
+{{- end }}

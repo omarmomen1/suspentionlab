@@ -66,6 +66,9 @@ class SimulationRun(Base):
     result          = Column(JSON_TYPE, nullable=False)
     warnings        = Column(JSON_TYPE, nullable=True)          # solver/validation warnings
     model_validity  = Column(JSON_TYPE, nullable=True)          # Issue-16 validity report
+    tire_snapshot   = Column(JSON_TYPE, nullable=True)          # Pacejka/empirical tire coeffs snapshot
+    aero_snapshot   = Column(JSON_TYPE, nullable=True)          # Downforce/drag polar snapshot
+    track_geometry_hash = Column(String(64), nullable=True)     # SHA-256 of track curvature/elevation profile
 
     # ── Version pinning ───────────────────────────────────────────────────
     software_version    = Column(String(32), nullable=False)

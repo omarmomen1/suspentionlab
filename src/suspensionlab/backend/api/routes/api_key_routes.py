@@ -74,7 +74,7 @@ async def create_key(
     user: dict = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db_dependency),
 ):
-    plan  = user.get("plan", PlanTier.FREE)
+    plan = getattr(user, "plan", PlanTier.FREE) if not isinstance(user, dict) else user.get("plan", PlanTier.FREE)
     limit = PLAN_LIMITS.get(plan, 0)
     if limit == 0:
         raise HTTPException(status_code=403, detail="API key access requires PRO or ENTERPRISE plan.")
@@ -106,6 +106,20 @@ async def create_key(
     await db.commit()
     await db.refresh(key)
 
+    try:
+        from suspensionlab.backend.security.audit import record_audit_event
+        await record_audit_event(
+            db=db,
+            event_type="API_KEY_CREATED",
+            user_id=str(user.user_id),
+            team_id=getattr(user, "team_id", None),
+            artifact_id=str(key.id),
+            metadata={"name": key.name, "key_prefix": key_prefix}
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger("security_audit").warning("Audit logging warning for API key creation: %s", e)
+
     return CreateKeyResponse(
         id=str(key.id), name=key.name, key_prefix=key_prefix,
         is_active=True, key=raw_key,
@@ -134,4 +148,19 @@ async def revoke_key(
         raise HTTPException(status_code=404, detail="API key not found.")
     key.is_active = False
     await db.commit()
+
+    try:
+        from suspensionlab.backend.security.audit import record_audit_event
+        await record_audit_event(
+            db=db,
+            event_type="API_KEY_REVOKED",
+            user_id=str(user.user_id),
+            team_id=getattr(user, "team_id", None),
+            artifact_id=str(key.id),
+            metadata={"name": key.name, "key_prefix": key.key_prefix}
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger("security_audit").warning("Audit logging warning for API key revocation: %s", e)
+
     return {"status": "revoked"}

@@ -1,0 +1,98 @@
+{
+  "manifest_version": "phase3e_frozen_phase3d_v1",
+  "timestamp_iso": "2026-09-22T02:16:23.432380+00:00",
+  "git_commit_sha": "fbe3d045762d8c216922630ca5c3b0da1d589a31",
+  "physics_engine_version": "dynamic-transient-14dof-v3.2-phase3d-frozen",
+  "freeze_policy": {
+    "status": "IMMUTABLE_FROZEN_FOR_PHASE3E",
+    "physics_modifications_allowed": false,
+    "parameter_tuning_allowed": false,
+    "optimizer_access_to_evaluation_data": false
+  },
+  "file_integrity_ledger": {
+    "src/suspensionlab/physics/dynamic_lap_sim.py": {
+      "sha256": "eacf373c379fe6ab04e375dede75007a052d56a58ec05242c4c76ff55019c682",
+      "size_bytes": 150607
+    },
+    "src/suspensionlab/physics/telemetry_dataset.py": {
+      "sha256": "8696d83bb53aebb4113d232887bb706b8514ed9c2834478c39a2896a9bec2e12",
+      "size_bytes": 51114
+    },
+    "src/suspensionlab/physics/magic_formula.py": {
+      "sha256": "69b182da4d2687e8cf7f9326501fc30c6380023445ea99d04f0f67bbc3d3f76c",
+      "size_bytes": 24403
+    },
+    "data/external/stanford_vw_golf_thunderhill_2023_11.csv": {
+      "sha256": "489adbf01d27da1c281c0fff353554dfd7d07a3f1c48e2744e9dd902546b74d3",
+      "size_bytes": 16934088
+    },
+    "data/phase3d_comparison.json": {
+      "sha256": "02ee10369f5e9d6c9868d75db45c204c46fdf675f91e7dadf87959448c5d4d19",
+      "size_bytes": 134123
+    },
+    "data/phase3d_parameter_provenance.json": {
+      "sha256": "c820a59513638ae41038b1e3643c041dec9e87de350094bc4c1e4fbb050b1ab8",
+      "size_bytes": 2186
+    },
+    "docs/phase3d_comparison.md": {
+      "sha256": "633a40f91d51e269334109c1965915c0effcc08125ffff9a10be600b6b537bbe",
+      "size_bytes": 7106
+    },
+    "docs/phase3d_parameter_governance.md": {
+      "sha256": "4230c200fc119619cca9ee25fdec4d42d78198825c341b865c19d2f60cbf47e3",
+      "size_bytes": 1530
+    },
+    "docs/phase3d_change_log.md": {
+      "sha256": "91bd5384e1a0e514cf127f4015c7367a63ab1ed53c9ea8e9227f024679d0688e",
+      "size_bytes": 2136
+    },
+    "docs/phase3d_validation_report.md": {
+      "sha256": "fbe71d07af7ed91b2d4c5b713c72305d12ccdb41b1d5a1d8305017ca77b298ba",
+      "size_bytes": 2691
+    },
+    "docs/phase3d_prechange_baseline.json": {
+      "sha256": "55f13a5c34d62125001ececc5d8807c7b48df1efe718a56b3bce2b3ad60a2aeb",
+      "size_bytes": 4923
+    }
+  },
+  "phase3d_calibrated_parameters": {
+    "s_tire_sweeper_scale": 1.16,
+    "steering_compliance_k_delta": 0.000451,
+    "brake_actuator_map": {
+      "pressure_breakpoints_bar": [
+        0.0,
+        15.0,
+        40.0,
+        80.0,
+        120.0
+      ],
+      "demand_breakpoints": [
+        0.0,
+        0.18,
+        0.52,
+        1.0,
+        1.0
+      ],
+      "max_torque_nm": 4800.0
+    },
+    "channel_normalization_scale": 0.01,
+    "grade_pitch_decoupling_formula": "theta_susp = (zf_avg - zr_avg) / Lwb"
+  },
+  "regression_test_certificate": {
+    "test_count": 53,
+    "passed": 53,
+    "failed": 0,
+    "pass_rate_percent": 100.0,
+    "suites": [
+      "tests/test_phase3d_unit_normalization.py",
+      "tests/test_phase3d_pitch_decoupling.py",
+      "tests/test_phase3d_steering_compliance.py",
+      "tests/test_phase3d_brake_mapping.py",
+      "tests/test_phase3d_tire_calibration_governance.py",
+      "tests/test_phase3d_baseline_comparison.py",
+      "tests/test_phase3c2_residual_experiment_integrity.py",
+      "tests/test_phase3c1_validation_integrity.py",
+      "tests/test_real_vehicle_dynamics_and_lap_sim.py"
+    ]
+  }
+}

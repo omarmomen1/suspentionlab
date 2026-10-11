@@ -92,11 +92,13 @@ def upgrade() -> None:
         batch_op.alter_column('id',
                existing_type=sa.VARCHAR(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='id::uuid')
         batch_op.alter_column('user_id',
                existing_type=sa.VARCHAR(),
                type_=sa.UUID(),
-               nullable=False)
+               nullable=False,
+               postgresql_using='user_id::uuid')
         batch_op.drop_index(batch_op.f('idx_user_active_jobs'))
         batch_op.drop_index(batch_op.f('ix_jobs_user_id'))
         batch_op.create_index(batch_op.f('ix_jobs_session_id'), ['session_id'], unique=False)
@@ -109,28 +111,33 @@ def upgrade() -> None:
         batch_op.alter_column('id',
                existing_type=sa.VARCHAR(length=36),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='id::uuid')
 
     with op.batch_alter_table('teams', schema=None) as batch_op:
         batch_op.alter_column('id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='id::uuid')
         batch_op.alter_column('owner_id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='owner_id::uuid')
         batch_op.create_foreign_key('fk_teams_owner_id', 'users', ['owner_id'], ['id'], ondelete='CASCADE')
 
     with op.batch_alter_table('users', schema=None) as batch_op:
         batch_op.alter_column('id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='id::uuid')
         batch_op.alter_column('team_id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=True)
+               existing_nullable=True,
+               postgresql_using='team_id::uuid')
 
     with op.batch_alter_table('vehicle_profiles', schema=None) as batch_op:
         batch_op.add_column(sa.Column('version', sa.Integer(), nullable=False))
@@ -138,15 +145,18 @@ def upgrade() -> None:
         batch_op.alter_column('id',
                existing_type=sa.VARCHAR(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='id::uuid')
         batch_op.alter_column('user_id',
                existing_type=sa.VARCHAR(),
                type_=sa.UUID(),
-               nullable=False)
+               nullable=False,
+               postgresql_using='user_id::uuid')
         batch_op.alter_column('team_id',
                existing_type=sa.VARCHAR(),
                type_=sa.UUID(),
-               existing_nullable=True)
+               existing_nullable=True,
+               postgresql_using='team_id::uuid')
         batch_op.create_foreign_key('fk_vp_parent_id', 'vehicle_profiles', ['parent_id'], ['id'], ondelete='SET NULL')
         batch_op.create_foreign_key('fk_vp_team_id', 'teams', ['team_id'], ['id'], ondelete='CASCADE')
         batch_op.create_foreign_key('fk_vp_user_id', 'users', ['user_id'], ['id'], ondelete='CASCADE')

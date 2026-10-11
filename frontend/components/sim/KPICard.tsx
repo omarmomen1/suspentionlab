@@ -34,22 +34,40 @@ const BORDERS: Record<Status, string> = {
   neutral: "border-[#252525]",
 };
 
+export function formatKpiValue(val: number | string): string {
+  if (typeof val !== "number") return String(val ?? "–");
+  if (!Number.isFinite(val)) return "–";
+  if (Number.isInteger(val)) return val.toLocaleString();
+  const abs = Math.abs(val);
+  if (abs >= 1000) return Math.round(val).toLocaleString();
+  if (abs >= 100) return val.toFixed(1);
+  if (abs >= 10) return val.toFixed(2);
+  if (abs >= 1) return val.toFixed(2);
+  return val.toFixed(3);
+}
+
 export default function KPICard({
   label, value, unit, sub, status = "neutral", color,
 }: KPICardProps) {
   const valueClass = color ? "" : COLOURS[status];
   const borderClass = color ? "border-[#252525]" : BORDERS[status];
+  const displayValue = formatKpiValue(value);
+
   return (
-    <div className={`bg-[#141416] border ${borderClass} rounded-xl p-3 flex flex-col gap-0.5`}>
-      <span className="text-[9px] font-bold tracking-[0.16em] text-gray-600 uppercase">{label}</span>
+    <div
+      className={`bg-[#141416] border ${borderClass} rounded-xl p-3 flex flex-col gap-0.5 min-w-0 overflow-hidden`}
+      aria-label={`${label}: ${displayValue} ${unit || ''}${status !== 'neutral' ? `, status: ${status}` : ''}`}
+    >
+      <span className="text-[9px] font-bold tracking-[0.16em] text-gray-400 uppercase truncate">{label}</span>
       <span
-        className={`text-[1.1rem] font-bold font-mono leading-tight ${valueClass}`}
+        className={`text-[1.1rem] font-bold font-mono leading-tight truncate overflow-hidden whitespace-nowrap ${valueClass}`}
         style={color ? { color } : undefined}
       >
-        {value}
-        {unit && <span className="text-[0.65rem] text-gray-500 ml-1 font-sans">{unit}</span>}
+        {displayValue}
+        {unit && <span className="text-[0.65rem] text-gray-400 ml-1 font-sans">{unit}</span>}
+        {status !== "neutral" && <span className="sr-only"> ({status})</span>}
       </span>
-      {sub && <span className="text-[10px] text-gray-500">{sub}</span>}
+      {sub && <span className="text-[10px] text-gray-400 truncate">{sub}</span>}
     </div>
   );
 }

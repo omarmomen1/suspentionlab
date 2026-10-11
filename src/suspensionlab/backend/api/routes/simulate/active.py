@@ -3,10 +3,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
 from suspensionlab.backend.database.core import get_db_dependency
-from suspensionlab.backend.security.auth import verify_api_key
+from suspensionlab.backend.security.auth import verify_api_key, require_permission
+from suspensionlab.backend.security.permissions import Permission
 from suspensionlab.backend.services.simulation_service import SimulationService
 from suspensionlab.shared.models import ActiveRequest
 from pydantic import BaseModel
+from typing import Any
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -18,7 +20,7 @@ class JobResponse(BaseModel):
 @router.post("/simulate/active", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
 async def simulate_active(
     payload: ActiveRequest,
-    user: dict = Depends(verify_api_key),
+    user: Any = Depends(require_permission(Permission.SIMULATION_RUN)),
     db: AsyncSession = Depends(get_db_dependency)
 ):
     try:

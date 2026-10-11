@@ -38,6 +38,20 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
+      - name: Terraform Format Check
+        working-directory: ${{ env.TF_WORKING_DIR }}
+        run: terraform fmt -check
+
+      - name: Set up Python for Security Validation
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Pre-Deployment Secrets Hardening Validation
+        run: |
+          pip install pyyaml
+          python scripts/validate_deployment_secrets.py --scan-dir terraform --scan-dir k8s
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -64,6 +78,12 @@ jobs:
       - name: Run tflint
         working-directory: ${{ env.TF_WORKING_DIR }}
         run: tflint --format compact
+
+      - name: Run tfsec Security Scanner
+        uses: aquasecurity/tfsec-action@v1.0.3
+        with:
+          working_directory: ${{ env.TF_WORKING_DIR }}
+          soft_fail: false
 
   # ── 2. Terraform Plan ───────────────────────────────────────────────────────
   plan:

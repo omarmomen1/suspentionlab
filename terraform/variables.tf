@@ -52,8 +52,43 @@ variable "eks_cluster_version" {
   default     = "1.29"
 }
 
+variable "eks_cluster_endpoint_public_access" {
+  description = "Whether the Amazon EKS public API server endpoint is enabled."
+  type        = bool
+  default     = true
+}
+
+variable "eks_public_access_cidrs" {
+  description = "List of CIDR blocks that can access the Amazon EKS public API server endpoint. Must not be open to 0.0.0.0/0 in production."
+  type        = list(string)
+  default     = ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+  validation {
+    condition     = var.environment != "prod" || !contains(var.eks_public_access_cidrs, "0.0.0.0/0")
+    error_message = "Public control-plane access cannot be open to 0.0.0.0/0 in production. Restrict CIDRs to trusted corporate or bastion networks."
+  }
+}
+
 variable "waf_enabled" {
   description = "Whether to provision and attach AWS WAFv2 to the application load balancer."
   type        = bool
   default     = true
+}
+
+variable "app_secrets" {
+  description = "Map of application secrets. Rejects placeholder strings in production."
+  type        = map(string)
+  default     = {}
+  sensitive   = true
+  validation {
+    condition = var.environment != "prod" || alltrue([
+      for k, v in var.app_secrets : !can(regex("(?i)(REPLACE_WITH_|changeme|default|example)", v))
+    ])
+    error_message = "Production secrets must not contain placeholder values (REPLACE_WITH_, changeme, default, example)."
+  }
+}
+
+variable "s3_artifacts_bucket_prefix" {
+  description = "Prefix for the S3 simulation artifacts and telemetry storage buckets."
+  type        = string
+  default     = "suspensionlab-artifacts"
 }

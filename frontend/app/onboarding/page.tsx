@@ -11,9 +11,10 @@ const STEPS = [
     content: (
       <div className="space-y-4 text-center">
         <p className="text-gray-400 text-sm leading-relaxed">
-          You have <span className="text-ansys-yellow font-bold">14 days of Pro access</span> — free, no card needed.
+          Welcome to <span className="text-ansys-yellow font-bold">SuspensionLab PRO</span>.
           Let&apos;s get you to your first simulation result in under 60 seconds.
         </p>
+
         <div className="grid grid-cols-3 gap-3">
           {[
             ["Quarter Car", "2-DOF vertical dynamics"],
@@ -68,9 +69,10 @@ const STEPS = [
           <CheckCircle2 size={32} className="text-ansys-yellow" />
         </div>
         <p className="text-gray-400 text-sm leading-relaxed">
-          Your 14-day Pro trial is active. Run your first simulation, save it to the Garage,
+          Your Pro account is active. Run your first simulation, save it to the Garage,
           and explore every model — no restrictions.
         </p>
+
         <p className="text-[11px] text-gray-600">
           Need help? Check the{" "}
           <a href="/docs" className="text-ansys-yellow hover:underline">documentation</a>
@@ -84,7 +86,7 @@ const STEPS = [
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export default function OnboardingPage() {
-  const { authHeader } = useAuth();
+  const { fetchWithAuth } = useAuth();
   const router  = useRouter();
   const [step,  setStep]  = useState(0);
   const [loading, setLoading] = useState(false);
@@ -94,8 +96,8 @@ export default function OnboardingPage() {
   const finish = async () => {
     setLoading(true);
     try {
-      await fetch(`${API_BASE}/auth/onboard`, {
-        method: "POST", headers: authHeader(),
+      await fetchWithAuth("/api/v1/auth/onboard", {
+        method: "POST",
       });
     } catch { /* non-fatal */ }
     router.push("/quarter-car");

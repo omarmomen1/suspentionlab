@@ -1,0 +1,28 @@
+{
+  "timestamp_iso": "2026-09-26T22:53:04.492688+00:00",
+  "phase": "PHASE_3H.1",
+  "frozen_baseline": "PHASE_3H",
+  "git_commit_sha": "fbe3d045762d8c216922630ca5c3b0da1d589a31",
+  "dataset_provenance": {
+    "path": "data\\external\\stanford_vw_golf_thunderhill_2023_11.csv",
+    "sha256": "489adbf01d27da1c281c0fff353554dfd7d07a3f1c48e2744e9dd902546b74d3"
+  },
+  "physics_files_sha256": {
+    "dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690",
+    "brake_distribution.py": "15338e921252e35afc9ee543fdb996464e4784b36e1ce18e05c8832e392a57ea",
+    "magic_formula.py": "69b182da4d2687e8cf7f9326501fc30c6380023445ea99d04f0f67bbc3d3f76c",
+    "tire_model.py": "da72dea8adf6b83846997fa02c9b1cade1b74272bcaa96f5aa0e2ea389005209"
+  },
+  "phase3h_artifact_hashes": {
+    "phase3h_longitudinal_ledger.json": "65736b967a0999d585e5473151766fa0457fa9a7b749c4e6acd5b8fb229ca058",
+    "phase3h_counterfactuals.json": "deca13dc872abb49498bee68f063f8a663fbc82cca9e0d8527a22661bc63784f",
+    "phase3h_energy_balance.json": "933e38f743ef8613e4e4b92016b510191bd8e1f6776087815a65deac2b3e5ff8",
+    "phase3h_dependency_graph.json": "d8459f737f199ea565f4b282061c5878a0fc639db7cd6632e0366307bfba641d",
+    "phase3h_longitudinal_forensic_report.md": "8c4a39eb78525b9c8631a5d4f4831cd487cd076956030d5411a23c4b8441d346",
+    "phase3h_powertrain_audit.md": "24cc93cc1e159ae01a6d1ca83823b737c37f3dd2ef016fd25f0de1c8bbfd5691",
+    "phase3h_energy_balance.md": "acf2b83b76029e756d2f07bb0cd5913ea25c5751d6241f938e359469bfc08931",
+    "phase3h_validation_status.md": "0f07a84dade9f4af7889cbc7d3a073493c1e82154ff981bd57b410da392f9f9c"
+  },
+  "baseline_test_count": 177,
+  "governance_note": "Phase 3H.1 is audit-only. Zero production physics modifications authorized."
+}

@@ -89,8 +89,13 @@ async def create_team(
     db_user.team_id = team_id
     db_user.team_role = "Owner"
 
-    await db.commit()
-    await db.refresh(team)
+    from sqlalchemy.exc import IntegrityError
+    try:
+        await db.commit()
+        await db.refresh(team)
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="A team with this slug or name was just created.")
 
     return TeamResponse(
         id=str(team.id),
@@ -297,13 +302,21 @@ async def update_member_role(
     member.team_role = req.role
     await db.commit()
 
-    from suspensionlab.backend.security.audit import log_audit_event
-    log_audit_event(
-        "TEAM_ROLE_CHANGED",
-        user_id=str(member.id),
-        ip="-",
-        metadata={"team_id": team_id, "old_role": old_role, "new_role": req.role, "changed_by": user.user_id},
-    )
+    try:
+        from suspensionlab.backend.security.audit import record_audit_event
+        await record_audit_event(
+            db=db,
+            event_type="TEAM_ROLE_CHANGED",
+            user_id=str(member.id),
+            team_id=team_id,
+            ip="-",
+            artifact_id=str(member.id),
+            metadata={"team_id": team_id, "old_role": old_role, "new_role": req.role, "changed_by": user.user_id},
+        )
+    except Exception as e:
+        import logging
+        logging.getLogger("security_audit").warning("Audit logging warning for team role change: %s", e)
+
     return {"id": str(member.id), "role": member.team_role}
 
 

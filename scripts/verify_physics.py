@@ -30,7 +30,7 @@ def run_tests():
     report.append("## 1. Quarter Car (2-DOF)")
     
     # Test 1A: Conservation of Energy (Undamped Free Vibration)
-    p_qc = QuarterCarParams(c=0, c_t=0)
+    p_qc = QuarterCarParams(c=0, c_t=0, enable_contact_loss=False)
     def zr_zero(t): return np.zeros_like(t)
     def dzr_zero(t): return np.zeros_like(t)
     
@@ -69,7 +69,7 @@ def run_tests():
     report.append(f"- **Harmonic Frequencies:** Sprung expected {modal['f_n_s']:.2f} Hz, observed ~{obs_f1:.2f} Hz. Unsprung expected {modal['f_n_u']:.2f} Hz, observed ~{obs_f2:.2f} Hz. {'✅' if err_f1 < 5.0 and err_f2 < 5.0 else '❌'}")
 
     # Test 1C: Conservation of Momentum (Free Floating)
-    p_float = QuarterCarParams(k_s=0, c=0, k_t=0, c_t=0)
+    p_float = QuarterCarParams(k_s=0, c=0, k_t=0, c_t=0, _skip_validation=True)
     x0_mom = [0.0, 2.0, 0.0, 0.0] # v_s = 2.0 m/s
     sol_mom = solve_ivp(
         fun=_quarter_car_ode, t_span=(0, 2.0), y0=x0_mom,

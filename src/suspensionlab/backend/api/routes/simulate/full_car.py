@@ -1,35 +1,65 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
+import numpy as np
 
 from suspensionlab.backend.database.core import get_db_dependency
-from suspensionlab.backend.security.auth import verify_api_key
-from suspensionlab.backend.services.simulation_service import SimulationService
+from suspensionlab.backend.security.auth import verify_api_key, require_permission
+from suspensionlab.backend.security.permissions import Permission
+from suspensionlab.backend.core.compute_governance import bounded_run, assert_user_concurrency
 from suspensionlab.shared.models import FullCarSimulateRequest
-from pydantic import BaseModel
+from suspensionlab.physics.full_car import FullCarParams, run_full_car_analysis, FourCornerRoadProfile
+from suspensionlab.physics.quarter_car import RoadProfile, _road_profile_fn
+from typing import Any
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-class JobResponse(BaseModel):
-    job_id: str
-    status: str
+from suspensionlab.backend.workers.unified_worker import _serialize_for_json
 
-@router.post("/simulate/full-car", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+def _serialize_numpy(obj):
+    return _serialize_for_json(obj)
+
+@router.post("/simulate/full-car")
 async def simulate_full_car(
     payload: FullCarSimulateRequest,
-    user: dict = Depends(verify_api_key),
+    user: Any = Depends(require_permission(Permission.SIMULATION_RUN)),
     db: AsyncSession = Depends(get_db_dependency)
 ):
     try:
-        job_id = await SimulationService.enqueue_simulation(
-            user_id=user.user_id,
-            plan=user.plan,
-            job_type="SIMULATE_FULL",
-            payload=payload.model_dump(),
-            db=db, team_id=getattr(user, "team_id", None)
+        await assert_user_concurrency(db, str(user.user_id), getattr(user, "plan", "FREE"))
+        pdump = payload.params.model_dump()
+        asymmetry = pdump.pop("road_asymmetry", 0.3)
+        for k in ["damper_curve_v_f", "damper_curve_f_f", "damper_curve_v_r", "damper_curve_f_r"]:
+            pdump.pop(k, None)
+        p = FullCarParams(**pdump)
+
+        base_profile = RoadProfile(**payload.profile.model_dump())
+        zr_fn, _ = _road_profile_fn(base_profile)
+        dt = 0.002
+        time_array = np.arange(0.0, base_profile.duration, dt)
+
+        z_road_f = np.array([float(zr_fn(np.array([t]))[0]) for t in time_array])
+        t_delay = p.L / p.speed_mps if p.speed_mps > 0 else 0.0
+        z_road_r = np.array([float(zr_fn(np.array([t - t_delay]))[0]) if t - t_delay >= 0 else 0.0 for t in time_array])
+
+        z_road_fr = z_road_f * asymmetry
+        z_road_rr = z_road_r * asymmetry
+
+        profile = FourCornerRoadProfile(
+            time=time_array,
+            z_rfl=z_road_f,
+            z_rfr=z_road_fr,
+            z_rrl=z_road_r,
+            z_rrr=z_road_rr
         )
-        return {"job_id": job_id, "status": "PENDING"}
+        raw_res = await bounded_run(run_full_car_analysis, p, profile, timeout=45.0, model="full_car")
+        res_dict = _serialize_numpy(raw_res)
+        return res_dict
+    except HTTPException:
+        raise
+    except TimeoutError:
+        raise HTTPException(status_code=504, detail="Full-car simulation timed out.")
     except Exception as e:
         logger.exception("Unhandled error in /simulate/full-car: %s", e)
-        raise HTTPException(status_code=500, detail="Internal simulation error.")
+        raise HTTPException(status_code=400, detail=str(e))

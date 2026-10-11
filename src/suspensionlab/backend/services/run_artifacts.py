@@ -60,6 +60,9 @@ def _git_build_id() -> Optional[str]:
     return os.getenv("GIT_COMMIT") or os.getenv("BUILD_ID")
 
 
+import asyncio
+_run_seq_lock = asyncio.Lock()
+
 async def create_run_from_job(
     db: AsyncSession,
     job_id: str,
@@ -79,14 +82,14 @@ async def create_run_from_job(
     """
     import uuid as _uuid
 
-    uid = _uuid.UUID(user_id)
-    jid = _uuid.UUID(job_id)
+    uid = _uuid.UUID(str(user_id))
+    jid = _uuid.UUID(str(job_id))
 
     result = await db.execute(
         select(JobRecord).where(
             JobRecord.id == jid,
             JobRecord.user_id == uid,
-            JobRecord.status == "COMPLETED",
+            JobRecord.status.in_(["COMPLETED", "COMPLETED_VALID", "COMPLETED_WITH_WARNINGS"]),
         )
     )
     job: JobRecord | None = result.scalar_one_or_none()
@@ -108,10 +111,6 @@ async def create_run_from_job(
     except Exception:
         pass
 
-    # Monotonic sequence → RUN-000183 label
-    seq_res = await db.execute(select(func.max(SimulationRun.seq)))
-    seq = (seq_res.scalar_one() or 0) + 1
-
     sim_type = (job.job_type or "").lower().replace("simulate_", "").replace("_quarter", "_car").replace("quarter", "quarter_car")
     if "quarter" in sim_type:
         sim_type = "quarter_car"
@@ -120,35 +119,71 @@ async def create_run_from_job(
     if isinstance(res, dict):
         warnings = res.get("warnings")
 
-    run = SimulationRun(
-        seq=seq,
-        label=f"RUN-{seq:06d}",
-        job_id=jid,
-        user_id=uid,
-        team_id=_uuid.UUID(team_id) if team_id else None,
-        simulation_type=sim_type,
-        title=title or f"{job.job_type} run",
-        vehicle_ref=setup_ref,   # caller may refine; kept distinct below
-        setup_ref=setup_ref,
-        tire_ref=tire_ref,
-        track_ref=track_ref,
-        telemetry_ref=telemetry_ref,
-        params=params,
-        profile=profile,
-        result=res,
-        warnings=warnings,
-        model_validity=model_validity,
-        software_version=SOFTWARE_VERSION,
-        physics_version=_physics_version_for(sim_type),
-        kinematics_version=KINEMATICS_VERSION,
-        solver_version=SOLVER_VERSION,
-        git_build_id=_git_build_id(),
-        params_hash=canonical_hash(params),
-        result_hash=canonical_hash(res),
-        input_hash=canonical_hash(profile),
-    )
-    # Capture response data BEFORE commit — committing expires ORM instances
-    # and lazy-loading them afterwards breaks inside async sessions.
+    tire_snapshot = params.get("tire_coeffs") or ({"k_t": params["k_t"], "c_t": params.get("c_t", 0.0)} if "k_t" in params else None)
+    aero_snapshot = params.get("aero_map") or ({"cl_base": params["cl_base"], "cd_base": params["cd_base"]} if "cl_base" in params else None)
+    track_geometry_hash = canonical_hash(profile) if profile else None
+
+    async with _run_seq_lock:
+        # Monotonic sequence → RUN-000183 label
+        seq_res = await db.execute(select(func.coalesce(func.max(SimulationRun.seq), 0)))
+        seq = int(seq_res.scalar_one()) + 1
+
+        run = SimulationRun(
+            seq=seq,
+            label=f"RUN-{seq:06d}",
+            job_id=jid,
+            user_id=uid,
+            team_id=_uuid.UUID(str(team_id)) if team_id else None,
+            simulation_type=sim_type,
+            title=title or f"{job.job_type} run",
+            vehicle_ref=setup_ref,
+            setup_ref=setup_ref,
+            tire_ref=tire_ref,
+            track_ref=track_ref,
+            telemetry_ref=telemetry_ref,
+            params=params,
+            profile=profile,
+            result=res,
+            warnings=warnings,
+            model_validity=model_validity,
+            tire_snapshot=tire_snapshot,
+            aero_snapshot=aero_snapshot,
+            track_geometry_hash=track_geometry_hash,
+            software_version=SOFTWARE_VERSION,
+            physics_version=_physics_version_for(sim_type),
+            kinematics_version=KINEMATICS_VERSION,
+            solver_version=SOLVER_VERSION,
+            git_build_id=_git_build_id(),
+            params_hash=canonical_hash(params),
+            result_hash=canonical_hash(res),
+            input_hash=canonical_hash(profile),
+        )
+        db.add(run)
+        await db.commit()
+
+        try:
+            from suspensionlab.backend.security.audit import record_audit_event
+            await record_audit_event(
+                db=db,
+                event_type="SIMULATION_RUN_CREATED",
+                user_id=str(uid) if uid else None,
+                team_id=str(team_id) if team_id else None,
+                artifact_id=run.label,
+                metadata={
+                    "run_id": str(run.id),
+                    "label": run.label,
+                    "simulation_type": run.simulation_type,
+                    "params_hash": run.params_hash,
+                    "result_hash": run.result_hash,
+                    "input_hash": run.input_hash,
+                    "software_version": run.software_version,
+                    "physics_version": run.physics_version,
+                    "solver_version": run.solver_version,
+                }
+            )
+        except Exception as e:
+            logger.warning("Audit logging warning for simulation run: %s", e)
+
     payload = {
         "label": run.label,
         "id": str(run.id),
@@ -157,8 +192,6 @@ async def create_run_from_job(
         "params_hash": run.params_hash,
         "result_hash": run.result_hash,
     }
-    db.add(run)
-    await db.commit()
     logger.info("Created immutable artifact %s from job %s", payload["label"], job_id)
     return payload
 
@@ -167,16 +200,22 @@ async def get_run(db: AsyncSession, label_or_id: str, user_id: str,
                   team_id: Optional[str] = None) -> SimulationRun:
     """Fetch one run visible to this user (own runs + team runs)."""
     import uuid as _uuid
+    from sqlalchemy import or_
     q = select(SimulationRun).limit(1)
     if label_or_id.upper().startswith("RUN-"):
         q = q.where(SimulationRun.label == label_or_id.upper())
     else:
         q = q.where(SimulationRun.id == _uuid.UUID(label_or_id))
 
-    conditions = [SimulationRun.user_id == _uuid.UUID(user_id)]
     if team_id:
-        conditions.append(SimulationRun.team_id == _uuid.UUID(team_id))
-    q = q.where(*conditions)
+        q = q.where(
+            or_(
+                SimulationRun.team_id == _uuid.UUID(str(team_id)),
+                SimulationRun.user_id == _uuid.UUID(str(user_id))
+            )
+        )
+    else:
+        q = q.where(SimulationRun.user_id == _uuid.UUID(str(user_id)))
 
     result = await db.execute(q)
     run = result.scalar_one_or_none()
@@ -188,12 +227,17 @@ async def get_run(db: AsyncSession, label_or_id: str, user_id: str,
 async def list_runs(db: AsyncSession, user_id: str, team_id: Optional[str] = None,
                     limit: int = 50) -> list[SimulationRun]:
     import uuid as _uuid
-    conditions = [SimulationRun.user_id == _uuid.UUID(user_id)]
+    from sqlalchemy import or_
     if team_id:
-        conditions.append(SimulationRun.team_id == _uuid.UUID(team_id))
+        access_filter = or_(
+            SimulationRun.team_id == _uuid.UUID(str(team_id)),
+            SimulationRun.user_id == _uuid.UUID(str(user_id))
+        )
+    else:
+        access_filter = (SimulationRun.user_id == _uuid.UUID(str(user_id)))
     result = await db.execute(
         select(SimulationRun)
-        .where(*conditions)
+        .where(access_filter)
         .order_by(desc(SimulationRun.seq))
         .limit(min(limit, 200))
     )

@@ -1,0 +1,92 @@
+name: Living Audit Evidence & Compliance Re-certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      strict_mode:
+        description: "Enforce strict zero-defect threshold across all 7 audit suites"
+        required: true
+        type: boolean
+        default: true
+  schedule:
+    # Run weekly re-certification every Monday at 04:00 UTC
+    - cron: "0 4 * * 1"
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  recertify-audit-evidence:
+    name: Living Audit Evidence Pipeline
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: susplab
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: suspensionlab_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://susplab:test_password@localhost:5432/suspensionlab_test
+      REDIS_URL: redis://localhost:6379/0
+      ENVIRONMENT: DEV
+      JWT_SECRET_KEY: test_jwt_secret_key_not_for_production
+      CI: "true"
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+
+      - name: Install dependencies & run DB migrations
+        run: |
+          pip install -e ".[dev,prod]"
+          alembic upgrade head
+
+      - name: Execute Living Audit Evidence Orchestrator
+        run: |
+          python scripts/run_audit_pipeline.py --ci --summary-file "$GITHUB_STEP_SUMMARY"
+
+      - name: Archive Living Audit Evidence Artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: living-audit-evidence-recertification-${{ github.sha }}
+          path: |
+            data/audit_evidence_manifest.json
+            data/approval_governance_results.json
+            data/scientific_validation_results.json
+            data/native_solver_certification_results.json
+            data/hostile_scientific_reaudit_evidence.json
+            data/tenant_isolation_canary_results.json
+            data/absolute_tenant_isolation_evidence.json
+            data/production_deployment_reality_evidence.json
+          retention-days: 90

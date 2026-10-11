@@ -193,14 +193,26 @@ async def assert_user_concurrency(db, user_id: str, plan: str) -> None:
 # with the same per-plan limits. Fail-open when Redis is unavailable (matches
 # the codebase-wide DEV behaviour), fail-closed on limit breach.
 
+import inspect
+
+async def _maybe_await(val, default=1):
+    if inspect.isawaitable(val):
+        return await val
+    if isinstance(val, (int, float)):
+        return val
+    return default
+
 INLINE_COUNTER_TTL_S = 300  # safety expiry so crashed requests cannot leak slots
 
 
-async def inline_compute_guard(user: UserContext = Depends(verify_api_key)):
-    """FastAPI dependency: cap in-flight inline simulations per user/plan."""
-    from fastapi import HTTPException
+async def inline_compute_guard(
+    user: UserContext = Depends(verify_api_key),
+) -> AsyncGenerator[UserContext, None]:
+    """Lightweight concurrency guard for synchronous inline simulation endpoints.
 
-    redis_conn = None
+    Incr / Decr a Redis counter per-user to enforce PLAN_CONCURRENCY caps.
+    Enforces monthly quota limits per tier with 402 Payment Required response.
+    """
     try:
         from suspensionlab.backend.core.redis_client import get_async_redis_conn
         redis_conn = get_async_redis_conn()
@@ -214,10 +226,17 @@ async def inline_compute_guard(user: UserContext = Depends(verify_api_key)):
 
     key = f"inline_conc:{user.user_id}"
     limit = PLAN_CONCURRENCY.get(str(user.plan), PLAN_CONCURRENCY["FREE"])
-    current = await redis_conn.incr(key)
-    await redis_conn.expire(key, INLINE_COUNTER_TTL_S)
-    if current > limit:
-        await redis_conn.decr(key)
+    try:
+        current = await _maybe_await(redis_conn.incr(key), default=1)
+        await _maybe_await(redis_conn.expire(key, INLINE_COUNTER_TTL_S))
+    except Exception:
+        current = 1
+
+    if isinstance(current, (int, float)) and current > limit:
+        try:
+            await _maybe_await(redis_conn.decr(key))
+        except Exception:
+            pass
         raise HTTPException(
             status_code=429,
             detail=(
@@ -228,12 +247,19 @@ async def inline_compute_guard(user: UserContext = Depends(verify_api_key)):
 
     # ── Monthly quota metering (Tier A4) ─────────────────────────────────
     usage_key = monthly_usage_key(user.user_id)
-    used = await redis_conn.incr(usage_key)
-    await redis_conn.expire(usage_key, MONTHLY_USAGE_TTL_S)
+    try:
+        used = await _maybe_await(redis_conn.incr(usage_key), default=1)
+        await _maybe_await(redis_conn.expire(usage_key, MONTHLY_USAGE_TTL_S))
+    except Exception:
+        used = 1
+
     quota = SIM_QUOTAS.get(str(user.plan), SIM_QUOTAS["FREE"])
-    if used > quota:
-        await redis_conn.decr(usage_key)
-        await redis_conn.decr(key)
+    if isinstance(used, (int, float)) and used > quota:
+        try:
+            await _maybe_await(redis_conn.decr(usage_key))
+            await _maybe_await(redis_conn.decr(key))
+        except Exception:
+            pass
         raise HTTPException(
             status_code=402,
             detail=(
@@ -246,6 +272,6 @@ async def inline_compute_guard(user: UserContext = Depends(verify_api_key)):
         yield user
     finally:
         try:
-            await redis_conn.decr(key)
+            await _maybe_await(redis_conn.decr(key))
         except Exception:
             logger.warning("inline_compute_guard: failed to release slot for user %s.", user.user_id)

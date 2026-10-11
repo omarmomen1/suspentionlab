@@ -1,35 +1,41 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
+import numpy as np
 
 from suspensionlab.backend.database.core import get_db_dependency
-from suspensionlab.backend.security.auth import verify_api_key
-from suspensionlab.backend.services.simulation_service import SimulationService
+from suspensionlab.backend.security.auth import verify_api_key, require_permission
+from suspensionlab.backend.security.permissions import Permission
+from suspensionlab.backend.core.compute_governance import bounded_run, assert_user_concurrency
 from suspensionlab.shared.models import HalfCarSimulateRequest
-from pydantic import BaseModel
+from suspensionlab.physics.half_car import HalfCarParams, RoadProfile, run_half_car_analysis
+from typing import Any
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-class JobResponse(BaseModel):
-    job_id: str
-    status: str
+from suspensionlab.backend.workers.unified_worker import _serialize_for_json
 
-@router.post("/simulate/half-car", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+def _serialize_numpy(obj):
+    return _serialize_for_json(obj)
+
+@router.post("/simulate/half-car")
 async def simulate_half_car(
     payload: HalfCarSimulateRequest,
-    user: dict = Depends(verify_api_key),
+    user: Any = Depends(require_permission(Permission.SIMULATION_RUN)),
     db: AsyncSession = Depends(get_db_dependency)
 ):
     try:
-        job_id = await SimulationService.enqueue_simulation(
-            user_id=user.user_id,
-            plan=user.plan,
-            job_type="SIMULATE_HALF",
-            payload=payload.model_dump(),
-            db=db, team_id=getattr(user, "team_id", None)
-        )
-        return {"job_id": job_id, "status": "PENDING"}
+        await assert_user_concurrency(db, str(user.user_id), getattr(user, "plan", "FREE"))
+        p = HalfCarParams(**payload.params.model_dump())
+        r = RoadProfile(**payload.profile.model_dump())
+        raw_res = await bounded_run(run_half_car_analysis, p, r, timeout=30.0, model="half_car")
+        res_dict = _serialize_numpy(raw_res)
+        return res_dict
+    except HTTPException:
+        raise
+    except TimeoutError:
+        raise HTTPException(status_code=504, detail="Half-car simulation timed out.")
     except Exception as e:
         logger.exception("Unhandled error in /simulate/half-car: %s", e)
-        raise HTTPException(status_code=500, detail="Internal simulation error.")
+        raise HTTPException(status_code=400, detail=str(e))

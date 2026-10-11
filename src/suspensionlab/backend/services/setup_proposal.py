@@ -199,6 +199,15 @@ async def generate_proposal(
     else:
         confidence = 0.3
 
+    # Compute SHA-256 canonical hash of proposal recommendation
+    from suspensionlab.backend.security.audit import canonical_hash
+    prop_payload = {
+        "recommended_params": best_params,
+        "param_changes": param_changes,
+        "predicted_effects": predicted_effects,
+    }
+    proposal_hash = canonical_hash(prop_payload)
+
     proposal = SetupProposal(
         twin_id=twin.id,
         user_id=__import__("uuid").UUID(user_id),
@@ -213,6 +222,7 @@ async def generate_proposal(
         predicted_effects=predicted_effects,
         constraint_violations=violations,
         confidence=confidence,
+        proposal_hash=proposal_hash,
     )
     db.add(proposal)
     await db.commit()
@@ -237,5 +247,11 @@ def proposal_to_dict(p: SetupProposal) -> dict:
         "constraint_violations": p.constraint_violations or [],
         "confidence": p.confidence,
         "status": p.status,
+        "proposal_hash": p.proposal_hash,
+        "approved_by_user_id": str(p.approved_by_user_id) if p.approved_by_user_id else None,
+        "approved_by_role": p.approved_by_role,
+        "approved_at": p.approved_at.isoformat() if p.approved_at else None,
+        "approval_signature": p.approval_signature,
         "created_at": p.created_at.isoformat() if p.created_at else None,
     }
+

@@ -23,7 +23,7 @@ interface WebhookEndpoint {
 }
 
 export default function WebhooksCard() {
-  const { authHeader } = useAuth();
+  const { fetchWithAuth } = useAuth();
   const [endpoints, setEndpoints] = useState<WebhookEndpoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -35,7 +35,7 @@ export default function WebhooksCard() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`${API_BASE}/webhooks`, { headers: authHeader() });
+      const res = await fetchWithAuth("/api/v1/webhooks");
       if (res.ok) setEndpoints((await res.json()).endpoints ?? []);
     } catch {
       setError("Network error while loading webhooks.");
@@ -52,9 +52,9 @@ export default function WebhooksCard() {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch(`${API_BASE}/webhooks`, {
+      const res = await fetchWithAuth("/api/v1/webhooks", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url: url.trim(), events: ["job.completed", "job.failed"] }),
       });
       const body = await res.json().catch(() => ({}));
@@ -72,7 +72,7 @@ export default function WebhooksCard() {
   const remove = async (id: string) => {
     setBusy(true);
     try {
-      await fetch(`${API_BASE}/webhooks/${id}`, { method: "DELETE", headers: authHeader() });
+      await fetchWithAuth(`/api/v1/webhooks/${id}`, { method: "DELETE" });
       await load();
     } finally {
       setBusy(false);
@@ -82,8 +82,8 @@ export default function WebhooksCard() {
   const sendTest = async (id: string) => {
     setBusy(true);
     try {
-      const res = await fetch(`${API_BASE}/webhooks/${id}/test`, {
-        method: "POST", headers: authHeader(),
+      const res = await fetchWithAuth(`/api/v1/webhooks/${id}/test`, {
+        method: "POST",
       });
       const body = await res.json().catch(() => ({}));
       setTestedId(id);
@@ -107,11 +107,11 @@ export default function WebhooksCard() {
         <div className="mb-4 p-4 bg-emerald-950/30 border border-emerald-900/40 rounded-xl">
           <div className="flex items-center gap-1.5 mb-2">
             <CheckCircle2 size={13} className="text-emerald-500" />
-            <p className="text-xs font-semibold text-emerald-400">Signing secret — copy it now. It won't be shown again.</p>
+            <p className="text-xs font-semibold text-emerald-400">Signing secret — copy it now. It won&apos;t be shown again.</p>
           </div>
           <p className="font-mono text-xs text-gray-300 break-all">{newSecret}</p>
           <button onClick={() => setNewSecret(null)} className="mt-2 text-[10px] text-gray-600 hover:text-gray-400">
-            I've copied the secret
+            I&apos;ve copied the secret
           </button>
         </div>
       )}

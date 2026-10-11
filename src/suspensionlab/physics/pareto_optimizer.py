@@ -427,7 +427,7 @@ class SuspensionParetoOptimizer:
 
             rms_accel   = float(getattr(result, "rms_body_accel",    0.0))
             peak_travel = float(getattr(result, "peak_susp_travel",  0.0)) * 1000.0  # m → mm
-            tire_var    = float(getattr(result, "rms_tire_load_var", 0.0))
+            tire_var    = float(getattr(result, "rms_tire_load", getattr(result, "rms_tire_load_var", 0.0)))
 
             # Ride frequency (natural frequency of sprung mass)
             import math

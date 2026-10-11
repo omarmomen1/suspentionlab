@@ -1,8 +1,9 @@
 "use client";
-import { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { SplitSquareHorizontal, X, TrendingUp, Upload } from "lucide-react";
-import dynamic from "next/dynamic";
-const Plot = dynamic(() => import("react-plotly.js"), { ssr: false });
+import Plot from "./sim/Plot";
+import { isMetricImprovement } from "./TraceManager";
+import EngineeringErrorDisplay, { EngineeringErrorDisplayProps } from "./engineering/EngineeringErrorDisplay";
 
 const DARK = {
   paper_bgcolor: "transparent", plot_bgcolor: "transparent",
@@ -37,12 +38,35 @@ interface ComparePanelProps {
 export default function ComparePanel({ current }: ComparePanelProps) {
   const [baseline, setBaseline] = useState<SimResult | null>(null);
   const [open,     setOpen]     = useState(false);
+  const [uploadError, setUploadError] = useState<EngineeringErrorDisplayProps | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+
+  // Escape key listener to close
+  useEffect(() => {
+    if (!open) return;
+    const triggerEl = triggerRef.current;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      triggerEl?.focus();
+    };
+  }, [open]);
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)}
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        aria-expanded={false}
         className="flex items-center gap-1.5 px-3 py-1.5 bg-[#141416] border border-[#252525]
-          hover:bg-[#1e1e20] rounded-lg text-xs font-medium transition-colors">
+          hover:bg-[#1e1e20] rounded-lg text-xs font-medium transition-colors"
+      >
         <SplitSquareHorizontal size={13} className="text-[#0af]" /> Compare
       </button>
     );
@@ -55,13 +79,13 @@ export default function ComparePanel({ current }: ComparePanelProps) {
     if (typeof bv !== "number" || typeof cv !== "number") return null;
     const diff = cv - bv;
     const pct  = bv !== 0 ? ((diff / Math.abs(bv)) * 100) : 0;
-    const better = diff < 0; // lower = better for all our metrics
+    const better = isMetricImprovement(key as string, diff, bv);
     return (
       <div className="flex justify-between items-center py-1.5 border-b border-[#1a1a1a]">
-        <span className="text-[10px] text-gray-600">{label}</span>
+        <span className="text-[10px] text-gray-400">{label}</span>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono text-gray-500">{bv.toFixed(3)}</span>
-          <span className="text-[9px] text-gray-700">→</span>
+          <span className="text-[10px] font-mono text-gray-400">{bv.toFixed(3)}</span>
+          <span className="text-[9px] text-gray-500">→</span>
           <span className="text-[10px] font-mono text-white">{cv.toFixed(3)}</span>
           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
             better ? "bg-emerald-950 text-emerald-400" : "bg-red-950 text-red-400"
@@ -74,15 +98,24 @@ export default function ComparePanel({ current }: ComparePanelProps) {
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 z-40 w-full sm:w-[440px] bg-[#0a0a0c] border-l border-[#1e1e1e]
-      flex flex-col shadow-2xl">
+    <div
+      role="region"
+      aria-label="Setup Comparison Panel"
+      className="fixed inset-y-0 right-0 z-40 w-full sm:w-[440px] bg-[#0a0a0c] border-l border-[#1e1e1e]
+      flex flex-col shadow-2xl"
+    >
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3 border-b border-[#1e1e1e] shrink-0">
         <div className="flex items-center gap-2">
           <SplitSquareHorizontal size={14} className="text-[#0af]" />
           <span className="text-sm font-semibold text-white">Comparison Mode</span>
         </div>
-        <button onClick={() => setOpen(false)} className="text-gray-600 hover:text-white transition-colors">
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          aria-label="Close comparison panel"
+          className="text-gray-400 hover:text-white transition-colors p-1"
+        >
           <X size={14} />
         </button>
       </div>
@@ -106,9 +139,18 @@ export default function ComparePanel({ current }: ComparePanelProps) {
                 const file = e.target.files?.[0];
                 if (!file) return;
                 if (file.size > 5 * 1024 * 1024) {
-                  alert("File size exceeds 5MB limit.");
+                  setUploadError({
+                    title: "CSV TELEMETRY INGESTION FAILED",
+                    whatFailed: `Telemetry file upload for '${file.name}' (${(file.size / 1024 / 1024).toFixed(1)} MB)`,
+                    why: "File size exceeds the 5 MB browser processing and client memory envelope limit.",
+                    whatRemainsValid: "Current simulation results, pinned baseline curves, and frequency response metrics remain valid.",
+                    whatCannotBeClaimed: "The oversized CSV cannot be overlaid against the active model response.",
+                    nextAction: "Resample or truncate the CSV telemetry export to < 5 MB and re-import.",
+                    onDismiss: () => setUploadError(null),
+                  });
                   return;
                 }
+                setUploadError(null);
                 const reader = new FileReader();
                 reader.onload = (event) => {
                   const text = event.target?.result as string;
@@ -154,6 +196,12 @@ export default function ComparePanel({ current }: ComparePanelProps) {
           </div>
         )}
       </div>
+
+      {uploadError && (
+        <div className="px-5 py-2">
+          <EngineeringErrorDisplay {...uploadError} />
+        </div>
+      )}
 
       <div className="flex-1 overflow-y-auto custom-scrollbar px-5 py-4 space-y-5">
         {/* Delta metrics (hide if telemetry since we lack full metrics) */}

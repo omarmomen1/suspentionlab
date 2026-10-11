@@ -10,10 +10,12 @@ interface DataExportProps {
 
 export default function DataExport({ results, fileName = "suspensionlab_export", className = "" }: DataExportProps) {
   const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const handleExport = useCallback(() => {
     if (!results) return;
     setExporting(true);
+    setExportError(null);
     
     try {
       let mScript = `% SuspensionLab Simulation Export\n`;
@@ -83,19 +85,24 @@ export default function DataExport({ results, fileName = "suspensionlab_export",
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("Export failed:", err);
-      alert("Failed to generate MATLAB script.");
+      setExportError("Failed to generate MATLAB script.");
     } finally {
       setExporting(false);
     }
   }, [results, fileName]);
 
   return (
-    <button onClick={handleExport} disabled={exporting || !results}
-      className={`flex items-center gap-1.5 px-3 py-1.5 bg-[#141416] border border-[#252525]
-        hover:bg-[#1e1e20] rounded-lg text-xs font-medium transition-colors disabled:opacity-40 ${className}`}>
-      {exporting
-        ? <><Loader2 size={13} className="animate-spin" /> Generating .m…</>
-        : <><FileCode2 size={13} /> Export MATLAB</>}
-    </button>
+    <div className="inline-flex flex-col items-start gap-1">
+      <button onClick={handleExport} disabled={exporting || !results}
+        className={`flex items-center gap-1.5 px-3 py-1.5 bg-[#141416] border border-[#252525]
+          hover:bg-[#1e1e20] rounded-lg text-xs font-medium transition-colors disabled:opacity-40 ${className}`}>
+        {exporting
+          ? <><Loader2 size={13} className="animate-spin" /> Generating .m…</>
+          : <><FileCode2 size={13} /> Export MATLAB</>}
+      </button>
+      {exportError && (
+        <span className="text-[10px] text-rose-400 font-mono">{exportError}</span>
+      )}
+    </div>
   );
 }

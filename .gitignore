@@ -4,10 +4,8 @@ data/
 *.sqlite3
 
 # Environment and secrets
-.env
-.env.local
-.env.*.local
-.env.railway
+.env*
+!.env*.example
 *.pem
 *.key
 
@@ -33,6 +31,20 @@ frontend/.next/
 playwright-report/
 test-results/
 
-# C++ build directories
+# C++ build directories & objects
 src/kinematics_core/_build/
 src/kinematics_core/_build_gcc/
+build/
+*.o
+*.obj
+
+# Terraform cache
+.terraform/
+
+# Internal orchestration & scratch
+.agents/
+.claude/
+scratch/
+.pytest_cache/
+.hypothesis/
+

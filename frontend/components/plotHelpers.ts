@@ -64,8 +64,100 @@ const C = {
   phase: "#ff9f0a", // orange/yellow
 };
 
-function applyTrace(t: Trace, x: number[], y: number[], name: string, color?: string, dash?: string, type = "scatter", mode = "lines"): PlotTrace {
-  return { x, y, type, mode, name: `${t.name} ${name}`, line: { color: color || t.color, width: 1.5, dash: dash || "dash" }, opacity: 0.7 };
+function plotType(x?: number[], fallback = "scatter"): string {
+  if (x && x.length > 1000) return "scattergl";
+  return fallback;
+}
+
+/**
+ * High-performance Largest Triangle Three Buckets (LTTB) decimation algorithm.
+ * Downsamples (x, y) arrays to `threshold` points while preserving visual extrema and peaks.
+ */
+export function lttbDecimate(xArr: number[], yArr: number[], threshold = 2000): { x: number[]; y: number[] } {
+  const dataLength = xArr ? xArr.length : 0;
+  if (!xArr || !yArr || threshold >= dataLength || threshold <= 0) {
+    return { x: xArr, y: yArr };
+  }
+
+  const sampledX: number[] = new Array(threshold);
+  const sampledY: number[] = new Array(threshold);
+  let sampledIndex = 0;
+
+  const every = (dataLength - 2) / (threshold - 2);
+  let a = 0;
+  let maxAreaPoint = { x: xArr[0], y: yArr[0] };
+  let nextA = 0;
+
+  sampledX[sampledIndex] = xArr[a];
+  sampledY[sampledIndex] = yArr[a];
+  sampledIndex++;
+
+  for (let i = 0; i < threshold - 2; i++) {
+    let avgX = 0;
+    let avgY = 0;
+    let avgRangeStart = Math.floor((i + 1) * every) + 1;
+    let avgRangeEnd = Math.floor((i + 2) * every) + 1;
+    avgRangeEnd = avgRangeEnd < dataLength ? avgRangeEnd : dataLength;
+
+    const avgRangeLength = avgRangeEnd - avgRangeStart;
+    for (let j = avgRangeStart; j < avgRangeEnd; j++) {
+      avgX += xArr[j];
+      avgY += yArr[j];
+    }
+    avgX /= (avgRangeLength || 1);
+    avgY /= (avgRangeLength || 1);
+
+    let rangeOffs = Math.floor((i + 0) * every) + 1;
+    const rangeTo = Math.floor((i + 1) * every) + 1;
+    const pointAX = xArr[a];
+    const pointAY = yArr[a];
+    let maxArea = -1;
+
+    for (; rangeOffs < rangeTo && rangeOffs < dataLength; rangeOffs++) {
+      const area = Math.abs((pointAX - avgX) * (yArr[rangeOffs] - pointAY) - (pointAX - xArr[rangeOffs]) * (avgY - pointAY)) * 0.5;
+      if (area > maxArea) {
+        maxArea = area;
+        maxAreaPoint = { x: xArr[rangeOffs], y: yArr[rangeOffs] };
+        nextA = rangeOffs;
+      }
+    }
+
+    sampledX[sampledIndex] = maxAreaPoint.x;
+    sampledY[sampledIndex] = maxAreaPoint.y;
+    sampledIndex++;
+    a = nextA;
+  }
+
+  sampledX[sampledIndex] = xArr[dataLength - 1];
+  sampledY[sampledIndex] = yArr[dataLength - 1];
+
+  return { x: sampledX, y: sampledY };
+}
+
+export function optTrace(x: number[], y: number[], name: string, lineOpts: Record<string, unknown> = {}, extra: Record<string, unknown> = {}): PlotTrace {
+  const { x: dx, y: dy } = x && x.length > 2000 ? lttbDecimate(x, y, 2000) : { x, y };
+  return {
+    x: dx,
+    y: dy,
+    type: plotType(dx),
+    mode: (extra.mode as string) || "lines",
+    name,
+    line: lineOpts,
+    ...extra
+  };
+}
+
+function applyTrace(t: Trace, x: number[], y: number[], name: string, color?: string, dash?: string, type = "scatter", mode = "lines", deltaMode = false): PlotTrace {
+  const { x: dx, y: dy } = x && x.length > 2000 ? lttbDecimate(x, y, 2000) : { x, y };
+  const finalType = plotType(dx, type);
+  return { 
+    x: dx, y: dy, 
+    type: finalType, 
+    mode, 
+    name: `${t.name} ${name}${deltaMode ? " (Δ vs Base)" : ""}`, 
+    line: { color: color || t.color, width: 1.5, dash: dash || "dash" }, 
+    opacity: 0.85 
+  };
 }
 
 const diffArr = (arr: number[], baseArr: number[], deltaMode: boolean) => {
@@ -77,44 +169,85 @@ const diffArr = (arr: number[], baseArr: number[], deltaMode: boolean) => {
 
 export function bDisp(r: QuarterCarSeries, traces: Trace[], deltaMode: boolean): PlotTrace[] {
   const p = traces.filter(t => t.visible).flatMap(t => [
-    applyTrace(t, t.data.time, diffArr(t.data.z_s, r.z_s, deltaMode).map((v:number)=>v*1000), "Body", t.color, "dash"),
-    applyTrace(t, t.data.time, diffArr(t.data.z_u, r.z_u, deltaMode).map((v:number)=>v*1000), "Wheel", t.color, "dot")
+    applyTrace(t, t.data.time, diffArr(t.data.z_s, r.z_s, deltaMode).map((v:number)=>v*1000), "Body", t.color, "dash", "scatter", "lines", deltaMode),
+    applyTrace(t, t.data.time, diffArr(t.data.z_u, r.z_u, deltaMode).map((v:number)=>v*1000), "Wheel", t.color, "dot", "scatter", "lines", deltaMode)
   ]);
   return [...p,
-    { x: r.time, y: diffArr(r.z_s, r.z_s, deltaMode).map((v:number)=>v*1000), type: "scatter", mode: "lines", name: "Body z_s", line: { color: C.body, width: 2 } },
-    { x: r.time, y: diffArr(r.z_u, r.z_u, deltaMode).map((v:number)=>v*1000), type: "scatter", mode: "lines", name: "Wheel z_u", line: { color: C.wheel, width: 1.5 } },
-    { x: r.time, y: diffArr(r.z_r, r.z_r, deltaMode).map((v:number)=>v*1000), type: "scatter", mode: "lines", name: "Road z_r", line: { color: C.road, width: 1, dash: "dash" } }
+    optTrace(
+      r.time, 
+      diffArr(r.z_s, r.z_s, deltaMode).map((v:number)=>v*1000), 
+      deltaMode ? "Baseline Ref (0.0 Δ)" : "Body z_s", 
+      deltaMode ? { color: "#666", width: 1, dash: "dot" } : { color: C.body, width: 2 } 
+    ),
+    optTrace(
+      r.time, 
+      diffArr(r.z_u, r.z_u, deltaMode).map((v:number)=>v*1000), 
+      deltaMode ? "Wheel Ref (0.0 Δ)" : "Wheel z_u", 
+      deltaMode ? { color: "#444", width: 1, dash: "dot" } : { color: C.wheel, width: 1.5 } 
+    ),
+    optTrace(
+      r.time, 
+      diffArr(r.z_r, r.z_r, deltaMode).map((v:number)=>v*1000), 
+      deltaMode ? "Road Ref (0.0 Δ)" : "Road z_r", 
+      { color: C.road, width: 1, dash: "dash" } 
+    )
   ];
 }
 
 export function bVel(r: QuarterCarSeries, traces: Trace[], deltaMode: boolean): PlotTrace[] {
   const p = traces.filter(t => t.visible).flatMap(t => [
-    applyTrace(t, t.data.time, diffArr(t.data.dz_s, r.dz_s, deltaMode).map((v:number)=>v*1000), "Body vel", t.color, "dash"),
-    applyTrace(t, t.data.time, diffArr(t.data.dz_u, r.dz_u, deltaMode).map((v:number)=>v*1000), "Wheel vel", t.color, "dot")
+    applyTrace(t, t.data.time, diffArr(t.data.dz_s, r.dz_s, deltaMode).map((v:number)=>v*1000), "Body vel", t.color, "dash", "scatter", "lines", deltaMode),
+    applyTrace(t, t.data.time, diffArr(t.data.dz_u, r.dz_u, deltaMode).map((v:number)=>v*1000), "Wheel vel", t.color, "dot", "scatter", "lines", deltaMode)
   ]);
   return [...p,
-    { x: r.time, y: diffArr(r.dz_s, r.dz_s, deltaMode).map((v:number)=>v*1000), type: "scatter", mode: "lines", name: "Body vel ż_s", line: { color: C.body, width: 2 } },
-    { x: r.time, y: diffArr(r.dz_u, r.dz_u, deltaMode).map((v:number)=>v*1000), type: "scatter", mode: "lines", name: "Wheel vel ż_u", line: { color: C.wheel, width: 1.5 } }
+    optTrace(
+      r.time, 
+      diffArr(r.dz_s, r.dz_s, deltaMode).map((v:number)=>v*1000), 
+      deltaMode ? "Baseline Vel Ref (0.0 Δ)" : "Body vel ż_s", 
+      deltaMode ? { color: "#666", width: 1, dash: "dot" } : { color: C.body, width: 2 } 
+    ),
+    optTrace(
+      r.time, 
+      diffArr(r.dz_u, r.dz_u, deltaMode).map((v:number)=>v*1000), 
+      deltaMode ? "Wheel Vel Ref (0.0 Δ)" : "Wheel vel ż_u", 
+      deltaMode ? { color: "#444", width: 1, dash: "dot" } : { color: C.wheel, width: 1.5 } 
+    )
   ];
 }
 
 export function bAccel(r: QuarterCarSeries, traces: Trace[], deltaMode: boolean): PlotTrace[] {
   const p = traces.filter(t => t.visible).flatMap(t => [
-    applyTrace(t, t.data.time, diffArr(t.data.ddz_s, r.ddz_s, deltaMode), "Body accel", t.color, "dash")
+    applyTrace(t, t.data.time, diffArr(t.data.ddz_s, r.ddz_s, deltaMode), "Body accel", t.color, "dash", "scatter", "lines", deltaMode)
   ]);
   return [...p,
-    { x: r.time, y: diffArr(r.ddz_s, r.ddz_s, deltaMode), type: "scatter", mode: "lines", name: "Body accel z̈_s", line: { color: C.accel, width: 2 }, fill: "tozeroy", fillcolor: "rgba(255,45,85,0.04)" }
+    optTrace(
+      r.time, 
+      diffArr(r.ddz_s, r.ddz_s, deltaMode), 
+      deltaMode ? "Baseline Accel Ref (0.0 Δ)" : "Body accel z̈_s", 
+      deltaMode ? { color: "#666", width: 1, dash: "dot" } : { color: C.accel, width: 2 }, 
+      { fill: deltaMode ? undefined : "tozeroy", fillcolor: "rgba(255,45,85,0.04)" }
+    )
   ];
 }
 
 export function bTravel(r: QuarterCarSeries, traces: Trace[], deltaMode: boolean): PlotTrace[] {
   const p = traces.filter(t => t.visible).flatMap(t => [
-    applyTrace(t, t.data.time, diffArr(t.data.susp_travel, r.susp_travel, deltaMode).map((v:number)=>v*1000), "Susp travel", t.color, "dash"),
-    applyTrace(t, t.data.time, diffArr(t.data.tire_defl, r.tire_defl, deltaMode).map((v:number)=>v*1000), "Tire defl", t.color, "dot")
+    applyTrace(t, t.data.time, diffArr(t.data.susp_travel, r.susp_travel, deltaMode).map((v:number)=>v*1000), "Susp travel", t.color, "dash", "scatter", "lines", deltaMode),
+    applyTrace(t, t.data.time, diffArr(t.data.tire_defl, r.tire_defl, deltaMode).map((v:number)=>v*1000), "Tire defl", t.color, "dot", "scatter", "lines", deltaMode)
   ]);
   return [...p,
-    { x: r.time, y: diffArr(r.susp_travel, r.susp_travel, deltaMode).map((v:number)=>v*1000), type: "scatter", mode: "lines", name: "Susp travel (mm)", line: { color: C.travel, width: 2 } },
-    { x: r.time, y: diffArr(r.tire_defl, r.tire_defl, deltaMode).map((v:number)=>v*1000), type: "scatter", mode: "lines", name: "Tire deflection (mm)", line: { color: C.tire, width: 1.5 } }
+    optTrace(
+      r.time, 
+      diffArr(r.susp_travel, r.susp_travel, deltaMode).map((v:number)=>v*1000), 
+      deltaMode ? "Baseline Travel Ref (0.0 Δ)" : "Susp travel (mm)", 
+      deltaMode ? { color: "#666", width: 1, dash: "dot" } : { color: C.travel, width: 2 } 
+    ),
+    optTrace(
+      r.time, 
+      diffArr(r.tire_defl, r.tire_defl, deltaMode).map((v:number)=>v*1000), 
+      deltaMode ? "Tire Defl Ref (0.0 Δ)" : "Tire deflection (mm)", 
+      deltaMode ? { color: "#444", width: 1, dash: "dot" } : { color: C.tire, width: 1.5 } 
+    )
   ];
 }
 
@@ -122,39 +255,69 @@ export function bTravel(r: QuarterCarSeries, traces: Trace[], deltaMode: boolean
 
 export function bTrans(r: QuarterCarSeries, traces: Trace[], deltaMode: boolean): PlotTrace[] {
   const p = traces.filter(t => t.visible).flatMap(t => [
-    applyTrace(t, t.data.freq_hz, diffArr(t.data.transmissibility_body, r.transmissibility_body, deltaMode), "Body |H_s|", t.color, "dash"),
-    applyTrace(t, t.data.freq_hz, diffArr(t.data.transmissibility_wheel, r.transmissibility_wheel, deltaMode), "Wheel |H_u|", t.color, "dot")
+    applyTrace(t, t.data.freq_hz, diffArr(t.data.transmissibility_body, r.transmissibility_body, deltaMode), "Body |H_s|", t.color, "dash", "scatter", "lines", deltaMode),
+    applyTrace(t, t.data.freq_hz, diffArr(t.data.transmissibility_wheel, r.transmissibility_wheel, deltaMode), "Wheel |H_u|", t.color, "dot", "scatter", "lines", deltaMode)
   ]);
   return [...p,
-    { x: r.freq_hz, y: diffArr(r.transmissibility_body, r.transmissibility_body, deltaMode), type: "scatter", mode: "lines", name: "Body |H_s|", line: { color: C.body, width: 2 }, fill: "tozeroy", fillcolor: "rgba(242,169,0,0.04)" },
-    { x: r.freq_hz, y: diffArr(r.transmissibility_wheel, r.transmissibility_wheel, deltaMode), type: "scatter", mode: "lines", name: "Wheel |H_u|", line: { color: C.wheel, width: 1.5 } }
+    optTrace(
+      r.freq_hz, 
+      diffArr(r.transmissibility_body, r.transmissibility_body, deltaMode), 
+      deltaMode ? "Body TX Ref (0.0 Δ)" : "Body |H_s|", 
+      deltaMode ? { color: "#666", width: 1, dash: "dot" } : { color: C.body, width: 2 }, 
+      { fill: deltaMode ? undefined : "tozeroy", fillcolor: "rgba(242,169,0,0.04)" }
+    ),
+    optTrace(
+      r.freq_hz, 
+      diffArr(r.transmissibility_wheel, r.transmissibility_wheel, deltaMode), 
+      deltaMode ? "Wheel TX Ref (0.0 Δ)" : "Wheel |H_u|", 
+      deltaMode ? { color: "#444", width: 1, dash: "dot" } : { color: C.wheel, width: 1.5 } 
+    )
   ];
 }
 
 export function bBodeMag(r: QuarterCarSeries, traces: Trace[], deltaMode: boolean): PlotTrace[] {
   const p = traces.filter(t => t.visible).flatMap(t => [
-    applyTrace(t, t.data.freq_hz, diffArr(t.data.bode_magnitude_db, r.bode_magnitude_db, deltaMode), "Mag (dB)", t.color, "dash")
+    applyTrace(t, t.data.freq_hz, diffArr(t.data.bode_magnitude_db, r.bode_magnitude_db, deltaMode), "Mag (dB)", t.color, "dash", "scatter", "lines", deltaMode)
   ]);
   return [...p,
-    { x: r.freq_hz, y: diffArr(r.bode_magnitude_db, r.bode_magnitude_db, deltaMode), type: "scatter", mode: "lines", name: "Magnitude (dB)", line: { color: C.mag, width: 2 } }
+    optTrace(
+      r.freq_hz, 
+      diffArr(r.bode_magnitude_db, r.bode_magnitude_db, deltaMode), 
+      deltaMode ? "Bode Mag Ref (0.0 Δ)" : "Magnitude (dB)", 
+      deltaMode ? { color: "#666", width: 1, dash: "dot" } : { color: C.mag, width: 2 } 
+    )
   ];
 }
 
 export function bBodePhase(r: QuarterCarSeries, traces: Trace[], deltaMode: boolean): PlotTrace[] {
   const p = traces.filter(t => t.visible).flatMap(t => [
-    applyTrace(t, t.data.freq_hz, diffArr(t.data.bode_phase_deg, r.bode_phase_deg, deltaMode), "Phase (°)", t.color, "dash")
+    applyTrace(t, t.data.freq_hz, diffArr(t.data.bode_phase_deg, r.bode_phase_deg, deltaMode), "Phase (°)", t.color, "dash", "scatter", "lines", deltaMode)
   ]);
   return [...p,
-    { x: r.freq_hz, y: diffArr(r.bode_phase_deg, r.bode_phase_deg, deltaMode), type: "scatter", mode: "lines", name: "Phase (°)", line: { color: C.phase, width: 2 } }
+    optTrace(
+      r.freq_hz, 
+      diffArr(r.bode_phase_deg, r.bode_phase_deg, deltaMode), 
+      deltaMode ? "Bode Phase Ref (0.0 Δ)" : "Phase (°)", 
+      deltaMode ? { color: "#666", width: 1, dash: "dot" } : { color: C.phase, width: 2 } 
+    )
   ];
 }
 
 export function bDynLoad(r: QuarterCarSeries, traces: Trace[], deltaMode: boolean): PlotTrace[] {
   const p = traces.filter(t => t.visible).flatMap(t => [
-    applyTrace(t, t.data.time, diffArr(t.data.tire_load_var, r.tire_load_var, deltaMode), "ΔF_z", t.color, "dash")
+    applyTrace(t, t.data.time, diffArr(t.data.tire_load_var, r.tire_load_var, deltaMode), "ΔF_z", t.color, "dash", "scatter", "lines", deltaMode)
   ]);
   return [...p,
-    { x: r.time, y: diffArr(r.tire_load_var, r.tire_load_var, deltaMode), type: "scatter", mode: "lines", name: "Dynamic tire load ΔF_z", line: { color: C.load, width: 2 }, fill: "tozeroy", fillcolor: "rgba(255,107,53,0.05)" }
+    { 
+      x: r.time, 
+      y: diffArr(r.tire_load_var, r.tire_load_var, deltaMode), 
+      type: plotType(r.time), 
+      mode: "lines", 
+      name: deltaMode ? "Dyn Load Ref (0.0 Δ)" : "Dynamic tire load ΔF_z", 
+      line: deltaMode ? { color: "#666", width: 1, dash: "dot" } : { color: C.load, width: 2 }, 
+      fill: deltaMode ? undefined : "tozeroy", 
+      fillcolor: "rgba(255,107,53,0.05)" 
+    }
   ];
 }
 
@@ -176,13 +339,34 @@ export function bForces(r: QuarterCarSeries, p: SpringDamperParams, traces: Trac
   const plt = traces.filter(t => t.visible).flatMap(t => {
     const { F_total } = calcForces(t.data, t.params as SpringDamperParams);
     return [
-      applyTrace(t, t.data.time, diffArr(F_total, fBase.F_total, deltaMode), "Total F", t.color, "dash")
+      applyTrace(t, t.data.time, diffArr(F_total, fBase.F_total, deltaMode), "Total F", t.color, "dash", "scatter", "lines", deltaMode)
     ];
   });
   return [...plt,
-    { x: r.time, y: diffArr(fBase.F_spring, fBase.F_spring, deltaMode), type: "scatter", mode: "lines", name: "Spring F_k", line: { color: C.body, width: 1.5 } },
-    { x: r.time, y: diffArr(fBase.F_damper, fBase.F_damper, deltaMode), type: "scatter", mode: "lines", name: "Damper F_c", line: { color: C.wheel, width: 1.5 } },
-    { x: r.time, y: diffArr(fBase.F_total, fBase.F_total, deltaMode), type: "scatter", mode: "lines", name: "Total F_susp", line: { color: "#fff", width: 2, dash: "dot" } }
+    { 
+      x: r.time, 
+      y: diffArr(fBase.F_spring, fBase.F_spring, deltaMode), 
+      type: plotType(r.time), 
+      mode: "lines", 
+      name: deltaMode ? "Spring F Ref (0.0 Δ)" : "Spring F_k", 
+      line: deltaMode ? { color: "#666", width: 1, dash: "dot" } : { color: C.body, width: 1.5 } 
+    },
+    { 
+      x: r.time, 
+      y: diffArr(fBase.F_damper, fBase.F_damper, deltaMode), 
+      type: plotType(r.time), 
+      mode: "lines", 
+      name: deltaMode ? "Damper F Ref (0.0 Δ)" : "Damper F_c", 
+      line: deltaMode ? { color: "#444", width: 1, dash: "dot" } : { color: C.wheel, width: 1.5 } 
+    },
+    { 
+      x: r.time, 
+      y: diffArr(fBase.F_total, fBase.F_total, deltaMode), 
+      type: plotType(r.time), 
+      mode: "lines", 
+      name: deltaMode ? "Total Susp F Ref (0.0 Δ)" : "Total F_susp", 
+      line: { color: "#fff", width: 2, dash: "dot" } 
+    }
   ];
 }
 
@@ -191,11 +375,30 @@ export function bFV(r: QuarterCarSeries, p: SpringDamperParams, traces: Trace[],
   const plt = traces.filter(t => t.visible).flatMap(t => {
     const { relVel, F_damper } = calcForces(t.data, t.params as SpringDamperParams);
     return [
-      { x: relVel.map((v:number)=>v*1000), y: diffArr(F_damper, fBase.F_damper, deltaMode), type: "scatter", mode: "markers", name: `${t.name} F-V`, marker: { color: t.color, size: 2, opacity: 0.6 } }
+      { 
+        x: relVel.map((v:number)=>v*1000), 
+        y: diffArr(F_damper, fBase.F_damper, deltaMode), 
+        type: "scatter", 
+        mode: "markers", 
+        name: `${t.name} F-V${deltaMode ? " (Δ vs Base)" : ""}`, 
+        marker: { color: t.color, size: 2, opacity: 0.6 } 
+      }
     ];
   });
   return [...plt,
-    { x: fBase.relVel.map((v:number)=>v*1000), y: diffArr(fBase.F_damper, fBase.F_damper, deltaMode), type: "scatter", mode: "markers", name: "Damper F–V", marker: { color: fBase.F_damper.map((_:number, i:number) => i / fBase.F_damper.length), colorscale: [[0, "#0a1628"], [0.5, "#00aeff"], [1, "#f2a900"]], size: 2, opacity: 0.8 } }
+    { 
+      x: fBase.relVel.map((v:number)=>v*1000), 
+      y: diffArr(fBase.F_damper, fBase.F_damper, deltaMode), 
+      type: "scatter", 
+      mode: "markers", 
+      name: deltaMode ? "Damper F–V Ref (0.0 Δ)" : "Damper F–V", 
+      marker: { 
+        color: fBase.F_damper.map((_:number, i:number) => i / fBase.F_damper.length), 
+        colorscale: [[0, "#0a1628"], [0.5, "#00aeff"], [1, "#f2a900"]], 
+        size: 2, 
+        opacity: 0.8 
+      } 
+    }
   ];
 }
 
@@ -204,11 +407,25 @@ export function bFx(r: QuarterCarSeries, p: SpringDamperParams, traces: Trace[],
   const plt = traces.filter(t => t.visible).flatMap(t => {
     const { F_spring } = calcForces(t.data, t.params as SpringDamperParams);
     return [
-      { x: t.data.susp_travel.map((v:number)=>v*1000), y: diffArr(F_spring, fBase.F_spring, deltaMode), type: "scatter", mode: "markers", name: `${t.name} F-x`, marker: { color: t.color, size: 2, opacity: 0.6 } }
+      { 
+        x: t.data.susp_travel.map((v:number)=>v*1000), 
+        y: diffArr(F_spring, fBase.F_spring, deltaMode), 
+        type: "scatter", 
+        mode: "markers", 
+        name: `${t.name} F-x${deltaMode ? " (Δ vs Base)" : ""}`, 
+        marker: { color: t.color, size: 2, opacity: 0.6 } 
+      }
     ];
   });
   return [...plt,
-    { x: r.susp_travel.map((v:number)=>v*1000), y: diffArr(fBase.F_spring, fBase.F_spring, deltaMode), type: "scatter", mode: "markers", name: "Spring F–x", marker: { color: C.body, size: 2, opacity: 0.7 } }
+    { 
+      x: r.susp_travel.map((v:number)=>v*1000), 
+      y: diffArr(fBase.F_spring, fBase.F_spring, deltaMode), 
+      type: "scatter", 
+      mode: "markers", 
+      name: deltaMode ? "Spring F–x Ref (0.0 Δ)" : "Spring F–x", 
+      marker: { color: C.body, size: 2, opacity: 0.7 } 
+    }
   ];
 }
 
@@ -216,10 +433,19 @@ export function bPower(r: QuarterCarSeries, p: SpringDamperParams, traces: Trace
   const fBase = calcForces(r, p);
   const plt = traces.filter(t => t.visible).flatMap(t => {
     const { P_c } = calcForces(t.data, t.params as SpringDamperParams);
-    return [ applyTrace(t, t.data.time, diffArr(P_c, fBase.P_c, deltaMode), "Power", t.color, "dash") ];
+    return [ applyTrace(t, t.data.time, diffArr(P_c, fBase.P_c, deltaMode), "Power", t.color, "dash", "scatter", "lines", deltaMode) ];
   });
   return [...plt,
-    { x: r.time, y: diffArr(fBase.P_c, fBase.P_c, deltaMode), type: "scatter", mode: "lines", name: "Damper Power P_c", line: { color: C.accel, width: 2 }, fill: "tozeroy", fillcolor: "rgba(255,45,85,0.05)" }
+    { 
+      x: r.time, 
+      y: diffArr(fBase.P_c, fBase.P_c, deltaMode), 
+      type: plotType(r.time), 
+      mode: "lines", 
+      name: deltaMode ? "Damper Power Ref (0.0 Δ)" : "Damper Power P_c", 
+      line: deltaMode ? { color: "#666", width: 1, dash: "dot" } : { color: C.accel, width: 2 }, 
+      fill: deltaMode ? undefined : "tozeroy", 
+      fillcolor: "rgba(255,45,85,0.05)" 
+    }
   ];
 }
 
@@ -227,7 +453,7 @@ export function bPower(r: QuarterCarSeries, p: SpringDamperParams, traces: Trace
 
 export function bPhaseS(r: QuarterCarSeries, traces: Trace[], deltaMode: boolean): PlotTrace[] {
   const p = traces.filter(t => t.visible).flatMap(t => [
-    applyTrace(t, t.data.z_s.map((v:number)=>v*1000), diffArr(t.data.dz_s, r.dz_s, deltaMode).map((v:number)=>v*1000), "Phase", t.color, "dash")
+    applyTrace(t, t.data.z_s.map((v:number)=>v*1000), diffArr(t.data.dz_s, r.dz_s, deltaMode).map((v:number)=>v*1000), "Phase", t.color, "dash", "scatter", "lines", deltaMode)
   ]);
   return [...p,
     { x: r.z_s.map((v:number)=>v*1000), y: diffArr(r.dz_s, r.dz_s, deltaMode).map((v:number)=>v*1000), type: "scatter", mode: "lines", name: "Body phase portrait", line: { color: C.body, width: 1.5 } },
@@ -237,7 +463,7 @@ export function bPhaseS(r: QuarterCarSeries, traces: Trace[], deltaMode: boolean
 
 export function bPhaseU(r: QuarterCarSeries, traces: Trace[], deltaMode: boolean): PlotTrace[] {
   const p = traces.filter(t => t.visible).flatMap(t => [
-    applyTrace(t, t.data.z_u.map((v:number)=>v*1000), diffArr(t.data.dz_u, r.dz_u, deltaMode).map((v:number)=>v*1000), "Phase", t.color, "dash")
+    applyTrace(t, t.data.z_u.map((v:number)=>v*1000), diffArr(t.data.dz_u, r.dz_u, deltaMode).map((v:number)=>v*1000), "Phase", t.color, "dash", "scatter", "lines", deltaMode)
   ]);
   return [...p,
     { x: r.z_u.map((v:number)=>v*1000), y: diffArr(r.dz_u, r.dz_u, deltaMode).map((v:number)=>v*1000), type: "scatter", mode: "lines", name: "Wheel phase portrait", line: { color: C.wheel, width: 1.5 } },
@@ -259,9 +485,18 @@ export function bComfortTravel(r: QuarterCarSeries, traces: Trace[], deltaMode: 
 export function bPSD(psdData: PsdPayload, traces: Trace[], deltaMode: boolean, r: QuarterCarSeries): PlotTrace[] {
   const p = traces.filter(t => t.visible).flatMap(t => {
     if (!t.data.psd_freqs || !t.data.psd_values) return [];
-    return [ applyTrace(t, t.data.psd_freqs, diffArr(t.data.psd_values, r.psd_values ?? [], deltaMode), "PSD", t.color, "dash") ];
+    return [ applyTrace(t, t.data.psd_freqs, diffArr(t.data.psd_values, r.psd_values ?? [], deltaMode), "PSD", t.color, "dash", "scatter", "lines", deltaMode) ];
   });
   return [...p,
-    { x: psdData.freqs, y: diffArr(psdData.psd, r.psd_values ?? [], deltaMode), type: "scatter", mode: "lines", name: "PSD ӓ_s", fill: "tozeroy", fillcolor: "rgba(255,45,85,0.06)", line: { color: C.accel, width: 2 } }
+    { 
+      x: psdData.freqs, 
+      y: diffArr(psdData.psd, r.psd_values ?? [], deltaMode), 
+      type: plotType(psdData.freqs), 
+      mode: "lines", 
+      name: deltaMode ? "PSD Ref (0.0 Δ)" : "PSD ӓ_s", 
+      fill: deltaMode ? undefined : "tozeroy", 
+      fillcolor: "rgba(255,45,85,0.06)", 
+      line: deltaMode ? { color: "#666", width: 1, dash: "dot" } : { color: C.accel, width: 2 } 
+    }
   ];
 }

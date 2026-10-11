@@ -33,25 +33,23 @@ def upgrade() -> None:
         batch_op.alter_column('id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='id::uuid')
         batch_op.alter_column('user_id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='user_id::uuid')
         batch_op.alter_column('team_id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=True)
+               existing_nullable=True,
+               postgresql_using='team_id::uuid')
         batch_op.alter_column('session_id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=True)
-        batch_op.drop_constraint(batch_op.f('fk_jobs_team_id'), type_='foreignkey')
-        batch_op.drop_constraint(batch_op.f('fk_jobs_user_id'), type_='foreignkey')
-        batch_op.drop_constraint(batch_op.f('fk_jobs_session_id'), type_='foreignkey')
-        batch_op.create_foreign_key(None, 'users', ['user_id'], ['id'], ondelete='SET NULL')
-        batch_op.create_foreign_key(None, 'sessions', ['session_id'], ['id'], ondelete='SET NULL')
-        batch_op.create_foreign_key(None, 'teams', ['team_id'], ['id'], ondelete='SET NULL')
+               existing_nullable=True,
+               postgresql_using='session_id::uuid')
 
     with op.batch_alter_table('lemon_events', schema=None) as batch_op:
         batch_op.drop_index(batch_op.f('ix_lemon_events_event_id'))
@@ -61,82 +59,92 @@ def upgrade() -> None:
         batch_op.alter_column('id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='id::uuid')
         batch_op.alter_column('session_id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='session_id::uuid')
         batch_op.alter_column('author_id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='author_id::uuid')
         batch_op.create_index('ix_session_comments_author_id', ['author_id'], unique=False)
-        batch_op.drop_constraint(None, type_='foreignkey')
-        batch_op.drop_constraint(None, type_='foreignkey')
-        batch_op.create_foreign_key(None, 'sessions', ['session_id'], ['id'], ondelete='SET NULL')
-        batch_op.create_foreign_key(None, 'users', ['author_id'], ['id'], ondelete='SET NULL')
 
     with op.batch_alter_table('sessions', schema=None) as batch_op:
         batch_op.add_column(sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True))
         batch_op.alter_column('id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='id::uuid')
         batch_op.alter_column('owner_id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='owner_id::uuid')
         batch_op.alter_column('team_id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=True)
-        batch_op.drop_constraint(None, type_='foreignkey')
-        batch_op.drop_constraint(None, type_='foreignkey')
-        batch_op.create_foreign_key(None, 'teams', ['team_id'], ['id'], ondelete='SET NULL')
-        batch_op.create_foreign_key(None, 'users', ['owner_id'], ['id'], ondelete='SET NULL')
+               existing_nullable=True,
+               postgresql_using='team_id::uuid')
+
+    bind = op.get_bind()
+    if bind.dialect.name == 'postgresql':
+        op.execute("ALTER TABLE shared_reports ALTER COLUMN view_count DROP DEFAULT")
 
     with op.batch_alter_table('shared_reports', schema=None) as batch_op:
         batch_op.add_column(sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True))
         batch_op.alter_column('id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='id::uuid')
         batch_op.alter_column('view_count',
                existing_type=sa.VARCHAR(),
                type_=sa.Integer(),
                existing_nullable=True,
-               existing_server_default=sa.text("'0'"))
+               server_default=sa.text('0'),
+               postgresql_using='view_count::integer')
 
     with op.batch_alter_table('teams', schema=None) as batch_op:
         batch_op.add_column(sa.Column('deleted_at', sa.DateTime(timezone=True), nullable=True))
         batch_op.alter_column('id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='id::uuid')
         batch_op.alter_column('owner_id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='owner_id::uuid')
 
     with op.batch_alter_table('user_api_keys', schema=None) as batch_op:
         batch_op.alter_column('id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='id::uuid')
         batch_op.alter_column('user_id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='user_id::uuid')
 
     with op.batch_alter_table('user_sessions', schema=None) as batch_op:
         batch_op.alter_column('id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='id::uuid')
         batch_op.alter_column('user_id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='user_id::uuid')
         batch_op.create_index('ix_user_sessions_expires_at', ['expires_at'], unique=False)
 
     with op.batch_alter_table('users', schema=None) as batch_op:
@@ -146,11 +154,13 @@ def upgrade() -> None:
         batch_op.alter_column('id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='id::uuid')
         batch_op.alter_column('team_id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=True)
+               existing_nullable=True,
+               postgresql_using='team_id::uuid')
         batch_op.drop_index(batch_op.f('ix_users_lemon_cust'))
         batch_op.create_index('ix_users_billing_cust', ['billing_customer_id'], unique=False)
         batch_op.drop_column('lemon_customer_id')
@@ -161,23 +171,23 @@ def upgrade() -> None:
         batch_op.alter_column('id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=False,
+               postgresql_using='id::uuid')
         batch_op.alter_column('user_id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=False)
+               existing_nullable=True,
+               postgresql_using='user_id::uuid')
         batch_op.alter_column('team_id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=True)
+               existing_nullable=True,
+               postgresql_using='team_id::uuid')
         batch_op.alter_column('parent_id',
                existing_type=sa.NUMERIC(),
                type_=sa.UUID(),
-               existing_nullable=True)
-        batch_op.drop_constraint(batch_op.f('fk_vp_user_id'), type_='foreignkey')
-        batch_op.drop_constraint(batch_op.f('fk_vp_team_id'), type_='foreignkey')
-        batch_op.create_foreign_key(None, 'teams', ['team_id'], ['id'], ondelete='SET NULL')
-        batch_op.create_foreign_key(None, 'users', ['user_id'], ['id'], ondelete='SET NULL')
+               existing_nullable=True,
+               postgresql_using='parent_id::uuid')
 
     # ### end Alembic commands ###
 

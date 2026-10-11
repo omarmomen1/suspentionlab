@@ -1,15 +1,14 @@
-import type { Metadata } from "next";
+"use client";
+
+import React from "react";
 import Link from "next/link";
 import { Check, Zap, Shield, Building2, ArrowRight } from "lucide-react";
-
-export const metadata: Metadata = {
-  title: "Pricing — SuspensionLab Pro",
-  description: "Simple, transparent pricing for every team. From individual engineers to enterprise OEMs.",
-};
+import { useAuth } from "../../contexts/AuthContext";
 
 const PLANS = [
   {
     name: "Starter",
+    planKey: "FREE",
     price: "Free",
     billing: "forever",
     description: "For individual engineers exploring vehicle dynamics.",
@@ -29,6 +28,7 @@ const PLANS = [
   },
   {
     name: "Pro",
+    planKey: "PRO",
     price: "$49",
     billing: "per month",
     description: "For suspension engineers who need the full toolkit.",
@@ -45,13 +45,14 @@ const PLANS = [
       "PDF export & reporting",
       "Priority email support",
     ],
-    cta: "Buy on Gumroad",
-    ctaHref: "https://suspendlab.gumroad.com/l/sltma",
+    cta: "Upgrade to Pro",
+    ctaHref: "/settings#billing",
     ctaStyle: "bg-ansys-yellow text-black font-bold hover:brightness-110 shadow-[0_0_20px_rgba(242,169,0,0.25)]",
     icon: Shield,
   },
   {
     name: "Enterprise",
+    planKey: "ENTERPRISE",
     price: "Custom",
     billing: "contact us",
     description: "For OEM teams that need scale, compliance, and integrations.",
@@ -69,7 +70,7 @@ const PLANS = [
       "Volume seat licensing",
     ],
     cta: "Contact Sales",
-    ctaHref: "mailto:suspenlabsupp@outlook.com",
+    ctaHref: "mailto:support@suspensionlab.pro",
     ctaStyle: "bg-[#1e1e20] border border-[#333] text-white hover:bg-[#2a2a2c]",
     icon: Building2,
   },
@@ -95,18 +96,21 @@ const FAQS = [
 ];
 
 export default function PricingPage() {
+  const { user } = useAuth();
+  const currentPlanKey = (user?.plan || "FREE").toUpperCase();
+
   return (
     <div className="min-h-full bg-black pt-[44px]">
       <div className="max-w-6xl mx-auto px-6 py-20">
 
         {/* Header */}
         <div className="text-center mb-16">
-          <span className="text-[10px] font-bold tracking-[0.25em] text-ansys-yellow uppercase">Pricing</span>
+          <span className="text-[10px] font-bold tracking-[0.25em] text-ansys-yellow uppercase">Pricing & Plans</span>
           <h1 className="text-5xl font-semibold tracking-tight text-white mt-3 mb-4">
-            Simple, transparent pricing
+            Simple, transparent engineering tiers
           </h1>
           <p className="text-gray-500 text-lg max-w-xl mx-auto">
-            Every plan includes the core physics engine. Upgrade when you need more models, more storage, or team features.
+            Every tier includes the core physics engine. Upgrade for multi-body DOF solvers, AI optimizers, and enterprise team governance.
           </p>
         </div>
 
@@ -114,12 +118,43 @@ export default function PricingPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-20">
           {PLANS.map((plan) => {
             const Icon = plan.icon;
+            const isCurrentPlan = user && plan.planKey === currentPlanKey;
+            const isEnterpriseUser = user && currentPlanKey === "ENTERPRISE";
+
+            let ctaText = plan.cta;
+            let ctaHref = plan.ctaHref;
+            let ctaStyle = plan.ctaStyle;
+
+            if (isCurrentPlan) {
+              ctaText = "Current Plan — Launch Simulator";
+              ctaHref = "/quarter-car";
+              ctaStyle = "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold hover:bg-emerald-500/30";
+            } else if (isEnterpriseUser) {
+              ctaText = "Included in Enterprise";
+              ctaHref = "/quarter-car";
+              ctaStyle = "bg-white/10 text-white border border-white/20 hover:bg-white/20";
+            } else if (!user) {
+              if (plan.planKey === "FREE") {
+                ctaText = "Get Started Free";
+                ctaHref = "/auth/register";
+              } else if (plan.planKey === "PRO") {
+                ctaText = "Get Started with Pro";
+                ctaHref = "/auth/register";
+              }
+            }
+
             return (
               <div
                 key={plan.name}
-                className={`relative bg-[#0d0d0f] border ${plan.color} rounded-2xl p-8 flex flex-col`}
+                className={`relative bg-[#0d0d0f] border ${isCurrentPlan ? "border-emerald-500/50 shadow-[0_0_30px_rgba(16,185,129,0.15)]" : plan.color} rounded-2xl p-8 flex flex-col`}
               >
-                {plan.badge && (
+                {isCurrentPlan ? (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="px-3 py-1 bg-emerald-500 text-black text-[10px] font-bold uppercase tracking-wider rounded-full">
+                      Your Active Plan
+                    </span>
+                  </div>
+                ) : plan.badge && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                     <span className="px-3 py-1 bg-ansys-yellow text-black text-[10px] font-bold uppercase tracking-wider rounded-full">
                       {plan.badge}
@@ -129,7 +164,7 @@ export default function PricingPage() {
 
                 <div className="mb-6">
                   <div className="flex items-center gap-2 mb-3">
-                    <Icon size={16} className="text-ansys-yellow" />
+                    <Icon size={16} className={isCurrentPlan ? "text-emerald-400" : "text-ansys-yellow"} />
                     <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{plan.name}</span>
                   </div>
                   <div className="flex items-end gap-1.5 mb-2">
@@ -151,10 +186,10 @@ export default function PricingPage() {
                 </ul>
 
                 <Link
-                  href={plan.ctaHref}
-                  className={`w-full py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2 ${plan.ctaStyle}`}
+                  href={ctaHref}
+                  className={`w-full py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2 ${ctaStyle}`}
                 >
-                  {plan.cta} <ArrowRight size={14} />
+                  {ctaText} <ArrowRight size={14} />
                 </Link>
               </div>
             );
