@@ -5,6 +5,7 @@ import {
   ParameterTrustExplanationResponseDTO,
   ParameterTrustHistoryResponseDTO,
   ParameterTrustEvidenceDTO,
+  DecisionExposureAssessmentResponseDTO,
 } from "../lib/api_client";
 import * as apiModule from "../lib/api";
 
@@ -494,5 +495,159 @@ describe("ParameterTrustApi & Trust Map Frontend Unit Tests", () => {
       expect(res.status).toBe("SENSITIVITY_UNAVAILABLE");
       expect(res.warning).toContain("never interpreted as zero");
     });
+
+    it("assessDecisionExposure queries decision exposure with strict governance separation", async () => {
+      const mockDecisionExposure: DecisionExposureAssessmentResponseDTO = {
+        decision_id: "DEC-12",
+        decision_type: "EngineeringDecision",
+        exposure_classification: "HIGH_EXPOSURE",
+        exposure_summary: "Decision is exposed to 1 high-sensitivity unvalidated parameters.",
+        policy_version: "DECISION_TRUST_POLICY_V1",
+        input_snapshot_hash: "snap_hash_1234",
+        assessment_hash: "assess_hash_5678",
+        governance_separation_notice: "Strict Governance Separation: Parameter trust and exposure quantification are decoupled from human approval and deployment safety.",
+        created_at: "2026-10-12T00:00:00Z",
+        parameter_dependencies: [
+          {
+            decision_id: "DEC-12",
+            decision_type: "EngineeringDecision",
+            parameter_name: "front_spring_rate",
+            entity_type: "SetupCandidate",
+            entity_id: "SETUP-P3L-CAND-01",
+            dependency_nature: "QUANTITATIVELY_SENSITIVE",
+            kpi_metrics: ["heave_stiffness_n_per_m"],
+            sensitivity_status: "HIGH_SENSITIVITY",
+            elasticity: 0.32,
+            source_artifact_hashes: [],
+            source_evidence_ids: [],
+            operating_conditions: {},
+            direct_profile: {
+              trust_state: "PROVISIONAL",
+              validation_coverage: "NO_VALIDATION",
+              conflicts: [],
+              recency_metadata: {},
+            },
+          },
+        ],
+        evidence_gaps: [
+          {
+            parameter_name: "front_spring_rate",
+            decision_id: "DEC-12",
+            severity: "CRITICAL",
+            reason: "Parameter has high sensitivity with no validation.",
+            supporting_sources: [],
+            contradicting_sources: [],
+            relevant_operating_conditions: {},
+            candidate_experiment_type: "RIG_TEST_4_POST",
+            expected_information_gain: "Validate dynamic corner stiffness",
+            unresolved_assumptions: [],
+            recommendation_disclaimer: "Candidate experiment suggestion for engineering review.",
+          },
+        ],
+        actionable_recommendations: [
+          {
+            target_parameter: "front_spring_rate",
+            severity: "CRITICAL",
+            candidate_experiment_type: "RIG_TEST_4_POST",
+            expected_information_gain: "Validate dynamic corner stiffness",
+            unresolved_assumptions: [],
+            notice: "Candidate experiment suggestion for engineering review.",
+          },
+        ],
+        governance_separation: {
+          parameter_trust_states: { front_spring_rate: "PROVISIONAL" },
+          sensitivity_impacts: { front_spring_rate: "HIGH_SENSITIVITY" },
+          evidence_completeness: { total_parameters: 1, unvalidated: 1 },
+          decision_exposure: "HIGH_EXPOSURE",
+          approval_authorization: {
+            decision_status: "PENDING",
+            is_human_approved: false,
+          },
+          deployment_safety: {
+            deployment_safety_inferred: false,
+            deployment_authorization: "NOT_ESTABLISHED",
+            notice: "Validation passing does not imply deployment safety.",
+          },
+        },
+      };
+
+      const spy = vi.spyOn(apiModule, "apiJson").mockResolvedValueOnce(mockDecisionExposure);
+
+      const res = await ParameterTrustApi.assessDecisionExposure({
+        decision_id: "DEC-12",
+        decision_type: "EngineeringDecision",
+        force_reassess: false,
+        persist_record: true,
+      });
+
+      expect(spy).toHaveBeenCalledWith("/api/v1/parameter-trust/decision/assess", {
+        method: "POST",
+        body: JSON.stringify({
+          decision_id: "DEC-12",
+          decision_type: "EngineeringDecision",
+          force_reassess: false,
+          persist_record: true,
+        }),
+      });
+      expect(res.decision_id).toBe("DEC-12");
+      expect(res.exposure_classification).toBe("HIGH_EXPOSURE");
+      expect(res.governance_separation.deployment_safety.deployment_authorization).toBe("NOT_ESTABLISHED");
+      expect(res.governance_separation.deployment_safety.deployment_safety_inferred).toBe(false);
+      expect(res.evidence_gaps).toHaveLength(1);
+      expect(res.evidence_gaps[0].candidate_experiment_type).toBe("RIG_TEST_4_POST");
+    });
+
+    it("getDecisionHistory, getDecisionDependencies, getDecisionGaps, and reassessDecisionExposure query correct routes", async () => {
+      const mockHistory = {
+        decision_id: "DEC-12",
+        decision_type: "EngineeringDecision",
+        history: [],
+        total_assessments: 0,
+      };
+      const mockDeps = {
+        decision_id: "DEC-12",
+        decision_type: "EngineeringDecision",
+        dependencies: [],
+        total_dependencies: 0,
+      };
+      const mockGaps = {
+        decision_id: "DEC-12",
+        decision_type: "EngineeringDecision",
+        exposure_classification: "LOW_EXPOSURE",
+        evidence_gaps: [],
+        actionable_recommendations: [],
+      };
+      const mockReassess = {
+        decision_id: "DEC-12",
+        decision_type: "EngineeringDecision",
+        exposure_classification: "LOW_EXPOSURE",
+        differential: {
+          previous_assessment_id: "prev-id-1",
+          rationale: "Updated validation results received",
+        },
+      };
+
+      const spy = vi.spyOn(apiModule, "apiJson")
+        .mockResolvedValueOnce(mockHistory)
+        .mockResolvedValueOnce(mockDeps)
+        .mockResolvedValueOnce(mockGaps)
+        .mockResolvedValueOnce(mockReassess);
+
+      const histRes = await ParameterTrustApi.getDecisionHistory("DEC-12");
+      expect(histRes.decision_id).toBe("DEC-12");
+
+      const depsRes = await ParameterTrustApi.getDecisionDependencies("DEC-12");
+      expect(depsRes.decision_id).toBe("DEC-12");
+
+      const gapsRes = await ParameterTrustApi.getDecisionGaps("DEC-12");
+      expect(gapsRes.decision_id).toBe("DEC-12");
+
+      const reassessRes = await ParameterTrustApi.reassessDecisionExposure({
+        decision_id: "DEC-12",
+        decision_type: "EngineeringDecision",
+      });
+      expect(reassessRes.differential?.rationale).toBe("Updated validation results received");
+    });
+
   });
 });

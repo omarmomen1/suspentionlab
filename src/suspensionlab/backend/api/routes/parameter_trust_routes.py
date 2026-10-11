@@ -417,6 +417,317 @@ async def get_sensitivity_evidence_endpoint(
     return SensitivityEvidenceResponseDTO(**evidence)
 
 
+# ── PHASE 6.4 DECISION TRUST DTO SCHEMAS ──────────────────────────────────────
+
+class DecisionExposureAssessRequestDTO(BaseModel):
+    decision_id: str
+    decision_type: str = "EngineeringDecision"
+    force_reassess: bool = False
+    persist_record: bool = True
+
+
+class DecisionReassessRequestDTO(BaseModel):
+    decision_id: str
+    decision_type: str = "EngineeringDecision"
+
+
+class DecisionExposureAssessmentResponseDTO(BaseModel):
+    decision_id: str
+    decision_type: str
+    policy_version: str
+    assessment_id: Optional[str] = None
+    assessment_hash: str
+    input_snapshot_hash: str
+    exposure_classification: str
+    exposure_summary: str
+    threshold_provenance: Optional[str] = "PROVISIONAL"
+    threshold_metadata: Optional[Dict[str, Any]] = None
+    parameter_dependencies: List[Dict[str, Any]] = Field(default_factory=list)
+    evidence_gaps: List[Dict[str, Any]] = Field(default_factory=list)
+    actionable_recommendations: List[Dict[str, Any]] = Field(default_factory=list)
+    differential: Optional[Dict[str, Any]] = None
+    governance_separation: Dict[str, Any]
+    governance_separation_notice: str
+    created_at: str
+
+
+class DecisionDependenciesResponseDTO(BaseModel):
+    decision_id: str
+    decision_type: str
+    dependencies: List[Dict[str, Any]]
+    total: int
+
+
+class DecisionGapsResponseDTO(BaseModel):
+    decision_id: str
+    decision_type: str
+    exposure_classification: str
+    evidence_gaps: List[Dict[str, Any]]
+    actionable_recommendations: List[Dict[str, Any]]
+    total_gaps: int
+
+
+class DecisionHistoryItemDTO(BaseModel):
+    assessment_id: str
+    decision_id: str
+    policy_version: str
+    assessment_hash: str
+    input_snapshot_hash: str
+    exposure_classification: str
+    exposure_summary: str
+    gaps_count: int
+    dependencies_count: int
+    is_active: bool
+    superseded_by: Optional[str] = None
+    created_at: str
+
+
+class DecisionHistoryResponseDTO(BaseModel):
+    decision_id: str
+    history: List[DecisionHistoryItemDTO]
+    total: int
+
+
+# ── PHASE 6.4 DECISION TRUST ENDPOINTS ────────────────────────────────────────
+
+@router.post(
+    "/decision/assess",
+    response_model=DecisionExposureAssessmentResponseDTO,
+)
+async def assess_decision_exposure_endpoint(
+    req: DecisionExposureAssessRequestDTO,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Evaluates an engineering decision or problem's exposure to underlying parameter uncertainty
+    under DECISION_TRUST_POLICY_V1. Enforces strict tenant boundaries and pre-reveal firewalls.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+
+    try:
+        res = await ParameterTrustDecisionService.assess_decision_exposure(
+            db=db,
+            decision_id=req.decision_id,
+            decision_type=req.decision_type,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+            force_reassess=req.force_reassess,
+            persist_record=req.persist_record,
+        )
+        return DecisionExposureAssessmentResponseDTO(**res)
+    except DecisionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except PreRevealFirewallViolation as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.get(
+    "/decision/{decision_id}",
+    response_model=DecisionExposureAssessmentResponseDTO,
+)
+async def get_decision_exposure_endpoint(
+    decision_id: str,
+    decision_type: str = "EngineeringDecision",
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Retrieves the active exposure assessment for an engineering decision.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+
+    try:
+        res = await ParameterTrustDecisionService.assess_decision_exposure(
+            db=db,
+            decision_id=decision_id,
+            decision_type=decision_type,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+            force_reassess=False,
+            persist_record=False,
+        )
+        return DecisionExposureAssessmentResponseDTO(**res)
+    except DecisionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except PreRevealFirewallViolation as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.get(
+    "/decision/{decision_id}/dependencies",
+    response_model=DecisionDependenciesResponseDTO,
+)
+async def get_decision_dependencies_endpoint(
+    decision_id: str,
+    decision_type: str = "EngineeringDecision",
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Inspects parameter dependencies relevant to an engineering decision,
+    distinguishing directly evidenced, quantitative, qualitative, and unresolved associations.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+
+    try:
+        decision_info = await ParameterTrustDecisionService.resolve_decision(
+            db=db,
+            decision_id=decision_id,
+            decision_type=decision_type,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        deps = await ParameterTrustDecisionService.discover_decision_dependencies(
+            db=db,
+            decision_info=decision_info,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        return DecisionDependenciesResponseDTO(
+            decision_id=decision_id,
+            decision_type=decision_type,
+            dependencies=deps,
+            total=len(deps),
+        )
+    except DecisionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except PreRevealFirewallViolation as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.get(
+    "/decision/{decision_id}/gaps",
+    response_model=DecisionGapsResponseDTO,
+)
+async def get_decision_gaps_endpoint(
+    decision_id: str,
+    decision_type: str = "EngineeringDecision",
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Retrieves prioritized actionable evidence gaps and candidate experiment recommendations.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+
+    try:
+        res = await ParameterTrustDecisionService.assess_decision_exposure(
+            db=db,
+            decision_id=decision_id,
+            decision_type=decision_type,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+            force_reassess=False,
+            persist_record=False,
+        )
+        return DecisionGapsResponseDTO(
+            decision_id=decision_id,
+            decision_type=decision_type,
+            exposure_classification=res["exposure_classification"],
+            evidence_gaps=res["evidence_gaps"],
+            actionable_recommendations=res["actionable_recommendations"],
+            total_gaps=len(res["evidence_gaps"]),
+        )
+    except DecisionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except PreRevealFirewallViolation as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.get(
+    "/decision/{decision_id}/history",
+    response_model=DecisionHistoryResponseDTO,
+)
+async def get_decision_history_endpoint(
+    decision_id: str,
+    limit: int = 50,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Retrieves chronological assessment revisions and supersession lineage.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+
+    try:
+        await ParameterTrustDecisionService.resolve_decision(
+            db=db,
+            decision_id=decision_id,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        hist = await ParameterTrustDecisionService.get_assessment_history(
+            db=db,
+            decision_id=decision_id,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+            limit=limit,
+        )
+        items = [DecisionHistoryItemDTO(**h) for h in hist]
+        return DecisionHistoryResponseDTO(
+            decision_id=decision_id,
+            history=items,
+            total=len(items),
+        )
+    except DecisionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except PreRevealFirewallViolation as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.post(
+    "/decision/reassess",
+    response_model=DecisionExposureAssessmentResponseDTO,
+)
+async def reassess_decision_exposure_endpoint(
+    req: DecisionReassessRequestDTO,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Forces a fresh assessment of decision exposure, superseding previous active assessments
+    and providing an explicit differential rationale.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+
+    try:
+        res = await ParameterTrustDecisionService.assess_decision_exposure(
+            db=db,
+            decision_id=req.decision_id,
+            decision_type=req.decision_type,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+            force_reassess=True,
+            persist_record=True,
+        )
+        return DecisionExposureAssessmentResponseDTO(**res)
+    except DecisionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except PreRevealFirewallViolation as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
 # ── ENDPOINTS ──────────────────────────────────────────────────────────────────
 
 @router.get(
@@ -918,316 +1229,6 @@ async def analyze_parameter_sweep_endpoint(
     except UnsupportedEntityTypeError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
-
-# ── PHASE 6.4 DECISION TRUST DTO SCHEMAS ──────────────────────────────────────
-
-class DecisionExposureAssessRequestDTO(BaseModel):
-    decision_id: str
-    decision_type: str = "EngineeringDecision"
-    force_reassess: bool = False
-    persist_record: bool = True
-
-
-class DecisionReassessRequestDTO(BaseModel):
-    decision_id: str
-    decision_type: str = "EngineeringDecision"
-
-
-class DecisionExposureAssessmentResponseDTO(BaseModel):
-    decision_id: str
-    decision_type: str
-    policy_version: str
-    assessment_id: Optional[str] = None
-    assessment_hash: str
-    input_snapshot_hash: str
-    exposure_classification: str
-    exposure_summary: str
-    threshold_provenance: Optional[str] = "PROVISIONAL"
-    threshold_metadata: Optional[Dict[str, Any]] = None
-    parameter_dependencies: List[Dict[str, Any]] = Field(default_factory=list)
-    evidence_gaps: List[Dict[str, Any]] = Field(default_factory=list)
-    actionable_recommendations: List[Dict[str, Any]] = Field(default_factory=list)
-    differential: Optional[Dict[str, Any]] = None
-    governance_separation: Dict[str, Any]
-    governance_separation_notice: str
-    created_at: str
-
-
-class DecisionDependenciesResponseDTO(BaseModel):
-    decision_id: str
-    decision_type: str
-    dependencies: List[Dict[str, Any]]
-    total: int
-
-
-class DecisionGapsResponseDTO(BaseModel):
-    decision_id: str
-    decision_type: str
-    exposure_classification: str
-    evidence_gaps: List[Dict[str, Any]]
-    actionable_recommendations: List[Dict[str, Any]]
-    total_gaps: int
-
-
-class DecisionHistoryItemDTO(BaseModel):
-    assessment_id: str
-    decision_id: str
-    policy_version: str
-    assessment_hash: str
-    input_snapshot_hash: str
-    exposure_classification: str
-    exposure_summary: str
-    gaps_count: int
-    dependencies_count: int
-    is_active: bool
-    superseded_by: Optional[str] = None
-    created_at: str
-
-
-class DecisionHistoryResponseDTO(BaseModel):
-    decision_id: str
-    history: List[DecisionHistoryItemDTO]
-    total: int
-
-
-# ── PHASE 6.4 DECISION TRUST ENDPOINTS ────────────────────────────────────────
-
-@router.post(
-    "/decision/assess",
-    response_model=DecisionExposureAssessmentResponseDTO,
-)
-async def assess_decision_exposure_endpoint(
-    req: DecisionExposureAssessRequestDTO,
-    user: UserContext = Depends(verify_api_key),
-    db: AsyncSession = Depends(get_db_dependency),
-):
-    """
-    Evaluates an engineering decision or problem's exposure to underlying parameter uncertainty
-    under DECISION_TRUST_POLICY_V1. Enforces strict tenant boundaries and pre-reveal firewalls.
-    """
-    team_id, org_id, user_id = _extract_tenant_scope(user)
-
-    try:
-        res = await ParameterTrustDecisionService.assess_decision_exposure(
-            db=db,
-            decision_id=req.decision_id,
-            decision_type=req.decision_type,
-            team_id=team_id,
-            organization_id=org_id,
-            user_id=user_id,
-            force_reassess=req.force_reassess,
-            persist_record=req.persist_record,
-        )
-        return DecisionExposureAssessmentResponseDTO(**res)
-    except DecisionNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except TenantIsolationError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except PreRevealFirewallViolation as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-
-
-@router.get(
-    "/decision/{decision_id}",
-    response_model=DecisionExposureAssessmentResponseDTO,
-)
-async def get_decision_exposure_endpoint(
-    decision_id: str,
-    decision_type: str = "EngineeringDecision",
-    user: UserContext = Depends(verify_api_key),
-    db: AsyncSession = Depends(get_db_dependency),
-):
-    """
-    Retrieves the active exposure assessment for an engineering decision.
-    """
-    team_id, org_id, user_id = _extract_tenant_scope(user)
-
-    try:
-        res = await ParameterTrustDecisionService.assess_decision_exposure(
-            db=db,
-            decision_id=decision_id,
-            decision_type=decision_type,
-            team_id=team_id,
-            organization_id=org_id,
-            user_id=user_id,
-            force_reassess=False,
-            persist_record=False,
-        )
-        return DecisionExposureAssessmentResponseDTO(**res)
-    except DecisionNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except TenantIsolationError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except PreRevealFirewallViolation as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-
-
-@router.get(
-    "/decision/{decision_id}/dependencies",
-    response_model=DecisionDependenciesResponseDTO,
-)
-async def get_decision_dependencies_endpoint(
-    decision_id: str,
-    decision_type: str = "EngineeringDecision",
-    user: UserContext = Depends(verify_api_key),
-    db: AsyncSession = Depends(get_db_dependency),
-):
-    """
-    Inspects parameter dependencies relevant to an engineering decision,
-    distinguishing directly evidenced, quantitative, qualitative, and unresolved associations.
-    """
-    team_id, org_id, user_id = _extract_tenant_scope(user)
-
-    try:
-        decision_info = await ParameterTrustDecisionService.resolve_decision(
-            db=db,
-            decision_id=decision_id,
-            decision_type=decision_type,
-            team_id=team_id,
-            organization_id=org_id,
-            user_id=user_id,
-        )
-        deps = await ParameterTrustDecisionService.discover_decision_dependencies(
-            db=db,
-            decision_info=decision_info,
-            team_id=team_id,
-            organization_id=org_id,
-            user_id=user_id,
-        )
-        return DecisionDependenciesResponseDTO(
-            decision_id=decision_id,
-            decision_type=decision_type,
-            dependencies=deps,
-            total=len(deps),
-        )
-    except DecisionNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except TenantIsolationError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except PreRevealFirewallViolation as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-
-
-@router.get(
-    "/decision/{decision_id}/gaps",
-    response_model=DecisionGapsResponseDTO,
-)
-async def get_decision_gaps_endpoint(
-    decision_id: str,
-    decision_type: str = "EngineeringDecision",
-    user: UserContext = Depends(verify_api_key),
-    db: AsyncSession = Depends(get_db_dependency),
-):
-    """
-    Retrieves prioritized actionable evidence gaps and candidate experiment recommendations.
-    """
-    team_id, org_id, user_id = _extract_tenant_scope(user)
-
-    try:
-        res = await ParameterTrustDecisionService.assess_decision_exposure(
-            db=db,
-            decision_id=decision_id,
-            decision_type=decision_type,
-            team_id=team_id,
-            organization_id=org_id,
-            user_id=user_id,
-            force_reassess=False,
-            persist_record=False,
-        )
-        return DecisionGapsResponseDTO(
-            decision_id=decision_id,
-            decision_type=decision_type,
-            exposure_classification=res["exposure_classification"],
-            evidence_gaps=res["evidence_gaps"],
-            actionable_recommendations=res["actionable_recommendations"],
-            total_gaps=len(res["evidence_gaps"]),
-        )
-    except DecisionNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except TenantIsolationError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except PreRevealFirewallViolation as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-
-
-@router.get(
-    "/decision/{decision_id}/history",
-    response_model=DecisionHistoryResponseDTO,
-)
-async def get_decision_history_endpoint(
-    decision_id: str,
-    limit: int = 50,
-    user: UserContext = Depends(verify_api_key),
-    db: AsyncSession = Depends(get_db_dependency),
-):
-    """
-    Retrieves chronological assessment revisions and supersession lineage.
-    """
-    team_id, org_id, user_id = _extract_tenant_scope(user)
-
-    try:
-        await ParameterTrustDecisionService.resolve_decision(
-            db=db,
-            decision_id=decision_id,
-            team_id=team_id,
-            organization_id=org_id,
-            user_id=user_id,
-        )
-        hist = await ParameterTrustDecisionService.get_assessment_history(
-            db=db,
-            decision_id=decision_id,
-            team_id=team_id,
-            organization_id=org_id,
-            user_id=user_id,
-            limit=limit,
-        )
-        items = [DecisionHistoryItemDTO(**h) for h in hist]
-        return DecisionHistoryResponseDTO(
-            decision_id=decision_id,
-            history=items,
-            total=len(items),
-        )
-    except DecisionNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except TenantIsolationError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except PreRevealFirewallViolation as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-
-
-@router.post(
-    "/decision/reassess",
-    response_model=DecisionExposureAssessmentResponseDTO,
-)
-async def reassess_decision_exposure_endpoint(
-    req: DecisionReassessRequestDTO,
-    user: UserContext = Depends(verify_api_key),
-    db: AsyncSession = Depends(get_db_dependency),
-):
-    """
-    Forces a fresh assessment of decision exposure, superseding previous active assessments
-    and providing an explicit differential rationale.
-    """
-    team_id, org_id, user_id = _extract_tenant_scope(user)
-
-    try:
-        res = await ParameterTrustDecisionService.assess_decision_exposure(
-            db=db,
-            decision_id=req.decision_id,
-            decision_type=req.decision_type,
-            team_id=team_id,
-            organization_id=org_id,
-            user_id=user_id,
-            force_reassess=True,
-            persist_record=True,
-        )
-        return DecisionExposureAssessmentResponseDTO(**res)
-    except DecisionNotFoundError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
-    except TenantIsolationError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
-    except PreRevealFirewallViolation as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
 
