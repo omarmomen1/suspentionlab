@@ -3530,6 +3530,220 @@ export class ParameterTrustApi {
     if (setupId) q.set("setup_id", setupId);
     return apiJson<SensitivityEvidenceResponseDTO>(`/api/v1/parameter-trust/sensitivity/evidence?${q.toString()}`);
   }
+
+  /**
+   * Assesses decision exposure to parameter uncertainty under DECISION_TRUST_POLICY_V1.
+   */
+  static async assessDecisionExposure(
+    payload: DecisionExposureAssessRequestDTO
+  ): Promise<DecisionExposureAssessmentResponseDTO> {
+    return apiJson<DecisionExposureAssessmentResponseDTO>("/api/v1/parameter-trust/decision/assess", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Retrieves active exposure assessment for an engineering decision.
+   */
+  static async getDecisionExposure(
+    decisionId: string,
+    decisionType: string = "EngineeringDecision"
+  ): Promise<DecisionExposureAssessmentResponseDTO> {
+    const q = new URLSearchParams({ decision_type: decisionType });
+    return apiJson<DecisionExposureAssessmentResponseDTO>(
+      `/api/v1/parameter-trust/decision/${encodeURIComponent(decisionId)}?${q.toString()}`
+    );
+  }
+
+  /**
+   * Inspects parameter dependencies relevant to an engineering decision.
+   */
+  static async getDecisionDependencies(
+    decisionId: string,
+    decisionType: string = "EngineeringDecision"
+  ): Promise<DecisionDependenciesResponseDTO> {
+    const q = new URLSearchParams({ decision_type: decisionType });
+    return apiJson<DecisionDependenciesResponseDTO>(
+      `/api/v1/parameter-trust/decision/${encodeURIComponent(decisionId)}/dependencies?${q.toString()}`
+    );
+  }
+
+  /**
+   * Retrieves actionable evidence gaps and candidate experiment recommendations.
+   */
+  static async getDecisionGaps(
+    decisionId: string,
+    decisionType: string = "EngineeringDecision"
+  ): Promise<DecisionGapsResponseDTO> {
+    const q = new URLSearchParams({ decision_type: decisionType });
+    return apiJson<DecisionGapsResponseDTO>(
+      `/api/v1/parameter-trust/decision/${encodeURIComponent(decisionId)}/gaps?${q.toString()}`
+    );
+  }
+
+  /**
+   * Retrieves chronological assessment revisions and supersession lineage for a decision.
+   */
+  static async getDecisionHistory(
+    decisionId: string,
+    limit: number = 50
+  ): Promise<DecisionHistoryResponseDTO> {
+    const q = new URLSearchParams({ limit: limit.toString() });
+    return apiJson<DecisionHistoryResponseDTO>(
+      `/api/v1/parameter-trust/decision/${encodeURIComponent(decisionId)}/history?${q.toString()}`
+    );
+  }
+
+  /**
+   * Forces fresh assessment of decision exposure with differential supersession tracking.
+   */
+  static async reassessDecisionExposure(
+    payload: DecisionReassessRequestDTO
+  ): Promise<DecisionExposureAssessmentResponseDTO> {
+    return apiJson<DecisionExposureAssessmentResponseDTO>("/api/v1/parameter-trust/decision/reassess", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+}
+
+// ── Phase 6.4 Decision Trust DTO Interfaces ──────────────────────────────────
+
+export interface DecisionExposureAssessRequestDTO {
+  decision_id: string;
+  decision_type?: string;
+  force_reassess?: boolean;
+  persist_record?: boolean;
+}
+
+export interface DecisionReassessRequestDTO {
+  decision_id: string;
+  decision_type?: string;
+}
+
+export interface DecisionExposureAssessmentResponseDTO {
+  decision_id: string;
+  decision_type: string;
+  policy_version: string;
+  assessment_id?: string | null;
+  assessment_hash: string;
+  input_snapshot_hash: string;
+  exposure_classification: string;
+  exposure_summary: string;
+  threshold_provenance?: string;
+  threshold_metadata?: Record<string, any>;
+  parameter_dependencies: Array<{
+    decision_id: string;
+    decision_type: string;
+    parameter_name: string;
+    entity_type: string;
+    entity_id: string;
+    dependency_nature: string;
+    kpi_metrics: string[];
+    sensitivity_status: string;
+    elasticity?: number | null;
+    numerical_derivative?: number | null;
+    derivative_unit?: string | null;
+    source_artifact_hashes: string[];
+    source_evidence_ids: string[];
+    operating_conditions: Record<string, any>;
+    model_version?: string | null;
+    notes?: string | null;
+    direct_profile: {
+      trust_state: string;
+      validation_coverage: string;
+      conflicts: any[];
+      recency_metadata: Record<string, any>;
+      assessment_hash?: string | null;
+    };
+  }>;
+  evidence_gaps: Array<{
+    parameter_name: string;
+    decision_id: string;
+    severity: string;
+    reason: string;
+    supporting_sources: string[];
+    contradicting_sources: string[];
+    relevant_operating_conditions: Record<string, any>;
+    candidate_experiment_type: string;
+    expected_information_gain: string;
+    unresolved_assumptions: string[];
+    recommendation_disclaimer: string;
+  }>;
+  actionable_recommendations: Array<{
+    target_parameter: string;
+    severity: string;
+    candidate_experiment_type: string;
+    expected_information_gain: string;
+    unresolved_assumptions: string[];
+    notice: string;
+  }>;
+  differential?: {
+    previous_assessment_id: string;
+    previous_classification: string;
+    new_classification: string;
+    classification_changed: boolean;
+    previous_hash: string;
+    new_hash: string;
+    rationale: string;
+  } | null;
+  governance_separation: {
+    parameter_trust_states: Record<string, string>;
+    sensitivity_impacts: Record<string, string>;
+    evidence_completeness: Record<string, any>;
+    decision_exposure: string;
+    approval_authorization: {
+      decision_status: string;
+      approver?: string | null;
+      approved_at?: string | null;
+      is_human_approved: boolean;
+    };
+    deployment_safety: {
+      deployment_safety_inferred: boolean;
+      deployment_authorization: string;
+      notice: string;
+    };
+  };
+  governance_separation_notice: string;
+  created_at: string;
+}
+
+export interface DecisionDependenciesResponseDTO {
+  decision_id: string;
+  decision_type: string;
+  dependencies: Array<any>;
+  total: number;
+}
+
+export interface DecisionGapsResponseDTO {
+  decision_id: string;
+  decision_type: string;
+  exposure_classification: string;
+  evidence_gaps: Array<any>;
+  actionable_recommendations: Array<any>;
+  total_gaps: number;
+}
+
+export interface DecisionHistoryItemDTO {
+  assessment_id: string;
+  decision_id: string;
+  policy_version: string;
+  assessment_hash: string;
+  input_snapshot_hash: string;
+  exposure_classification: string;
+  exposure_summary: string;
+  gaps_count: number;
+  dependencies_count: number;
+  is_active: boolean;
+  superseded_by?: string | null;
+  created_at: string;
+}
+
+export interface DecisionHistoryResponseDTO {
+  decision_id: string;
+  history: DecisionHistoryItemDTO[];
+  total: number;
 }
 
 // ── Blind Engineering Calibration & Longitudinal Track Record (Phase 5.4) ─────

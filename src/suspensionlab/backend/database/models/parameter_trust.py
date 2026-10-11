@@ -28,8 +28,10 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import (
+    Boolean,
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -63,6 +65,44 @@ CURRENT_FLEET_TRUST_POLICY_VERSION = FLEET_TRUST_POLICY_V1
 
 SENSITIVITY_PROPAGATION_POLICY_V1 = "SENSITIVITY_PROPAGATION_POLICY_V1"
 CURRENT_SENSITIVITY_PROPAGATION_POLICY_VERSION = SENSITIVITY_PROPAGATION_POLICY_V1
+
+DECISION_TRUST_POLICY_V1 = "DECISION_TRUST_POLICY_V1"
+CURRENT_DECISION_TRUST_POLICY_VERSION = DECISION_TRUST_POLICY_V1
+
+
+class DependencyNature(str, enum.Enum):
+    """
+    Formal classification of parameter dependency nature relative to an engineering decision (Phase 6.4).
+    Strictly distinguishes directly evidenced, quantitative, and qualitative associations.
+    Never equates a qualitative hypothesis with a proven causal derivative.
+    """
+    DIRECTLY_EVIDENCED = "DIRECTLY_EVIDENCED"
+    QUANTITATIVELY_SENSITIVE = "QUANTITATIVELY_SENSITIVE"
+    QUALITATIVE_HYPOTHESIS = "QUALITATIVE_HYPOTHESIS"
+    UNRESOLVED_DEPENDENCY = "UNRESOLVED_DEPENDENCY"
+
+
+class DecisionExposureClassification(str, enum.Enum):
+    """
+    Versioned decision exposure classifications under DECISION_TRUST_POLICY_V1 (Phase 6.4).
+    Explicit qualitative categories; zero arbitrary weighted scores.
+    """
+    LOW_EXPOSURE = "LOW_EXPOSURE"
+    MODERATE_EXPOSURE = "MODERATE_EXPOSURE"
+    HIGH_EXPOSURE = "HIGH_EXPOSURE"
+    CRITICAL_CONFLICT_EXPOSURE = "CRITICAL_CONFLICT_EXPOSURE"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+    NOT_ASSESSED = "NOT_ASSESSED"
+    NOT_COMPARABLE = "NOT_COMPARABLE"
+
+
+class EvidenceGapSeverity(str, enum.Enum):
+    """
+    Severity classification for actionable evidence gaps limiting an engineering decision (Phase 6.4).
+    """
+    CRITICAL = "CRITICAL"
+    WARNING = "WARNING"
+    ADVISORY = "ADVISORY"
 
 VALIDATION_GATE_PROVENANCE = "THRESHOLD_PROVENANCE_UNRESOLVED"
 
@@ -400,4 +440,89 @@ class ParameterTrustAssemblyImpactRecord(Base):
     evidence_gaps = Column(JSON_TYPE, nullable=False, default=list)
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+
+class DecisionParameterDependencyRecord(Base):
+    """
+    Formal Decision-Parameter Dependency Association (Phase 6.4).
+    Traceably links an engineering decision or investigation to an affected parameter.
+    Captures dependency nature (direct, quantitative, qualitative, unresolved),
+    affected KPIs, sensitivity status, and source evidence hashes.
+    """
+    __tablename__ = "decision_parameter_dependencies"
+    __table_args__ = (
+        Index("ix_dec_param_dep_lookup", "team_id", "decision_id", "parameter_name"),
+        Index("ix_dec_param_dep_user", "user_id", "decision_id"),
+        Index("ix_dec_param_dep_nature", "dependency_nature"),
+    )
+
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    decision_id = Column(String(64), nullable=False)
+    decision_type = Column(String(64), nullable=False, default="EngineeringDecision")
+    parameter_name = Column(String(128), nullable=False)
+    entity_type = Column(String(64), nullable=False)
+    entity_id = Column(String(128), nullable=False)
+
+    dependency_nature = Column(String(64), nullable=False)  # DependencyNature value
+    kpi_metrics = Column(JSON_TYPE, nullable=False, default=list)
+    sensitivity_status = Column(String(32), nullable=False)
+
+    elasticity = Column(Float, nullable=True)  # Strictly None if qualitative!
+    numerical_derivative = Column(Float, nullable=True)
+    derivative_unit = Column(String(64), nullable=True)
+
+    source_artifact_hashes = Column(JSON_TYPE, nullable=False, default=list)
+    source_evidence_ids = Column(JSON_TYPE, nullable=False, default=list)
+    operating_conditions = Column(JSON_TYPE, nullable=False, default=dict)
+    model_version = Column(String(64), nullable=True)
+    notes = Column(Text, nullable=True)
+
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+
+class DecisionExposureAssessmentRecord(Base):
+    """
+    Deterministic Decision Exposure Assessment Record (Phase 6.4).
+    Captures versioned assessment of decision exposure to parameter uncertainty,
+    reproducible input snapshot hash, prioritized actionable evidence gaps,
+    and recommended candidate validation activities.
+    Strict Invariant: Decision exposure is decoupled from human approval and deployment safety.
+    """
+    __tablename__ = "decision_exposure_assessments"
+    __table_args__ = (
+        Index("ix_dec_exposure_lookup", "team_id", "decision_id", "created_at"),
+        Index("ix_dec_exposure_user", "user_id", "decision_id"),
+        Index("ix_dec_exposure_hash", "assessment_hash"),
+        Index("ix_dec_exposure_active", "decision_id", "is_active"),
+    )
+
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    decision_id = Column(String(64), nullable=False)
+    decision_type = Column(String(64), nullable=False, default="EngineeringDecision")
+
+    policy_version = Column(String(32), nullable=False, default=DECISION_TRUST_POLICY_V1)
+    assessment_hash = Column(String(64), nullable=False)
+    input_snapshot_hash = Column(String(64), nullable=False)
+
+    exposure_classification = Column(String(64), nullable=False)  # DecisionExposureClassification value
+    exposure_summary = Column(Text, nullable=False)
+
+    parameter_dependencies = Column(JSON_TYPE, nullable=False, default=list)
+    evidence_gaps = Column(JSON_TYPE, nullable=False, default=list)
+    actionable_recommendations = Column(JSON_TYPE, nullable=False, default=list)
+    governance_separation_notice = Column(Text, nullable=False)
+
+    is_active = Column(Boolean, nullable=False, default=True)
+    superseded_by = Column(UUID_TYPE, nullable=True)
+
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
 

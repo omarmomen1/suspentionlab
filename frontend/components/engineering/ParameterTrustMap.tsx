@@ -16,6 +16,12 @@ import {
   RefreshCw,
   Sliders,
   CheckCircle2,
+  FileText,
+  Scale,
+  Target,
+  FlaskConical,
+  Workflow,
+  GitCommit,
 } from "lucide-react";
 import {
   ParameterTrustApi,
@@ -28,6 +34,10 @@ import {
   FleetSynchronizationResponseDTO,
   AssemblyImpactAssessmentResponseDTO,
   SensitivityEvidenceResponseDTO,
+  DecisionExposureAssessmentResponseDTO,
+  DecisionHistoryItemDTO,
+  DecisionDependenciesResponseDTO,
+  DecisionGapsResponseDTO,
 } from "../../lib/api_client";
 
 interface ParameterTrustMapProps {
@@ -52,7 +62,7 @@ export function ParameterTrustMap({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "evidence" | "history" | "sweep" | "ingestion" | "fleet" | "propagation"
+    "overview" | "evidence" | "history" | "sweep" | "ingestion" | "fleet" | "propagation" | "decisions"
   >("overview");
 
   // Phase 6.2 Ingestion & Sweep State
@@ -73,6 +83,45 @@ export function ParameterTrustMap({
   const [impactData, setImpactData] = useState<AssemblyImpactAssessmentResponseDTO | null>(null);
   const [impactLoading, setImpactLoading] = useState(false);
   const [impactError, setImpactError] = useState<string | null>(null);
+
+  // Phase 6.4 Decision Trust State
+  const [decisionId, setDecisionId] = useState("DEC-12");
+  const [decisionType, setDecisionType] = useState("EngineeringDecision");
+  const [decisionExposureData, setDecisionExposureData] = useState<DecisionExposureAssessmentResponseDTO | null>(null);
+  const [decisionLoading, setDecisionLoading] = useState(false);
+  const [decisionError, setDecisionError] = useState<string | null>(null);
+  const [decisionHistoryItems, setDecisionHistoryItems] = useState<DecisionHistoryItemDTO[]>([]);
+
+  const fetchDecisionExposure = async (
+    targetDecisionId: string,
+    targetDecisionType: string = "EngineeringDecision",
+    forceReassess: boolean = false
+  ) => {
+    if (!targetDecisionId) return;
+    setDecisionLoading(true);
+    setDecisionError(null);
+    try {
+      const res = await ParameterTrustApi.assessDecisionExposure({
+        decision_id: targetDecisionId,
+        decision_type: targetDecisionType,
+        force_reassess: forceReassess,
+        persist_record: true,
+      });
+      setDecisionExposureData(res);
+      try {
+        const histRes = await ParameterTrustApi.getDecisionHistory(targetDecisionId);
+        setDecisionHistoryItems(histRes.history || []);
+      } catch {
+        setDecisionHistoryItems([]);
+      }
+    } catch (err: any) {
+      setDecisionError(err?.message || "Failed to assess decision exposure.");
+      setDecisionExposureData(null);
+      setDecisionHistoryItems([]);
+    } finally {
+      setDecisionLoading(false);
+    }
+  };
 
   const fetchTrustData = async (type: string, id: string, param: string) => {
     if (!type || !id || !param) return;
@@ -473,6 +522,17 @@ export function ParameterTrustMap({
               data-testid="tab-propagation"
             >
               Assembly Propagation
+            </button>
+            <button
+              onClick={() => setActiveTab("decisions")}
+              className={`px-3 py-1.5 text-xs font-semibold rounded transition ${
+                activeTab === "decisions"
+                  ? "bg-zinc-800 text-white border border-zinc-700"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+              data-testid="tab-decisions"
+            >
+              Decision Trust
             </button>
           </div>
 
@@ -1170,6 +1230,417 @@ export function ParameterTrustMap({
                           )}
                         </div>
                       )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 8: Decision-Aware Trust & Exposure Engine (Phase 6.4) */}
+          {activeTab === "decisions" && (
+            <div className="space-y-6" data-testid="tab-decisions-content">
+              {/* Decision Query Controls */}
+              <div className="p-4 rounded-lg bg-zinc-900/60 border border-zinc-800 space-y-3">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-2">
+                  <div>
+                    <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                      <Target className="w-4 h-4 text-amber-400" />
+                      Engineering Decision Exposure & Evidence Integration
+                    </h3>
+                    <p className="text-xs text-zinc-400">
+                      Grounded uncertainty quantification: connects decisions to parameter trust, quantitative sensitivities, and prioritized validation gaps.
+                    </p>
+                  </div>
+                  {/* Preset Decision Chips */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] uppercase font-mono text-zinc-500">Presets:</span>
+                    {["DEC-12", "DEC-P3L-01", "PROB-P3L-01", "INV-91"].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => {
+                          setDecisionId(preset);
+                          const dtype = preset.startsWith("PROB") ? "EngineeringProblem" : preset.startsWith("INV") ? "Investigation" : "EngineeringDecision";
+                          setDecisionType(dtype);
+                          fetchDecisionExposure(preset, dtype);
+                        }}
+                        className="px-2 py-0.5 text-[10px] font-mono rounded bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-700 transition"
+                      >
+                        {preset}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-zinc-800/80">
+                  <input
+                    type="text"
+                    value={decisionId}
+                    onChange={(e) => setDecisionId(e.target.value)}
+                    placeholder="Decision ID (e.g. DEC-12)"
+                    className="px-3 py-1.5 text-xs bg-zinc-900 border border-zinc-700 rounded text-zinc-200 focus:outline-none focus:border-amber-400 w-44 font-mono"
+                    data-testid="input-decision-id"
+                  />
+                  <select
+                    value={decisionType}
+                    onChange={(e) => setDecisionType(e.target.value)}
+                    className="px-3 py-1.5 text-xs bg-zinc-900 border border-zinc-700 rounded text-zinc-200 focus:outline-none focus:border-amber-400 font-mono"
+                    data-testid="select-decision-type"
+                  >
+                    <option value="EngineeringDecision">EngineeringDecision</option>
+                    <option value="EngineeringProblem">EngineeringProblem</option>
+                    <option value="Investigation">Investigation</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => fetchDecisionExposure(decisionId, decisionType, false)}
+                    disabled={decisionLoading}
+                    className="px-3.5 py-1.5 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-black rounded transition flex items-center gap-1.5 disabled:opacity-50"
+                    data-testid="btn-assess-decision"
+                  >
+                    <Search className="w-3.5 h-3.5" />
+                    {decisionLoading ? "Evaluating..." : "Assess Exposure"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => fetchDecisionExposure(decisionId, decisionType, true)}
+                    disabled={decisionLoading}
+                    className="px-3 py-1.5 text-xs font-medium bg-zinc-800 hover:bg-zinc-700 text-zinc-200 border border-zinc-700 rounded transition flex items-center gap-1.5 disabled:opacity-50"
+                    data-testid="btn-reassess-decision"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                    Reassess (Supersede)
+                  </button>
+                </div>
+              </div>
+
+              {/* Error banner */}
+              {decisionError && (
+                <div className="p-3 rounded-lg bg-red-950/50 border border-red-500/40 text-red-300 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-red-400" />
+                  <span>{decisionError}</span>
+                </div>
+              )}
+
+              {/* Assessment Results */}
+              {decisionExposureData && (
+                <div className="space-y-6">
+                  {/* Primary Exposure Classification Card */}
+                  <div className="p-5 rounded-lg bg-zinc-900/60 border border-zinc-800">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-mono tracking-widest uppercase px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                            POLICY: {decisionExposureData.policy_version}
+                          </span>
+                          <span className="text-[10px] font-mono text-zinc-500">
+                            DECISION: {decisionExposureData.decision_id} ({decisionExposureData.decision_type})
+                          </span>
+                        </div>
+                        <h2 className="text-lg font-bold text-white mt-1">
+                          Decision Exposure Posture
+                        </h2>
+                        <p className="text-xs text-zinc-300 mt-1 max-w-3xl" data-testid="decision-exposure-summary">
+                          {decisionExposureData.exposure_summary}
+                        </p>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-[10px] text-zinc-400 uppercase font-mono mb-1">Exposure Classification</div>
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold border ${
+                            decisionExposureData.exposure_classification === "LOW_EXPOSURE"
+                              ? "bg-emerald-950/70 border-emerald-500/40 text-emerald-300"
+                              : decisionExposureData.exposure_classification === "MODERATE_EXPOSURE"
+                              ? "bg-amber-950/70 border-amber-500/40 text-amber-300"
+                              : decisionExposureData.exposure_classification === "HIGH_EXPOSURE"
+                              ? "bg-orange-950/70 border-orange-500/40 text-orange-300"
+                              : decisionExposureData.exposure_classification === "CRITICAL_CONFLICT_EXPOSURE"
+                              ? "bg-rose-950/70 border-rose-500/40 text-rose-300"
+                              : "bg-zinc-800 border-zinc-700 text-zinc-300"
+                          }`}
+                          data-testid="decision-exposure-badge"
+                        >
+                          <Scale className="w-3.5 h-3.5" />
+                          {decisionExposureData.exposure_classification}
+                        </span>
+                        <div className="text-[10px] text-zinc-500 font-mono mt-1.5">
+                          Thresholds: <span className="text-amber-300">{decisionExposureData.threshold_provenance || "PROVISIONAL"}</span> (Analytical Screening)
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Hashes & Lineage */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 pt-4 border-t border-zinc-800 text-[11px] font-mono">
+                      <div className="p-2 rounded bg-zinc-950/60 border border-zinc-800/80">
+                        <span className="text-zinc-500">Input Snapshot Hash:</span>{" "}
+                        <span className="text-zinc-300">{decisionExposureData.input_snapshot_hash}</span>
+                      </div>
+                      <div className="p-2 rounded bg-zinc-950/60 border border-zinc-800/80">
+                        <span className="text-zinc-500">Assessment Hash:</span>{" "}
+                        <span className="text-amber-400">{decisionExposureData.assessment_hash}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Strict Governance Separation (6-Pillar Card) */}
+                  <div className="p-4 rounded-lg bg-zinc-900/40 border border-zinc-800 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Workflow className="w-4 h-4 text-amber-400" />
+                      <span className="text-xs font-semibold uppercase font-mono text-zinc-300">
+                        Strict Governance Separation (Non-Conflated Architecture)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 text-xs font-mono">
+                      <div className="p-2.5 rounded bg-zinc-900 border border-zinc-800">
+                        <div className="text-[9px] uppercase text-zinc-500">1. Parameter Trust</div>
+                        <div className="text-white font-semibold mt-1">
+                          {Object.keys(decisionExposureData.governance_separation.parameter_trust_states).length} Parameters
+                        </div>
+                        <div className="text-[10px] text-zinc-400 truncate mt-0.5">Local component posture</div>
+                      </div>
+
+                      <div className="p-2.5 rounded bg-zinc-900 border border-zinc-800">
+                        <div className="text-[9px] uppercase text-zinc-500">2. Sensitivity / Impact</div>
+                        <div className="text-white font-semibold mt-1">Physical Deriv.</div>
+                        <div className="text-[10px] text-zinc-400 truncate mt-0.5">∂(KPI) / ∂(Param)</div>
+                      </div>
+
+                      <div className="p-2.5 rounded bg-zinc-900 border border-zinc-800">
+                        <div className="text-[9px] uppercase text-zinc-500">3. Completeness</div>
+                        <div className="text-white font-semibold mt-1">Evidence Coverage</div>
+                        <div className="text-[10px] text-zinc-400 truncate mt-0.5">Holdout validation & recency</div>
+                      </div>
+
+                      <div className="p-2.5 rounded bg-zinc-900 border border-zinc-800">
+                        <div className="text-[9px] uppercase text-zinc-500">4. Decision Exposure</div>
+                        <div className="text-amber-400 font-semibold mt-1 truncate">
+                          {decisionExposureData.exposure_classification}
+                        </div>
+                        <div className="text-[10px] text-zinc-400 truncate mt-0.5">Premise vulnerability</div>
+                      </div>
+
+                      <div className="p-2.5 rounded bg-zinc-900 border border-zinc-800">
+                        <div className="text-[9px] uppercase text-zinc-500">5. Human Approval</div>
+                        <div className="text-emerald-400 font-semibold mt-1">
+                          {decisionExposureData.governance_separation.approval_authorization.decision_status}
+                        </div>
+                        <div className="text-[10px] text-zinc-400 truncate mt-0.5">
+                          {decisionExposureData.governance_separation.approval_authorization.is_human_approved ? "Signed" : "Pending Sign-off"}
+                        </div>
+                      </div>
+
+                      <div className="p-2.5 rounded bg-zinc-900 border border-zinc-800">
+                        <div className="text-[9px] uppercase text-zinc-500">6. Deployment Safety</div>
+                        <div className="text-rose-400 font-semibold mt-1">NOT ESTABLISHED</div>
+                        <div className="text-[10px] text-zinc-400 truncate mt-0.5">Independent Commissioning</div>
+                      </div>
+                    </div>
+
+                    <div className="p-2.5 rounded bg-zinc-950/60 border border-zinc-800 text-[11px] text-zinc-400 font-sans italic">
+                      {decisionExposureData.governance_separation_notice}
+                    </div>
+                  </div>
+
+                  {/* Differential Reassessment Notice (if present) */}
+                  {decisionExposureData.differential && (
+                    <div className="p-4 rounded-lg bg-amber-950/30 border border-amber-500/40 text-amber-200 text-xs space-y-1">
+                      <div className="font-semibold flex items-center gap-1.5">
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        Supersession Differential Analysis
+                      </div>
+                      <p>{decisionExposureData.differential.rationale}</p>
+                      <div className="text-[10px] font-mono text-amber-400/80 pt-1">
+                        Previous Hash: {decisionExposureData.differential.previous_hash.slice(0, 16)}... → New Hash: {decisionExposureData.differential.new_hash.slice(0, 16)}...
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Parameter Dependencies Table */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-semibold uppercase font-mono text-zinc-300 flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-amber-400" />
+                        Decision Parameter Dependencies ({decisionExposureData.parameter_dependencies.length})
+                      </h3>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        Direct vs Quantitative vs Qualitative vs Unresolved
+                      </span>
+                    </div>
+
+                    <div className="rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900/30">
+                      <table className="w-full text-xs text-left" data-testid="table-decision-dependencies">
+                        <thead className="bg-zinc-900 text-zinc-400 font-mono text-[11px] uppercase border-b border-zinc-800">
+                          <tr>
+                            <th className="p-3">Parameter & Entity</th>
+                            <th className="p-3">Dependency Nature</th>
+                            <th className="p-3">Downstream KPIs</th>
+                            <th className="p-3">Numerical Sensitivity</th>
+                            <th className="p-3">Local Trust Posture</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-800 font-mono text-xs">
+                          {decisionExposureData.parameter_dependencies.map((dep, idx) => (
+                            <tr key={idx} className="hover:bg-zinc-900/50 transition">
+                              <td className="p-3">
+                                <div className="text-white font-semibold">{dep.parameter_name}</div>
+                                <div className="text-[10px] text-zinc-500">{dep.entity_type}:{dep.entity_id}</div>
+                              </td>
+                              <td className="p-3">
+                                <span
+                                  className={`inline-block px-2 py-0.5 text-[10px] font-bold rounded border ${
+                                    dep.dependency_nature === "DIRECTLY_EVIDENCED"
+                                      ? "bg-blue-950/70 border-blue-500/40 text-blue-300"
+                                      : dep.dependency_nature === "QUANTITATIVELY_SENSITIVE"
+                                      ? "bg-purple-950/70 border-purple-500/40 text-purple-300"
+                                      : dep.dependency_nature === "QUALITATIVE_HYPOTHESIS"
+                                      ? "bg-amber-950/70 border-amber-500/40 text-amber-300"
+                                      : "bg-zinc-800 border-zinc-700 text-zinc-400"
+                                  }`}
+                                >
+                                  {dep.dependency_nature}
+                                </span>
+                              </td>
+                              <td className="p-3 text-zinc-300">
+                                {dep.kpi_metrics && dep.kpi_metrics.length > 0 ? dep.kpi_metrics.join(", ") : "—"}
+                              </td>
+                              <td className="p-3">
+                                {dep.elasticity !== null && dep.elasticity !== undefined ? (
+                                  <div>
+                                    <span className="text-amber-400 font-semibold">{dep.elasticity}</span>
+                                    <span className="text-[10px] text-zinc-500 ml-1">({dep.derivative_unit || "ratio"})</span>
+                                  </div>
+                                ) : (
+                                  <span className="text-zinc-500 text-[11px] italic">
+                                    {dep.dependency_nature === "QUALITATIVE_HYPOTHESIS" ? "Directional trend only" : "Unavailable"}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="p-3">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-200">
+                                    {dep.direct_profile.trust_state}
+                                  </span>
+                                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400">
+                                    {dep.direct_profile.validation_coverage}
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Actionable Evidence Gaps & Experiment Recommendations */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-semibold uppercase font-mono text-zinc-300 flex items-center gap-2">
+                        <FlaskConical className="w-4 h-4 text-amber-400" />
+                        Actionable Evidence Gaps & Candidate Experiments ({decisionExposureData.evidence_gaps.length})
+                      </h3>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        Prioritized uncertainty reduction designs
+                      </span>
+                    </div>
+
+                    {decisionExposureData.evidence_gaps.length === 0 ? (
+                      <div className="p-4 rounded-lg bg-zinc-900/40 border border-zinc-800 text-center text-xs text-zinc-400">
+                        Zero actionable evidence gaps identified. All parameters backed by validated physical evidence.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3" data-testid="container-evidence-gaps">
+                        {decisionExposureData.evidence_gaps.map((gap, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-4 rounded-lg border space-y-2.5 ${
+                              gap.severity === "CRITICAL"
+                                ? "bg-rose-950/20 border-rose-500/40"
+                                : gap.severity === "WARNING"
+                                ? "bg-amber-950/20 border-amber-500/40"
+                                : "bg-blue-950/20 border-blue-500/40"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-white font-mono">{gap.parameter_name}</span>
+                              <span
+                                className={`px-2 py-0.5 text-[9px] font-bold rounded uppercase ${
+                                  gap.severity === "CRITICAL"
+                                    ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                                    : gap.severity === "WARNING"
+                                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                                    : "bg-blue-500/20 text-blue-300 border border-blue-500/40"
+                                }`}
+                              >
+                                {gap.severity} GAP
+                              </span>
+                            </div>
+
+                            <p className="text-xs text-zinc-300">{gap.reason}</p>
+
+                            <div className="p-2.5 rounded bg-zinc-950/60 border border-zinc-800 text-xs space-y-1 font-mono">
+                              <div className="text-[10px] text-amber-400 uppercase font-semibold">Recommended Candidate Experiment</div>
+                              <div className="text-white">{gap.candidate_experiment_type}</div>
+                              <div className="text-[11px] text-zinc-400 mt-1">
+                                <span className="text-zinc-500">Expected Info Gain:</span> {gap.expected_information_gain}
+                              </div>
+                            </div>
+
+                            <div className="text-[10px] text-zinc-500 italic font-sans">
+                              {gap.recommendation_disclaimer}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Audit History & Revisions */}
+                  {decisionHistoryItems.length > 0 && (
+                    <div className="space-y-3 pt-4 border-t border-zinc-800">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-semibold uppercase font-mono text-zinc-300 flex items-center gap-2">
+                          <History className="w-4 h-4 text-amber-400" />
+                          Historical Revisions & Supersession Lineage ({decisionHistoryItems.length})
+                        </h3>
+                        <span className="text-[10px] font-mono text-zinc-500">Append-only audit trail</span>
+                      </div>
+
+                      <div className="space-y-2">
+                        {decisionHistoryItems.map((hist, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-lg border text-xs font-mono flex flex-col md:flex-row md:items-center justify-between gap-2 ${
+                              hist.is_active
+                                ? "bg-zinc-900/80 border-amber-500/40 text-white"
+                                : "bg-zinc-950/40 border-zinc-800 text-zinc-400"
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold">{hist.exposure_classification}</span>
+                                {hist.is_active ? (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                                    ACTIVE
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-zinc-800 text-zinc-500">
+                                    SUPERSEDED
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-zinc-400 mt-0.5">{hist.exposure_summary}</div>
+                            </div>
+                            <div className="text-right text-[10px] text-zinc-500">
+                              <div>Hash: {hist.assessment_hash.slice(0, 16)}...</div>
+                              <div>{hist.created_at ? new Date(hist.created_at).toLocaleString() : ""}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>
