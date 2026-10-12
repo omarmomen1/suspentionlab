@@ -44,6 +44,7 @@ from fastapi import (
 )
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from suspensionlab.backend.database.core import get_db_dependency
@@ -55,9 +56,21 @@ from suspensionlab.backend.database.models.solver_exchange import (
     SolverExchangeArtifact,
     SolverExchangeOperation,
 )
+from suspensionlab.backend.database.models.solver_execution import (
+    ExecutionJobState,
+    ImmutableExecutionError,
+    InvalidExecutionStateTransitionError,
+    SolverExecutionJob,
+)
 from suspensionlab.backend.security.auth import UserContext, verify_api_key
 from suspensionlab.backend.services.solver_exchange_service import SolverExchangeService
+from suspensionlab.backend.services.solver_execution_service import (
+    ExecutionJobNotFoundError,
+    RuntimeUnavailableError,
+    SolverExecutionService,
+)
 from suspensionlab.interop.adapter import AdapterCapability, SupportLevel
+from suspensionlab.interop.execution.runtimes import SolverRuntimeRegistry
 from suspensionlab.interop.frames import (
     CoordinateFrameDefinition,
     FrameValidationStatus,
@@ -91,6 +104,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/interop", tags=["Solver Interoperability"])
 _service = SolverExchangeService()
+_exec_service = SolverExecutionService()
 
 
 # ── DTO SCHEMAS ───────────────────────────────────────────────────────────────
@@ -175,6 +189,64 @@ class DiagnosticsResponseDTO(BaseModel):
     mapping_diagnostics: Dict[str, Any]
     validation_diagnostics: Dict[str, Any]
     failure_reason: Optional[str] = None
+
+
+class ExecuteJobRequest(BaseModel):
+    solver_name: str = Field(..., description="Target solver runtime (e.g. 'FMI_COSIMULATION', 'EXTERNAL_CAE_SOLVER').")
+    input_artifact_id: str = Field(..., description="UUID string of existing input artifact.")
+    execution_config: Optional[Dict[str, Any]] = Field(default=None, description="Solver execution configuration.")
+    resource_limits: Optional[Dict[str, Any]] = Field(default=None, description="Resource limits (e.g. timeout_seconds).")
+    idempotency_key: Optional[str] = Field(default=None, description="Optional idempotency key.")
+    wait_for_completion: bool = Field(default=True, description="Whether to execute immediately and return completed job.")
+
+
+class JobResponseDTO(BaseModel):
+    id: str
+    organization_id: Optional[str] = None
+    team_id: Optional[str] = None
+    user_id: str
+    solver_name: str
+    solver_version: str
+    adapter_id: str
+    state: str
+    input_artifact_id: Optional[str] = None
+    input_artifact_hash: str
+    output_artifact_ids: List[str] = Field(default_factory=list)
+    execution_config: Dict[str, Any] = Field(default_factory=dict)
+    resource_limits: Dict[str, Any] = Field(default_factory=dict)
+    pid: Optional[int] = None
+    exit_code: Optional[int] = None
+    stdout_excerpt: Optional[str] = None
+    stderr_excerpt: Optional[str] = None
+    failure_reason: Optional[str] = None
+    error_category: Optional[str] = None
+    is_executed: bool = False
+    is_physically_validated: bool = False
+    execution_provenance: Dict[str, Any] = Field(default_factory=dict)
+    reconciliation_summary: Dict[str, Any] = Field(default_factory=dict)
+    created_at: Optional[str] = None
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+class JobPreflightRequest(BaseModel):
+    solver_name: str
+    input_artifact_id: str
+
+
+class JobPreflightResponse(BaseModel):
+    is_supported: bool
+    is_available: bool
+    solver_name: str
+    licensing_model: str
+    executable_path: Optional[str] = None
+    notes: str
+    warnings: List[str] = Field(default_factory=list)
+
+
+class ReconcileJobRequest(BaseModel):
+    custom_tolerances: Optional[Dict[str, float]] = None
 
 
 # ── ADAPTER CAPABILITY DISCOVERY ─────────────────────────────────────────────
@@ -476,3 +548,309 @@ def check_frame(frame: CoordinateFrameDefinition) -> Dict[str, Any]:
         "is_valid": f_status == FrameValidationStatus.VALID,
         "reasons": reasons,
     }
+
+
+# ── PHASE 7.3 CONTROLLED EXECUTION & RECONCILIATION ENDPOINTS ─────────────────
+
+@router.get("/runtimes")
+def list_runtimes() -> List[Dict[str, Any]]:
+    """
+    Returns detected CAE solver execution runtimes and their verified availability status.
+    Truthfully reports unavailable proprietary solvers (MSC Adams, MATLAB).
+    """
+    runtimes = SolverRuntimeRegistry.inspect_all()
+    return [r.to_dict() for r in runtimes.values()]
+
+
+@router.post("/execute/preflight", response_model=JobPreflightResponse)
+async def preflight_execution(
+    req: JobPreflightRequest,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> JobPreflightResponse:
+    """
+    Preflight check verifying solver runtime availability and input artifact presence.
+    """
+    runtime = SolverRuntimeRegistry.get_runtime(req.solver_name)
+    if not runtime:
+        return JobPreflightResponse(
+            is_supported=False,
+            is_available=False,
+            solver_name=req.solver_name,
+            licensing_model="Unknown",
+            notes=f"Solver runtime '{req.solver_name}' is not recognized.",
+            warnings=["Solver is unsupported."],
+        )
+
+    warnings: List[str] = []
+    if not runtime.is_available:
+        warnings.append(f"Solver '{runtime.solver_name}' is not installed on this host environment.")
+
+    # Check input artifact
+    try:
+        art_id = uuid.UUID(req.input_artifact_id)
+        stmt = select(SolverExchangeArtifact).where(SolverExchangeArtifact.id == art_id)
+        res = await db.execute(stmt)
+        art = res.scalar_one_or_none()
+        if not art:
+            warnings.append(f"Input artifact '{req.input_artifact_id}' does not exist.")
+        elif art.file_format not in runtime.supported_input_formats and f".{art.file_format.lstrip('.')}" not in runtime.supported_input_formats:
+            warnings.append(f"Artifact format '{art.file_format}' is not in supported inputs {runtime.supported_input_formats}.")
+    except Exception as e:
+        warnings.append(f"Invalid artifact ID: {e}")
+
+    return JobPreflightResponse(
+        is_supported=True,
+        is_available=runtime.is_available,
+        solver_name=runtime.solver_name,
+        licensing_model=runtime.licensing_model,
+        executable_path=runtime.executable_path,
+        notes=runtime.notes,
+        warnings=warnings,
+    )
+
+
+@router.post("/execute", response_model=JobResponseDTO)
+async def submit_execution_job(
+    req: ExecuteJobRequest,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> JobResponseDTO:
+    """
+    Creates and executes a controlled solver execution job within an isolated sandbox.
+    Enforces tenant boundaries, wall-clock timeouts, and immutable provenance recording.
+    """
+    try:
+        art_id = uuid.UUID(req.input_artifact_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid artifact UUID '{req.input_artifact_id}'.")
+
+    try:
+        job = await _exec_service.create_execution_job(
+            db=db,
+            user=user,
+            solver_name=req.solver_name,
+            input_artifact_id=art_id,
+            execution_config=req.execution_config,
+            resource_limits=req.resource_limits,
+            idempotency_key=req.idempotency_key,
+        )
+
+        if req.wait_for_completion and job.state == ExecutionJobState.QUEUED.value:
+            job = await _exec_service.execute_job(db=db, job_id=job.id, user=user)
+
+        return JobResponseDTO(
+            id=str(job.id),
+            organization_id=str(job.organization_id) if job.organization_id else None,
+            team_id=str(job.team_id) if job.team_id else None,
+            user_id=str(job.user_id),
+            solver_name=job.solver_name,
+            solver_version=job.solver_version,
+            adapter_id=job.adapter_id,
+            state=job.state,
+            input_artifact_id=str(job.input_artifact_id) if job.input_artifact_id else None,
+            input_artifact_hash=job.input_artifact_hash,
+            output_artifact_ids=job.output_artifact_ids or [],
+            execution_config=job.execution_config or {},
+            resource_limits=job.resource_limits or {},
+            pid=job.pid,
+            exit_code=job.exit_code,
+            stdout_excerpt=job.stdout_excerpt,
+            stderr_excerpt=job.stderr_excerpt,
+            failure_reason=job.failure_reason,
+            error_category=job.error_category,
+            is_executed=job.is_executed,
+            is_physically_validated=job.is_physically_validated,
+            execution_provenance=job.execution_provenance or {},
+            reconciliation_summary=job.reconciliation_summary or {},
+            created_at=job.created_at.isoformat() if job.created_at else None,
+            started_at=job.started_at.isoformat() if job.started_at else None,
+            completed_at=job.completed_at.isoformat() if job.completed_at else None,
+            updated_at=job.updated_at.isoformat() if job.updated_at else None,
+        )
+
+    except RuntimeUnavailableError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except KeyError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        logger.exception("Unexpected error submitting execution job: %s", e)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Execution error: {e}")
+
+
+@router.get("/jobs", response_model=List[JobResponseDTO])
+async def list_execution_jobs(
+    limit: int = Query(50, ge=1, le=100),
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> List[JobResponseDTO]:
+    """
+    Lists execution jobs accessible to the calling tenant user.
+    """
+    jobs = await _exec_service.list_jobs(db=db, user=user, limit=limit)
+    return [
+        JobResponseDTO(
+            id=str(j.id),
+            organization_id=str(j.organization_id) if j.organization_id else None,
+            team_id=str(j.team_id) if j.team_id else None,
+            user_id=str(j.user_id),
+            solver_name=j.solver_name,
+            solver_version=j.solver_version,
+            adapter_id=j.adapter_id,
+            state=j.state,
+            input_artifact_id=str(j.input_artifact_id) if j.input_artifact_id else None,
+            input_artifact_hash=j.input_artifact_hash,
+            output_artifact_ids=j.output_artifact_ids or [],
+            execution_config=j.execution_config or {},
+            resource_limits=j.resource_limits or {},
+            pid=j.pid,
+            exit_code=j.exit_code,
+            stdout_excerpt=j.stdout_excerpt,
+            stderr_excerpt=j.stderr_excerpt,
+            failure_reason=j.failure_reason,
+            error_category=j.error_category,
+            is_executed=j.is_executed,
+            is_physically_validated=j.is_physically_validated,
+            execution_provenance=j.execution_provenance or {},
+            reconciliation_summary=j.reconciliation_summary or {},
+            created_at=j.created_at.isoformat() if j.created_at else None,
+            started_at=j.started_at.isoformat() if j.started_at else None,
+            completed_at=j.completed_at.isoformat() if j.completed_at else None,
+            updated_at=j.updated_at.isoformat() if j.updated_at else None,
+        )
+        for j in jobs
+    ]
+
+
+@router.get("/jobs/{job_id}", response_model=JobResponseDTO)
+async def get_execution_job(
+    job_id: str,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> JobResponseDTO:
+    """
+    Retrieves execution job state, resource logs, and provenance metadata.
+    """
+    try:
+        jid = uuid.UUID(job_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid job UUID '{job_id}'.")
+
+    try:
+        j = await _exec_service.get_job(db=db, job_id=jid, user=user)
+        return JobResponseDTO(
+            id=str(j.id),
+            organization_id=str(j.organization_id) if j.organization_id else None,
+            team_id=str(j.team_id) if j.team_id else None,
+            user_id=str(j.user_id),
+            solver_name=j.solver_name,
+            solver_version=j.solver_version,
+            adapter_id=j.adapter_id,
+            state=j.state,
+            input_artifact_id=str(j.input_artifact_id) if j.input_artifact_id else None,
+            input_artifact_hash=j.input_artifact_hash,
+            output_artifact_ids=j.output_artifact_ids or [],
+            execution_config=j.execution_config or {},
+            resource_limits=j.resource_limits or {},
+            pid=j.pid,
+            exit_code=j.exit_code,
+            stdout_excerpt=j.stdout_excerpt,
+            stderr_excerpt=j.stderr_excerpt,
+            failure_reason=j.failure_reason,
+            error_category=j.error_category,
+            is_executed=j.is_executed,
+            is_physically_validated=j.is_physically_validated,
+            execution_provenance=j.execution_provenance or {},
+            reconciliation_summary=j.reconciliation_summary or {},
+            created_at=j.created_at.isoformat() if j.created_at else None,
+            started_at=j.started_at.isoformat() if j.started_at else None,
+            completed_at=j.completed_at.isoformat() if j.completed_at else None,
+            updated_at=j.updated_at.isoformat() if j.updated_at else None,
+        )
+    except ExecutionJobNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.post("/jobs/{job_id}/cancel", response_model=JobResponseDTO)
+async def cancel_execution_job(
+    job_id: str,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> JobResponseDTO:
+    """
+    Cancels an active or queued execution job and terminates its sandbox process.
+    """
+    try:
+        jid = uuid.UUID(job_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid job UUID '{job_id}'.")
+
+    try:
+        j = await _exec_service.cancel_job(db=db, job_id=jid, user=user)
+        return JobResponseDTO(
+            id=str(j.id),
+            organization_id=str(j.organization_id) if j.organization_id else None,
+            team_id=str(j.team_id) if j.team_id else None,
+            user_id=str(j.user_id),
+            solver_name=j.solver_name,
+            solver_version=j.solver_version,
+            adapter_id=j.adapter_id,
+            state=j.state,
+            input_artifact_id=str(j.input_artifact_id) if j.input_artifact_id else None,
+            input_artifact_hash=j.input_artifact_hash,
+            output_artifact_ids=j.output_artifact_ids or [],
+            execution_config=j.execution_config or {},
+            resource_limits=j.resource_limits or {},
+            pid=j.pid,
+            exit_code=j.exit_code,
+            stdout_excerpt=j.stdout_excerpt,
+            stderr_excerpt=j.stderr_excerpt,
+            failure_reason=j.failure_reason,
+            error_category=j.error_category,
+            is_executed=j.is_executed,
+            is_physically_validated=j.is_physically_validated,
+            execution_provenance=j.execution_provenance or {},
+            reconciliation_summary=j.reconciliation_summary or {},
+            created_at=j.created_at.isoformat() if j.created_at else None,
+            started_at=j.started_at.isoformat() if j.started_at else None,
+            completed_at=j.completed_at.isoformat() if j.completed_at else None,
+            updated_at=j.updated_at.isoformat() if j.updated_at else None,
+        )
+    except ExecutionJobNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ImmutableExecutionError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.post("/jobs/{job_id}/reconcile")
+async def reconcile_job_results(
+    job_id: str,
+    req: Optional[ReconcileJobRequest] = None,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> Dict[str, Any]:
+    """
+    Reconciles external solver output against independent reference dynamics.
+    Returns unit-normalized peak, RMS, NRMSE, phase, and energy consistency metrics.
+    """
+    try:
+        jid = uuid.UUID(job_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid job UUID '{job_id}'.")
+
+    try:
+        tolerances = req.custom_tolerances if req else None
+        report = await _exec_service.reconcile_job_results(db=db, job_id=jid, user=user, custom_tolerances=tolerances)
+        return report.to_dict()
+    except ExecutionJobNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except (ValueError, FileNotFoundError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))

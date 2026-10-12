@@ -18,29 +18,59 @@ import {
   Hash,
   Database,
   ArrowRight,
+  Play,
+  Square,
+  Terminal,
+  Activity,
+  Check,
+  Sliders,
+  Scale,
 } from "lucide-react";
 import {
   SolverInteropApi,
   AdapterCapabilityDTO,
   SolverOperationResponseDTO,
   SolverDiagnosticsResponseDTO,
+  SolverExecutionApi,
+  RuntimeEnvironmentInfoDTO,
+  JobResponseDTO,
+  ReconciliationReportDTO,
+  JobPreflightResponseDTO,
 } from "../../lib/api_client";
 
 export function SolverInteropWorkspace() {
   const [adapters, setAdapters] = useState<AdapterCapabilityDTO[]>([]);
   const [selectedAdapterId, setSelectedAdapterId] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<"import" | "export" | "inspect">("import");
+  const [activeTab, setActiveTab] = useState<"import" | "export" | "execute" | "jobs" | "inspect">("execute");
   const [loading, setLoading] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
-  // Import form state
+  // Runtimes state (Phase 7.3)
+  const [runtimes, setRuntimes] = useState<RuntimeEnvironmentInfoDTO[]>([]);
+
+  // Execution form state (Phase 7.3)
+  const [execSolver, setExecSolver] = useState<string>("FMI_COSIMULATION");
+  const [execArtifactId, setExecArtifactId] = useState<string>("");
+  const [stepSize, setStepSize] = useState<number>(0.001);
+  const [stopTime, setStopTime] = useState<number>(2.0);
+  const [roadType, setRoadType] = useState<string>("step");
+  const [timeoutSec, setTimeoutSec] = useState<number>(30);
+  const [preflightResult, setPreflightResult] = useState<JobPreflightResponseDTO | null>(null);
+
+  // Jobs & Reconciliation state (Phase 7.3)
+  const [jobs, setJobs] = useState<JobResponseDTO[]>([]);
+  const [selectedJob, setSelectedJob] = useState<JobResponseDTO | null>(null);
+  const [reconciliationReport, setReconciliationReport] = useState<ReconciliationReportDTO | null>(null);
+  const [reconcileLoading, setReconcileLoading] = useState<boolean>(false);
+
+  // Import form state (Phase 7.2)
   const [importFilename, setImportFilename] = useState<string>("quarter_car.adm");
   const [importContent, setImportContent] = useState<string>(
     "! MSC ADAMS / Solver Dataset\nADAMS/View model dataset export\nPART/1, MASS = 300.0\nPART/2, MASS = 35.0\nSPRING/1, K = 25000.0, C = 2050.0\nEND"
   );
   const [expectedSha256, setExpectedSha256] = useState<string>("");
 
-  // Export form state
+  // Export form state (Phase 7.2)
   const [exportFormat, setExportFormat] = useState<string>(".adm");
   const [exportManifestJson, setExportManifestJson] = useState<string>(
     JSON.stringify(
@@ -70,13 +100,15 @@ export function SolverInteropWorkspace() {
     )
   );
 
-  // Active / Inspected Operation
+  // Active / Inspected Operation (Phase 7.2)
   const [currentOperation, setCurrentOperation] = useState<SolverOperationResponseDTO | null>(null);
   const [diagnostics, setDiagnostics] = useState<SolverDiagnosticsResponseDTO | null>(null);
   const [operationIdInput, setOperationIdInput] = useState<string>("");
 
   useEffect(() => {
     loadAdapters();
+    loadRuntimes();
+    loadJobs();
   }, []);
 
   const loadAdapters = async () => {
@@ -95,6 +127,27 @@ export function SolverInteropWorkspace() {
       setErrorMsg(err.message || "Failed to load solver adapters.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadRuntimes = async () => {
+    try {
+      const list = await SolverExecutionApi.getRuntimes();
+      setRuntimes(list);
+    } catch (err: any) {
+      console.error("Failed to load runtimes:", err);
+    }
+  };
+
+  const loadJobs = async () => {
+    try {
+      const list = await SolverExecutionApi.listJobs(20);
+      setJobs(list);
+      if (list.length > 0 && !selectedJob) {
+        setSelectedJob(list[0]);
+      }
+    } catch (err: any) {
+      console.error("Failed to load execution jobs:", err);
     }
   };
 
@@ -202,6 +255,86 @@ export function SolverInteropWorkspace() {
     }
   };
 
+  // Phase 7.3 Handlers
+  const handlePreflight = async () => {
+    if (!execArtifactId.trim()) {
+      setErrorMsg("Please specify an input artifact UUID.");
+      return;
+    }
+    try {
+      setLoading(true);
+      setErrorMsg(null);
+      const res = await SolverExecutionApi.preflightExecution({
+        solver_name: execSolver,
+        input_artifact_id: execArtifactId.trim(),
+      });
+      setPreflightResult(res);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Preflight check failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExecuteJob = async () => {
+    if (!execArtifactId.trim()) {
+      setErrorMsg("Please specify an input artifact UUID.");
+      return;
+    }
+    try {
+      setLoading(true);
+      setErrorMsg(null);
+      const job = await SolverExecutionApi.executeJob({
+        solver_name: execSolver,
+        input_artifact_id: execArtifactId.trim(),
+        execution_config: {
+          step_size: stepSize,
+          stop_time: stopTime,
+          road_input_type: roadType,
+        },
+        resource_limits: {
+          timeout_seconds: timeoutSec,
+          max_memory_mb: 512,
+        },
+        wait_for_completion: true,
+      });
+      setSelectedJob(job);
+      setActiveTab("jobs");
+      await loadJobs();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Execution submission failed.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCancelJob = async (jobId: string) => {
+    try {
+      setLoading(true);
+      setErrorMsg(null);
+      const updated = await SolverExecutionApi.cancelJob(jobId);
+      setSelectedJob(updated);
+      await loadJobs();
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to cancel job.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleReconcileJob = async (jobId: string) => {
+    try {
+      setReconcileLoading(true);
+      setErrorMsg(null);
+      const report = await SolverExecutionApi.reconcileJob(jobId);
+      setReconciliationReport(report);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Result reconciliation failed.");
+    } finally {
+      setReconcileLoading(false);
+    }
+  };
+
   return (
     <div className="w-full max-w-7xl mx-auto p-6 space-y-8 bg-slate-950 text-slate-100 min-h-screen">
       {/* Header */}
@@ -212,16 +345,22 @@ export function SolverInteropWorkspace() {
             <h1 className="text-2xl font-bold tracking-tight">Solver Interoperability Workspace</h1>
           </div>
           <p className="text-sm text-slate-400 mt-1">
-            Secure, auditable CAE and external solver exchange with immutable provenance and strict epistemic verification.
+            Controlled CAE solver execution, isolated sandbox environments, and rigorous numerical result reconciliation.
           </p>
         </div>
-        <button
-          onClick={loadAdapters}
-          className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
-          Refresh Adapters
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              loadAdapters();
+              loadRuntimes();
+              loadJobs();
+            }}
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 transition"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${loading ? "animate-spin" : ""}`} />
+            Refresh All
+          </button>
+        </div>
       </div>
 
       {/* Epistemic Truth Banners */}
@@ -230,29 +369,72 @@ export function SolverInteropWorkspace() {
           <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
           <div className="text-xs">
             <span className="font-semibold text-amber-300 block">EXPORTED ≠ EXECUTED</span>
-            <span className="text-slate-400">Exporting CAE input files does not prove external solver ran.</span>
+            <span className="text-slate-400">Deck generation does not prove the external solver ran.</span>
           </div>
         </div>
         <div className="p-3.5 rounded-lg border border-sky-900/40 bg-sky-950/20 flex items-start gap-2.5">
           <ShieldCheck className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
           <div className="text-xs">
-            <span className="font-semibold text-sky-300 block">IMPORTED ≠ VALIDATED</span>
-            <span className="text-slate-400">Parsing success is not physical simulation validation.</span>
+            <span className="font-semibold text-sky-300 block">EXECUTED ≠ VALIDATED</span>
+            <span className="text-slate-400">Zero exit code is not physical vehicle validation.</span>
           </div>
         </div>
         <div className="p-3.5 rounded-lg border border-purple-900/40 bg-purple-950/20 flex items-start gap-2.5">
-          <Info className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
+          <Scale className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
           <div className="text-xs">
-            <span className="font-semibold text-purple-300 block">SCHEMA VALID ≠ CORRECT</span>
-            <span className="text-slate-400">JSON schema compliance does not imply dynamic validity.</span>
+            <span className="font-semibold text-purple-300 block">RECONCILED ≠ SIGNED-OFF</span>
+            <span className="text-slate-400">Mathematical agreement is not track verification.</span>
           </div>
         </div>
         <div className="p-3.5 rounded-lg border border-emerald-900/40 bg-emerald-950/20 flex items-start gap-2.5">
           <Cpu className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
           <div className="text-xs">
-            <span className="font-semibold text-emerald-300 block">METADATA ≠ RUNNER</span>
-            <span className="text-slate-400">FMI XML ingestion excludes binary co-simulation execution.</span>
+            <span className="font-semibold text-emerald-300 block">HONEST RUNTIME GATE</span>
+            <span className="text-slate-400">Uninstalled proprietary solvers fail closed truthfully.</span>
           </div>
+        </div>
+      </div>
+
+      {/* Discovered Solver Runtimes Banner (Phase 7.3) */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <Terminal className="w-4 h-4 text-indigo-400" />
+            Detected CAE Solver Runtimes
+          </h2>
+          <span className="text-[11px] text-slate-400">Audited via host sandbox discovery</span>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {runtimes.map((rt) => (
+            <div
+              key={rt.solver_name}
+              className={`p-3 rounded-lg border text-xs flex flex-col justify-between ${
+                rt.is_available
+                  ? "bg-slate-950/80 border-emerald-900/50"
+                  : "bg-slate-950/40 border-slate-800 opacity-75"
+              }`}
+            >
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-semibold text-slate-200">{rt.solver_name}</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                      rt.is_available
+                        ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
+                        : "bg-rose-950 text-rose-300 border border-rose-800"
+                    }`}
+                  >
+                    {rt.is_available ? "AVAILABLE" : "UNAVAILABLE"}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 line-clamp-2">{rt.notes}</p>
+              </div>
+              <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-500 font-mono">
+                <span>{rt.licensing_model}</span>
+                <span>{rt.is_sandboxed ? "SANDBOXED" : "UNRESTRICTED"}</span>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -373,7 +555,7 @@ export function SolverInteropWorkspace() {
                   ))}
                 </div>
 
-                {/* Known Limitations */}
+                {/* Technical Limitations */}
                 {selectedAdapter.known_limitations.length > 0 && (
                   <div className="pt-1">
                     <span className="text-slate-400 block mb-1 font-semibold">Technical Limitations</span>
@@ -391,11 +573,33 @@ export function SolverInteropWorkspace() {
 
         {/* Right 2 Columns: Workflow Tabs */}
         <div className="lg:col-span-2 space-y-6">
-          {/* Tabs */}
-          <div className="flex border-b border-slate-800 space-x-4">
+          {/* Tabs Navigation */}
+          <div className="flex border-b border-slate-800 space-x-2 overflow-x-auto pb-1">
+            <button
+              onClick={() => setActiveTab("execute")}
+              className={`pb-2.5 px-3 text-sm font-medium transition flex items-center gap-1.5 border-b-2 whitespace-nowrap ${
+                activeTab === "execute"
+                  ? "border-indigo-500 text-indigo-400"
+                  : "border-transparent text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Play className="w-4 h-4 text-emerald-400" />
+              Run External Solver
+            </button>
+            <button
+              onClick={() => setActiveTab("jobs")}
+              className={`pb-2.5 px-3 text-sm font-medium transition flex items-center gap-1.5 border-b-2 whitespace-nowrap ${
+                activeTab === "jobs"
+                  ? "border-indigo-500 text-indigo-400"
+                  : "border-transparent text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              <Activity className="w-4 h-4 text-indigo-400" />
+              Jobs & Reconciliation
+            </button>
             <button
               onClick={() => setActiveTab("import")}
-              className={`pb-2.5 text-sm font-medium transition flex items-center gap-2 border-b-2 ${
+              className={`pb-2.5 px-3 text-sm font-medium transition flex items-center gap-1.5 border-b-2 whitespace-nowrap ${
                 activeTab === "import"
                   ? "border-indigo-500 text-indigo-400"
                   : "border-transparent text-slate-400 hover:text-slate-200"
@@ -406,7 +610,7 @@ export function SolverInteropWorkspace() {
             </button>
             <button
               onClick={() => setActiveTab("export")}
-              className={`pb-2.5 text-sm font-medium transition flex items-center gap-2 border-b-2 ${
+              className={`pb-2.5 px-3 text-sm font-medium transition flex items-center gap-1.5 border-b-2 whitespace-nowrap ${
                 activeTab === "export"
                   ? "border-indigo-500 text-indigo-400"
                   : "border-transparent text-slate-400 hover:text-slate-200"
@@ -417,7 +621,7 @@ export function SolverInteropWorkspace() {
             </button>
             <button
               onClick={() => setActiveTab("inspect")}
-              className={`pb-2.5 text-sm font-medium transition flex items-center gap-2 border-b-2 ${
+              className={`pb-2.5 px-3 text-sm font-medium transition flex items-center gap-1.5 border-b-2 whitespace-nowrap ${
                 activeTab === "inspect"
                   ? "border-indigo-500 text-indigo-400"
                   : "border-transparent text-slate-400 hover:text-slate-200"
@@ -428,7 +632,393 @@ export function SolverInteropWorkspace() {
             </button>
           </div>
 
-          {/* TAB 1: IMPORT */}
+          {/* TAB: RUN EXTERNAL SOLVER (Phase 7.3) */}
+          {activeTab === "execute" && (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                  <Play className="w-4 h-4 text-emerald-400" />
+                  Controlled Solver Execution Preflight & Launch
+                </h3>
+                <span className="text-xs text-slate-400">Sandboxed Subprocess Runner</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Target Solver Runtime</label>
+                  <select
+                    value={execSolver}
+                    onChange={(e) => setExecSolver(e.target.value)}
+                    className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm text-slate-200 focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="FMI_COSIMULATION">FMI Co-Simulation (FMPy 0.3.31)</option>
+                    <option value="EXTERNAL_CAE_SOLVER">Standalone External CAE Solver (RK4)</option>
+                    <option value="MSC_ADAMS">MSC Adams (Unavailable)</option>
+                    <option value="MATLAB_SIMULINK">MATLAB / Simulink (Unavailable)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs text-slate-400 block mb-1">Input Artifact UUID</label>
+                  <input
+                    type="text"
+                    value={execArtifactId}
+                    onChange={(e) => setExecArtifactId(e.target.value)}
+                    placeholder="e.g. 550e8400-e29b-41d4-a716-446655440000"
+                    className="w-full bg-slate-950 border border-slate-700 rounded p-2 text-sm font-mono text-slate-200 focus:outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
+              {/* Execution Config Controls */}
+              <div className="p-3.5 bg-slate-950/60 rounded-lg border border-slate-800 space-y-3">
+                <span className="text-xs font-semibold text-slate-300 block flex items-center gap-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                  Simulation Parameters & Sandbox Resource Limits
+                </span>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                  <div>
+                    <label className="text-slate-400 block mb-1">Stop Time (s)</label>
+                    <input
+                      type="number"
+                      step="0.5"
+                      value={stopTime}
+                      onChange={(e) => setStopTime(parseFloat(e.target.value) || 2.0)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 font-mono text-slate-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Step Size (s)</label>
+                    <input
+                      type="number"
+                      step="0.0005"
+                      value={stepSize}
+                      onChange={(e) => setStepSize(parseFloat(e.target.value) || 0.001)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 font-mono text-slate-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Road Input Profile</label>
+                    <select
+                      value={roadType}
+                      onChange={(e) => setRoadType(e.target.value)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-slate-200"
+                    >
+                      <option value="step">Step (0.05m)</option>
+                      <option value="bump">Half-Sine Bump (0.05m)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-slate-400 block mb-1">Timeout (s)</label>
+                    <input
+                      type="number"
+                      value={timeoutSec}
+                      onChange={(e) => setTimeoutSec(parseInt(e.target.value, 10) || 30)}
+                      className="w-full bg-slate-900 border border-slate-700 rounded p-1.5 font-mono text-slate-200"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Preflight Results */}
+              {preflightResult && (
+                <div
+                  className={`p-3.5 rounded-lg border text-xs ${
+                    preflightResult.is_available && preflightResult.warnings.length === 0
+                      ? "bg-emerald-950/20 border-emerald-800 text-emerald-300"
+                      : "bg-amber-950/20 border-amber-800 text-amber-300"
+                  }`}
+                >
+                  <div className="font-semibold flex items-center gap-1.5 mb-1">
+                    {preflightResult.is_available ? (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-rose-400" />
+                    )}
+                    Preflight: {preflightResult.solver_name} ({preflightResult.licensing_model})
+                  </div>
+                  {preflightResult.warnings.length > 0 ? (
+                    <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-200">
+                      {preflightResult.warnings.map((w, idx) => (
+                        <li key={idx}>{w}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-[11px] text-emerald-300">
+                      Executable verified on host. Sandboxed working directory and input deck are valid.
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-3">
+                <button
+                  onClick={handlePreflight}
+                  disabled={loading || !execArtifactId.trim()}
+                  className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:bg-slate-900 text-slate-200 rounded-md text-sm font-medium transition flex items-center gap-2"
+                >
+                  <Check className="w-4 h-4" />
+                  Preflight Check
+                </button>
+                <button
+                  onClick={handleExecuteJob}
+                  disabled={loading || !execArtifactId.trim()}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 text-white rounded-md text-sm font-medium transition flex items-center gap-2"
+                >
+                  <Play className="w-4 h-4" />
+                  {loading ? "Executing in Sandbox..." : "Launch Isolated Solver"}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: JOBS & RECONCILIATION (Phase 7.3) */}
+          {activeTab === "jobs" && (
+            <div className="space-y-6">
+              {/* Jobs List */}
+              <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-indigo-400" />
+                    Execution Jobs Monitor
+                  </h3>
+                  <button
+                    onClick={loadJobs}
+                    className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    Refresh
+                  </button>
+                </div>
+
+                {jobs.length === 0 ? (
+                  <p className="text-xs text-slate-500 italic py-4 text-center">
+                    No execution jobs found in this workspace. Launch a job from the "Run External Solver" tab.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-slate-800">
+                    {jobs.map((j) => (
+                      <div
+                        key={j.id}
+                        onClick={() => {
+                          setSelectedJob(j);
+                          setReconciliationReport(null);
+                        }}
+                        className={`py-3 px-2 flex items-center justify-between rounded cursor-pointer transition ${
+                          selectedJob?.id === j.id ? "bg-slate-800/80" : "hover:bg-slate-950/60"
+                        }`}
+                      >
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs font-semibold text-slate-200">
+                              #{j.id.substring(0, 8)}
+                            </span>
+                            <span className="text-[11px] px-1.5 py-0.2 rounded bg-slate-800 text-indigo-300 font-mono">
+                              {j.solver_name}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-400">
+                            Created: {j.created_at ? new Date(j.created_at).toLocaleTimeString() : "N/A"} | PID: {j.pid || "N/A"}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span
+                            className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${
+                              j.state === "COMPLETED"
+                                ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
+                                : j.state === "RUNNING"
+                                ? "bg-sky-950 text-sky-300 border border-sky-800 animate-pulse"
+                                : j.state === "QUEUED"
+                                ? "bg-amber-950 text-amber-300 border border-amber-800"
+                                : j.state === "CANCELLED"
+                                ? "bg-slate-800 text-slate-300 border border-slate-700"
+                                : "bg-rose-950 text-rose-300 border border-rose-800"
+                            }`}
+                          >
+                            {j.state}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Selected Job Inspection & Reconciliation View */}
+              {selectedJob && (
+                <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                    <div>
+                      <span className="font-mono text-sm font-semibold text-slate-200">
+                        Job #{selectedJob.id}
+                      </span>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        Solver: {selectedJob.solver_name} (v{selectedJob.solver_version}) | Exit Code: {selectedJob.exit_code ?? "N/A"}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      {(selectedJob.state === "QUEUED" || selectedJob.state === "RUNNING") && (
+                        <button
+                          onClick={() => handleCancelJob(selectedJob.id)}
+                          disabled={loading}
+                          className="px-2.5 py-1 text-xs rounded bg-rose-950 border border-rose-800 hover:bg-rose-900 text-rose-300 font-medium transition flex items-center gap-1.5"
+                        >
+                          <Square className="w-3.5 h-3.5" />
+                          Cancel Job
+                        </button>
+                      )}
+
+                      {selectedJob.state === "COMPLETED" && (
+                        <button
+                          onClick={() => handleReconcileJob(selectedJob.id)}
+                          disabled={reconcileLoading}
+                          className="px-3 py-1 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition flex items-center gap-1.5"
+                        >
+                          <Scale className="w-3.5 h-3.5" />
+                          {reconcileLoading ? "Reconciling..." : "Reconcile Results"}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Epistemic Badges Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                    <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
+                      <span className="text-slate-500 block mb-0.5">Execution Status</span>
+                      <span
+                        className={`font-semibold ${
+                          selectedJob.is_executed ? "text-emerald-400" : "text-amber-400"
+                        }`}
+                      >
+                        {selectedJob.is_executed ? "REAL EXECUTED" : "UNEXECUTED"}
+                      </span>
+                    </div>
+                    <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
+                      <span className="text-slate-500 block mb-0.5">Physical Validation</span>
+                      <span className="font-semibold text-rose-400">FALSE (IMMUTABLE)</span>
+                    </div>
+                    <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
+                      <span className="text-slate-500 block mb-0.5">Input Artifact SHA-256</span>
+                      <span className="font-mono text-slate-300 truncate block">
+                        {selectedJob.input_artifact_hash ? selectedJob.input_artifact_hash.substring(0, 12) + "..." : "N/A"}
+                      </span>
+                    </div>
+                    <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
+                      <span className="text-slate-500 block mb-0.5">Output Artifacts</span>
+                      <span className="font-semibold text-slate-300">
+                        {selectedJob.output_artifact_ids.length} artifact(s)
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Output Logs Accordion */}
+                  <div className="space-y-3 pt-2 text-xs">
+                    <h4 className="font-semibold text-slate-300 flex items-center gap-1.5">
+                      <Terminal className="w-3.5 h-3.5 text-indigo-400" />
+                      Execution Process Standard Output
+                    </h4>
+                    <div className="bg-slate-950 p-3 rounded border border-slate-800 font-mono text-[11px] overflow-x-auto max-h-40 text-slate-300">
+                      <pre>{selectedJob.stdout_excerpt || "(No stdout emitted)"}</pre>
+                    </div>
+                  </div>
+
+                  {selectedJob.stderr_excerpt && (
+                    <div className="space-y-2 text-xs">
+                      <h4 className="font-semibold text-rose-300 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
+                        Standard Error Logs
+                      </h4>
+                      <div className="bg-rose-950/20 p-3 rounded border border-rose-900/60 font-mono text-[11px] overflow-x-auto max-h-32 text-rose-300">
+                        <pre>{selectedJob.stderr_excerpt}</pre>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* RECONCILIATION REPORT PANEL */}
+                  {reconciliationReport && (
+                    <div className="p-4 rounded-xl bg-slate-950 border border-indigo-900/40 space-y-4 pt-3">
+                      <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                        <div className="flex items-center gap-2">
+                          <Scale className="w-4 h-4 text-indigo-400" />
+                          <h4 className="text-sm font-semibold text-slate-200">
+                            Engineering Result Reconciliation
+                          </h4>
+                        </div>
+                        <span
+                          className={`text-xs px-2.5 py-0.5 rounded-full font-bold ${
+                            reconciliationReport.overall_reconciliation_verdict === "CONCORDANT"
+                              ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
+                              : "bg-amber-950 text-amber-300 border border-amber-800"
+                          }`}
+                        >
+                          {reconciliationReport.overall_reconciliation_verdict}
+                        </span>
+                      </div>
+
+                      {/* Prominent Epistemic Notice */}
+                      <div className="p-3 bg-indigo-950/30 border border-indigo-800/60 rounded text-xs text-indigo-300 flex items-start gap-2">
+                        <Info className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+                        <span>{reconciliationReport.epistemic_notice}</span>
+                      </div>
+
+                      {/* Energy Consistency */}
+                      <div className="flex justify-between items-center py-1.5 px-3 bg-slate-900 rounded text-xs">
+                        <span className="text-slate-400">Dynamic Energy Ratio (External / Analytical Ref)</span>
+                        <span className="font-mono font-semibold text-slate-200">
+                          {reconciliationReport.dynamic_energy_ratio.toFixed(4)}
+                        </span>
+                      </div>
+
+                      {/* Signals Comparison Table */}
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs border-collapse">
+                          <thead>
+                            <tr className="border-b border-slate-800 text-slate-400 text-[11px]">
+                              <th className="py-2 px-2">Signal Channel</th>
+                              <th className="py-2 px-2">Peak Ext.</th>
+                              <th className="py-2 px-2">Peak Ref.</th>
+                              <th className="py-2 px-2">Peak Err %</th>
+                              <th className="py-2 px-2">NRMSE %</th>
+                              <th className="py-2 px-2">Phase Delay (ms)</th>
+                              <th className="py-2 px-2">Verdict</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                            {Object.entries(reconciliationReport.signals).map(([sigKey, sig]) => (
+                              <tr key={sigKey} className="hover:bg-slate-900/50">
+                                <td className="py-2 px-2 font-semibold text-slate-300">{sig.channel_name}</td>
+                                <td className="py-2 px-2 text-slate-400">{sig.peak_external.toFixed(4)} {sig.unit}</td>
+                                <td className="py-2 px-2 text-slate-400">{sig.peak_reference.toFixed(4)} {sig.unit}</td>
+                                <td className="py-2 px-2 text-slate-300">{sig.peak_error_pct.toFixed(2)}%</td>
+                                <td className="py-2 px-2 text-slate-300">{sig.nrmse_pct.toFixed(2)}%</td>
+                                <td className="py-2 px-2 text-slate-300">{sig.peak_phase_delay_ms.toFixed(1)} ms</td>
+                                <td className="py-2 px-2">
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                      sig.passed_tolerance
+                                        ? "bg-emerald-950 text-emerald-300"
+                                        : "bg-amber-950 text-amber-300"
+                                    }`}
+                                  >
+                                    {sig.passed_tolerance ? "PASS" : "WARN"}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB: IMPORT (Phase 7.2) */}
           {activeTab === "import" && (
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
               <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
@@ -491,7 +1081,7 @@ export function SolverInteropWorkspace() {
             </div>
           )}
 
-          {/* TAB 2: EXPORT */}
+          {/* TAB: EXPORT (Phase 7.2) */}
           {activeTab === "export" && (
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
               <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
@@ -537,7 +1127,7 @@ export function SolverInteropWorkspace() {
             </div>
           )}
 
-          {/* TAB 3: INSPECT */}
+          {/* TAB: INSPECT (Phase 7.2) */}
           {activeTab === "inspect" && (
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
               <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
@@ -564,8 +1154,8 @@ export function SolverInteropWorkspace() {
             </div>
           )}
 
-          {/* OPERATION DETAILS & PROVENANCE RECORD */}
-          {currentOperation && (
+          {/* HISTORICAL OPERATION DETAILS (When inspecting Phase 7.2 operation) */}
+          {currentOperation && (activeTab === "import" || activeTab === "export" || activeTab === "inspect") && (
             <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-5">
               <div className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div className="flex items-center gap-2">

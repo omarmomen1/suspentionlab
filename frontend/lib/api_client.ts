@@ -4040,3 +4040,140 @@ export class SolverInteropApi {
     });
   }
 }
+
+// ── Solver Execution & Reconciliation API (Phase 7.3) ─────────────────────────
+
+export interface RuntimeEnvironmentInfoDTO {
+  solver_name: string;
+  is_available: boolean;
+  version: string;
+  executable_path?: string | null;
+  licensing_model: string;
+  is_sandboxed: boolean;
+  supported_input_formats: string[];
+  output_format: string;
+  notes: string;
+}
+
+export interface JobPreflightRequestDTO {
+  solver_name: string;
+  input_artifact_id: string;
+}
+
+export interface JobPreflightResponseDTO {
+  is_supported: boolean;
+  is_available: boolean;
+  solver_name: string;
+  licensing_model: string;
+  executable_path?: string | null;
+  notes?: string;
+  warnings: string[];
+}
+
+export interface ExecuteJobRequestDTO {
+  solver_name: string;
+  input_artifact_id: string;
+  execution_config?: Record<string, any>;
+  resource_limits?: Record<string, any>;
+  idempotency_key?: string;
+  wait_for_completion?: boolean;
+}
+
+export interface JobResponseDTO {
+  id: string;
+  organization_id?: string | null;
+  team_id?: string | null;
+  user_id: string;
+  solver_name: string;
+  solver_version: string;
+  adapter_id: string;
+  state: "QUEUED" | "RUNNING" | "COMPLETED" | "FAILED" | "CANCELLED" | "TIMED_OUT";
+  input_artifact_id?: string | null;
+  input_artifact_hash?: string | null;
+  output_artifact_ids: string[];
+  execution_config: Record<string, any>;
+  resource_limits: Record<string, any>;
+  pid?: number | null;
+  exit_code?: number | null;
+  stdout_excerpt?: string | null;
+  stderr_excerpt?: string | null;
+  failure_reason?: string | null;
+  error_category?: string | null;
+  is_executed: boolean;
+  is_physically_validated: boolean;
+  execution_provenance: Record<string, any>;
+  reconciliation_summary: Record<string, any>;
+  created_at?: string | null;
+  started_at?: string | null;
+  completed_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface ReconciliationSignalMetricDTO {
+  channel_name: string;
+  unit: string;
+  peak_external: number;
+  peak_reference: number;
+  peak_error_abs: number;
+  peak_error_pct: number;
+  rms_external: number;
+  rms_reference: number;
+  rms_error_abs: number;
+  nrmse_pct: number;
+  peak_phase_delay_ms: number;
+  passed_tolerance: boolean;
+  applied_tolerances: Record<string, any>;
+}
+
+export interface ReconciliationReportDTO {
+  reconciliation_id: string;
+  job_id: string;
+  solver_name: string;
+  evaluated_at: string;
+  signals: Record<string, ReconciliationSignalMetricDTO>;
+  dynamic_energy_ratio: number;
+  overall_reconciliation_verdict: "CONCORDANT" | "TOLERANCE_EXCEEDED" | "DIVERGENT";
+  epistemic_notice: string;
+}
+
+export class SolverExecutionApi {
+  static async getRuntimes(): Promise<RuntimeEnvironmentInfoDTO[]> {
+    return apiJson<RuntimeEnvironmentInfoDTO[]>("/api/v1/interop/runtimes");
+  }
+
+  static async preflightExecution(req: JobPreflightRequestDTO): Promise<JobPreflightResponseDTO> {
+    return apiJson<JobPreflightResponseDTO>("/api/v1/interop/execute/preflight", {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  }
+
+  static async executeJob(req: ExecuteJobRequestDTO): Promise<JobResponseDTO> {
+    return apiJson<JobResponseDTO>("/api/v1/interop/execute", {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  }
+
+  static async listJobs(limit = 50): Promise<JobResponseDTO[]> {
+    return apiJson<JobResponseDTO[]>(`/api/v1/interop/jobs?limit=${limit}`);
+  }
+
+  static async getJob(jobId: string): Promise<JobResponseDTO> {
+    return apiJson<JobResponseDTO>(`/api/v1/interop/jobs/${encodeURIComponent(jobId)}`);
+  }
+
+  static async cancelJob(jobId: string): Promise<JobResponseDTO> {
+    return apiJson<JobResponseDTO>(`/api/v1/interop/jobs/${encodeURIComponent(jobId)}/cancel`, {
+      method: "POST",
+    });
+  }
+
+  static async reconcileJob(jobId: string, customTolerances?: Record<string, any>): Promise<ReconciliationReportDTO> {
+    return apiJson<ReconciliationReportDTO>(`/api/v1/interop/jobs/${encodeURIComponent(jobId)}/reconcile`, {
+      method: "POST",
+      body: JSON.stringify({ custom_tolerances: customTolerances || {} }),
+    });
+  }
+}
+

@@ -132,6 +132,10 @@ __all__ = [
     'ArtifactDirection',
     'InvalidStateTransitionError',
     'ImmutableOperationError',
+    'SolverExecutionJob',
+    'ExecutionJobState',
+    'ImmutableExecutionError',
+    'InvalidExecutionStateTransitionError',
 ]
 
 from suspensionlab.backend.database.models.parameter_trust import (
@@ -163,6 +167,13 @@ from suspensionlab.backend.database.models.solver_exchange import (
     ArtifactDirection,
     InvalidStateTransitionError,
     ImmutableOperationError,
+)
+
+from suspensionlab.backend.database.models.solver_execution import (
+    SolverExecutionJob,
+    ExecutionJobState,
+    ImmutableExecutionError,
+    InvalidExecutionStateTransitionError,
 )
 
 
