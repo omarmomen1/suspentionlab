@@ -22,6 +22,8 @@ import {
   FlaskConical,
   Workflow,
   GitCommit,
+  Activity,
+  TrendingUp,
 } from "lucide-react";
 import {
   ParameterTrustApi,
@@ -38,6 +40,10 @@ import {
   DecisionHistoryItemDTO,
   DecisionDependenciesResponseDTO,
   DecisionGapsResponseDTO,
+  RobustnessPreflightResponseDTO,
+  RobustnessAnalysisResponseDTO,
+  DecisionBoundariesResponseDTO,
+  DecisionVOIResponseDTO,
 } from "../../lib/api_client";
 
 interface ParameterTrustMapProps {
@@ -62,7 +68,7 @@ export function ParameterTrustMap({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "evidence" | "history" | "sweep" | "ingestion" | "fleet" | "propagation" | "decisions"
+    "overview" | "evidence" | "history" | "sweep" | "ingestion" | "fleet" | "propagation" | "decisions" | "robustness"
   >("overview");
 
   // Phase 6.2 Ingestion & Sweep State
@@ -120,6 +126,74 @@ export function ParameterTrustMap({
       setDecisionHistoryItems([]);
     } finally {
       setDecisionLoading(false);
+    }
+  };
+
+  // Phase 6.5 Decision Robustness State
+  const [robustnessDecisionId, setRobustnessDecisionId] = useState("DEC-12");
+  const [robustnessData, setRobustnessData] = useState<RobustnessAnalysisResponseDTO | null>(null);
+  const [robustnessLoading, setRobustnessLoading] = useState(false);
+  const [robustnessError, setRobustnessError] = useState<string | null>(null);
+  const [preflightData, setPreflightData] = useState<RobustnessPreflightResponseDTO | null>(null);
+  const [preflightLoading, setPreflightLoading] = useState(false);
+  const [preflightError, setPreflightError] = useState<string | null>(null);
+  const [boundariesData, setBoundariesData] = useState<DecisionBoundariesResponseDTO | null>(null);
+  const [voiData, setVoiData] = useState<DecisionVOIResponseDTO | null>(null);
+  const [robustnessHistoryItems, setRobustnessHistoryItems] = useState<any[]>([]);
+
+  const handleRunRobustnessPreflight = async (targetDecisionId: string) => {
+    if (!targetDecisionId) return;
+    setPreflightLoading(true);
+    setPreflightError(null);
+    try {
+      const res = await ParameterTrustApi.preflightDecisionRobustness({
+        decision_id: targetDecisionId,
+      });
+      setPreflightData(res);
+    } catch (err: any) {
+      setPreflightError(err?.message || "Failed to run robustness preflight.");
+      setPreflightData(null);
+    } finally {
+      setPreflightLoading(false);
+    }
+  };
+
+  const handleRunRobustnessAnalysis = async (
+    targetDecisionId: string,
+    forceReassess: boolean = false
+  ) => {
+    if (!targetDecisionId) return;
+    setRobustnessLoading(true);
+    setRobustnessError(null);
+    try {
+      const res = await ParameterTrustApi.runDecisionRobustness({
+        decision_id: targetDecisionId,
+        persist_record: true,
+      });
+      setRobustnessData(res);
+      try {
+        const boundsRes = await ParameterTrustApi.getDecisionBoundaries(targetDecisionId);
+        setBoundariesData(boundsRes);
+      } catch {
+        setBoundariesData(null);
+      }
+      try {
+        const voiRes = await ParameterTrustApi.getDecisionVOI(targetDecisionId);
+        setVoiData(voiRes);
+      } catch {
+        setVoiData(null);
+      }
+      try {
+        const histRes = await ParameterTrustApi.getDecisionRobustnessHistory(targetDecisionId);
+        setRobustnessHistoryItems(histRes.history || []);
+      } catch {
+        setRobustnessHistoryItems([]);
+      }
+    } catch (err: any) {
+      setRobustnessError(err?.message || "Failed to analyze decision robustness.");
+      setRobustnessData(null);
+    } finally {
+      setRobustnessLoading(false);
     }
   };
 
@@ -298,6 +372,36 @@ export function ParameterTrustMap({
       case "NO_VALIDATION":
       default:
         return "bg-zinc-900 border-zinc-700 text-zinc-400";
+    }
+  };
+
+  const getRobustnessBadge = (classification: string) => {
+    switch (classification) {
+      case "ROBUST_WITHIN_CREDIBLE_RANGE":
+        return {
+          bg: "bg-emerald-950/80 border-emerald-500/50 text-emerald-300",
+          icon: ShieldCheck,
+          label: "ROBUST WITHIN CREDIBLE RANGE",
+        };
+      case "POTENTIALLY_SENSITIVE":
+        return {
+          bg: "bg-amber-950/80 border-amber-500/50 text-amber-300",
+          icon: AlertTriangle,
+          label: "POTENTIALLY SENSITIVE",
+        };
+      case "VULNERABLE_TO_REVERSAL":
+        return {
+          bg: "bg-rose-950/80 border-rose-500/50 text-rose-300",
+          icon: ShieldAlert,
+          label: "VULNERABLE TO REVERSAL",
+        };
+      case "UNCERTAINTY_INSUFFICIENT_EVIDENCE":
+      default:
+        return {
+          bg: "bg-zinc-900 border-zinc-700 text-zinc-400",
+          icon: HelpCircle,
+          label: "UNCERTAINTY INSUFFICIENT EVIDENCE",
+        };
     }
   };
 
@@ -533,6 +637,17 @@ export function ParameterTrustMap({
               data-testid="tab-decisions"
             >
               Decision Trust
+            </button>
+            <button
+              onClick={() => setActiveTab("robustness")}
+              className={`px-3 py-1.5 text-xs font-semibold rounded transition ${
+                activeTab === "robustness"
+                  ? "bg-zinc-800 text-white border border-zinc-700"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+              data-testid="tab-robustness"
+            >
+              Decision Robustness
             </button>
           </div>
 
@@ -1636,6 +1751,503 @@ export function ParameterTrustMap({
                             </div>
                             <div className="text-right text-[10px] text-zinc-500">
                               <div>Hash: {hist.assessment_hash.slice(0, 16)}...</div>
+                              <div>{hist.created_at ? new Date(hist.created_at).toLocaleString() : ""}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 8: Decision Robustness (Phase 6.5) */}
+          {activeTab === "robustness" && (
+            <div className="space-y-6" data-testid="container-robustness">
+              {/* Decision ID Search / Trigger Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-lg bg-zinc-900/40 border border-zinc-800">
+                <div className="flex items-center gap-2">
+                  <Activity className="w-5 h-5 text-amber-400" />
+                  <div>
+                    <div className="text-xs font-bold text-white uppercase font-mono">
+                      Phase 6.5 — Decision Robustness & Uncertainty Propagation
+                    </div>
+                    <div className="text-[10px] text-zinc-400">
+                      Bounded intervals, reversal identification, parameter boundary bisection, and VOI prioritization
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={robustnessDecisionId}
+                    onChange={(e) => setRobustnessDecisionId(e.target.value)}
+                    placeholder="Decision ID (e.g. DEC-12)"
+                    className="px-2.5 py-1 text-xs rounded bg-zinc-950 border border-zinc-700 text-white font-mono focus:border-amber-500 focus:outline-none"
+                    data-testid="input-robustness-decision-id"
+                  />
+                  <button
+                    onClick={() => handleRunRobustnessPreflight(robustnessDecisionId)}
+                    disabled={preflightLoading}
+                    className="px-3 py-1 text-xs font-semibold rounded bg-zinc-800 text-zinc-200 border border-zinc-700 hover:bg-zinc-700 transition disabled:opacity-50"
+                    data-testid="btn-robustness-preflight"
+                  >
+                    {preflightLoading ? "Checking..." : "Preflight Check"}
+                  </button>
+                  <button
+                    onClick={() => handleRunRobustnessAnalysis(robustnessDecisionId, false)}
+                    disabled={robustnessLoading}
+                    className="px-3 py-1 text-xs font-semibold rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition disabled:opacity-50"
+                    data-testid="btn-run-robustness-analysis"
+                  >
+                    {robustnessLoading ? "Evaluating Envelope..." : "Analyze Robustness"}
+                  </button>
+                  <button
+                    onClick={() => handleRunRobustnessAnalysis(robustnessDecisionId, true)}
+                    disabled={robustnessLoading}
+                    className="px-2 py-1 text-xs rounded bg-zinc-800 text-zinc-400 hover:text-white transition disabled:opacity-50"
+                    title="Force Reassess & Persist Revision"
+                    data-testid="btn-force-reassess-robustness"
+                  >
+                    <RefreshCw className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Preflight Results */}
+              {preflightError && (
+                <div className="p-3 rounded bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
+                  {preflightError}
+                </div>
+              )}
+              {preflightData && (
+                <div className="p-4 rounded-lg bg-zinc-900/60 border border-zinc-800 space-y-3" data-testid="container-preflight-results">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-zinc-200 font-mono">
+                      PREFLIGHT AUDIT: {preflightData.decision_id}
+                    </span>
+                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${
+                      preflightData.is_ready ? "bg-emerald-950/80 border border-emerald-500/40 text-emerald-300" : "bg-rose-950/80 border border-rose-500/40 text-rose-300"
+                    }`}>
+                      {preflightData.is_ready ? "READY FOR PROPAGATION" : "BLOCKED"}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs font-mono">
+                    <div className="p-2 rounded bg-zinc-950/60 border border-zinc-800/80">
+                      <span className="text-[10px] text-zinc-500 block">Verified Parameters</span>
+                      <span className="text-white font-semibold">{preflightData.matched_parameters_count}</span>
+                    </div>
+                    <div className="p-2 rounded bg-zinc-950/60 border border-zinc-800/80">
+                      <span className="text-[10px] text-zinc-500 block">Missing Uncertainty Evidence</span>
+                      <span className={preflightData.missing_evidence_parameters.length > 0 ? "text-amber-400 font-semibold" : "text-emerald-400 font-semibold"}>
+                        {preflightData.missing_evidence_parameters.length}
+                      </span>
+                    </div>
+                    <div className="p-2 rounded bg-zinc-950/60 border border-zinc-800/80">
+                      <span className="text-[10px] text-zinc-500 block">Recomputable Modal KPIs</span>
+                      <span className="text-cyan-400 font-semibold">{preflightData.recomputable_kpis?.map((k) => k.kpi).join(", ") || "None"}</span>
+                    </div>
+                  </div>
+                  {preflightData.warnings.length > 0 && (
+                    <div className="p-2 rounded bg-amber-950/30 border border-amber-500/30 text-amber-200 text-xs">
+                      {preflightData.warnings.map((w, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5">
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+                          <span>{w}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Analysis Error / Loading */}
+              {robustnessError && (
+                <div className="p-4 rounded-lg bg-rose-950/40 border border-rose-500/50 text-rose-200 text-xs">
+                  {robustnessError}
+                </div>
+              )}
+
+              {/* Robustness Analysis Results */}
+              {robustnessData && (
+                <div className="space-y-6" data-testid="container-robustness-results">
+                  {/* Governance Notice */}
+                  <div
+                    className="p-4 rounded-lg bg-amber-950/30 border border-amber-500/50 text-amber-200 text-xs space-y-1.5"
+                    data-testid="robustness-governance-notice"
+                  >
+                    <div className="font-semibold flex items-center gap-2 text-amber-300">
+                      <AlertTriangle className="w-4 h-4" />
+                      GOVERNANCE & DEPLOYMENT SAFETY SEPARATION
+                    </div>
+                    <p className="text-zinc-300">
+                      {robustnessData.governance_separation_notice}
+                    </p>
+                    <div className="flex flex-wrap gap-4 pt-1 font-mono text-[11px]">
+                      <span>
+                        Deployment Safety Inferred:{" "}
+                        <strong className="text-rose-400">
+                          {String(robustnessData.deployment_safety_inferred)}
+                        </strong>
+                      </span>
+                      <span>
+                        Deployment Authorization Gate:{" "}
+                        <strong className="text-amber-400">
+                          {robustnessData.deployment_authorization}
+                        </strong>
+                      </span>
+                      <span>
+                        Policy Version:{" "}
+                        <strong className="text-zinc-300">
+                          {robustnessData.policy_version}
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Summary Metric Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-lg bg-zinc-900/60 border border-zinc-800">
+                    <div>
+                      <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400">
+                        Robustness Posture
+                      </div>
+                      <div className="mt-1">
+                        {(() => {
+                          const badge = getRobustnessBadge(robustnessData.robustness_classification);
+                          const Icon = badge.icon;
+                          return (
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-bold border ${badge.bg}`}
+                              data-testid="robustness-classification-badge"
+                            >
+                              <Icon className="w-3.5 h-3.5" />
+                              {badge.label}
+                            </span>
+                          );
+                        })()}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400">
+                        Target KPI & Selection
+                      </div>
+                      <div className="mt-1 text-sm font-bold text-white font-mono">
+                        {robustnessData.target_kpi}
+                      </div>
+                      <div className="text-[10px] text-zinc-500 font-mono">
+                        Selected: {robustnessData.selected_option}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400">
+                        Scenarios & Reversals
+                      </div>
+                      <div className="mt-1 text-sm font-bold font-mono">
+                        <span className="text-white">{robustnessData.evaluated_scenarios_count} Evaluated</span>
+                        <span className="text-zinc-500 mx-1">/</span>
+                        <span className={robustnessData.reversals_count > 0 ? "text-rose-400" : "text-emerald-400"}>
+                          {robustnessData.reversals_count} Reversals
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-zinc-500 font-mono">
+                        Boundaries: {robustnessData.boundary_crossings?.length || 0}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400">
+                        Cryptographic Provenance
+                      </div>
+                      <div className="text-[11px] text-zinc-300 font-mono mt-1 truncate" title={robustnessData.analysis_hash}>
+                        Analysis: {robustnessData.analysis_hash.slice(0, 14)}...
+                      </div>
+                      <div className="text-[10px] text-zinc-500 font-mono truncate" title={robustnessData.input_snapshot_hash}>
+                        Snapshot: {robustnessData.input_snapshot_hash.slice(0, 14)}...
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary Text */}
+                  <div className="p-3 rounded-lg bg-zinc-900/30 border border-zinc-800 text-xs text-zinc-300">
+                    <span className="font-semibold text-white">Assessment Summary: </span>
+                    {robustnessData.robustness_summary}
+                  </div>
+
+                  {/* Solver Failures (Preserved Unmasked) */}
+                  {robustnessData.solver_failures && robustnessData.solver_failures.length > 0 && (
+                    <div className="p-4 rounded-lg bg-rose-950/30 border border-rose-500/50 text-rose-200 text-xs space-y-2">
+                      <div className="font-semibold flex items-center gap-1.5 text-rose-300">
+                        <AlertTriangle className="w-4 h-4" />
+                        Numerical Solver Failures Preserved ({robustnessData.solver_failures.length})
+                      </div>
+                      <p className="text-zinc-400 text-[11px]">
+                        The following scenarios triggered physical constraint violations or numerical non-convergence and are preserved as explicit failure results rather than masked.
+                      </p>
+                      <div className="space-y-1 font-mono text-[10px]">
+                        {robustnessData.solver_failures.map((sf, idx) => (
+                          <div key={idx} className="p-2 rounded bg-zinc-950/60 border border-rose-500/30">
+                            Scenario: {sf.scenario_id} | Status: {sf.convergence_status} | Reason: {sf.failure_reason}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Demonstrated Reversal Scenarios Table */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-semibold uppercase font-mono text-zinc-300 flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4 text-rose-400" />
+                        Demonstrated Ranking Reversals ({robustnessData.reversal_scenarios?.length || 0})
+                      </h3>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        Parameter combinations that flip the engineering conclusion
+                      </span>
+                    </div>
+
+                    {(!robustnessData.reversal_scenarios || robustnessData.reversal_scenarios.length === 0) ? (
+                      <div className="p-4 rounded-lg bg-zinc-900/40 border border-zinc-800 text-center text-xs text-zinc-400">
+                        Zero ranking reversals demonstrated within the credible parameter uncertainty envelope.
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900/30">
+                        <table className="w-full text-xs text-left" data-testid="table-reversal-scenarios">
+                          <thead className="bg-zinc-900 text-zinc-400 font-mono text-[11px] uppercase border-b border-zinc-800">
+                            <tr>
+                              <th className="p-3">Scenario</th>
+                              <th className="p-3">Reversal Winner</th>
+                              <th className="p-3">Decision Margin</th>
+                              <th className="p-3">Nature</th>
+                              <th className="p-3">Parameter Values</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-800 font-mono text-xs">
+                            {robustnessData.reversal_scenarios.map((rev, idx) => (
+                              <tr key={idx} className="hover:bg-zinc-900/50 transition">
+                                <td className="p-3 text-amber-400 font-semibold">{rev.scenario_id}</td>
+                                <td className="p-3 text-rose-300 font-semibold">
+                                  {rev.scenario_winner} <span className="text-[10px] text-zinc-500">(vs {rev.original_selection})</span>
+                                </td>
+                                <td className="p-3 text-zinc-300">
+                                  {rev.decision_margin !== undefined && rev.decision_margin !== null ? rev.decision_margin.toFixed(4) : "—"}
+                                </td>
+                                <td className="p-3 text-cyan-300">{rev.nature}</td>
+                                <td className="p-3 text-zinc-400 text-[10px]">
+                                  {rev.parameter_values ? JSON.stringify(rev.parameter_values) : "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Decision Boundary Crossings Table */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-semibold uppercase font-mono text-zinc-300 flex items-center gap-2">
+                        <Target className="w-4 h-4 text-cyan-400" />
+                        Decision Boundary Crossings ({robustnessData.boundary_crossings?.length || 0})
+                      </h3>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        Bisection analysis of parameter shifts required to flip decision
+                      </span>
+                    </div>
+
+                    {(!robustnessData.boundary_crossings || robustnessData.boundary_crossings.length === 0) ? (
+                      <div className="p-4 rounded-lg bg-zinc-900/40 border border-zinc-800 text-center text-xs text-zinc-400">
+                        No continuous single-parameter boundary crossings identified within the evaluated bounds.
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900/30">
+                        <table className="w-full text-xs text-left" data-testid="table-decision-boundaries">
+                          <thead className="bg-zinc-900 text-zinc-400 font-mono text-[11px] uppercase border-b border-zinc-800">
+                            <tr>
+                              <th className="p-3">Type</th>
+                              <th className="p-3">Parameter</th>
+                              <th className="p-3">Nominal Value</th>
+                              <th className="p-3">Boundary Value</th>
+                              <th className="p-3">Shift %</th>
+                              <th className="p-3">Description</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-800 font-mono text-xs">
+                            {robustnessData.boundary_crossings.map((bc, idx) => (
+                              <tr key={idx} className="hover:bg-zinc-900/50 transition">
+                                <td className="p-3">
+                                  <span className={`px-2 py-0.5 text-[9px] font-bold rounded ${
+                                    bc.crossing_type === "BISECTION_APPROXIMATED" ? "bg-cyan-950/70 border border-cyan-500/40 text-cyan-300" : "bg-zinc-800 text-zinc-300"
+                                  }`}>
+                                    {bc.crossing_type}
+                                  </span>
+                                </td>
+                                <td className="p-3 text-white font-semibold">
+                                  {bc.critical_parameter || bc.critical_parameters?.join(", ") || "—"}
+                                </td>
+                                <td className="p-3 text-zinc-400">{bc.nominal_value ?? "—"}</td>
+                                <td className="p-3 text-amber-300 font-semibold">{bc.boundary_value !== undefined ? bc.boundary_value.toFixed(2) : "—"}</td>
+                                <td className="p-3 text-rose-300 font-semibold">
+                                  {bc.parameter_shift_pct !== undefined ? `${bc.parameter_shift_pct.toFixed(1)}%` : "—"}
+                                </td>
+                                <td className="p-3 text-zinc-400 text-[11px] font-sans">{bc.description}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Dominant Uncertainties Ranking Table */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-semibold uppercase font-mono text-zinc-300 flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-amber-400" />
+                        Dominant Decision Uncertainties ({robustnessData.dominant_uncertainties?.length || 0})
+                      </h3>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        Ranked by elasticity × uncertainty span & reversal participation
+                      </span>
+                    </div>
+
+                    {(!robustnessData.dominant_uncertainties || robustnessData.dominant_uncertainties.length === 0) ? (
+                      <div className="p-4 rounded-lg bg-zinc-900/40 border border-zinc-800 text-center text-xs text-zinc-400">
+                        Zero dominant uncertainties identified.
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900/30">
+                        <table className="w-full text-xs text-left" data-testid="table-dominant-uncertainties">
+                          <thead className="bg-zinc-900 text-zinc-400 font-mono text-[11px] uppercase border-b border-zinc-800">
+                            <tr>
+                              <th className="p-3">Rank</th>
+                              <th className="p-3">Parameter</th>
+                              <th className="p-3">Impact Score</th>
+                              <th className="p-3">Sensitivity Elasticity</th>
+                              <th className="p-3">Uncertainty Span %</th>
+                              <th className="p-3">Reversals Driven</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-zinc-800 font-mono text-xs">
+                            {robustnessData.dominant_uncertainties.map((du, idx) => (
+                              <tr key={idx} className="hover:bg-zinc-900/50 transition">
+                                <td className="p-3 text-zinc-500 font-bold">#{idx + 1}</td>
+                                <td className="p-3 text-white font-semibold">{du.parameter_name}</td>
+                                <td className="p-3 text-amber-400 font-bold">{du.impact_score !== undefined ? du.impact_score.toFixed(4) : "—"}</td>
+                                <td className="p-3 text-zinc-300">{du.elasticity !== undefined ? du.elasticity.toFixed(3) : "—"}</td>
+                                <td className="p-3 text-cyan-300">{du.relative_uncertainty_span_pct !== undefined ? du.relative_uncertainty_span_pct.toFixed(1) : "—"}%</td>
+                                <td className="p-3 text-rose-300 font-semibold">{du.reversals_participated}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Value of Information (VOI) Prioritizations */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-xs font-semibold uppercase font-mono text-zinc-300 flex items-center gap-2">
+                        <FlaskConical className="w-4 h-4 text-emerald-400" />
+                        Value of Information (VOI) Prioritizations ({robustnessData.voi_prioritizations?.length || 0})
+                      </h3>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        Concrete experiments mapped to uncertainty reduction (No fabricated dollar EVOI)
+                      </span>
+                    </div>
+
+                    {(!robustnessData.voi_prioritizations || robustnessData.voi_prioritizations.length === 0) ? (
+                      <div className="p-4 rounded-lg bg-zinc-900/40 border border-zinc-800 text-center text-xs text-zinc-400">
+                        Zero VOI recommendations required.
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3" data-testid="table-voi-prioritizations">
+                        {robustnessData.voi_prioritizations.map((voi, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-4 rounded-lg border space-y-2.5 ${
+                              voi.priority_level === "HIGH"
+                                ? "bg-rose-950/20 border-rose-500/40"
+                                : voi.priority_level === "MEDIUM"
+                                ? "bg-amber-950/20 border-amber-500/40"
+                                : "bg-blue-950/20 border-blue-500/40"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-bold text-white font-mono">{voi.parameter_name}</span>
+                              <span
+                                className={`px-2 py-0.5 text-[9px] font-bold rounded uppercase ${
+                                  voi.priority_level === "HIGH"
+                                    ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
+                                    : voi.priority_level === "MEDIUM"
+                                    ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                                    : "bg-blue-500/20 text-blue-300 border border-blue-500/40"
+                                }`}
+                              >
+                                {voi.priority_level} PRIORITY ({voi.urgency})
+                              </span>
+                            </div>
+
+                            <div className="p-2.5 rounded bg-zinc-950/60 border border-zinc-800 text-xs space-y-1 font-mono">
+                              <div className="text-[10px] text-amber-400 uppercase font-semibold">Recommended Physical Experiment</div>
+                              <div className="text-white">{voi.recommended_experiment}</div>
+                              <div className="text-[11px] text-zinc-400 mt-1 flex justify-between">
+                                <span>Elasticity: {voi.elasticity}</span>
+                                <span>Trust: {voi.current_trust_state}</span>
+                              </div>
+                            </div>
+
+                            <p className="text-xs text-zinc-300 font-sans">{voi.justification}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Historical Robustness Runs */}
+                  {robustnessHistoryItems.length > 0 && (
+                    <div className="space-y-3 pt-4 border-t border-zinc-800" data-testid="robustness-history">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-xs font-semibold uppercase font-mono text-zinc-300 flex items-center gap-2">
+                          <History className="w-4 h-4 text-amber-400" />
+                          Robustness Analysis Lineage ({robustnessHistoryItems.length})
+                        </h3>
+                        <span className="text-[10px] font-mono text-zinc-500">Append-only audit trail</span>
+                      </div>
+
+                      <div className="space-y-2">
+                        {robustnessHistoryItems.map((hist, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-lg border text-xs font-mono flex flex-col md:flex-row md:items-center justify-between gap-2 ${
+                              hist.is_active
+                                ? "bg-zinc-900/80 border-amber-500/40 text-white"
+                                : "bg-zinc-950/40 border-zinc-800 text-zinc-400"
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold">{hist.robustness_classification}</span>
+                                {hist.is_active ? (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                                    ACTIVE
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-zinc-800 text-zinc-500">
+                                    SUPERSEDED
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-zinc-400 mt-0.5">{hist.robustness_summary}</div>
+                            </div>
+                            <div className="text-right text-[10px] text-zinc-500">
+                              <div>Hash: {hist.analysis_hash ? `${hist.analysis_hash.slice(0, 16)}...` : ""}</div>
                               <div>{hist.created_at ? new Date(hist.created_at).toLocaleString() : ""}</div>
                             </div>
                           </div>

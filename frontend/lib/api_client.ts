@@ -3606,6 +3606,74 @@ export class ParameterTrustApi {
       body: JSON.stringify(payload),
     });
   }
+
+  /**
+   * Preflight check validating parameter uncertainty inputs against decision dependencies (Phase 6.5).
+   */
+  static async preflightDecisionRobustness(
+    payload: RobustnessPreflightRequestDTO
+  ): Promise<RobustnessPreflightResponseDTO> {
+    return apiJson<RobustnessPreflightResponseDTO>("/api/v1/parameter-trust/decision/robustness/preflight", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Runs deterministic decision robustness evaluation and uncertainty propagation (Phase 6.5).
+   */
+  static async runDecisionRobustness(
+    payload: RobustnessAnalysisRequestDTO
+  ): Promise<RobustnessAnalysisResponseDTO> {
+    return apiJson<RobustnessAnalysisResponseDTO>("/api/v1/parameter-trust/decision/robustness/analyze", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Retrieves active robustness assessment for an engineering decision (Phase 6.5).
+   */
+  static async getDecisionRobustness(
+    decisionId: string
+  ): Promise<RobustnessAnalysisResponseDTO> {
+    return apiJson<RobustnessAnalysisResponseDTO>(
+      `/api/v1/parameter-trust/decision/${encodeURIComponent(decisionId)}/robustness`
+    );
+  }
+
+  /**
+   * Retrieves demonstrated and numerically approximated decision boundary crossings (Phase 6.5).
+   */
+  static async getDecisionBoundaries(
+    decisionId: string
+  ): Promise<DecisionBoundariesResponseDTO> {
+    return apiJson<DecisionBoundariesResponseDTO>(
+      `/api/v1/parameter-trust/decision/${encodeURIComponent(decisionId)}/robustness/boundaries`
+    );
+  }
+
+  /**
+   * Retrieves Value-of-Information (VOI) evidence prioritizations (Phase 6.5).
+   */
+  static async getDecisionVOI(
+    decisionId: string
+  ): Promise<DecisionVOIResponseDTO> {
+    return apiJson<DecisionVOIResponseDTO>(
+      `/api/v1/parameter-trust/decision/${encodeURIComponent(decisionId)}/robustness/voi`
+    );
+  }
+
+  /**
+   * Retrieves audit history of robustness evaluations (Phase 6.5).
+   */
+  static async getDecisionRobustnessHistory(
+    decisionId: string
+  ): Promise<RobustnessHistoryResponseDTO> {
+    return apiJson<RobustnessHistoryResponseDTO>(
+      `/api/v1/parameter-trust/decision/${encodeURIComponent(decisionId)}/robustness/history`
+    );
+  }
 }
 
 // ── Phase 6.4 Decision Trust DTO Interfaces ──────────────────────────────────
@@ -3745,6 +3813,140 @@ export interface DecisionHistoryResponseDTO {
   history: DecisionHistoryItemDTO[];
   total: number;
 }
+
+// ── Phase 6.5 Decision Robustness Interfaces ────────────────────────────────
+
+export interface UncertaintyInputDTO {
+  parameter_name: string;
+  nominal_value: number;
+  min_value?: number;
+  max_value?: number;
+  tolerance?: number;
+  unit: string;
+  representation_type?: string;
+  source_evidence_id?: string;
+  reason?: string;
+}
+
+export interface RobustnessPreflightRequestDTO {
+  decision_id: string;
+  decision_type?: string;
+  uncertainty_inputs?: UncertaintyInputDTO[];
+}
+
+export interface RobustnessPreflightResponseDTO {
+  decision_id: string;
+  decision_type: string;
+  is_ready: boolean;
+  validation_errors: string[];
+  warnings: string[];
+  matched_parameters_count: number;
+  missing_evidence_parameters: string[];
+  recomputable_kpis: Array<{ kpi: string; model: string; unit: string }>;
+  policy_version: string;
+}
+
+export interface RobustnessAnalysisRequestDTO {
+  decision_id: string;
+  decision_type?: string;
+  uncertainty_inputs?: UncertaintyInputDTO[];
+  correlated_groups?: Array<Record<string, any>>;
+  target_kpi?: string;
+  decision_threshold?: number | null;
+  optimization_direction?: string;
+  threshold_range?: [number, number] | null;
+  persist_record?: boolean;
+}
+
+export interface ReversalScenarioDTO {
+  scenario_id: string;
+  parameter_values: Record<string, number>;
+  original_selection: string;
+  scenario_winner: string;
+  target_kpi: string;
+  selected_option_kpi?: number | null;
+  scenario_winner_kpi?: number | null;
+  decision_margin?: number | null;
+  is_ranking_reversal: boolean;
+  threshold_breach: boolean;
+  nature: string;
+}
+
+export interface BoundaryCrossingDTO {
+  scenario_id: string;
+  crossing_type: string;
+  critical_parameter?: string;
+  nominal_value?: number;
+  boundary_value?: number;
+  parameter_shift_pct?: number;
+  critical_parameters?: string[];
+  parameter_values?: Record<string, number>;
+  target_kpi: string;
+  description: string;
+}
+
+export interface DominantUncertaintyDTO {
+  parameter_name: string;
+  impact_score: number;
+  elasticity: number;
+  relative_uncertainty_span_pct: number;
+  reversals_participated: number;
+  unit: string;
+}
+
+export interface VOIPrioritizationDTO {
+  parameter_name: string;
+  priority_level: string;
+  urgency: string;
+  recommended_experiment: string;
+  current_trust_state: string;
+  elasticity: number;
+  justification: string;
+}
+
+export interface RobustnessAnalysisResponseDTO {
+  decision_id: string;
+  decision_type: string;
+  policy_version: string;
+  analysis_hash: string;
+  input_snapshot_hash: string;
+  robustness_classification: string;
+  robustness_summary: string;
+  selected_option: string;
+  target_kpi: string;
+  evaluated_envelope: Record<string, any>;
+  evaluated_scenarios_count: number;
+  reversals_count: number;
+  reversal_scenarios: ReversalScenarioDTO[];
+  boundary_crossings: BoundaryCrossingDTO[];
+  dominant_uncertainties: DominantUncertaintyDTO[];
+  voi_prioritizations: VOIPrioritizationDTO[];
+  solver_failures: Array<Record<string, any>>;
+  governance_separation_notice: string;
+  deployment_safety_inferred: boolean;
+  deployment_authorization: string;
+  is_active: boolean;
+  created_at?: string | null;
+}
+
+export interface DecisionBoundariesResponseDTO {
+  decision_id: string;
+  boundary_crossings: BoundaryCrossingDTO[];
+  total: number;
+}
+
+export interface DecisionVOIResponseDTO {
+  decision_id: string;
+  voi_prioritizations: VOIPrioritizationDTO[];
+  total: number;
+}
+
+export interface RobustnessHistoryResponseDTO {
+  decision_id: string;
+  history: Array<Record<string, any>>;
+  total: number;
+}
+
 
 // ── Blind Engineering Calibration & Longitudinal Track Record (Phase 5.4) ─────
 

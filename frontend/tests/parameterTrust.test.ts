@@ -649,5 +649,126 @@ describe("ParameterTrustApi & Trust Map Frontend Unit Tests", () => {
       expect(reassessRes.differential?.rationale).toBe("Updated validation results received");
     });
 
+    it("preflightDecisionRobustness and runDecisionRobustness query correct routes with governance separation", async () => {
+      const mockPreflight = {
+        decision_id: "DEC-12",
+        decision_type: "EngineeringDecision",
+        is_ready: true,
+        validation_errors: [],
+        warnings: [],
+        matched_parameters_count: 2,
+        missing_evidence_parameters: [],
+        recomputable_kpis: [{ kpi: "ride_frequency_hz", model: "QUARTER_CAR_MODAL", unit: "Hz" }],
+        policy_version: "ROBUSTNESS_POLICY_V1",
+      };
+
+      const mockRobustness = {
+        decision_id: "DEC-12",
+        decision_type: "EngineeringDecision",
+        policy_version: "ROBUSTNESS_POLICY_V1",
+        analysis_hash: "hash_robust_123",
+        input_snapshot_hash: "hash_snapshot_456",
+        robustness_classification: "VULNERABLE_TO_REVERSAL",
+        robustness_summary: "Reversal demonstrated under corner stiffness variations.",
+        selected_option: "Option A",
+        target_kpi: "ride_frequency_hz",
+        evaluated_envelope: {},
+        evaluated_scenarios_count: 8,
+        reversals_count: 1,
+        reversal_scenarios: [
+          {
+            scenario_id: "SCEN-CORNER-01",
+            parameter_values: { front_spring_rate: 70000.0 },
+            original_selection: "Option A",
+            scenario_winner: "Option B",
+            target_kpi: "ride_frequency_hz",
+            is_ranking_reversal: true,
+            threshold_breach: false,
+            nature: "RANKING_REVERSAL",
+          },
+        ],
+        boundary_crossings: [
+          {
+            scenario_id: "SCEN-BISECT-01",
+            crossing_type: "BISECTION_APPROXIMATED",
+            critical_parameter: "front_spring_rate",
+            nominal_value: 85000.0,
+            boundary_value: 74200.0,
+            parameter_shift_pct: -12.7,
+            target_kpi: "ride_frequency_hz",
+            description: "Boundary crossing flips winner from Option A to Option B.",
+          },
+        ],
+        dominant_uncertainties: [
+          {
+            parameter_name: "front_spring_rate",
+            impact_score: 0.15,
+            elasticity: 0.45,
+            relative_uncertainty_span_pct: 15.0,
+            reversals_participated: 1,
+            unit: "N/m",
+          },
+        ],
+        voi_prioritizations: [
+          {
+            parameter_name: "front_spring_rate",
+            priority_level: "HIGH",
+            urgency: "CRITICAL",
+            recommended_experiment: "RIG_TEST_4_POST",
+            current_trust_state: "PROVISIONAL",
+            elasticity: 0.45,
+            justification: "Critical reversal driver requiring experimental stiffness verification.",
+          },
+        ],
+        solver_failures: [],
+        governance_separation_notice: "DECISION ROBUSTNESS ANALYSIS IS AN ANALYTICAL UNCERTAINTY QUANTIFICATION ONLY.",
+        deployment_safety_inferred: false,
+        deployment_authorization: "NOT_ESTABLISHED",
+        is_active: true,
+      };
+
+      const spy = vi.spyOn(apiModule, "apiJson")
+        .mockResolvedValueOnce(mockPreflight)
+        .mockResolvedValueOnce(mockRobustness);
+
+      const preflightRes = await ParameterTrustApi.preflightDecisionRobustness({
+        decision_id: "DEC-12",
+      });
+      expect(preflightRes.decision_id).toBe("DEC-12");
+      expect(preflightRes.is_ready).toBe(true);
+      expect(preflightRes.recomputable_kpis).toHaveLength(1);
+
+      const robustnessRes = await ParameterTrustApi.runDecisionRobustness({
+        decision_id: "DEC-12",
+        persist_record: true,
+      });
+      expect(robustnessRes.decision_id).toBe("DEC-12");
+      expect(robustnessRes.robustness_classification).toBe("VULNERABLE_TO_REVERSAL");
+      expect(robustnessRes.deployment_safety_inferred).toBe(false);
+      expect(robustnessRes.deployment_authorization).toBe("NOT_ESTABLISHED");
+      expect(robustnessRes.reversals_count).toBe(1);
+      expect(robustnessRes.boundary_crossings).toHaveLength(1);
+      expect(robustnessRes.voi_prioritizations[0].recommended_experiment).toBe("RIG_TEST_4_POST");
+    });
+
+    it("getDecisionBoundaries, getDecisionVOI, and getDecisionRobustnessHistory query correct endpoints", async () => {
+      const mockBounds = { decision_id: "DEC-12", boundary_crossings: [], total: 0 };
+      const mockVOI = { decision_id: "DEC-12", voi_prioritizations: [], total: 0 };
+      const mockHistory = { decision_id: "DEC-12", history: [], total: 0 };
+
+      const spy = vi.spyOn(apiModule, "apiJson")
+        .mockResolvedValueOnce(mockBounds)
+        .mockResolvedValueOnce(mockVOI)
+        .mockResolvedValueOnce(mockHistory);
+
+      const boundsRes = await ParameterTrustApi.getDecisionBoundaries("DEC-12");
+      expect(boundsRes.decision_id).toBe("DEC-12");
+
+      const voiRes = await ParameterTrustApi.getDecisionVOI("DEC-12");
+      expect(voiRes.decision_id).toBe("DEC-12");
+
+      const histRes = await ParameterTrustApi.getDecisionRobustnessHistory("DEC-12");
+      expect(histRes.decision_id).toBe("DEC-12");
+    });
   });
 });

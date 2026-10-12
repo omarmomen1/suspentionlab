@@ -522,7 +522,7 @@ class ParameterTrustDecisionService:
         if db is None and args_list and hasattr(args_list[0], "execute"):
             db = args_list.pop(0)
 
-        dec_or_info = args_list[0] if len(args_list) > 0 else (kwargs.pop("decision_info", None) or kwargs.pop("decision", None))
+        dec_or_info = args_list[0] if len(args_list) > 0 else (kwargs.pop("decision_info", None) or kwargs.pop("decision", None) or kwargs.pop("decision_id", None))
         user_context = args_list[1] if len(args_list) > 1 else kwargs.pop("user_context", None)
 
         team_id = kwargs.pop("team_id", None)

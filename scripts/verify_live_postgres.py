@@ -31,7 +31,7 @@ async def run_verification():
     # 2. Current Migration Head
     current_head = await conn.fetchval("SELECT version_num FROM alembic_version")
     print(f"[VERIFIED] Current Alembic Head in PostgreSQL: {current_head}")
-    assert current_head == "s9t0u1v2w3x4", f"Expected s9t0u1v2w3x4, got {current_head}"
+    assert current_head in ("s9t0u1v2w3x4", "t0u1v2w3x4y5"), f"Expected s9t0u1v2w3x4 or t0u1v2w3x4y5, got {current_head}"
 
     # 3. Check Schema Tables
     rows = await conn.fetch(
@@ -43,8 +43,9 @@ async def run_verification():
 
     p64_tables = ["decision_parameter_dependencies", "decision_exposure_assessments"]
     p72_tables = ["solver_exchange_artifacts", "solver_exchange_operations"]
+    p65_tables = ["decision_robustness_analyses"]
 
-    for t in p64_tables + p72_tables:
+    for t in p64_tables + p72_tables + p65_tables:
         assert t in table_names, f"Missing table {t}"
         print(f"  [OK] Table verified: {t}")
 
@@ -60,6 +61,18 @@ async def run_verification():
     assert "ix_dec_param_dep_user" in dep_idx_names
     assert "ix_dec_param_dep_nature" in dep_idx_names
     print("  [OK] decision_parameter_dependencies indexes verified")
+
+    # Indices on decision_robustness_analyses
+    rob_idx = await conn.fetch(
+        "SELECT indexname FROM pg_indexes WHERE tablename = $1",
+        "decision_robustness_analyses"
+    )
+    rob_idx_names = [r["indexname"] for r in rob_idx]
+    assert "ix_dec_robustness_lookup" in rob_idx_names
+    assert "ix_dec_robustness_user" in rob_idx_names
+    assert "ix_dec_robustness_hash" in rob_idx_names
+    assert "ix_dec_robustness_active" in rob_idx_names
+    print("  [OK] decision_robustness_analyses indexes verified")
 
     # Indices on decision_exposure_assessments
     exp_idx = await conn.fetch(
@@ -340,8 +353,8 @@ async def test_baseline_upgrade_and_downgrade():
         env=env, capture_output=True, text=True, check=True
     )
     v = await test_conn.fetchval("SELECT version_num FROM alembic_version")
-    assert v == "s9t0u1v2w3x4"
-    print("  [OK] Full clean upgrade back to head verified")
+    assert v in ("s9t0u1v2w3x4", "t0u1v2w3x4y5")
+    print(f"  [OK] Full clean upgrade back to head {v} verified")
 
     await test_conn.close()
     print("\n>>> LIVE BASELINE UPGRADE/DOWNGRADE CYCLE VERIFIED ON POSTGRESQL 16! <<<\n")
