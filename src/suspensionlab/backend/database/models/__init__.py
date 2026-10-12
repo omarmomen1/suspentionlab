@@ -125,6 +125,13 @@ __all__ = [
     'SensitivityStatus',
     'ImpactClassification',
     'FleetOutlierClassification',
+    'SolverExchangeArtifact',
+    'SolverExchangeOperation',
+    'ExchangeOperationType',
+    'ExchangeOperationState',
+    'ArtifactDirection',
+    'InvalidStateTransitionError',
+    'ImmutableOperationError',
 ]
 
 from suspensionlab.backend.database.models.parameter_trust import (
@@ -146,6 +153,16 @@ from suspensionlab.backend.database.models.parameter_trust import (
     SensitivityStatus,
     ImpactClassification,
     FleetOutlierClassification,
+)
+
+from suspensionlab.backend.database.models.solver_exchange import (
+    SolverExchangeArtifact,
+    SolverExchangeOperation,
+    ExchangeOperationType,
+    ExchangeOperationState,
+    ArtifactDirection,
+    InvalidStateTransitionError,
+    ImmutableOperationError,
 )
 
 

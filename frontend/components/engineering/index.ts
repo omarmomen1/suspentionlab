@@ -70,5 +70,6 @@ export { default as DecisionLoopCockpit } from "./DecisionLoopCockpit";
 
 export { BlindSessionView } from "./BlindSessionView";
 export { ParameterTrustMap } from "./ParameterTrustMap";
+export { SolverInteropWorkspace } from "./SolverInteropWorkspace";
 
 

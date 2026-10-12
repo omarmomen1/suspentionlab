@@ -3898,3 +3898,145 @@ export class BlindCalibrationApi {
     );
   }
 }
+
+// ── Solver Interoperability API (Phase 7.2) ──────────────────────────────────
+
+export interface AdapterCapabilityDTO {
+  adapter_id: string;
+  adapter_version: string;
+  solver_name: string;
+  supported_formats: string[];
+  supported_import_formats: string[];
+  supported_export_formats: string[];
+  supported_versions: string[];
+  supported_categories: string[];
+  unit_restrictions: string[];
+  frame_restrictions: string[];
+  import_capability: "SUPPORTED" | "PARTIALLY_SUPPORTED" | "UNSUPPORTED" | "UNAVAILABLE_DEPENDENCY";
+  export_capability: "SUPPORTED" | "PARTIALLY_SUPPORTED" | "UNSUPPORTED" | "UNAVAILABLE_DEPENDENCY";
+  required_dependencies: Array<{
+    name: string;
+    version_spec?: string;
+    is_available: boolean;
+    description: string;
+  }>;
+  known_limitations: string[];
+  verification_status: "VERIFIED" | "UNVERIFIED" | "EXPERIMENTAL";
+}
+
+export interface SolverImportRequestDTO {
+  adapter_id: string;
+  filename: string;
+  content: string;
+  is_base64?: boolean;
+  idempotency_key?: string;
+  expected_sha256?: string;
+  options?: Record<string, any>;
+}
+
+export interface SolverExportRequestDTO {
+  adapter_id: string;
+  target_format: string;
+  manifest: Record<string, any>;
+  idempotency_key?: string;
+  options?: Record<string, any>;
+}
+
+export interface SolverOperationResponseDTO {
+  id: string;
+  organization_id?: string | null;
+  team_id?: string | null;
+  user_id: string;
+  operation_type: "IMPORT" | "EXPORT";
+  adapter_id: string;
+  adapter_version: string;
+  solver_name: string;
+  state: "PENDING" | "VALIDATING" | "TRANSFORMING" | "COMPLETED" | "REJECTED" | "FAILED";
+  input_artifact_id?: string | null;
+  output_artifact_id?: string | null;
+  canonical_manifest_version: string;
+  manifest_hash?: string | null;
+  coordinate_frame: Record<string, any>;
+  units_summary: Record<string, any>;
+  mapping_diagnostics: Record<string, any>;
+  validation_diagnostics: Record<string, any>;
+  failure_reason?: string | null;
+  idempotency_key?: string | null;
+  is_executed: boolean;
+  is_physically_validated: boolean;
+  created_at?: string | null;
+  updated_at?: string | null;
+  completed_at?: string | null;
+}
+
+export interface SolverDiagnosticsResponseDTO {
+  operation_id: string;
+  operation_type: string;
+  state: string;
+  is_executed: boolean;
+  is_physically_validated: boolean;
+  coordinate_frame: Record<string, any>;
+  units_summary: Record<string, any>;
+  mapping_diagnostics: Record<string, any>;
+  validation_diagnostics: Record<string, any>;
+  failure_reason?: string | null;
+}
+
+export class SolverInteropApi {
+  static async listAdapters(direction?: "import" | "export"): Promise<AdapterCapabilityDTO[]> {
+    const qs = direction ? `?direction=${direction}` : "";
+    return apiJson<AdapterCapabilityDTO[]>(`/api/v1/interop/adapters${qs}`);
+  }
+
+  static async getAdapter(adapterId: string): Promise<AdapterCapabilityDTO> {
+    return apiJson<AdapterCapabilityDTO>(`/api/v1/interop/adapters/${encodeURIComponent(adapterId)}`);
+  }
+
+  static async startImport(req: SolverImportRequestDTO): Promise<SolverOperationResponseDTO> {
+    return apiJson<SolverOperationResponseDTO>("/api/v1/interop/import", {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  }
+
+  static async startExport(req: SolverExportRequestDTO): Promise<SolverOperationResponseDTO> {
+    return apiJson<SolverOperationResponseDTO>("/api/v1/interop/export", {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  }
+
+  static async getOperation(operationId: string): Promise<SolverOperationResponseDTO> {
+    return apiJson<SolverOperationResponseDTO>(`/api/v1/interop/operations/${encodeURIComponent(operationId)}`);
+  }
+
+  static async getDiagnostics(operationId: string): Promise<SolverDiagnosticsResponseDTO> {
+    return apiJson<SolverDiagnosticsResponseDTO>(`/api/v1/interop/operations/${encodeURIComponent(operationId)}/diagnostics`);
+  }
+
+  static async downloadArtifact(operationId: string): Promise<Blob> {
+    const resp = await apiFetch(`/api/v1/interop/operations/${encodeURIComponent(operationId)}/artifact`);
+    return resp.blob();
+  }
+
+  static async validateManifest(manifest: Record<string, any>): Promise<{ is_valid: boolean; warnings: string[]; manifest?: any }> {
+    return apiJson("/api/v1/interop/manifests/validate", {
+      method: "POST",
+      body: JSON.stringify(manifest),
+    });
+  }
+
+  static async checkUnits(unitA: string, unitB: string): Promise<{ status: string; dimension?: string; detail?: string }> {
+    return apiJson("/api/v1/interop/units/check", {
+      method: "POST",
+      body: JSON.stringify({ unit_a: unitA, unit_b: unitB }),
+    });
+  }
+
+  static async checkFrame(frame: Record<string, any>): Promise<{ status: string; is_valid: boolean; reasons: string[] }> {
+    return apiJson("/api/v1/interop/frames/check", {
+      method: "POST",
+      body: JSON.stringify(frame),
+    });
+  }
+}

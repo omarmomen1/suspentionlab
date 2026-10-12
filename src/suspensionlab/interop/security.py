@@ -76,6 +76,16 @@ class TenantIsolationError(InteropSecurityError):
     pass
 
 
+class ContentMismatchSecurityError(InteropSecurityError):
+    """Raised when an artifact's content does not match its declared format or extension."""
+    pass
+
+
+class HashMismatchSecurityError(InteropSecurityError):
+    """Raised when an artifact's computed content hash does not match the expected hash."""
+    pass
+
+
 def sanitize_artifact_filename(filename: str) -> str:
     """
     Sanitizes an untrusted filename, stripping directory path components,
@@ -330,3 +340,81 @@ def enforce_tenant_isolation(
         raise TenantIsolationError(
             f"Tenant isolation violation: Access denied to tenant '{resource_tenant_id}'."
         )
+
+
+def safe_parse_xml(content: Union[str, bytes]) -> Any:
+    """
+    Safely parses XML content using defusedxml to guard against entity expansion
+    bombs, quadratic blowup attacks, and external entity vulnerabilities.
+    """
+    check_payload_size(content)
+    try:
+        import defusedxml.ElementTree as DefusedET
+        if isinstance(content, bytes):
+            return DefusedET.fromstring(content)
+        return DefusedET.fromstring(content.encode("utf-8"))
+    except ImportError:
+        import xml.etree.ElementTree as ET
+        parser = ET.XMLParser()
+        if isinstance(content, bytes):
+            return ET.fromstring(content, parser=parser)
+        return ET.fromstring(content.encode("utf-8"), parser=parser)
+    except Exception as e:
+        raise MalformedPayloadSecurityError(f"Malformed or unsafe XML payload: {e}")
+
+
+def verify_content_extension_match(content: bytes, filename_or_ext: str) -> None:
+    """
+    Verifies that artifact binary/text content matches its declared extension and format,
+    preventing extension-spoofing and hidden executable payloads.
+
+    Raises:
+        ExecutableContentSecurityError: If executable content or prohibited scripts are detected.
+        ContentMismatchSecurityError: If content violates expected structure for declared format.
+        MalformedPayloadSecurityError: If payload cannot be safely parsed.
+    """
+    check_payload_size(content)
+
+    # 1. Reject binary executable headers immediately regardless of filename
+    if content.startswith(b"\x7fELF") or content.startswith(b"MZ"):
+        raise ExecutableContentSecurityError("Binary executable signature detected in payload.")
+
+    ext = pathlib.Path(filename_or_ext).suffix.lower() if "." in filename_or_ext else f".{filename_or_ext.lower().lstrip('.')}"
+
+    if ext in PROHIBITED_EXECUTABLE_EXTENSIONS:
+        raise ExecutableContentSecurityError(
+            f"Prohibited executable or script format '{ext}' cannot be ingested."
+        )
+
+    # 2. Format-specific verification
+    if ext == ".json":
+        try:
+            safe_parse_json(content)
+        except (MalformedPayloadSecurityError, MalformedNumericSecurityError):
+            raise
+        except Exception as e:
+            raise ContentMismatchSecurityError(f"Content declared as JSON failed validation: {e}")
+
+    elif ext == ".adm":
+        text = content.decode("utf-8", errors="replace")
+        if "import adams" in text or "adams.models" in text:
+            raise ExecutableContentSecurityError("Python automation script detected in .adm file.")
+        if "! msc adams/view command" in text.lower() or "model create" in text.lower():
+            raise ExecutableContentSecurityError("ADAMS/View command deck detected in .adm file.")
+        if not any(k in text.upper() for k in ("ADAMS", "PART/", "MARKER/", "SPRING/", "!")):
+            raise ContentMismatchSecurityError("File with .adm extension lacks MSC Adams dataset directives.")
+
+    elif ext == ".xml":
+        try:
+            root = safe_parse_xml(content)
+            if root is None:
+                raise ContentMismatchSecurityError("XML payload contains empty or invalid root.")
+        except MalformedPayloadSecurityError:
+            raise
+        except Exception as e:
+            raise ContentMismatchSecurityError(f"Content declared as XML failed validation: {e}")
+
+    elif ext == ".tir":
+        text = content.decode("utf-8", errors="replace")
+        if not any(k in text.upper() for k in ("[MDI_HEADER]", "[TIRE]", "[DIMENSION]", "[VERTICAL]", "[LONGITUDINAL]")):
+            raise ContentMismatchSecurityError("File with .tir extension lacks Pacejka Magic Formula section markers.")

@@ -336,6 +336,10 @@ from suspensionlab.backend.api.routes.parameter_trust_routes import router as pa
 app.include_router(parameter_trust_router, prefix="/api/v1", dependencies=protected)
 app.include_router(parameter_trust_router, dependencies=protected)
 
+from suspensionlab.backend.api.routes.solver_interop_routes import router as solver_interop_router
+app.include_router(solver_interop_router, prefix="/api/v1", dependencies=protected)
+app.include_router(solver_interop_router, dependencies=protected)
+
 
 
 
