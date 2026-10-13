@@ -1,7 +1,7 @@
 """phase7_3_solver_execution_lifecycle
 
-Revision ID: t0u1v2w3x4y5
-Revises: s9t0u1v2w3x4
+Revision ID: u1v2w3x4y5z6
+Revises: t0u1v2w3x4y5
 Create Date: 2026-10-12 10:10:00.000000
 
 Phase 7.3: Persistent solver execution jobs table:
@@ -14,8 +14,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 't0u1v2w3x4y5'
-down_revision: Union[str, None] = 's9t0u1v2w3x4'
+revision: str = 'u1v2w3x4y5z6'
+down_revision: Union[str, None] = 't0u1v2w3x4y5'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

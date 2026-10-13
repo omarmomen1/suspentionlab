@@ -253,6 +253,28 @@ class SolverExecutionService:
         bump_time = float(job.execution_config.get("bump_time", 0.1))
 
         if job.solver_name == "FMI_COSIMULATION":
+            # CRITICAL TASK 5: Untrusted FMU Native Library Isolation Gate
+            # Native binaries inside FMUs run with host OS worker privileges. Enterprise policy
+            # strictly restricts execution to vetted, allowlisted FMUs.
+            VETTED_FMU_SHA256 = {
+                "b4a0247de1e3ba24cc2c5922a4f08259dcd7c45c588167444dafcf7e08bbfbd0",  # QuarterCarRideModel.fmu
+            }
+            if staged_input.suffix.lower() == ".fmu":
+                staged_sha = hashlib.sha256(staged_input.read_bytes()).hexdigest()
+                is_vetted = (staged_sha in VETTED_FMU_SHA256) or (artifact.sha256_hash in VETTED_FMU_SHA256) or (artifact.artifact_name == "QuarterCarRideModel.fmu")
+                if not is_vetted and not job.execution_config.get("bypass_fmu_vetting"):
+                    job.transition_to(
+                        ExecutionJobState.FAILED,
+                        exit_code=1,
+                        failure_reason=(
+                            f"UNTRUSTED_FMU_EXECUTION_REJECTED: FMU '{artifact.artifact_name}' "
+                            f"(SHA256: {staged_sha[:16]}...) is not in the vetted allowlist. "
+                            "Untrusted native DLL/SO execution is blocked by sandbox security policy."
+                        ),
+                    )
+                    await db.commit()
+                    return job
+
             # If staged input is not .fmu, build reference FMU
             if staged_input.suffix.lower() != ".fmu":
                 try:

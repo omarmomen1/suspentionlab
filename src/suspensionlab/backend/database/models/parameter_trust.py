@@ -104,6 +104,64 @@ class EvidenceGapSeverity(str, enum.Enum):
     WARNING = "WARNING"
     ADVISORY = "ADVISORY"
 
+
+ROBUSTNESS_POLICY_V1 = "ROBUSTNESS_POLICY_V1"
+CURRENT_ROBUSTNESS_POLICY_VERSION = ROBUSTNESS_POLICY_V1
+GOVERNANCE_ROBUSTNESS_SEPARATION_NOTICE = (
+    "GOVERNANCE & SAFETY SEPARATION: Analytical decision robustness does not constitute engineering approval, "
+    "deployment safety certification, or vehicle commissioning authorization. "
+    "Those determinations require independent role-based governance gates."
+)
+
+
+class UncertaintyRepresentationType(str, enum.Enum):
+    """
+    Classification of parameter uncertainty representation (Phase 6.5).
+    Strictly distinguishes measured intervals, measurement tolerance, empirical samples,
+    and correlated sets. Never invents unsupported distributions or independence.
+    """
+    INTERVAL_BOUNDED = "INTERVAL_BOUNDED"
+    MEASUREMENT_TOLERANCE = "MEASUREMENT_TOLERANCE"
+    EMPIRICAL_SAMPLES = "EMPIRICAL_SAMPLES"
+    CORRELATED_SET = "CORRELATED_SET"
+    UNKNOWN_INSUFFICIENT = "UNKNOWN_INSUFFICIENT"
+
+
+class DecisionRobustnessClassification(str, enum.Enum):
+    """
+    Decision robustness classifications under ROBUSTNESS_POLICY_V1 (Phase 6.5).
+    Evaluated strictly across the documented uncertainty envelope.
+    No universal robustness percentage.
+    """
+    ROBUST_ACROSS_ENVELOPE = "ROBUST_ACROSS_ENVELOPE"
+    FRAGILE_REVERSAL_DEMONSTRATED = "FRAGILE_REVERSAL_DEMONSTRATED"
+    CONSTRAINT_VIOLATION_DEMONSTRATED = "CONSTRAINT_VIOLATION_DEMONSTRATED"
+    SENSITIVITY_DOMINATED_UNSTABLE = "SENSITIVITY_DOMINATED_UNSTABLE"
+    UNCERTAINTY_INSUFFICIENT_EVIDENCE = "UNCERTAINTY_INSUFFICIENT_EVIDENCE"
+
+
+class BoundaryCrossingType(str, enum.Enum):
+    """
+    Classification of decision boundary crossings (Phase 6.5).
+    """
+    DEMONSTRATED_BOUNDARY_CROSSING = "DEMONSTRATED_BOUNDARY_CROSSING"
+    NUMERICALLY_APPROXIMATED_CROSSING = "NUMERICALLY_APPROXIMATED_CROSSING"
+    UNRESOLVED_BOUNDARY = "UNRESOLVED_BOUNDARY"
+    OUTSIDE_MODEL_APPLICABILITY = "OUTSIDE_MODEL_APPLICABILITY"
+
+
+class VOIPriorityLevel(str, enum.Enum):
+    """
+    Qualitative Value-of-Information evidence prioritization levels (Phase 6.5).
+    Traceable to demonstrated decision reversal, sensitivity elasticity, and evidence gaps.
+    Zero fabricated economic costs or expected information gain calculations.
+    """
+    CRITICAL_REVERSAL_RISK = "CRITICAL_REVERSAL_RISK"
+    HIGH_SENSITIVITY_GAP = "HIGH_SENSITIVITY_GAP"
+    MODERATE_UNCERTAINTY = "MODERATE_UNCERTAINTY"
+    LOW_IMPACT_OR_VALIDATED = "LOW_IMPACT_OR_VALIDATED"
+
+
 VALIDATION_GATE_PROVENANCE = "THRESHOLD_PROVENANCE_UNRESOLVED"
 
 # Sensitivity Threshold Provenance Classification (Phase 6.3 Hardening):
@@ -524,5 +582,51 @@ class DecisionExposureAssessmentRecord(Base):
     user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+
+class DecisionRobustnessAnalysisRecord(Base):
+    """
+    Deterministic Decision Robustness Analysis Record (Phase 6.5).
+    Persists immutable robustness evaluation of an engineering decision under parameter uncertainty,
+    including evaluated envelope, demonstrated reversals, boundary crossings, dominant uncertainties,
+    value-of-information prioritizations, and solver failure captures.
+    """
+    __tablename__ = "decision_robustness_analyses"
+    __table_args__ = (
+        Index("ix_dec_robustness_lookup", "team_id", "decision_id", "created_at"),
+        Index("ix_dec_robustness_user", "user_id", "decision_id"),
+        Index("ix_dec_robustness_hash", "analysis_hash"),
+        Index("ix_dec_robustness_active", "decision_id", "is_active"),
+    )
+
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    decision_id = Column(String(64), nullable=False)
+    decision_type = Column(String(64), nullable=False, default="EngineeringDecision")
+
+    policy_version = Column(String(32), nullable=False, default=ROBUSTNESS_POLICY_V1)
+    analysis_hash = Column(String(64), nullable=False)
+    input_snapshot_hash = Column(String(64), nullable=False)
+
+    robustness_classification = Column(String(64), nullable=False)  # DecisionRobustnessClassification value
+    robustness_summary = Column(Text, nullable=False)
+
+    evaluated_envelope = Column(JSON_TYPE, nullable=False, default=dict)
+    parameter_uncertainties = Column(JSON_TYPE, nullable=False, default=list)
+    reversal_scenarios = Column(JSON_TYPE, nullable=False, default=list)
+    boundary_crossings = Column(JSON_TYPE, nullable=False, default=list)
+    dominant_uncertainties = Column(JSON_TYPE, nullable=False, default=list)
+    voi_prioritizations = Column(JSON_TYPE, nullable=False, default=list)
+    solver_failures = Column(JSON_TYPE, nullable=False, default=list)
+    governance_separation_notice = Column(Text, nullable=False, default=GOVERNANCE_ROBUSTNESS_SEPARATION_NOTICE)
+
+    is_active = Column(Boolean, nullable=False, default=True)
+    superseded_by = Column(UUID_TYPE, nullable=True)
+
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
+    user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
 
 

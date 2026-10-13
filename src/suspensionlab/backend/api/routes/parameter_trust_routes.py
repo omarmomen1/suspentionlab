@@ -44,11 +44,19 @@ from suspensionlab.backend.services.parameter_trust_decision_service import (
     PreRevealFirewallViolation,
     CURRENT_DECISION_TRUST_POLICY_VERSION,
 )
+from suspensionlab.backend.services.parameter_trust_robustness_service import (
+    ParameterTrustRobustnessService,
+    InvalidUncertaintyInputError,
+    MissingUncertaintyEvidenceError,
+    NumericalConvergenceFailure,
+)
 from suspensionlab.backend.database.models.parameter_trust import (
     ParameterTrustFleetReport,
     ParameterTrustAssemblyImpactRecord,
     DecisionParameterDependencyRecord,
     DecisionExposureAssessmentRecord,
+    DecisionRobustnessAnalysisRecord,
+    CURRENT_ROBUSTNESS_POLICY_VERSION,
 )
 from suspensionlab.backend.services.evidence_graph_service import (
     EntityNotFoundError,
@@ -488,6 +496,82 @@ class DecisionHistoryResponseDTO(BaseModel):
     total: int
 
 
+# ── PHASE 6.5 DECISION ROBUSTNESS DTOs ────────────────────────────────────────
+
+class RobustnessPreflightRequestDTO(BaseModel):
+    decision_id: str
+    decision_type: str = "EngineeringDecision"
+    uncertainty_inputs: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class RobustnessPreflightResponseDTO(BaseModel):
+    decision_id: str
+    decision_type: str
+    is_ready: bool
+    validation_errors: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    matched_parameters_count: int
+    missing_evidence_parameters: List[str] = Field(default_factory=list)
+    recomputable_kpis: List[Dict[str, Any]] = Field(default_factory=list)
+    policy_version: str
+
+
+class RobustnessAnalysisRequestDTO(BaseModel):
+    decision_id: str
+    decision_type: str = "EngineeringDecision"
+    uncertainty_inputs: List[Dict[str, Any]] = Field(default_factory=list)
+    correlated_groups: List[Dict[str, Any]] = Field(default_factory=list)
+    target_kpi: str = "damping_ratio"
+    decision_threshold: Optional[float] = None
+    optimization_direction: str = "MAXIMIZE"
+    threshold_range: Optional[Tuple[float, float]] = None
+    persist_record: bool = True
+
+
+class RobustnessAnalysisResponseDTO(BaseModel):
+    decision_id: str
+    decision_type: str
+    policy_version: str
+    analysis_hash: str
+    input_snapshot_hash: str
+    robustness_classification: str
+    robustness_summary: str
+    selected_option: str
+    target_kpi: str
+    evaluated_envelope: Dict[str, Any]
+    evaluated_scenarios_count: int
+    reversals_count: int
+    reversal_scenarios: List[Dict[str, Any]] = Field(default_factory=list)
+    boundary_crossings: List[Dict[str, Any]] = Field(default_factory=list)
+    dominant_uncertainties: List[Dict[str, Any]] = Field(default_factory=list)
+    voi_prioritizations: List[Dict[str, Any]] = Field(default_factory=list)
+    solver_failures: List[Dict[str, Any]] = Field(default_factory=list)
+    governance_separation_notice: str
+    deployment_safety_inferred: bool = False
+    deployment_authorization: str = "NOT_ESTABLISHED"
+    is_active: bool = True
+    created_at: Optional[str] = None
+
+
+class DecisionBoundariesResponseDTO(BaseModel):
+    decision_id: str
+    boundary_crossings: List[Dict[str, Any]]
+    total: int
+
+
+class DecisionVOIResponseDTO(BaseModel):
+    decision_id: str
+    voi_prioritizations: List[Dict[str, Any]]
+    total: int
+
+
+class RobustnessHistoryResponseDTO(BaseModel):
+    decision_id: str
+    history: List[Dict[str, Any]]
+    total: int
+
+
+
 # ── PHASE 6.4 DECISION TRUST ENDPOINTS ────────────────────────────────────────
 
 @router.post(
@@ -725,6 +809,229 @@ async def reassess_decision_exposure_endpoint(
     except TenantIsolationError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except PreRevealFirewallViolation as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+# ── PHASE 6.5 DECISION ROBUSTNESS ENDPOINTS ────────────────────────────────────
+
+@router.post(
+    "/decision/robustness/preflight",
+    response_model=RobustnessPreflightResponseDTO,
+)
+async def preflight_robustness_endpoint(
+    req: RobustnessPreflightRequestDTO,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Validates parameter uncertainty inputs against decision premises and dependencies.
+    Identifies missing uncertainty evidence, unsupported assumptions, and recomputable KPIs.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        res = await ParameterTrustRobustnessService.preflight_robustness(
+            db=db,
+            decision_id=req.decision_id,
+            decision_type=req.decision_type,
+            user_context=user,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+            uncertainty_inputs=req.uncertainty_inputs,
+        )
+        return RobustnessPreflightResponseDTO(**res)
+    except DecisionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except InvalidUncertaintyInputError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/decision/robustness/analyze",
+    response_model=RobustnessAnalysisResponseDTO,
+)
+async def run_robustness_analysis_endpoint(
+    req: RobustnessAnalysisRequestDTO,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Executes deterministic decision robustness evaluation across the documented uncertainty envelope.
+    Evaluates extreme corner scenarios and sensitivity-directed search. Detects ranking reversals,
+    constraint violations, dominant uncertainties, and value-of-information priorities.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        res = await ParameterTrustRobustnessService.run_robustness_analysis(
+            db=db,
+            decision_id=req.decision_id,
+            decision_type=req.decision_type,
+            user_context=user,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+            uncertainty_inputs=req.uncertainty_inputs,
+            correlated_groups=req.correlated_groups,
+            target_kpi=req.target_kpi,
+            decision_threshold=req.decision_threshold,
+            optimization_direction=req.optimization_direction,
+            threshold_range=req.threshold_range,
+            persist_record=req.persist_record,
+        )
+        return RobustnessAnalysisResponseDTO(**res)
+    except DecisionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except InvalidUncertaintyInputError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get(
+    "/decision/{decision_id}/robustness",
+    response_model=RobustnessAnalysisResponseDTO,
+)
+async def get_decision_robustness_endpoint(
+    decision_id: str,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Retrieves the active robustness assessment for an engineering decision.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        res = await ParameterTrustRobustnessService.get_active_robustness_analysis(
+            db=db,
+            decision_id=decision_id,
+            user_context=user,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        if not res:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No active robustness analysis found for decision '{decision_id}'.",
+            )
+        return RobustnessAnalysisResponseDTO(**res)
+    except DecisionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.get(
+    "/decision/{decision_id}/robustness/boundaries",
+    response_model=DecisionBoundariesResponseDTO,
+)
+async def get_decision_boundaries_endpoint(
+    decision_id: str,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Retrieves demonstrated and numerically approximated decision boundary crossings.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        res = await ParameterTrustRobustnessService.get_active_robustness_analysis(
+            db=db,
+            decision_id=decision_id,
+            user_context=user,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        if not res:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No active robustness analysis found for decision '{decision_id}'.",
+            )
+        crossings = res.get("boundary_crossings", [])
+        return DecisionBoundariesResponseDTO(
+            decision_id=decision_id,
+            boundary_crossings=crossings,
+            total=len(crossings),
+        )
+    except DecisionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.get(
+    "/decision/{decision_id}/robustness/voi",
+    response_model=DecisionVOIResponseDTO,
+)
+async def get_decision_voi_endpoint(
+    decision_id: str,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Retrieves qualitative, traceable Value-of-Information (VOI) evidence prioritizations.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        res = await ParameterTrustRobustnessService.get_active_robustness_analysis(
+            db=db,
+            decision_id=decision_id,
+            user_context=user,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        if not res:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No active robustness analysis found for decision '{decision_id}'.",
+            )
+        prioritizations = res.get("voi_prioritizations", [])
+        return DecisionVOIResponseDTO(
+            decision_id=decision_id,
+            voi_prioritizations=prioritizations,
+            total=len(prioritizations),
+        )
+    except DecisionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.get(
+    "/decision/{decision_id}/robustness/history",
+    response_model=RobustnessHistoryResponseDTO,
+)
+async def get_decision_robustness_history_endpoint(
+    decision_id: str,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Retrieves audit history of robustness analyses for an engineering decision.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        hist_data = await ParameterTrustRobustnessService.get_robustness_history(
+            db=db,
+            decision_id=decision_id,
+            user_context=user,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        items = hist_data.get("history", []) if isinstance(hist_data, dict) else list(hist_data)
+        return RobustnessHistoryResponseDTO(
+            decision_id=decision_id,
+            history=[dict(h) for h in items],
+            total=len(items),
+        )
+    except DecisionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 

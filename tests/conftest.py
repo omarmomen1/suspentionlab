@@ -26,8 +26,10 @@ _worker_id = os.environ.get("PYTEST_XDIST_WORKER")
 if _worker_id and "DATABASE_URL" not in os.environ:
     os.environ["DATABASE_URL"] = f"sqlite+aiosqlite:///./data/test_{_worker_id}.db"
 
-# Ensure src is on path for all tests
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+# Ensure local worktree src is strictly prioritized on path for all tests
+src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
+sys.path = [p for p in sys.path if not p.rstrip("/\\").endswith("src")]
+sys.path.insert(0, src_path)
 
 from suspensionlab.backend.api.main import app
 from suspensionlab.backend.security.auth import verify_api_key

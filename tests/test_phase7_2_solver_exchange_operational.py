@@ -698,4 +698,4 @@ def test_wpg_03_alembic_single_head():
     script_dir = alembic.script.ScriptDirectory.from_config(cfg)
     heads = script_dir.get_heads()
     assert len(heads) == 1, f"Expected exactly 1 Alembic head, got {heads}"
-    assert heads[0] in ("s9t0u1v2w3x4", "r8s9t0u1v2w3", "t0u1v2w3x4y5")
+    assert heads[0] in ("s9t0u1v2w3x4", "r8s9t0u1v2w3", "t0u1v2w3x4y5", "u1v2w3x4y5z6")

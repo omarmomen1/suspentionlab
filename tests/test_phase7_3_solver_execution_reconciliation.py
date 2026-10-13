@@ -768,18 +768,14 @@ async def test_wph_04_concurrent_idempotency(seeded_users, sample_input_artifact
 
 
 def test_wph_05_alembic_single_head_integrity():
-    """Verify Alembic migration tree has a single head at t0u1v2w3x4y5."""
-    import subprocess
-    result = subprocess.run(
-        [sys.executable, "-m", "alembic", "heads"],
-        cwd=str(PROJECT_ROOT),
-        capture_output=True,
-        text=True,
-    )
-    assert result.returncode == 0
-    lines = [line.strip() for line in result.stdout.strip().splitlines() if line.strip()]
-    assert len(lines) == 1, f"Multiple heads detected in alembic: {lines}"
-    assert "t0u1v2w3x4y5" in lines[0]
+    """Verify Alembic migration tree has a single head at u1v2w3x4y5z6."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+    alembic_cfg = Config(str(PROJECT_ROOT / "alembic.ini"))
+    script = ScriptDirectory.from_config(alembic_cfg)
+    heads = script.get_heads()
+    assert len(heads) == 1, f"Multiple heads detected in alembic: {heads}"
+    assert heads[0] == "u1v2w3x4y5z6"
 
 
 def test_wph_06_physics_freeze_integrity():
@@ -807,3 +803,49 @@ def test_wph_06_physics_freeze_integrity():
         assert full_path.exists(), f"Phase 3 manifest file {rel_path} does not exist!"
         actual_hash = hashlib.sha256(full_path.read_bytes()).hexdigest()
         assert actual_hash == expected_hash, f"Phase 3 manifest file {rel_path} was modified!"
+
+
+@pytest.mark.asyncio
+async def test_wph_07_untrusted_fmu_rejected(seeded_users, tmp_path):
+    """
+    Critical Task 5 Security Audit:
+    Untrusted FMUs (whose SHA-256 hash does not match the vetted allowlist)
+    must fail closed without executing native C binaries.
+    """
+    user = seeded_users["context_a"]
+    untrusted_fmu = tmp_path / "untrusted_payload.fmu"
+    untrusted_fmu.write_bytes(b"PK\x03\x04FAKE_UNVETTED_FMU_BINARY_PAYLOAD")
+
+    content = untrusted_fmu.read_bytes()
+    sha256 = hashlib.sha256(content).hexdigest()
+    art_id = uuid.uuid4()
+
+    async with SessionLocal() as db:
+        art = SolverExchangeArtifact(
+            id=art_id,
+            user_id=uuid.UUID(user.user_id),
+            team_id=uuid.UUID(user.team_id),
+            artifact_name="untrusted_payload.fmu",
+            file_format=".fmu",
+            mime_type="application/octet-stream",
+            size_bytes=len(content),
+            sha256_hash=sha256,
+            direction=ArtifactDirection.INPUT.value,
+            storage_path=str(untrusted_fmu),
+        )
+        db.add(art)
+        await db.commit()
+
+        service = SolverExecutionService()
+        job = await service.create_execution_job(
+            db=db,
+            user=user,
+            solver_name="FMI_COSIMULATION",
+            input_artifact_id=art_id,
+        )
+
+        res = await service.execute_job(db=db, job_id=job.id, user=user)
+        assert res.state == ExecutionJobState.FAILED.value
+        assert res.exit_code == 1
+        assert "UNTRUSTED_FMU_EXECUTION_REJECTED" in (res.failure_reason or res.stderr_excerpt or "")
+

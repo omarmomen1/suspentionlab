@@ -794,7 +794,7 @@ export function SolverInteropWorkspace() {
 
                 {jobs.length === 0 ? (
                   <p className="text-xs text-slate-500 italic py-4 text-center">
-                    No execution jobs found in this workspace. Launch a job from the "Run External Solver" tab.
+                    No execution jobs found in this workspace. Launch a job from the &quot;Run External Solver&quot; tab.
                   </p>
                 ) : (
                   <div className="divide-y divide-slate-800">
