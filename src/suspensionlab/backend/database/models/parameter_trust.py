@@ -162,6 +162,96 @@ class VOIPriorityLevel(str, enum.Enum):
     LOW_IMPACT_OR_VALIDATED = "LOW_IMPACT_OR_VALIDATED"
 
 
+VALIDATION_PLANNING_POLICY_V1 = "VALIDATION_PLANNING_POLICY_V1"
+CURRENT_VALIDATION_PLANNING_POLICY_VERSION = VALIDATION_PLANNING_POLICY_V1
+
+GOVERNANCE_VALIDATION_SEPARATION_NOTICE = (
+    "GOVERNANCE & SAFETY SEPARATION: Validation plan approval, evidence acceptance, and evidence gap closure "
+    "do not constitute engineering decision approval, vehicle commissioning, or deployment safety authorization. "
+    "Those actions strictly require independent role-based governance gates."
+)
+
+FINITE_SAMPLE_SCOPE_NOTICE = (
+    "FINITE SAMPLE LIMITATION: Physical rig, bench, and track test observations provide finite empirical evidence "
+    "under specific operating conditions. They narrow localized parameter uncertainty intervals but do NOT certify "
+    "the full infinite operational envelope."
+)
+
+
+class ValidationPlanStatus(str, enum.Enum):
+    """
+    Lifecycle status of an Engineering Validation Plan (Phase 6.6).
+    Distinguishes plan proposal, authorization, execution, review, and final disposition.
+    """
+    DRAFT = "DRAFT"
+    PROPOSED = "PROPOSED"
+    AUTHORIZED = "AUTHORIZED"
+    IN_PROGRESS = "IN_PROGRESS"
+    EVIDENCE_SUBMITTED = "EVIDENCE_SUBMITTED"
+    UNDER_REVIEW = "UNDER_REVIEW"
+    ACCEPTED = "ACCEPTED"
+    REJECTED = "REJECTED"
+    INCONCLUSIVE = "INCONCLUSIVE"
+    SUPERSEDED = "SUPERSEDED"
+
+
+class ValidationMethodType(str, enum.Enum):
+    """
+    Standardized engineering validation methods (Phase 6.6).
+    """
+    RIG_TEST_4_POST = "RIG_TEST_4_POST"
+    SHOCK_DYNO_CHARACTERIZATION = "SHOCK_DYNO_CHARACTERIZATION"
+    TRACK_K_AND_C_RIG_TEST = "TRACK_K&C_RIG_TEST"
+    COMPONENT_BENCH_TEST = "COMPONENT_BENCH_TEST"
+    CALIBRATED_TELEMETRY_SESSION = "CALIBRATED_TELEMETRY_SESSION"
+    VERIFIED_PHYSICAL_SIMULATION = "VERIFIED_PHYSICAL_SIMULATION"
+    SUPPLIER_CERTIFICATE_AUDIT = "SUPPLIER_CERTIFICATE_AUDIT"
+
+
+class CriterionStatus(str, enum.Enum):
+    """
+    Status of an acceptance criterion within a validation plan (Phase 6.6).
+    """
+    PROPOSED = "PROPOSED"
+    ESTABLISHED = "ESTABLISHED"
+    AUTHORIZED = "AUTHORIZED"
+    UNRESOLVED = "UNRESOLVED"
+
+
+class EvidenceDataSourceType(str, enum.Enum):
+    """
+    Authoritative evidence source type for validation data (Phase 6.6).
+    """
+    PHYSICAL_RIG_MEASUREMENT = "PHYSICAL_RIG_MEASUREMENT"
+    CALIBRATED_INSTRUMENT = "CALIBRATED_INSTRUMENT"
+    VEHICLE_TELEMETRY_DATASET = "VEHICLE_TELEMETRY_DATASET"
+    NUMERICAL_SIMULATION_RESULT = "NUMERICAL_SIMULATION_RESULT"
+    SUPPLIER_TEST_CERTIFICATE = "SUPPLIER_TEST_CERTIFICATE"
+
+
+class EvidenceClosureVerdict(str, enum.Enum):
+    """
+    Evidence gap closure evaluation verdict (Phase 6.6).
+    """
+    CLOSED_WITH_SUPPORTING_EVIDENCE = "CLOSED_WITH_SUPPORTING_EVIDENCE"
+    REMAINS_OPEN = "REMAINS_OPEN"
+    PARTIALLY_RESOLVED = "PARTIALLY_RESOLVED"
+    EVIDENCE_CONFLICTED = "EVIDENCE_CONFLICTED"
+    EVIDENCE_NOT_APPLICABLE = "EVIDENCE_NOT_APPLICABLE"
+    INCONCLUSIVE = "INCONCLUSIVE"
+    REVIEW_REQUIRED = "REVIEW_REQUIRED"
+
+
+class ReversalResolutionStatus(str, enum.Enum):
+    """
+    Status of demonstrated decision reversals following evidence ingestion and reassessment (Phase 6.6).
+    """
+    REVERSAL_RESOLVED = "REVERSAL_RESOLVED"
+    REVERSAL_PERSISTS = "REVERSAL_PERSISTS"
+    NEW_REVERSAL_INTRODUCED = "NEW_REVERSAL_INTRODUCED"
+    NO_REVERSAL_DEMONSTRATED = "NO_REVERSAL_DEMONSTRATED"
+
+
 VALIDATION_GATE_PROVENANCE = "THRESHOLD_PROVENANCE_UNRESOLVED"
 
 # Sensitivity Threshold Provenance Classification (Phase 6.3 Hardening):
@@ -627,6 +717,214 @@ class DecisionRobustnessAnalysisRecord(Base):
     user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+
+class EngineeringValidationPlanRecord(Base):
+    """
+    Engineering Validation Plan Record (Phase 6.6).
+    Versioned, tenant-scoped validation contract specifying target parameters, evidence gaps,
+    validation objectives, required artifacts, operating scopes, and authorized acceptance criteria.
+    Acceptance criteria become immutable once AUTHORIZED.
+    """
+    __tablename__ = "engineering_validation_plans"
+    __table_args__ = (
+        Index("ix_val_plans_decision_id", "decision_id"),
+        Index("ix_val_plans_parameter_name", "parameter_name"),
+        Index("ix_val_plans_status", "status"),
+        Index("ix_val_plans_tenant", "organization_id", "team_id"),
+        Index("ix_val_plans_active", "is_active"),
+    )
+
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    plan_id = Column(String(128), nullable=False)  # Human-readable code e.g. "VAL-PLAN-..."
+    decision_id = Column(String(128), nullable=False)
+    decision_type = Column(String(64), nullable=False, default="EngineeringDecision")
+
+    parameter_name = Column(String(128), nullable=False)
+    parameter_path = Column(String(256), nullable=True)
+    evidence_gap_id = Column(String(128), nullable=True)
+
+    validation_objective = Column(Text, nullable=False)
+    validation_method = Column(String(64), nullable=False)  # ValidationMethodType value
+    status = Column(String(32), nullable=False, default=ValidationPlanStatus.DRAFT.value)
+
+    plan_version = Column(Integer, nullable=False, default=1)
+    parent_plan_id = Column(UUID_TYPE, ForeignKey("engineering_validation_plans.id", ondelete="SET NULL"), nullable=True)
+
+    exposure_assessment_id = Column(UUID_TYPE, ForeignKey("decision_exposure_assessments.id", ondelete="SET NULL"), nullable=True)
+    robustness_analysis_id = Column(UUID_TYPE, ForeignKey("decision_robustness_analyses.id", ondelete="SET NULL"), nullable=True)
+    analysis_snapshot_hash = Column(String(64), nullable=True)
+
+    input_artifact_requirements = Column(JSON_TYPE, nullable=False, default=list)
+    operating_conditions = Column(JSON_TYPE, nullable=False, default=dict)
+    applicability_envelope = Column(JSON_TYPE, nullable=False, default=dict)
+    unit = Column(String(32), nullable=False)
+    measurement_definition = Column(Text, nullable=False)
+
+    acceptance_criteria = Column(JSON_TYPE, nullable=False, default=list)
+    criteria_established_at = Column(DateTime(timezone=True), nullable=True)
+    criteria_authorized_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    expected_outputs = Column(JSON_TYPE, nullable=False, default=list)
+    required_reviewer_role = Column(String(64), nullable=False, default="VALIDATION_LEAD")
+
+    authorized_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    authorized_at = Column(DateTime(timezone=True), nullable=True)
+
+    plan_hash = Column(String(64), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
+    created_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
+
+class ValidationEvidenceItemRecord(Base):
+    """
+    Validation Evidence Item Record (Phase 6.6).
+    Represents actual ingested evidence (rig test, telemetry, calibrated bench measurement).
+    Tracks source identity, timestamps, operating scope, unit, and cryptographic integrity hash.
+    Requires reviewer verification before acceptance.
+    """
+    __tablename__ = "validation_evidence_items"
+    __table_args__ = (
+        Index("ix_val_evidence_plan_id", "plan_id"),
+        Index("ix_val_evidence_param", "parameter_name"),
+        Index("ix_val_evidence_review_status", "review_status"),
+        Index("ix_val_evidence_tenant", "organization_id", "team_id"),
+    )
+
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    plan_id = Column(UUID_TYPE, ForeignKey("engineering_validation_plans.id", ondelete="CASCADE"), nullable=False)
+
+    evidence_source_type = Column(String(64), nullable=False)  # EvidenceDataSourceType
+    source_identifier = Column(String(256), nullable=False)
+    source_timestamp = Column(DateTime(timezone=True), nullable=False)
+
+    parameter_name = Column(String(128), nullable=False)
+    observed_value = Column(Float, nullable=True)
+    observed_interval = Column(JSON_TYPE, nullable=True)
+    observed_samples = Column(JSON_TYPE, nullable=True)
+
+    unit = Column(String(32), nullable=False)
+    operating_scope = Column(JSON_TYPE, nullable=False, default=dict)
+    integrity_hash = Column(String(64), nullable=False)
+
+    provenance = Column(JSON_TYPE, nullable=False, default=dict)
+    calibration_metadata = Column(JSON_TYPE, nullable=False, default=dict)
+
+    is_physically_validated = Column(Boolean, nullable=False, default=False)
+    physical_limitations = Column(Text, nullable=True)
+
+    review_status = Column(String(32), nullable=False, default="PENDING_REVIEW")  # PENDING_REVIEW, ACCEPTED, REJECTED, INCONCLUSIVE
+    review_notes = Column(Text, nullable=True)
+    reviewed_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_at = Column(DateTime(timezone=True), nullable=True)
+
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
+    submitted_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+
+class ValidationEvidenceClosureRecord(Base):
+    """
+    Validation Evidence Closure Record (Phase 6.6).
+    Evaluates whether submitted evidence legitimately closes the target evidence gap.
+    Checks test execution, parameter matching, operating scope compatibility,
+    unit alignment, criteria satisfaction, and conflict status.
+    """
+    __tablename__ = "validation_evidence_closures"
+    __table_args__ = (
+        Index("ix_val_closure_plan_id", "plan_id"),
+        Index("ix_val_closure_decision_id", "decision_id"),
+        Index("ix_val_closure_verdict", "closure_verdict"),
+        Index("ix_val_closure_active", "is_active"),
+        Index("ix_val_closure_tenant", "organization_id", "team_id"),
+    )
+
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    plan_id = Column(UUID_TYPE, ForeignKey("engineering_validation_plans.id", ondelete="CASCADE"), nullable=False)
+    decision_id = Column(String(128), nullable=False)
+    parameter_name = Column(String(128), nullable=False)
+    evidence_gap_id = Column(String(128), nullable=True)
+
+    closure_verdict = Column(String(64), nullable=False)  # EvidenceClosureVerdict value
+    criteria_met = Column(Boolean, nullable=False, default=False)
+    criteria_evaluated = Column(JSON_TYPE, nullable=False, default=list)
+
+    applicability_check = Column(JSON_TYPE, nullable=False, default=dict)
+    conflict_assessment = Column(JSON_TYPE, nullable=False, default=dict)
+    uncertainty_update = Column(JSON_TYPE, nullable=False, default=dict)
+
+    requires_robustness_reassessment = Column(Boolean, nullable=False, default=False)
+    closure_summary = Column(Text, nullable=False)
+    closure_hash = Column(String(64), nullable=False)
+
+    governance_separation_notice = Column(Text, nullable=False, default=GOVERNANCE_VALIDATION_SEPARATION_NOTICE)
+    finite_sample_notice = Column(Text, nullable=False, default=FINITE_SAMPLE_SCOPE_NOTICE)
+    deployment_safety_inferred = Column(Boolean, nullable=False, default=False)
+    deployment_authorization = Column(String(32), nullable=False, default="NOT_ESTABLISHED")
+
+    is_active = Column(Boolean, nullable=False, default=True)
+    superseded_by = Column(UUID_TYPE, ForeignKey("validation_evidence_closures.id", ondelete="SET NULL"), nullable=True)
+
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
+    evaluated_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+
+class ValidationDecisionReassessmentRecord(Base):
+    """
+    Validation Decision Reassessment Record (Phase 6.6).
+    Links original Phase 6.4/6.5 assessments to new Phase 6.5 robustness analysis
+    computed with updated evidence-backed parameter uncertainties.
+    Quantifies before/after deltas: uncertainty intervals, reversal resolutions, and boundary margins.
+    """
+    __tablename__ = "validation_decision_reassessments"
+    __table_args__ = (
+        Index("ix_val_reassess_decision_id", "decision_id"),
+        Index("ix_val_reassess_plan_id", "plan_id"),
+        Index("ix_val_reassess_closure_id", "closure_id"),
+        Index("ix_val_reassess_active", "is_active"),
+        Index("ix_val_reassess_tenant", "organization_id", "team_id"),
+    )
+
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    decision_id = Column(String(128), nullable=False)
+    decision_type = Column(String(64), nullable=False, default="EngineeringDecision")
+
+    plan_id = Column(UUID_TYPE, ForeignKey("engineering_validation_plans.id", ondelete="CASCADE"), nullable=False)
+    closure_id = Column(UUID_TYPE, ForeignKey("validation_evidence_closures.id", ondelete="CASCADE"), nullable=False)
+
+    original_exposure_assessment_id = Column(UUID_TYPE, ForeignKey("decision_exposure_assessments.id", ondelete="SET NULL"), nullable=True)
+    original_robustness_analysis_id = Column(UUID_TYPE, ForeignKey("decision_robustness_analyses.id", ondelete="SET NULL"), nullable=True)
+    new_robustness_analysis_id = Column(UUID_TYPE, ForeignKey("decision_robustness_analyses.id", ondelete="SET NULL"), nullable=True)
+
+    reassessment_delta = Column(JSON_TYPE, nullable=False, default=dict)
+    reversal_status = Column(String(64), nullable=False)  # ReversalResolutionStatus value
+    envelope_coverage_statement = Column(Text, nullable=False)
+
+    governance_separation_notice = Column(Text, nullable=False, default=GOVERNANCE_VALIDATION_SEPARATION_NOTICE)
+    deployment_safety_inferred = Column(Boolean, nullable=False, default=False)
+    deployment_authorization = Column(String(32), nullable=False, default="NOT_ESTABLISHED")
+
+    reassessment_hash = Column(String(64), nullable=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    superseded_by = Column(UUID_TYPE, ForeignKey("validation_decision_reassessments.id", ondelete="SET NULL"), nullable=True)
+
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
+    reassessed_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
 
 
 

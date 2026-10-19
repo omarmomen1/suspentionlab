@@ -1,11 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   ParameterTrustApi,
+  ValidationPlanningApi,
   ParameterTrustResponseDTO,
   ParameterTrustExplanationResponseDTO,
   ParameterTrustHistoryResponseDTO,
   ParameterTrustEvidenceDTO,
   DecisionExposureAssessmentResponseDTO,
+  ValidationPlanResponseDTO,
+  ClosureAssessmentResponseDTO,
+  DecisionReassessmentResponseDTO,
 } from "../lib/api_client";
 import * as apiModule from "../lib/api";
 
@@ -769,6 +773,161 @@ describe("ParameterTrustApi & Trust Map Frontend Unit Tests", () => {
 
       const histRes = await ParameterTrustApi.getDecisionRobustnessHistory("DEC-12");
       expect(histRes.decision_id).toBe("DEC-12");
+    });
+
+    it("ValidationPlanningApi manages plan lifecycle, evidence, closure, and reassessment", async () => {
+      const mockPlan: ValidationPlanResponseDTO = {
+        id: "plan-uuid-1",
+        plan_id: "VAL-PLAN-001",
+        decision_id: "DEC-12",
+        parameter_name: "front_spring_rate",
+        validation_method: "RIG_TEST_4_POST",
+        status: "DRAFT",
+        plan_version: 1,
+        unit: "N/mm",
+        is_active: true,
+        deployment_safety_inferred: false,
+        deployment_authorization: "NOT_ESTABLISHED",
+        acceptance_criteria: [
+          {
+            metric_name: "spring_rate_tolerance",
+            target_value: 80.0,
+            tolerance_band: [76.0, 84.0],
+            unit: "N/mm",
+            status: "PROPOSED",
+          },
+        ],
+      };
+
+      const mockAuthorizedPlan: ValidationPlanResponseDTO = {
+        ...mockPlan,
+        status: "AUTHORIZED",
+        acceptance_criteria: [
+          {
+            metric_name: "spring_rate_tolerance",
+            target_value: 80.0,
+            tolerance_band: [76.0, 84.0],
+            unit: "N/mm",
+            status: "AUTHORIZED",
+          },
+        ],
+      };
+
+      const mockEvidence = {
+        id: "ev-uuid-1",
+        plan_id: "plan-uuid-1",
+        evidence_source_type: "PHYSICAL_RIG_MEASUREMENT",
+        source_identifier: "TEST-RIG-001",
+        parameter_name: "front_spring_rate",
+        observed_value: 80.4,
+        observed_interval: [78.5, 82.3],
+        unit: "N/mm",
+        is_physically_validated: true,
+        review_status: "PENDING_REVIEW",
+      };
+
+      const mockClosure: ClosureAssessmentResponseDTO = {
+        id: "closure-uuid-1",
+        plan_id: "plan-uuid-1",
+        decision_id: "DEC-12",
+        parameter_name: "front_spring_rate",
+        closure_verdict: "CLOSED_WITH_SUPPORTING_EVIDENCE",
+        criteria_met: true,
+        criteria_evaluated: [
+          {
+            metric_name: "spring_rate_tolerance",
+            target_value: 80.0,
+            measured_value: 80.4,
+            passed: true,
+            status: "SATISFIED",
+          },
+        ],
+        requires_robustness_reassessment: true,
+        closure_summary: "Observed 4-post rig measurement satisfies authorized tolerance band.",
+        closure_hash: "closurehash123",
+        governance_separation_notice: "VALIDATION EVIDENCE GAP CLOSURE DOES NOT AUTHORIZE DEPLOYMENT.",
+        finite_sample_notice: "Finite empirical test runs do not certify full infinite operational envelope.",
+        deployment_safety_inferred: false,
+        deployment_authorization: "NOT_ESTABLISHED",
+        is_active: true,
+      };
+
+      const mockReassessment: DecisionReassessmentResponseDTO = {
+        id: "reassess-uuid-1",
+        decision_id: "DEC-12",
+        plan_id: "plan-uuid-1",
+        closure_id: "closure-uuid-1",
+        reversal_status: "REVERSAL_RESOLVED",
+        reassessment_delta: {
+          classification_before: "VULNERABLE_TO_REVERSAL",
+          classification_after: "ROBUST_WITHIN_CREDIBLE_RANGE",
+          reversals_before_count: 1,
+          reversals_after_count: 0,
+          reversal_status: "REVERSAL_RESOLVED",
+          parameter_uncertainty_updated: "front_spring_rate",
+          boundaries_before_count: 2,
+          boundaries_after_count: 0,
+          gap_closure_verdict: "CLOSED_WITH_SUPPORTING_EVIDENCE",
+        },
+        envelope_coverage_statement: "Empirical physical measurements narrow tolerance interval to [78.5, 82.3] N/mm.",
+        governance_separation_notice: "DECISION REASSESSMENT DOES NOT ESTABLISH DEPLOYMENT SAFETY.",
+        deployment_safety_inferred: false,
+        deployment_authorization: "NOT_ESTABLISHED",
+        reassessment_hash: "reassesshash123",
+        is_active: true,
+      };
+
+      const spy = vi.spyOn(apiModule, "apiJson")
+        .mockResolvedValueOnce(mockPlan) // createValidationPlan
+        .mockResolvedValueOnce(mockAuthorizedPlan) // transitionValidationPlan
+        .mockResolvedValueOnce(mockEvidence) // submitValidationEvidence
+        .mockResolvedValueOnce(mockClosure) // evaluateEvidenceClosure
+        .mockResolvedValueOnce(mockReassessment); // reassessDecision
+
+      // 1. Create Plan
+      const created = await ValidationPlanningApi.createValidationPlan({
+        decision_id: "DEC-12",
+        parameter_name: "front_spring_rate",
+        validation_method: "RIG_TEST_4_POST",
+      });
+      expect(created.plan_id).toBe("VAL-PLAN-001");
+      expect(created.status).toBe("DRAFT");
+      expect(created.deployment_safety_inferred).toBe(false);
+      expect(created.deployment_authorization).toBe("NOT_ESTABLISHED");
+
+      // 2. Authorize Plan
+      const authorized = await ValidationPlanningApi.transitionValidationPlan("plan-uuid-1", {
+        target_status: "AUTHORIZED",
+      });
+      expect(authorized.status).toBe("AUTHORIZED");
+      expect(authorized.acceptance_criteria![0].status).toBe("AUTHORIZED");
+
+      // 3. Submit Evidence
+      const evidence = await ValidationPlanningApi.submitValidationEvidence("plan-uuid-1", {
+        source_identifier: "TEST-RIG-001",
+        evidence_source_type: "PHYSICAL_RIG_MEASUREMENT",
+        observed_value: 80.4,
+        is_physically_validated: true,
+      });
+      expect(evidence.source_identifier).toBe("TEST-RIG-001");
+      expect(evidence.is_physically_validated).toBe(true);
+
+      // 4. Evaluate Closure
+      const closure = await ValidationPlanningApi.evaluateEvidenceClosure("plan-uuid-1");
+      expect(closure.closure_verdict).toBe("CLOSED_WITH_SUPPORTING_EVIDENCE");
+      expect(closure.criteria_met).toBe(true);
+      expect(closure.deployment_safety_inferred).toBe(false);
+      expect(closure.deployment_authorization).toBe("NOT_ESTABLISHED");
+      expect(closure.finite_sample_notice).toBeDefined();
+
+      // 5. Reassess Decision
+      const reassessment = await ValidationPlanningApi.reassessDecision("plan-uuid-1");
+      expect(reassessment.reversal_status).toBe("REVERSAL_RESOLVED");
+      expect(reassessment.reassessment_delta?.classification_before).toBe("VULNERABLE_TO_REVERSAL");
+      expect(reassessment.reassessment_delta?.classification_after).toBe("ROBUST_WITHIN_CREDIBLE_RANGE");
+      expect(reassessment.reassessment_delta?.reversals_after_count).toBe(0);
+      expect(reassessment.deployment_safety_inferred).toBe(false);
+      expect(reassessment.deployment_authorization).toBe("NOT_ESTABLISHED");
     });
   });
 });

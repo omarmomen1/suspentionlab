@@ -24,9 +24,16 @@ import {
   GitCommit,
   Activity,
   TrendingUp,
+  Lock,
+  Unlock,
+  ClipboardList,
+  CheckSquare,
+  XCircle,
+  ArrowRight,
 } from "lucide-react";
 import {
   ParameterTrustApi,
+  ValidationPlanningApi,
   ParameterTrustResponseDTO,
   ParameterTrustHistoryItemDTO,
   ParameterTrustState,
@@ -44,6 +51,14 @@ import {
   RobustnessAnalysisResponseDTO,
   DecisionBoundariesResponseDTO,
   DecisionVOIResponseDTO,
+  ValidationPlanResponseDTO,
+  ValidationPlanCreateRequestDTO,
+  ValidationPlanTransitionRequestDTO,
+  EvidenceSubmissionRequestDTO,
+  EvidenceItemResponseDTO,
+  ClosureAssessmentResponseDTO,
+  DecisionReassessmentResponseDTO,
+  AcceptanceCriterionDTO,
 } from "../../lib/api_client";
 
 interface ParameterTrustMapProps {
@@ -68,7 +83,7 @@ export function ParameterTrustMap({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "evidence" | "history" | "sweep" | "ingestion" | "fleet" | "propagation" | "decisions" | "robustness"
+    "overview" | "evidence" | "history" | "sweep" | "ingestion" | "fleet" | "propagation" | "decisions" | "robustness" | "validation"
   >("overview");
 
   // Phase 6.2 Ingestion & Sweep State
@@ -194,6 +209,208 @@ export function ParameterTrustMap({
       setRobustnessData(null);
     } finally {
       setRobustnessLoading(false);
+    }
+  };
+
+  // Phase 6.6 Validation Planning State
+  const [validationDecisionId, setValidationDecisionId] = useState("DEC-12");
+  const [validationPlans, setValidationPlans] = useState<ValidationPlanResponseDTO[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<ValidationPlanResponseDTO | null>(null);
+  const [validationLoading, setValidationLoading] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  // New Plan Modal State
+  const [showNewPlanModal, setShowNewPlanModal] = useState(false);
+  const [newPlanParam, setNewPlanParam] = useState("front_spring_rate");
+  const [newPlanMethod, setNewPlanMethod] = useState("RIG_TEST_4_POST");
+  const [newPlanObjective, setNewPlanObjective] = useState("Empirically characterize spring stiffness and uncertainty bounds");
+  const [newPlanUnit, setNewPlanUnit] = useState("N/mm");
+  const [newPlanMeasurementDef, setNewPlanMeasurementDef] = useState("Quasi-static deflection load cell measurement");
+  const [newPlanTargetValue, setNewPlanTargetValue] = useState<number>(80.0);
+  const [newPlanToleranceLow, setNewPlanToleranceLow] = useState<number>(76.0);
+  const [newPlanToleranceHigh, setNewPlanToleranceHigh] = useState<number>(84.0);
+
+  // Evidence Submission Modal State
+  const [showSubmitEvidenceModal, setShowSubmitEvidenceModal] = useState(false);
+  const [evidenceSourceId, setEvidenceSourceId] = useState("TEST-RIG-4P-2026-001");
+  const [evidenceSourceType, setEvidenceSourceType] = useState("PHYSICAL_RIG_MEASUREMENT");
+  const [evidenceObservedVal, setEvidenceObservedVal] = useState<number>(80.4);
+  const [evidenceLowBound, setEvidenceLowBound] = useState<number>(78.5);
+  const [evidenceHighBound, setEvidenceHighBound] = useState<number>(82.3);
+  const [evidenceUnit, setEvidenceUnit] = useState("N/mm");
+  const [isPhysicallyValidated, setIsPhysicallyValidated] = useState(true);
+  const [evidenceLimitation, setEvidenceLimitation] = useState("Finite run: 25 dry track cycles at 22C");
+
+  // Closure & Reassessment State
+  const [closureAssessment, setClosureAssessment] = useState<ClosureAssessmentResponseDTO | null>(null);
+  const [closureLoading, setClosureLoading] = useState(false);
+  const [reassessmentResult, setReassessmentResult] = useState<DecisionReassessmentResponseDTO | null>(null);
+  const [reassessmentLoading, setReassessmentLoading] = useState(false);
+  const [historicalReassessments, setHistoricalReassessments] = useState<DecisionReassessmentResponseDTO[]>([]);
+
+  const fetchValidationPlans = async (targetDecisionId: string) => {
+    if (!targetDecisionId) return;
+    setValidationLoading(true);
+    setValidationError(null);
+    try {
+      const res = await ValidationPlanningApi.listValidationPlansForDecision(targetDecisionId);
+      setValidationPlans(res.plans || []);
+      if (res.plans && res.plans.length > 0) {
+        setSelectedPlan((prev) => (prev ? res.plans.find((p) => p.id === prev.id) || res.plans[0] : res.plans[0]));
+      } else {
+        setSelectedPlan(null);
+      }
+      try {
+        const histRes = await ValidationPlanningApi.getDecisionReassessments(targetDecisionId);
+        setHistoricalReassessments(histRes.reassessments || []);
+      } catch {
+        setHistoricalReassessments([]);
+      }
+    } catch (err: any) {
+      setValidationError(err?.message || "Failed to load validation plans.");
+      setValidationPlans([]);
+      setSelectedPlan(null);
+    } finally {
+      setValidationLoading(false);
+    }
+  };
+
+  const handleCreateValidationPlan = async () => {
+    setValidationLoading(true);
+    setValidationError(null);
+    try {
+      const criteria: AcceptanceCriterionDTO[] = [
+        {
+          metric_name: `${newPlanParam}_rate_limit`,
+          target_value: Number(newPlanTargetValue),
+          tolerance_band: [Number(newPlanToleranceLow), Number(newPlanToleranceHigh)],
+          unit: newPlanUnit,
+          status: "PROPOSED",
+          rationale: "Established from preliminary sensitivity thresholds",
+        },
+      ];
+
+      const res = await ValidationPlanningApi.createValidationPlan({
+        decision_id: validationDecisionId,
+        parameter_name: newPlanParam,
+        validation_method: newPlanMethod,
+        validation_objective: newPlanObjective,
+        measurement_definition: newPlanMeasurementDef,
+        unit: newPlanUnit,
+        acceptance_criteria: criteria,
+        operating_conditions: {
+          temperature_min_c: 15.0,
+          temperature_max_c: 35.0,
+          regime: "TRACK_DRY",
+        },
+      });
+
+      setShowNewPlanModal(false);
+      await fetchValidationPlans(validationDecisionId);
+      setSelectedPlan(res);
+    } catch (err: any) {
+      setValidationError(err?.message || "Failed to create validation plan.");
+    } finally {
+      setValidationLoading(false);
+    }
+  };
+
+  const handleTransitionPlan = async (planId: string, targetStatus: string) => {
+    setValidationLoading(true);
+    setValidationError(null);
+    try {
+      const res = await ValidationPlanningApi.transitionValidationPlan(planId, {
+        target_status: targetStatus,
+      });
+      setSelectedPlan(res);
+      await fetchValidationPlans(validationDecisionId);
+    } catch (err: any) {
+      setValidationError(err?.message || `Failed to transition plan to ${targetStatus}`);
+    } finally {
+      setValidationLoading(false);
+    }
+  };
+
+  const handleSubmitEvidence = async (planId: string) => {
+    if (!selectedPlan) return;
+    setValidationLoading(true);
+    setValidationError(null);
+    try {
+      await ValidationPlanningApi.submitValidationEvidence(planId, {
+        source_identifier: evidenceSourceId,
+        evidence_source_type: evidenceSourceType,
+        observed_value: Number(evidenceObservedVal),
+        observed_interval: [Number(evidenceLowBound), Number(evidenceHighBound)],
+        unit: evidenceUnit,
+        is_physically_validated: isPhysicallyValidated,
+        physical_limitations: evidenceLimitation,
+        provenance: {
+          facility: "DynoLab-Chassis-01",
+          rig_id: "RIG-4P-A",
+          test_engineer: "Lead Validation Engineer",
+        },
+        operating_scope: {
+          temperature_min_c: 18.0,
+          temperature_max_c: 28.0,
+          regime: "TRACK_DRY",
+        },
+      });
+      setShowSubmitEvidenceModal(false);
+      const updated = await ValidationPlanningApi.getValidationPlan(planId);
+      setSelectedPlan(updated);
+      await fetchValidationPlans(validationDecisionId);
+    } catch (err: any) {
+      setValidationError(err?.message || "Failed to submit evidence.");
+    } finally {
+      setValidationLoading(false);
+    }
+  };
+
+  const handleReviewEvidence = async (planId: string, evidenceId: string, reviewStatus: string) => {
+    setValidationLoading(true);
+    setValidationError(null);
+    try {
+      await ValidationPlanningApi.reviewValidationEvidence(planId, evidenceId, {
+        review_status: reviewStatus,
+        review_notes: `Reviewed by Lead Validation Engineer: ${reviewStatus}`,
+      });
+      const updated = await ValidationPlanningApi.getValidationPlan(planId);
+      setSelectedPlan(updated);
+      await fetchValidationPlans(validationDecisionId);
+    } catch (err: any) {
+      setValidationError(err?.message || "Failed to review evidence item.");
+    } finally {
+      setValidationLoading(false);
+    }
+  };
+
+  const handleEvaluateClosure = async (planId: string) => {
+    setClosureLoading(true);
+    setValidationError(null);
+    try {
+      const res = await ValidationPlanningApi.evaluateEvidenceClosure(planId);
+      setClosureAssessment(res);
+      const updated = await ValidationPlanningApi.getValidationPlan(planId);
+      setSelectedPlan(updated);
+      await fetchValidationPlans(validationDecisionId);
+    } catch (err: any) {
+      setValidationError(err?.message || "Failed to evaluate evidence closure.");
+    } finally {
+      setClosureLoading(false);
+    }
+  };
+
+  const handleExecuteReassessment = async (planId: string) => {
+    setReassessmentLoading(true);
+    setValidationError(null);
+    try {
+      const res = await ValidationPlanningApi.reassessDecision(planId);
+      setReassessmentResult(res);
+      await fetchValidationPlans(validationDecisionId);
+    } catch (err: any) {
+      setValidationError(err?.message || "Failed to execute decision reassessment.");
+    } finally {
+      setReassessmentLoading(false);
     }
   };
 
@@ -648,6 +865,22 @@ export function ParameterTrustMap({
               data-testid="tab-robustness"
             >
               Decision Robustness
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab("validation");
+                if (validationPlans.length === 0) {
+                  fetchValidationPlans(validationDecisionId);
+                }
+              }}
+              className={`px-3 py-1.5 text-xs font-semibold rounded transition ${
+                activeTab === "validation"
+                  ? "bg-zinc-800 text-white border border-zinc-700"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+              data-testid="tab-validation-planning"
+            >
+              Validation Planning
             </button>
           </div>
 
@@ -2255,6 +2488,856 @@ export function ParameterTrustMap({
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 9: Validation Planning, Evidence Closure & Decision Reassessment (Phase 6.6) */}
+          {activeTab === "validation" && (
+            <div className="space-y-6" data-testid="container-validation-planning">
+              {/* Governance & Validation Separation Banner */}
+              <div
+                className="p-4 rounded-lg bg-zinc-900/80 border border-amber-500/40 text-xs space-y-2"
+                data-testid="governance-separation-banner"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-bold text-amber-400 uppercase font-mono tracking-wider">
+                    <Scale className="w-4 h-4 text-amber-400" />
+                    Governance & Validation Separation Notice
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-300 border border-zinc-700"
+                      data-testid="badge-safety-inferred"
+                    >
+                      deployment_safety_inferred = false
+                    </span>
+                    <span
+                      className="px-2 py-0.5 rounded text-[10px] font-mono bg-rose-950/70 text-rose-300 border border-rose-500/40"
+                      data-testid="badge-deployment-auth"
+                    >
+                      Deployment: NOT_ESTABLISHED
+                    </span>
+                  </div>
+                </div>
+                <p className="text-zinc-300 font-sans leading-relaxed">
+                  Strict Separation Invariant: Plan approval != Activity permission != Evidence acceptance !=
+                  Decision approval != Deployment safety. Satisfying validation acceptance criteria or closing an
+                  evidence gap establishes epistemic bounding, not operational safety authorization.
+                </p>
+              </div>
+
+              {/* Decision Query & Plan Creation Bar */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-lg bg-zinc-900/50 border border-zinc-800 gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono uppercase text-zinc-400">Decision ID:</span>
+                  <input
+                    type="text"
+                    value={validationDecisionId}
+                    onChange={(e) => setValidationDecisionId(e.target.value)}
+                    className="px-3 py-1.5 text-xs bg-zinc-950 border border-zinc-700 rounded text-white font-mono w-44"
+                    placeholder="e.g. DEC-12"
+                    data-testid="input-validation-decision-id"
+                  />
+                  <button
+                    onClick={() => fetchValidationPlans(validationDecisionId)}
+                    disabled={validationLoading}
+                    className="px-3 py-1.5 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-400 text-black transition flex items-center gap-1.5 disabled:opacity-50"
+                    data-testid="btn-fetch-plans"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${validationLoading ? "animate-spin" : ""}`} />
+                    Load Plans
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setShowNewPlanModal(true)}
+                    className="px-3 py-1.5 text-xs font-semibold rounded bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 transition flex items-center gap-1.5"
+                    data-testid="btn-open-new-plan-modal"
+                  >
+                    <ClipboardList className="w-3.5 h-3.5 text-amber-400" />
+                    New Validation Plan
+                  </button>
+                </div>
+              </div>
+
+              {/* Error Alert */}
+              {validationError && (
+                <div className="p-3 rounded-lg bg-rose-950/60 border border-rose-500/50 text-rose-200 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span>{validationError}</span>
+                </div>
+              )}
+
+              {/* Plan Selection Tabs */}
+              {validationPlans.length > 0 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  {validationPlans.map((p) => (
+                    <button
+                      key={p.id}
+                      onClick={() => setSelectedPlan(p)}
+                      className={`px-3 py-1.5 text-xs font-mono rounded border transition flex items-center gap-2 ${
+                        selectedPlan?.id === p.id
+                          ? "bg-amber-500/10 border-amber-500 text-amber-300"
+                          : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                      }`}
+                      data-testid={`btn-select-plan-${p.plan_id}`}
+                    >
+                      <span className="font-bold">{p.plan_id}</span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+                        {p.status}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Active Plan Detail Card */}
+              {selectedPlan ? (
+                <div className="space-y-6" data-testid="card-validation-plan">
+                  {/* Plan Header & Lifecycle State */}
+                  <div className="p-5 rounded-lg bg-zinc-900/60 border border-zinc-800 space-y-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between pb-3 border-b border-zinc-800 gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold font-mono text-white" data-testid="plan-code">
+                            {selectedPlan.plan_id}
+                          </span>
+                          <span className="text-xs px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40">
+                            v{selectedPlan.plan_version}
+                          </span>
+                          <span
+                            className="text-xs px-2.5 py-0.5 rounded font-mono font-bold bg-zinc-800 text-zinc-200 border border-zinc-700"
+                            data-testid="plan-status-badge"
+                          >
+                            {selectedPlan.status}
+                          </span>
+                        </div>
+                        <p className="text-xs text-zinc-400 mt-1">{selectedPlan.validation_objective}</p>
+                      </div>
+
+                      {/* Lifecycle Transition Controls */}
+                      <div className="flex items-center gap-2 flex-wrap" data-testid="plan-lifecycle-controls">
+                        {selectedPlan.status === "DRAFT" && (
+                          <button
+                            onClick={() => handleTransitionPlan(selectedPlan.id, "PROPOSED")}
+                            disabled={validationLoading}
+                            className="px-2.5 py-1 text-xs font-semibold rounded bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 transition"
+                            data-testid="btn-transition-propose"
+                          >
+                            Propose Plan
+                          </button>
+                        )}
+                        {selectedPlan.status === "PROPOSED" && (
+                          <>
+                            <button
+                              onClick={() => handleTransitionPlan(selectedPlan.id, "AUTHORIZED")}
+                              disabled={validationLoading}
+                              className="px-2.5 py-1 text-xs font-semibold rounded bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1"
+                              data-testid="btn-transition-authorize"
+                            >
+                              <Lock className="w-3 h-3" />
+                              Authorize Plan (Lead)
+                            </button>
+                            <button
+                              onClick={() => handleTransitionPlan(selectedPlan.id, "REJECTED")}
+                              disabled={validationLoading}
+                              className="px-2.5 py-1 text-xs font-semibold rounded bg-rose-900/60 hover:bg-rose-800 text-rose-200 border border-rose-700 transition"
+                              data-testid="btn-transition-reject"
+                            >
+                              Reject Plan
+                            </button>
+                          </>
+                        )}
+                        {selectedPlan.status === "AUTHORIZED" && (
+                          <button
+                            onClick={() => handleTransitionPlan(selectedPlan.id, "IN_PROGRESS")}
+                            disabled={validationLoading}
+                            className="px-2.5 py-1 text-xs font-semibold rounded bg-amber-600 hover:bg-amber-500 text-black font-bold transition"
+                            data-testid="btn-transition-inprogress"
+                          >
+                            Start Validation
+                          </button>
+                        )}
+                        {selectedPlan.status === "IN_PROGRESS" && (
+                          <button
+                            onClick={() => setShowSubmitEvidenceModal(true)}
+                            className="px-2.5 py-1 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 text-white transition flex items-center gap-1"
+                            data-testid="btn-open-submit-evidence"
+                          >
+                            <FlaskConical className="w-3 h-3" />
+                            Submit Evidence
+                          </button>
+                        )}
+                        {selectedPlan.status === "EVIDENCE_SUBMITTED" && (
+                          <button
+                            onClick={() => handleTransitionPlan(selectedPlan.id, "UNDER_REVIEW")}
+                            disabled={validationLoading}
+                            className="px-2.5 py-1 text-xs font-semibold rounded bg-indigo-600 hover:bg-indigo-500 text-white transition"
+                            data-testid="btn-transition-under-review"
+                          >
+                            Submit for Review
+                          </button>
+                        )}
+                        {selectedPlan.status === "UNDER_REVIEW" && (
+                          <>
+                            <button
+                              onClick={() => handleTransitionPlan(selectedPlan.id, "ACCEPTED")}
+                              disabled={validationLoading}
+                              className="px-2.5 py-1 text-xs font-semibold rounded bg-emerald-600 hover:bg-emerald-500 text-white transition"
+                              data-testid="btn-transition-accept"
+                            >
+                              Accept Plan (Lead)
+                            </button>
+                            <button
+                              onClick={() => handleTransitionPlan(selectedPlan.id, "INCONCLUSIVE")}
+                              disabled={validationLoading}
+                              className="px-2.5 py-1 text-xs font-semibold rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition"
+                              data-testid="btn-transition-inconclusive"
+                            >
+                              Inconclusive
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Metadata Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
+                      <div>
+                        <span className="text-zinc-500 block text-[10px] uppercase">Target Parameter</span>
+                        <span className="text-white font-bold" data-testid="plan-target-param">{selectedPlan.parameter_name}</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block text-[10px] uppercase">Method</span>
+                        <span className="text-zinc-200">{selectedPlan.validation_method}</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block text-[10px] uppercase">Canonical Unit</span>
+                        <span className="text-amber-400 font-bold">{selectedPlan.unit || "—"}</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block text-[10px] uppercase">Plan Hash</span>
+                        <span className="text-zinc-400 truncate block" title={selectedPlan.plan_hash || ""}>
+                          {selectedPlan.plan_hash ? `${selectedPlan.plan_hash.slice(0, 16)}...` : "—"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Acceptance Criteria Table with Immutability Notice */}
+                  <div className="p-5 rounded-lg bg-zinc-900/40 border border-zinc-800 space-y-3" data-testid="section-acceptance-criteria">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckSquare className="w-4 h-4 text-amber-400" />
+                        <h3 className="text-xs font-semibold uppercase font-mono text-zinc-200">
+                          Authorized Acceptance Criteria
+                        </h3>
+                        {selectedPlan.status !== "DRAFT" && selectedPlan.status !== "PROPOSED" && (
+                          <span
+                            className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-emerald-400 border border-emerald-500/40 flex items-center gap-1"
+                            data-testid="badge-criteria-sealed"
+                          >
+                            <Lock className="w-3 h-3 text-emerald-400" />
+                            CRITERIA SEALED UPON AUTHORIZATION
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        {selectedPlan.acceptance_criteria ? selectedPlan.acceptance_criteria.length : 0} criteria defined
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left font-mono border border-zinc-800 rounded">
+                        <thead className="bg-zinc-950 text-zinc-400 text-[10px] uppercase">
+                          <tr>
+                            <th className="p-2.5">Metric</th>
+                            <th className="p-2.5">Target Value</th>
+                            <th className="p-2.5">Tolerance Band</th>
+                            <th className="p-2.5">Unit</th>
+                            <th className="p-2.5">Status</th>
+                            <th className="p-2.5">Provenance</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-800">
+                          {selectedPlan.acceptance_criteria && selectedPlan.acceptance_criteria.length > 0 ? (
+                            selectedPlan.acceptance_criteria.map((c: any, idx: number) => (
+                              <tr key={idx} className="hover:bg-zinc-800/30">
+                                <td className="p-2.5 text-white font-semibold">{c.metric_name}</td>
+                                <td className="p-2.5 text-zinc-300">{c.target_value ?? "—"}</td>
+                                <td className="p-2.5 text-zinc-300">
+                                  {c.tolerance_band ? `[${c.tolerance_band[0]}, ${c.tolerance_band[1]}]` : "—"}
+                                </td>
+                                <td className="p-2.5 text-amber-400">{c.unit}</td>
+                                <td className="p-2.5">
+                                  <span
+                                    className={`px-1.5 py-0.5 rounded text-[10px] ${
+                                      c.status === "AUTHORIZED" || c.status === "ESTABLISHED"
+                                        ? "bg-emerald-950/60 text-emerald-400 border border-emerald-500/30"
+                                        : "bg-amber-950/60 text-amber-400 border border-amber-500/30"
+                                    }`}
+                                  >
+                                    {c.status}
+                                  </span>
+                                </td>
+                                <td className="p-2.5 text-zinc-500 truncate max-w-xs">{c.provenance || c.rationale || "—"}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={6} className="p-3 text-center text-zinc-500 font-sans">
+                                No acceptance criteria recorded.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  {/* Evidence Ingestion & Review Card */}
+                  <div className="p-5 rounded-lg bg-zinc-900/40 border border-zinc-800 space-y-4" data-testid="card-evidence-review">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FlaskConical className="w-4 h-4 text-blue-400" />
+                        <h3 className="text-xs font-semibold uppercase font-mono text-zinc-200">
+                          Validation Evidence & Provenance
+                        </h3>
+                      </div>
+                      <button
+                        onClick={() => setShowSubmitEvidenceModal(true)}
+                        className="px-2.5 py-1 text-xs font-semibold rounded bg-blue-600/80 hover:bg-blue-600 text-white transition flex items-center gap-1"
+                        data-testid="btn-add-evidence-inline"
+                      >
+                        + Ingest Evidence
+                      </button>
+                    </div>
+
+                    {/* Masquerade Protection Notice */}
+                    <div className="p-2.5 rounded bg-zinc-950 border border-blue-900/30 text-[11px] text-zinc-400 flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />
+                      <span>
+                        Anti-Masquerading Guardrail: CAE and numerical simulation data cannot be falsely flagged as
+                        physically validated. Missing provenance fails closed.
+                      </span>
+                    </div>
+
+                    {/* Evidence List */}
+                    {selectedPlan.evidence_items && selectedPlan.evidence_items.length > 0 ? (
+                      <div className="space-y-3" data-testid="list-evidence-items">
+                        {selectedPlan.evidence_items.map((ev: any) => (
+                          <div
+                            key={ev.id}
+                            className="p-3.5 rounded-lg bg-zinc-950/70 border border-zinc-800 text-xs font-mono space-y-2"
+                            data-testid={`evidence-item-${ev.id}`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-white">{ev.source_identifier}</span>
+                                <span className="px-1.5 py-0.2 rounded text-[10px] bg-zinc-800 text-zinc-300">
+                                  {ev.evidence_source_type}
+                                </span>
+                                {ev.is_physically_validated ? (
+                                  <span className="px-1.5 py-0.2 rounded text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-500/40 font-bold">
+                                    PHYSICAL
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.2 rounded text-[10px] bg-zinc-800 text-zinc-400">
+                                    SYNTHETIC / CAE
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                    ev.review_status === "ACCEPTED"
+                                      ? "bg-emerald-950 text-emerald-300 border border-emerald-500/40"
+                                      : ev.review_status === "REJECTED"
+                                      ? "bg-rose-950 text-rose-300 border border-rose-500/40"
+                                      : "bg-amber-950 text-amber-300 border border-amber-500/40"
+                                  }`}
+                                  data-testid={`badge-review-status-${ev.id}`}
+                                >
+                                  {ev.review_status}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] text-zinc-400 pt-1 border-t border-zinc-900">
+                              <div>
+                                Observed: <span className="text-white font-bold">{ev.observed_value ?? "—"}</span> {ev.unit}
+                              </div>
+                              <div>
+                                Interval: <span className="text-zinc-300">{ev.observed_interval ? `[${ev.observed_interval[0]}, ${ev.observed_interval[1]}]` : "—"}</span>
+                              </div>
+                              <div className="truncate" title={ev.integrity_hash || ""}>
+                                Hash: <span className="text-zinc-500">{ev.integrity_hash ? `${ev.integrity_hash.slice(0, 10)}...` : "—"}</span>
+                              </div>
+                              <div className="text-right">
+                                {ev.review_status === "PENDING_REVIEW" && (
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <button
+                                      onClick={() => handleReviewEvidence(selectedPlan.id, ev.id, "ACCEPTED")}
+                                      className="px-2 py-0.5 rounded bg-emerald-700 hover:bg-emerald-600 text-white text-[10px]"
+                                      data-testid={`btn-evidence-accept-${ev.id}`}
+                                    >
+                                      Accept
+                                    </button>
+                                    <button
+                                      onClick={() => handleReviewEvidence(selectedPlan.id, ev.id, "REJECTED")}
+                                      className="px-2 py-0.5 rounded bg-rose-800 hover:bg-rose-700 text-white text-[10px]"
+                                      data-testid={`btn-evidence-reject-${ev.id}`}
+                                    >
+                                      Reject
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {ev.physical_limitations && (
+                              <div className="text-[10px] text-zinc-500 font-sans">
+                                Limitation: {ev.physical_limitations}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-zinc-500 font-sans">
+                        No validation evidence items recorded yet. Ingest empirical telemetry or dyno runs above.
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Gap Closure Assessment Card */}
+                  <div className="p-5 rounded-lg bg-zinc-900/40 border border-zinc-800 space-y-4" data-testid="card-gap-closure">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                        <h3 className="text-xs font-semibold uppercase font-mono text-zinc-200">
+                          Evidence Gap Closure Assessment
+                        </h3>
+                      </div>
+                      <button
+                        onClick={() => handleEvaluateClosure(selectedPlan.id)}
+                        disabled={closureLoading}
+                        className="px-3 py-1 text-xs font-semibold rounded bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1.5 disabled:opacity-50"
+                        data-testid="btn-evaluate-closure"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${closureLoading ? "animate-spin" : ""}`} />
+                        Evaluate Gap Closure
+                      </button>
+                    </div>
+
+                    {/* Verdict Banner */}
+                    {closureAssessment && (
+                      <div className="space-y-3">
+                        <div
+                          className={`p-4 rounded-lg border text-xs font-mono space-y-2 ${
+                            closureAssessment.closure_verdict.startsWith("CLOSED")
+                              ? "bg-emerald-950/60 border-emerald-500/50 text-emerald-200"
+                              : "bg-amber-950/60 border-amber-500/50 text-amber-200"
+                          }`}
+                          data-testid="banner-closure-verdict"
+                        >
+                          <div className="flex items-center justify-between font-bold">
+                            <span className="text-sm tracking-wide" data-testid="text-closure-verdict">
+                              VERDICT: {closureAssessment.closure_verdict}
+                            </span>
+                            <span className="text-[10px] text-zinc-400">
+                              Criteria Met: {closureAssessment.criteria_met ? "YES" : "NO"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-zinc-300 font-sans">{closureAssessment.closure_summary}</p>
+                          <div className="text-[10px] text-zinc-400 pt-1 border-t border-zinc-800">
+                            Closure Hash: {closureAssessment.closure_hash}
+                          </div>
+                        </div>
+
+                        {/* Finite Sample Scope Notice */}
+                        <div
+                          className="p-3 rounded bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-400 space-y-1 font-sans"
+                          data-testid="box-finite-sample-notice"
+                        >
+                          <div className="font-bold font-mono text-amber-400 text-xs">
+                            FINITE SAMPLE SCOPE LIMITATION
+                          </div>
+                          <p>{closureAssessment.finite_sample_notice || "Empirical test runs narrow localized tolerance intervals without certifying the full infinite operational envelope."}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Decision Robustness Reassessment & Delta Card */}
+                  <div className="p-5 rounded-lg bg-zinc-900/40 border border-zinc-800 space-y-4" data-testid="card-decision-reassessment">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-amber-400" />
+                        <h3 className="text-xs font-semibold uppercase font-mono text-zinc-200">
+                          Decision Robustness Reassessment & Delta
+                        </h3>
+                      </div>
+                      <button
+                        onClick={() => handleExecuteReassessment(selectedPlan.id)}
+                        disabled={reassessmentLoading}
+                        className="px-3 py-1.5 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-400 text-black font-bold transition flex items-center gap-1.5 disabled:opacity-50"
+                        data-testid="btn-execute-reassessment"
+                      >
+                        <RefreshCw className={`w-3.5 h-3.5 ${reassessmentLoading ? "animate-spin" : ""}`} />
+                        Execute Reassessment
+                      </button>
+                    </div>
+
+                    {reassessmentResult && (
+                      <div className="space-y-4">
+                        {/* Reversal Resolution Status Badge */}
+                        <div className="flex items-center justify-between p-3 rounded-lg bg-zinc-950 border border-zinc-800">
+                          <span className="text-xs font-mono uppercase text-zinc-400">Reversal Resolution Status:</span>
+                          <span
+                            className={`px-2.5 py-1 rounded text-xs font-mono font-bold border ${
+                              reassessmentResult.reversal_status === "REVERSAL_RESOLVED"
+                                ? "bg-emerald-950 border-emerald-500 text-emerald-300"
+                                : reassessmentResult.reversal_status === "REVERSAL_PERSISTS"
+                                ? "bg-rose-950 border-rose-500 text-rose-300"
+                                : "bg-zinc-800 border-zinc-700 text-zinc-300"
+                            }`}
+                            data-testid="badge-reversal-resolution"
+                          >
+                            {reassessmentResult.reversal_status}
+                          </span>
+                        </div>
+
+                        {/* Delta Comparison Grid */}
+                        {reassessmentResult.reassessment_delta && (
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs" data-testid="grid-reassessment-delta">
+                            <div className="p-3 rounded bg-zinc-950 border border-zinc-800">
+                              <span className="text-[10px] text-zinc-500 block uppercase">Classification Before</span>
+                              <span className="text-zinc-400 font-bold">
+                                {reassessmentResult.reassessment_delta.classification_before}
+                              </span>
+                            </div>
+                            <div className="p-3 rounded bg-zinc-950 border border-amber-500/40">
+                              <span className="text-[10px] text-amber-400 block uppercase font-bold">Classification After</span>
+                              <span className="text-emerald-400 font-bold">
+                                {reassessmentResult.reassessment_delta.classification_after}
+                              </span>
+                            </div>
+                            <div className="p-3 rounded bg-zinc-950 border border-zinc-800">
+                              <span className="text-[10px] text-zinc-500 block uppercase">Reversals Before / After</span>
+                              <span className="text-white">
+                                {reassessmentResult.reassessment_delta.reversals_before_count} →{" "}
+                                <span className="font-bold text-emerald-400">
+                                  {reassessmentResult.reassessment_delta.reversals_after_count}
+                                </span>
+                              </span>
+                            </div>
+                            <div className="p-3 rounded bg-zinc-950 border border-zinc-800">
+                              <span className="text-[10px] text-zinc-500 block uppercase">Boundaries Before / After</span>
+                              <span className="text-white">
+                                {reassessmentResult.reassessment_delta.boundaries_before_count} →{" "}
+                                <span className="font-bold text-emerald-400">
+                                  {reassessmentResult.reassessment_delta.boundaries_after_count}
+                                </span>
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Coverage Statement */}
+                        <div className="p-3 rounded bg-zinc-950/70 border border-zinc-800 text-xs text-zinc-300 font-sans">
+                          {reassessmentResult.envelope_coverage_statement}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Historical Decision Reassessments Audit Trail */}
+                  {historicalReassessments.length > 0 && (
+                    <div className="space-y-3 pt-4 border-t border-zinc-800" data-testid="list-reassessment-history">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-semibold uppercase font-mono text-zinc-300 flex items-center gap-2">
+                          <History className="w-4 h-4 text-amber-400" />
+                          Reassessment Audit History ({historicalReassessments.length})
+                        </h4>
+                        <span className="text-[10px] font-mono text-zinc-500">Immutable ledger</span>
+                      </div>
+
+                      <div className="space-y-2">
+                        {historicalReassessments.map((r, idx) => (
+                          <div
+                            key={idx}
+                            className={`p-3 rounded-lg border text-xs font-mono flex flex-col md:flex-row md:items-center justify-between gap-2 ${
+                              r.is_active
+                                ? "bg-zinc-900/80 border-amber-500/40 text-white"
+                                : "bg-zinc-950/40 border-zinc-800 text-zinc-400"
+                            }`}
+                          >
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold">{r.reversal_status}</span>
+                                {r.is_active ? (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                                    ACTIVE
+                                  </span>
+                                ) : (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-zinc-800 text-zinc-500">
+                                    SUPERSEDED
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] text-zinc-400 mt-0.5">{r.envelope_coverage_statement}</div>
+                            </div>
+                            <div className="text-right text-[10px] text-zinc-500">
+                              <div>Hash: {r.reassessment_hash ? `${r.reassessment_hash.slice(0, 16)}...` : ""}</div>
+                              <div>{r.created_at ? new Date(r.created_at).toLocaleString() : ""}</div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="p-8 text-center rounded-lg bg-zinc-900/20 border border-zinc-800 text-zinc-500 text-xs">
+                  No validation plan selected. Click "New Validation Plan" or select an existing plan above.
+                </div>
+              )}
+
+              {/* Modal: New Validation Plan */}
+              {showNewPlanModal && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div
+                    className="w-full max-w-lg rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-100 p-6 shadow-2xl space-y-4"
+                    data-testid="modal-new-plan"
+                  >
+                    <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <ClipboardList className="w-4 h-4 text-amber-400" />
+                        Create Engineering Validation Plan
+                      </h3>
+                      <button
+                        onClick={() => setShowNewPlanModal(false)}
+                        className="text-zinc-500 hover:text-zinc-300 text-sm"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="space-y-3 text-xs">
+                      <div>
+                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                          Target Parameter
+                        </label>
+                        <input
+                          type="text"
+                          value={newPlanParam}
+                          onChange={(e) => setNewPlanParam(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-mono"
+                          data-testid="input-new-plan-param"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                          Validation Method
+                        </label>
+                        <select
+                          value={newPlanMethod}
+                          onChange={(e) => setNewPlanMethod(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-mono"
+                          data-testid="select-new-plan-method"
+                        >
+                          <option value="RIG_TEST_4_POST">RIG_TEST_4_POST (4-Post Rig)</option>
+                          <option value="DAMPER_DYNO_FORCE_VELOCITY">DAMPER_DYNO_FORCE_VELOCITY (Damper Dyno)</option>
+                          <option value="PHYSICAL_TEST_TRACK">PHYSICAL_TEST_TRACK (Proving Ground)</option>
+                          <option value="LAB_COMPONENT_DYNOMETER">LAB_COMPONENT_DYNOMETER (Component Dyno)</option>
+                          <option value="KINEMATICS_COMPLIANCE_RIG">KINEMATICS_COMPLIANCE_RIG (K&C Rig)</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                          Validation Objective
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={newPlanObjective}
+                          onChange={(e) => setNewPlanObjective(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-sans"
+                          data-testid="input-new-plan-objective"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">Target</label>
+                          <input
+                            type="number"
+                            value={newPlanTargetValue}
+                            onChange={(e) => setNewPlanTargetValue(Number(e.target.value))}
+                            className="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-mono"
+                            data-testid="input-new-plan-target"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">Tol Min</label>
+                          <input
+                            type="number"
+                            value={newPlanToleranceLow}
+                            onChange={(e) => setNewPlanToleranceLow(Number(e.target.value))}
+                            className="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-mono"
+                            data-testid="input-new-plan-tol-min"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">Tol Max</label>
+                          <input
+                            type="number"
+                            value={newPlanToleranceHigh}
+                            onChange={(e) => setNewPlanToleranceHigh(Number(e.target.value))}
+                            className="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-mono"
+                            data-testid="input-new-plan-tol-max"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
+                      <button
+                        onClick={() => setShowNewPlanModal(false)}
+                        className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleCreateValidationPlan}
+                        disabled={validationLoading}
+                        className="px-3.5 py-1.5 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-400 text-black font-bold"
+                        data-testid="btn-submit-new-plan"
+                      >
+                        Create Plan
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal: Submit Validation Evidence */}
+              {showSubmitEvidenceModal && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div
+                    className="w-full max-w-lg rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-100 p-6 shadow-2xl space-y-4"
+                    data-testid="modal-submit-evidence"
+                  >
+                    <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <FlaskConical className="w-4 h-4 text-blue-400" />
+                        Ingest Observed Validation Evidence
+                      </h3>
+                      <button
+                        onClick={() => setShowSubmitEvidenceModal(false)}
+                        className="text-zinc-500 hover:text-zinc-300 text-sm"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="space-y-3 text-xs">
+                      <div>
+                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                          Source Identifier
+                        </label>
+                        <input
+                          type="text"
+                          value={evidenceSourceId}
+                          onChange={(e) => setEvidenceSourceId(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-mono"
+                          data-testid="input-evidence-source-id"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">Observed Mean</label>
+                          <input
+                            type="number"
+                            value={evidenceObservedVal}
+                            onChange={(e) => setEvidenceObservedVal(Number(e.target.value))}
+                            className="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-mono"
+                            data-testid="input-evidence-val"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">Interval Min</label>
+                          <input
+                            type="number"
+                            value={evidenceLowBound}
+                            onChange={(e) => setEvidenceLowBound(Number(e.target.value))}
+                            className="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-mono"
+                            data-testid="input-evidence-low"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">Interval Max</label>
+                          <input
+                            type="number"
+                            value={evidenceHighBound}
+                            onChange={(e) => setEvidenceHighBound(Number(e.target.value))}
+                            className="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-mono"
+                            data-testid="input-evidence-high"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2">
+                        <input
+                          type="checkbox"
+                          id="chk-phys"
+                          checked={isPhysicallyValidated}
+                          onChange={(e) => setIsPhysicallyValidated(e.target.checked)}
+                          className="rounded border-zinc-700 bg-zinc-950 text-emerald-500"
+                          data-testid="chk-physically-validated"
+                        />
+                        <label htmlFor="chk-phys" className="text-zinc-300 font-mono text-[11px]">
+                          Empirically / Physically Validated Measurement (Non-Simulated)
+                        </label>
+                      </div>
+
+                      <div>
+                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                          Physical Limitations / Scope Notes
+                        </label>
+                        <input
+                          type="text"
+                          value={evidenceLimitation}
+                          onChange={(e) => setEvidenceLimitation(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-sans"
+                          data-testid="input-evidence-limitation"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
+                      <button
+                        onClick={() => setShowSubmitEvidenceModal(false)}
+                        className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => selectedPlan && handleSubmitEvidence(selectedPlan.id)}
+                        disabled={validationLoading}
+                        className="px-3.5 py-1.5 text-xs font-semibold rounded bg-blue-600 hover:bg-blue-500 text-white font-bold"
+                        data-testid="btn-submit-evidence"
+                      >
+                        Submit Evidence
+                      </button>
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

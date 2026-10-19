@@ -338,7 +338,15 @@ class ParameterTrustDecisionService:
 
         # 2. Polymorphic Entity Resolution
         # 2a. Primary: EngineeringDecision
-        stmt_dec = select(EngineeringDecision).where(EngineeringDecision.decision_id == dec_clean)
+        try:
+            dec_uuid_val = uuid.UUID(dec_clean) if len(dec_clean) == 36 else None
+        except Exception:
+            dec_uuid_val = None
+
+        conds = [EngineeringDecision.decision_id == dec_clean]
+        if dec_uuid_val is not None:
+            conds.append(EngineeringDecision.id == dec_uuid_val)
+        stmt_dec = select(EngineeringDecision).where(or_(*conds))
         res_dec = await db.execute(stmt_dec)
         dec_obj = res_dec.scalars().first()
 
