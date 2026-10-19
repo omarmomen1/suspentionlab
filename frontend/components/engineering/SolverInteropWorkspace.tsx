@@ -57,11 +57,13 @@ export function SolverInteropWorkspace() {
   const [timeoutSec, setTimeoutSec] = useState<number>(30);
   const [preflightResult, setPreflightResult] = useState<JobPreflightResponseDTO | null>(null);
 
-  // Jobs & Reconciliation state (Phase 7.3)
+  // Jobs & Reconciliation state (Phase 7.3 & 7.4)
   const [jobs, setJobs] = useState<JobResponseDTO[]>([]);
   const [selectedJob, setSelectedJob] = useState<JobResponseDTO | null>(null);
   const [reconciliationReport, setReconciliationReport] = useState<ReconciliationReportDTO | null>(null);
   const [reconcileLoading, setReconcileLoading] = useState<boolean>(false);
+  const [selectedBenchmarkMethod, setSelectedBenchmarkMethod] = useState<string>("EXACT_ANALYTICAL_MATRIX_EXPONENTIAL");
+  const [recoveringJobs, setRecoveringJobs] = useState<boolean>(false);
 
   // Import form state (Phase 7.2)
   const [importFilename, setImportFilename] = useState<string>("quarter_car.adm");
@@ -326,12 +328,28 @@ export function SolverInteropWorkspace() {
     try {
       setReconcileLoading(true);
       setErrorMsg(null);
-      const report = await SolverExecutionApi.reconcileJob(jobId);
+      const report = await SolverExecutionApi.reconcileJob(jobId, undefined, selectedBenchmarkMethod);
       setReconciliationReport(report);
     } catch (err: any) {
       setErrorMsg(err.message || "Result reconciliation failed.");
     } finally {
       setReconcileLoading(false);
+    }
+  };
+
+  const handleRecoverCrashed = async () => {
+    try {
+      setRecoveringJobs(true);
+      setErrorMsg(null);
+      const recovered = await SolverExecutionApi.recoverCrashedJobs();
+      await loadJobs();
+      if (recovered && recovered.length > 0) {
+        setSelectedJob(recovered[0]);
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to recover crashed jobs.");
+    } finally {
+      setRecoveringJobs(false);
     }
   };
 
@@ -363,30 +381,44 @@ export function SolverInteropWorkspace() {
         </div>
       </div>
 
-      {/* Epistemic Truth Banners */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="p-3.5 rounded-lg border border-amber-900/40 bg-amber-950/20 flex items-start gap-2.5">
+      {/* Epistemic Truth Banners (Phase 7.3 & 7.4) */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+        <div className="p-3 rounded-lg border border-amber-900/40 bg-amber-950/20 flex items-start gap-2.5">
           <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
           <div className="text-xs">
             <span className="font-semibold text-amber-300 block">EXPORTED ≠ EXECUTED</span>
             <span className="text-slate-400">Deck generation does not prove the external solver ran.</span>
           </div>
         </div>
-        <div className="p-3.5 rounded-lg border border-sky-900/40 bg-sky-950/20 flex items-start gap-2.5">
+        <div className="p-3 rounded-lg border border-sky-900/40 bg-sky-950/20 flex items-start gap-2.5">
           <ShieldCheck className="w-4 h-4 text-sky-400 shrink-0 mt-0.5" />
           <div className="text-xs">
             <span className="font-semibold text-sky-300 block">EXECUTED ≠ VALIDATED</span>
             <span className="text-slate-400">Zero exit code is not physical vehicle validation.</span>
           </div>
         </div>
-        <div className="p-3.5 rounded-lg border border-purple-900/40 bg-purple-950/20 flex items-start gap-2.5">
+        <div className="p-3 rounded-lg border border-purple-900/40 bg-purple-950/20 flex items-start gap-2.5">
           <Scale className="w-4 h-4 text-purple-400 shrink-0 mt-0.5" />
           <div className="text-xs">
             <span className="font-semibold text-purple-300 block">RECONCILED ≠ SIGNED-OFF</span>
             <span className="text-slate-400">Mathematical agreement is not track verification.</span>
           </div>
         </div>
-        <div className="p-3.5 rounded-lg border border-emerald-900/40 bg-emerald-950/20 flex items-start gap-2.5">
+        <div className="p-3 rounded-lg border border-rose-900/40 bg-rose-950/20 flex items-start gap-2.5">
+          <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+          <div className="text-xs">
+            <span className="font-semibold text-rose-300 block">UNTRUSTED FMU ISOLATION: FALSE</span>
+            <span className="text-slate-400">Micro-VM/container sandbox unavailable. Untrusted FMUs fail closed.</span>
+          </div>
+        </div>
+        <div className="p-3 rounded-lg border border-slate-800 bg-slate-900/60 flex items-start gap-2.5">
+          <Cpu className="w-4 h-4 text-slate-400 shrink-0 mt-0.5" />
+          <div className="text-xs">
+            <span className="font-semibold text-slate-300 block">THIRD-PARTY INDEPENDENCE: FALSE</span>
+            <span className="text-slate-400">MSC Adams and MATLAB proprietary solvers unverified on host.</span>
+          </div>
+        </div>
+        <div className="p-3 rounded-lg border border-emerald-900/40 bg-emerald-950/20 flex items-start gap-2.5">
           <Cpu className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
           <div className="text-xs">
             <span className="font-semibold text-emerald-300 block">HONEST RUNTIME GATE</span>
@@ -783,13 +815,24 @@ export function SolverInteropWorkspace() {
                     <Activity className="w-4 h-4 text-indigo-400" />
                     Execution Jobs Monitor
                   </h3>
-                  <button
-                    onClick={loadJobs}
-                    className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
-                  >
-                    <RefreshCw className="w-3 h-3" />
-                    Refresh
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleRecoverCrashed}
+                      disabled={recoveringJobs}
+                      className="text-xs text-amber-400 hover:text-amber-300 border border-amber-800/60 bg-amber-950/20 px-2.5 py-1 rounded flex items-center gap-1 transition"
+                      title="Reap orphaned jobs whose execution lease expired"
+                    >
+                      <AlertTriangle className={`w-3 h-3 ${recoveringJobs ? "animate-spin" : ""}`} />
+                      {recoveringJobs ? "Recovering..." : "Recover Crashed Jobs"}
+                    </button>
+                    <button
+                      onClick={loadJobs}
+                      className="text-xs text-indigo-400 hover:text-indigo-300 flex items-center gap-1"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      Refresh
+                    </button>
+                  </div>
                 </div>
 
                 {jobs.length === 0 ? (
@@ -872,44 +915,74 @@ export function SolverInteropWorkspace() {
                       )}
 
                       {selectedJob.state === "COMPLETED" && (
-                        <button
-                          onClick={() => handleReconcileJob(selectedJob.id)}
-                          disabled={reconcileLoading}
-                          className="px-3 py-1 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition flex items-center gap-1.5"
-                        >
-                          <Scale className="w-3.5 h-3.5" />
-                          {reconcileLoading ? "Reconciling..." : "Reconcile Results"}
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={selectedBenchmarkMethod}
+                            onChange={(e) => setSelectedBenchmarkMethod(e.target.value)}
+                            className="bg-slate-900 border border-slate-700 rounded px-2.5 py-1 text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                            title="Select independent reference solver benchmark formulation"
+                          >
+                            <option value="EXACT_ANALYTICAL_MATRIX_EXPONENTIAL">
+                              Exact Analytical exp(A*t)
+                            </option>
+                            <option value="HIGH_ORDER_ADAPTIVE_NUMERICAL">
+                              SciPy Adaptive DOP853 (8th-Order)
+                            </option>
+                            <option value="INTERNAL_RK4_REFERENCE">
+                              Internal RK4 Baseline
+                            </option>
+                          </select>
+                          <button
+                            onClick={() => handleReconcileJob(selectedJob.id)}
+                            disabled={reconcileLoading}
+                            className="px-3 py-1 text-xs rounded bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition flex items-center gap-1.5 whitespace-nowrap"
+                          >
+                            <Scale className="w-3.5 h-3.5" />
+                            {reconcileLoading ? "Reconciling..." : "Reconcile Results"}
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Epistemic Badges Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                    <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
-                      <span className="text-slate-500 block mb-0.5">Execution Status</span>
+                  {/* Epistemic Badges Grid (Phase 7.3 & 7.4) */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
+                    <div className="bg-slate-950 p-2 rounded border border-slate-800">
+                      <span className="text-slate-500 block text-[10px] mb-0.5">Execution Status</span>
                       <span
-                        className={`font-semibold ${
+                        className={`font-semibold text-xs ${
                           selectedJob.is_executed ? "text-emerald-400" : "text-amber-400"
                         }`}
                       >
                         {selectedJob.is_executed ? "REAL EXECUTED" : "UNEXECUTED"}
                       </span>
                     </div>
-                    <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
-                      <span className="text-slate-500 block mb-0.5">Physical Validation</span>
-                      <span className="font-semibold text-rose-400">FALSE (IMMUTABLE)</span>
+                    <div className="bg-slate-950 p-2 rounded border border-slate-800">
+                      <span className="text-slate-500 block text-[10px] mb-0.5">Physical Validation</span>
+                      <span className="font-semibold text-xs text-rose-400">FALSE (IMMUTABLE)</span>
                     </div>
-                    <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
-                      <span className="text-slate-500 block mb-0.5">Input Artifact SHA-256</span>
-                      <span className="font-mono text-slate-300 truncate block">
-                        {selectedJob.input_artifact_hash ? selectedJob.input_artifact_hash.substring(0, 12) + "..." : "N/A"}
+                    <div className="bg-slate-950 p-2 rounded border border-slate-800">
+                      <span className="text-slate-500 block text-[10px] mb-0.5">Execution Mode</span>
+                      <span className="font-semibold text-xs text-indigo-300">
+                        {selectedJob.execution_mode || "TRUSTED_ALLOWLIST"}
                       </span>
                     </div>
-                    <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
-                      <span className="text-slate-500 block mb-0.5">Output Artifacts</span>
-                      <span className="font-semibold text-slate-300">
-                        {selectedJob.output_artifact_ids.length} artifact(s)
+                    <div className="bg-slate-950 p-2 rounded border border-slate-800">
+                      <span className="text-slate-500 block text-[10px] mb-0.5">Benchmark Ref</span>
+                      <span className="font-semibold text-xs text-sky-300 truncate block">
+                        {selectedJob.benchmark_reference_type || "ANALYTICAL_RK4"}
+                      </span>
+                    </div>
+                    <div className="bg-slate-950 p-2 rounded border border-slate-800">
+                      <span className="text-slate-500 block text-[10px] mb-0.5">Artifact SHA-256</span>
+                      <span className="font-mono text-[11px] text-slate-300 truncate block">
+                        {selectedJob.input_artifact_hash ? selectedJob.input_artifact_hash.substring(0, 10) + "..." : "N/A"}
+                      </span>
+                    </div>
+                    <div className="bg-slate-950 p-2 rounded border border-slate-800">
+                      <span className="text-slate-500 block text-[10px] mb-0.5">Lease Status</span>
+                      <span className="font-mono text-[11px] text-slate-300 truncate block">
+                        {selectedJob.lease_expires_at ? new Date(selectedJob.lease_expires_at).toLocaleTimeString() : "N/A"}
                       </span>
                     </div>
                   </div>

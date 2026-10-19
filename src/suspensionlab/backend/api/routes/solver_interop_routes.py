@@ -220,6 +220,10 @@ class JobResponseDTO(BaseModel):
     stderr_excerpt: Optional[str] = None
     failure_reason: Optional[str] = None
     error_category: Optional[str] = None
+    lease_expires_at: Optional[str] = None
+    heartbeat_at: Optional[str] = None
+    execution_mode: Optional[str] = "TRUSTED_ALLOWLIST"
+    benchmark_reference_type: Optional[str] = None
     is_executed: bool = False
     is_physically_validated: bool = False
     execution_provenance: Dict[str, Any] = Field(default_factory=dict)
@@ -247,6 +251,45 @@ class JobPreflightResponse(BaseModel):
 
 class ReconcileJobRequest(BaseModel):
     custom_tolerances: Optional[Dict[str, float]] = None
+    custom_absolute_tolerances: Optional[Dict[str, float]] = None
+    benchmark_method: Optional[str] = None
+    required_signals: Optional[List[str]] = None
+
+
+def _job_to_dto(job: SolverExecutionJob) -> JobResponseDTO:
+    return JobResponseDTO(
+        id=str(job.id),
+        organization_id=str(job.organization_id) if job.organization_id else None,
+        team_id=str(job.team_id) if job.team_id else None,
+        user_id=str(job.user_id),
+        solver_name=job.solver_name,
+        solver_version=job.solver_version,
+        adapter_id=job.adapter_id,
+        state=job.state,
+        input_artifact_id=str(job.input_artifact_id) if job.input_artifact_id else None,
+        input_artifact_hash=job.input_artifact_hash,
+        output_artifact_ids=job.output_artifact_ids or [],
+        execution_config=job.execution_config or {},
+        resource_limits=job.resource_limits or {},
+        pid=job.pid,
+        exit_code=job.exit_code,
+        stdout_excerpt=job.stdout_excerpt,
+        stderr_excerpt=job.stderr_excerpt,
+        failure_reason=job.failure_reason,
+        error_category=job.error_category,
+        lease_expires_at=job.lease_expires_at.isoformat() if getattr(job, "lease_expires_at", None) else None,
+        heartbeat_at=job.heartbeat_at.isoformat() if getattr(job, "heartbeat_at", None) else None,
+        execution_mode=getattr(job, "execution_mode", "TRUSTED_ALLOWLIST"),
+        benchmark_reference_type=getattr(job, "benchmark_reference_type", None),
+        is_executed=job.is_executed,
+        is_physically_validated=job.is_physically_validated,
+        execution_provenance=job.execution_provenance or {},
+        reconciliation_summary=job.reconciliation_summary or {},
+        created_at=job.created_at.isoformat() if job.created_at else None,
+        started_at=job.started_at.isoformat() if job.started_at else None,
+        completed_at=job.completed_at.isoformat() if job.completed_at else None,
+        updated_at=job.updated_at.isoformat() if job.updated_at else None,
+    )
 
 
 # ── ADAPTER CAPABILITY DISCOVERY ─────────────────────────────────────────────
@@ -639,35 +682,7 @@ async def submit_execution_job(
         if req.wait_for_completion and job.state == ExecutionJobState.QUEUED.value:
             job = await _exec_service.execute_job(db=db, job_id=job.id, user=user)
 
-        return JobResponseDTO(
-            id=str(job.id),
-            organization_id=str(job.organization_id) if job.organization_id else None,
-            team_id=str(job.team_id) if job.team_id else None,
-            user_id=str(job.user_id),
-            solver_name=job.solver_name,
-            solver_version=job.solver_version,
-            adapter_id=job.adapter_id,
-            state=job.state,
-            input_artifact_id=str(job.input_artifact_id) if job.input_artifact_id else None,
-            input_artifact_hash=job.input_artifact_hash,
-            output_artifact_ids=job.output_artifact_ids or [],
-            execution_config=job.execution_config or {},
-            resource_limits=job.resource_limits or {},
-            pid=job.pid,
-            exit_code=job.exit_code,
-            stdout_excerpt=job.stdout_excerpt,
-            stderr_excerpt=job.stderr_excerpt,
-            failure_reason=job.failure_reason,
-            error_category=job.error_category,
-            is_executed=job.is_executed,
-            is_physically_validated=job.is_physically_validated,
-            execution_provenance=job.execution_provenance or {},
-            reconciliation_summary=job.reconciliation_summary or {},
-            created_at=job.created_at.isoformat() if job.created_at else None,
-            started_at=job.started_at.isoformat() if job.started_at else None,
-            completed_at=job.completed_at.isoformat() if job.completed_at else None,
-            updated_at=job.updated_at.isoformat() if job.updated_at else None,
-        )
+        return _job_to_dto(job)
 
     except RuntimeUnavailableError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
@@ -690,38 +705,7 @@ async def list_execution_jobs(
     Lists execution jobs accessible to the calling tenant user.
     """
     jobs = await _exec_service.list_jobs(db=db, user=user, limit=limit)
-    return [
-        JobResponseDTO(
-            id=str(j.id),
-            organization_id=str(j.organization_id) if j.organization_id else None,
-            team_id=str(j.team_id) if j.team_id else None,
-            user_id=str(j.user_id),
-            solver_name=j.solver_name,
-            solver_version=j.solver_version,
-            adapter_id=j.adapter_id,
-            state=j.state,
-            input_artifact_id=str(j.input_artifact_id) if j.input_artifact_id else None,
-            input_artifact_hash=j.input_artifact_hash,
-            output_artifact_ids=j.output_artifact_ids or [],
-            execution_config=j.execution_config or {},
-            resource_limits=j.resource_limits or {},
-            pid=j.pid,
-            exit_code=j.exit_code,
-            stdout_excerpt=j.stdout_excerpt,
-            stderr_excerpt=j.stderr_excerpt,
-            failure_reason=j.failure_reason,
-            error_category=j.error_category,
-            is_executed=j.is_executed,
-            is_physically_validated=j.is_physically_validated,
-            execution_provenance=j.execution_provenance or {},
-            reconciliation_summary=j.reconciliation_summary or {},
-            created_at=j.created_at.isoformat() if j.created_at else None,
-            started_at=j.started_at.isoformat() if j.started_at else None,
-            completed_at=j.completed_at.isoformat() if j.completed_at else None,
-            updated_at=j.updated_at.isoformat() if j.updated_at else None,
-        )
-        for j in jobs
-    ]
+    return [_job_to_dto(j) for j in jobs]
 
 
 @router.get("/jobs/{job_id}", response_model=JobResponseDTO)
@@ -740,35 +724,7 @@ async def get_execution_job(
 
     try:
         j = await _exec_service.get_job(db=db, job_id=jid, user=user)
-        return JobResponseDTO(
-            id=str(j.id),
-            organization_id=str(j.organization_id) if j.organization_id else None,
-            team_id=str(j.team_id) if j.team_id else None,
-            user_id=str(j.user_id),
-            solver_name=j.solver_name,
-            solver_version=j.solver_version,
-            adapter_id=j.adapter_id,
-            state=j.state,
-            input_artifact_id=str(j.input_artifact_id) if j.input_artifact_id else None,
-            input_artifact_hash=j.input_artifact_hash,
-            output_artifact_ids=j.output_artifact_ids or [],
-            execution_config=j.execution_config or {},
-            resource_limits=j.resource_limits or {},
-            pid=j.pid,
-            exit_code=j.exit_code,
-            stdout_excerpt=j.stdout_excerpt,
-            stderr_excerpt=j.stderr_excerpt,
-            failure_reason=j.failure_reason,
-            error_category=j.error_category,
-            is_executed=j.is_executed,
-            is_physically_validated=j.is_physically_validated,
-            execution_provenance=j.execution_provenance or {},
-            reconciliation_summary=j.reconciliation_summary or {},
-            created_at=j.created_at.isoformat() if j.created_at else None,
-            started_at=j.started_at.isoformat() if j.started_at else None,
-            completed_at=j.completed_at.isoformat() if j.completed_at else None,
-            updated_at=j.updated_at.isoformat() if j.updated_at else None,
-        )
+        return _job_to_dto(j)
     except ExecutionJobNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except TenantIsolationError as e:
@@ -791,41 +747,58 @@ async def cancel_execution_job(
 
     try:
         j = await _exec_service.cancel_job(db=db, job_id=jid, user=user)
-        return JobResponseDTO(
-            id=str(j.id),
-            organization_id=str(j.organization_id) if j.organization_id else None,
-            team_id=str(j.team_id) if j.team_id else None,
-            user_id=str(j.user_id),
-            solver_name=j.solver_name,
-            solver_version=j.solver_version,
-            adapter_id=j.adapter_id,
-            state=j.state,
-            input_artifact_id=str(j.input_artifact_id) if j.input_artifact_id else None,
-            input_artifact_hash=j.input_artifact_hash,
-            output_artifact_ids=j.output_artifact_ids or [],
-            execution_config=j.execution_config or {},
-            resource_limits=j.resource_limits or {},
-            pid=j.pid,
-            exit_code=j.exit_code,
-            stdout_excerpt=j.stdout_excerpt,
-            stderr_excerpt=j.stderr_excerpt,
-            failure_reason=j.failure_reason,
-            error_category=j.error_category,
-            is_executed=j.is_executed,
-            is_physically_validated=j.is_physically_validated,
-            execution_provenance=j.execution_provenance or {},
-            reconciliation_summary=j.reconciliation_summary or {},
-            created_at=j.created_at.isoformat() if j.created_at else None,
-            started_at=j.started_at.isoformat() if j.started_at else None,
-            completed_at=j.completed_at.isoformat() if j.completed_at else None,
-            updated_at=j.updated_at.isoformat() if j.updated_at else None,
-        )
+        return _job_to_dto(j)
     except ExecutionJobNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except ImmutableExecutionError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except TenantIsolationError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.post("/jobs/recover-crashed", response_model=List[JobResponseDTO])
+async def recover_crashed_jobs_endpoint(
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> List[JobResponseDTO]:
+    """
+    Identifies and recovers orphaned solver execution jobs whose lease expired or worker crashed.
+    """
+    recovered = await _exec_service.recover_crashed_jobs(db=db)
+    return [_job_to_dto(j) for j in recovered]
+
+
+@router.get("/benchmarks/capabilities")
+async def get_benchmark_capabilities() -> Dict[str, Any]:
+    """
+    Returns available independent benchmark methods, scenarios, taxonomy definitions,
+    channel tolerance provenance, and truthful capability flags.
+    """
+    from suspensionlab.interop.benchmarks.independent_solver import (
+        BenchmarkMethod,
+        BenchmarkScenario,
+        EXPERIMENTAL_PHYSICAL_VALIDATION_VERIFIED,
+        TAXONOMY_DEFINITIONS,
+        THIRD_PARTY_SOLVER_INDEPENDENCE_VERIFIED,
+        UNTRUSTED_FMU_ISOLATION_VERIFIED,
+    )
+    from suspensionlab.interop.reconciliation.engine import ResultReconciliationEngine
+
+    return {
+        "taxonomy": TAXONOMY_DEFINITIONS,
+        "available_methods": [m.value for m in BenchmarkMethod],
+        "available_scenarios": [s.value for s in BenchmarkScenario],
+        "channel_provenance": {
+            k: v.to_dict() for k, v in ResultReconciliationEngine.CHANNEL_PROVENANCE.items()
+        },
+        "epistemic_invariants": {
+            "third_party_solver_independence_verified": THIRD_PARTY_SOLVER_INDEPENDENCE_VERIFIED,
+            "experimental_physical_validation_verified": EXPERIMENTAL_PHYSICAL_VALIDATION_VERIFIED,
+            "untrusted_fmu_isolation_verified": UNTRUSTED_FMU_ISOLATION_VERIFIED,
+            "executed_implies_verified_correct": False,
+            "numerical_agreement_implies_physical_validation": False,
+        },
+    }
 
 
 @router.post("/jobs/{job_id}/reconcile")
@@ -846,7 +819,18 @@ async def reconcile_job_results(
 
     try:
         tolerances = req.custom_tolerances if req else None
-        report = await _exec_service.reconcile_job_results(db=db, job_id=jid, user=user, custom_tolerances=tolerances)
+        abs_tolerances = req.custom_absolute_tolerances if req else None
+        bench_method = req.benchmark_method if req else None
+        req_signals = req.required_signals if req else None
+        report = await _exec_service.reconcile_job_results(
+            db=db,
+            job_id=jid,
+            user=user,
+            custom_tolerances=tolerances,
+            custom_absolute_tolerances=abs_tolerances,
+            benchmark_method=bench_method,
+            required_signals=req_signals,
+        )
         return report.to_dict()
     except ExecutionJobNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
