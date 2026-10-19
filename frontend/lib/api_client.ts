@@ -3676,6 +3676,154 @@ export class ParameterTrustApi {
   }
 }
 
+// ── Phase 6.6 Engineering Validation Planning & Evidence Closure API ────────
+
+export class ValidationPlanningApi {
+  /**
+   * Creates an Engineering Validation Plan bound to an engineering decision, parameter, and gap (Phase 6.6).
+   */
+  static async createValidationPlan(
+    payload: ValidationPlanCreateRequestDTO
+  ): Promise<ValidationPlanResponseDTO> {
+    return apiJson<ValidationPlanResponseDTO>("/api/v1/parameter-trust/validation/plans", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  }
+
+  /**
+   * Retrieves a validation plan by ID including criteria and evidence items (Phase 6.6).
+   */
+  static async getValidationPlan(
+    planId: string
+  ): Promise<ValidationPlanResponseDTO> {
+    return apiJson<ValidationPlanResponseDTO>(
+      `/api/v1/parameter-trust/validation/plans/${encodeURIComponent(planId)}`
+    );
+  }
+
+  /**
+   * Lists all validation plans associated with an engineering decision (Phase 6.6).
+   */
+  static async listValidationPlansForDecision(
+    decisionId: string
+  ): Promise<ValidationPlanListResponseDTO> {
+    return apiJson<ValidationPlanListResponseDTO>(
+      `/api/v1/parameter-trust/decision/${encodeURIComponent(decisionId)}/validation-plans`
+    );
+  }
+
+  /**
+   * Transitions plan status in the state machine (Phase 6.6).
+   */
+  static async transitionValidationPlan(
+    planId: string,
+    payload: ValidationPlanTransitionRequestDTO
+  ): Promise<ValidationPlanResponseDTO> {
+    return apiJson<ValidationPlanResponseDTO>(
+      `/api/v1/parameter-trust/validation/plans/${encodeURIComponent(planId)}/transition`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  }
+
+  /**
+   * Creates a new immutable plan version when authorized criteria require modification (Phase 6.6).
+   */
+  static async createNewPlanVersion(
+    planId: string,
+    payload?: Partial<ValidationPlanCreateRequestDTO>
+  ): Promise<ValidationPlanResponseDTO> {
+    return apiJson<ValidationPlanResponseDTO>(
+      `/api/v1/parameter-trust/validation/plans/${encodeURIComponent(planId)}/version`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload || {}),
+      }
+    );
+  }
+
+  /**
+   * Submits an observed validation evidence item (Phase 6.6).
+   */
+  static async submitValidationEvidence(
+    planId: string,
+    payload: EvidenceSubmissionRequestDTO
+  ): Promise<EvidenceItemResponseDTO> {
+    return apiJson<EvidenceItemResponseDTO>(
+      `/api/v1/parameter-trust/validation/plans/${encodeURIComponent(planId)}/evidence`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  }
+
+  /**
+   * Reviews a submitted validation evidence item (Phase 6.6).
+   */
+  static async reviewValidationEvidence(
+    planId: string,
+    evidenceId: string,
+    payload: EvidenceReviewRequestDTO
+  ): Promise<EvidenceItemResponseDTO> {
+    return apiJson<EvidenceItemResponseDTO>(
+      `/api/v1/parameter-trust/validation/plans/${encodeURIComponent(planId)}/evidence/${encodeURIComponent(evidenceId)}/review`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  }
+
+  /**
+   * Evaluates evidence closure for a plan against its acceptance criteria (Phase 6.6).
+   */
+  static async evaluateEvidenceClosure(
+    planId: string,
+    payload?: ClosureAssessmentRequestDTO
+  ): Promise<ClosureAssessmentResponseDTO> {
+    return apiJson<ClosureAssessmentResponseDTO>(
+      `/api/v1/parameter-trust/validation/plans/${encodeURIComponent(planId)}/closure-assessment`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload || {}),
+      }
+    );
+  }
+
+  /**
+   * Reassesses an engineering decision using newly closed validation evidence (Phase 6.6).
+   */
+  static async reassessDecision(
+    planId: string,
+    payload?: DecisionReassessmentRequestDTO
+  ): Promise<DecisionReassessmentResponseDTO> {
+    return apiJson<DecisionReassessmentResponseDTO>(
+      `/api/v1/parameter-trust/validation/plans/${encodeURIComponent(planId)}/reassess`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload || {}),
+      }
+    );
+  }
+
+  /**
+   * Retrieves historical decision reassessments for an engineering decision (Phase 6.6).
+   */
+  static async getDecisionReassessments(
+    decisionId: string
+  ): Promise<DecisionReassessmentHistoryResponseDTO> {
+    return apiJson<DecisionReassessmentHistoryResponseDTO>(
+      `/api/v1/parameter-trust/decision/${encodeURIComponent(decisionId)}/reassessments`
+    );
+  }
+}
+
+export const ParameterTrustValidationApi = ValidationPlanningApi;
+
 // ── Phase 6.4 Decision Trust DTO Interfaces ──────────────────────────────────
 
 export interface DecisionExposureAssessRequestDTO {
@@ -3944,6 +4092,261 @@ export interface DecisionVOIResponseDTO {
 export interface RobustnessHistoryResponseDTO {
   decision_id: string;
   history: Array<Record<string, any>>;
+  total: number;
+}
+
+// ── Phase 6.6 Engineering Validation Planning & Evidence Closure Interfaces ─
+
+export type ValidationPlanStatusType =
+  | "DRAFT"
+  | "PROPOSED"
+  | "AUTHORIZED"
+  | "IN_PROGRESS"
+  | "EVIDENCE_SUBMITTED"
+  | "UNDER_REVIEW"
+  | "ACCEPTED"
+  | "REJECTED"
+  | "INCONCLUSIVE"
+  | "SUPERSEDED";
+
+export type ValidationMethodType =
+  | "PHYSICAL_TEST_TRACK"
+  | "LAB_COMPONENT_DYNOMETER"
+  | "RIG_TEST_4_POST"
+  | "DAMPER_DYNO_FORCE_VELOCITY"
+  | "TIRE_FORCE_MOMENT_DRUM"
+  | "KINEMATICS_COMPLIANCE_RIG"
+  | "SURFACE_PROFILOMETRY"
+  | "PRODUCTION_METROLOGY"
+  | "METROLOGY_INSPECTION"
+  | "NUMERICAL_CAE_RECOMPUTATION"
+  | "CALIBRATED_HARDWARE_IN_LOOP"
+  | "FLEET_OPERATIONAL_LOG";
+
+export type EvidenceClosureVerdictType =
+  | "CLOSED_WITH_SUPPORTING_EVIDENCE"
+  | "CLOSED_WITH_QUALIFIED_UNCERTAINTY"
+  | "EVIDENCE_CONFLICTED"
+  | "EVIDENCE_NOT_APPLICABLE"
+  | "UNRESOLVED_LIMITATIONS"
+  | "CRITERIA_FAILED"
+  | "REMAINS_OPEN";
+
+export type ReversalResolutionStatusType =
+  | "REVERSAL_RESOLVED"
+  | "REVERSAL_PERSISTS"
+  | "NEW_REVERSAL_INTRODUCED"
+  | "NO_REVERSAL_DEMONSTRATED";
+
+export interface AcceptanceCriterionDTO {
+  metric_name: string;
+  target_value?: number | null;
+  tolerance_band?: [number, number] | number[] | null;
+  unit: string;
+  status: "PROPOSED" | "AUTHORIZED" | "SATISFIED" | "BREACHED" | "SUPERSEDED" | string;
+  rationale?: string;
+  provenance?: string;
+  measured_value?: number | null;
+  passed?: boolean | null;
+}
+
+export interface ValidationPlanCreateRequestDTO {
+  decision_id: string;
+  parameter_name: string;
+  evidence_gap_id?: string | null;
+  parameter_path?: string | null;
+  validation_objective?: string | null;
+  validation_method?: ValidationMethodType | string | null;
+  unit?: string | null;
+  measurement_definition?: string | null;
+  acceptance_criteria?: AcceptanceCriterionDTO[] | Array<Record<string, any>> | null;
+  input_artifact_requirements?: string[] | null;
+  operating_conditions?: Record<string, any> | null;
+  applicability_envelope?: Record<string, any> | null;
+  expected_outputs?: string[] | null;
+  required_reviewer_role?: string | null;
+}
+
+export interface ValidationPlanResponseDTO {
+  id: string;
+  plan_id: string;
+  decision_id: string;
+  decision_type?: string | null;
+  parameter_name: string;
+  parameter_path?: string | null;
+  evidence_gap_id?: string | null;
+  validation_objective?: string | null;
+  validation_method?: string | null;
+  status: ValidationPlanStatusType | string;
+  plan_version: number;
+  parent_plan_id?: string | null;
+  exposure_assessment_id?: string | null;
+  robustness_analysis_id?: string | null;
+  analysis_snapshot_hash?: string | null;
+  input_artifact_requirements?: string[] | null;
+  operating_conditions?: Record<string, any> | null;
+  applicability_envelope?: Record<string, any> | null;
+  unit?: string | null;
+  measurement_definition?: string | null;
+  acceptance_criteria?: AcceptanceCriterionDTO[] | Array<Record<string, any>> | null;
+  criteria_established_at?: string | null;
+  criteria_authorized_by_user_id?: string | null;
+  expected_outputs?: string[] | null;
+  required_reviewer_role?: string | null;
+  authorized_by_user_id?: string | null;
+  authorized_at?: string | null;
+  plan_hash?: string | null;
+  is_active: boolean;
+  governance_separation_notice?: string | null;
+  deployment_safety_inferred: boolean;
+  deployment_authorization: string;
+  organization_id?: string | null;
+  team_id?: string | null;
+  created_by_user_id?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  evidence_items?: EvidenceItemResponseDTO[] | Array<Record<string, any>> | null;
+  closures?: ClosureAssessmentResponseDTO[] | Array<Record<string, any>> | null;
+  reassessments?: DecisionReassessmentResponseDTO[] | Array<Record<string, any>> | null;
+}
+
+export interface ValidationPlanListResponseDTO {
+  decision_id: string;
+  plans: ValidationPlanResponseDTO[];
+  total: number;
+}
+
+export interface ValidationPlanTransitionRequestDTO {
+  target_status: ValidationPlanStatusType | string;
+  reason?: string | null;
+  authorized_by_role?: string | null;
+}
+
+export interface EvidenceSubmissionRequestDTO {
+  evidence_source_type: string;
+  source_identifier: string;
+  parameter_name?: string | null;
+  observed_value?: number | null;
+  observed_interval?: [number, number] | number[] | null;
+  observed_samples?: number[] | null;
+  unit?: string | null;
+  operating_scope?: Record<string, any> | null;
+  integrity_hash?: string | null;
+  provenance?: Record<string, any> | null;
+  calibration_metadata?: Record<string, any> | null;
+  is_physically_validated?: boolean;
+  physical_limitations?: string | null;
+  source_timestamp?: string | null;
+}
+
+export interface EvidenceItemResponseDTO {
+  id: string;
+  plan_id: string;
+  evidence_source_type: string;
+  source_identifier: string;
+  source_timestamp?: string | null;
+  parameter_name: string;
+  observed_value?: number | null;
+  observed_interval?: [number, number] | number[] | null;
+  observed_samples?: number[] | null;
+  unit?: string | null;
+  operating_scope?: Record<string, any> | null;
+  integrity_hash?: string | null;
+  provenance?: Record<string, any> | null;
+  calibration_metadata?: Record<string, any> | null;
+  is_physically_validated: boolean;
+  physical_limitations?: string | null;
+  review_status: string;
+  review_notes?: string | null;
+  reviewed_by_user_id?: string | null;
+  reviewed_at?: string | null;
+  organization_id?: string | null;
+  team_id?: string | null;
+  submitted_by_user_id?: string | null;
+  created_at?: string | null;
+}
+
+export interface EvidenceReviewRequestDTO {
+  review_status: "ACCEPTED" | "REJECTED" | "REVISION_REQUESTED" | string;
+  review_notes?: string | null;
+  reviewer_role?: string | null;
+}
+
+export interface ClosureAssessmentRequestDTO {
+  reviewer_notes?: string | null;
+  evidence_item_ids?: string[] | null;
+}
+
+export interface ClosureAssessmentResponseDTO {
+  id: string;
+  plan_id: string;
+  decision_id: string;
+  parameter_name: string;
+  evidence_gap_id?: string | null;
+  closure_verdict: EvidenceClosureVerdictType | string;
+  criteria_met: boolean;
+  criteria_evaluated?: Array<Record<string, any>> | null;
+  applicability_check?: Record<string, any> | null;
+  conflict_assessment?: Record<string, any> | null;
+  uncertainty_update?: Record<string, any> | null;
+  requires_robustness_reassessment: boolean;
+  closure_summary?: string | null;
+  closure_hash?: string | null;
+  governance_separation_notice?: string | null;
+  finite_sample_notice?: string | null;
+  deployment_safety_inferred: boolean;
+  deployment_authorization: string;
+  is_active: boolean;
+  superseded_by?: string | null;
+  organization_id?: string | null;
+  team_id?: string | null;
+  evaluated_by_user_id?: string | null;
+  created_at?: string | null;
+}
+
+export interface DecisionReassessmentRequestDTO {
+  closure_id?: string | null;
+  rationale?: string | null;
+}
+
+export interface DecisionReassessmentResponseDTO {
+  id: string;
+  decision_id: string;
+  decision_type?: string | null;
+  plan_id: string;
+  closure_id: string;
+  original_exposure_assessment_id?: string | null;
+  original_robustness_analysis_id?: string | null;
+  new_robustness_analysis_id?: string | null;
+  reassessment_delta?: {
+    classification_before?: string;
+    classification_after?: string;
+    reversals_before_count?: number;
+    reversals_after_count?: number;
+    reversal_status?: ReversalResolutionStatusType | string;
+    parameter_uncertainty_updated?: string;
+    boundaries_before_count?: number;
+    boundaries_after_count?: number;
+    dominant_uncertainties_after?: DominantUncertaintyDTO[];
+    gap_closure_verdict?: string;
+  } | null;
+  reversal_status: ReversalResolutionStatusType | string;
+  envelope_coverage_statement?: string | null;
+  governance_separation_notice?: string | null;
+  deployment_safety_inferred: boolean;
+  deployment_authorization: string;
+  reassessment_hash?: string | null;
+  is_active: boolean;
+  superseded_by?: string | null;
+  organization_id?: string | null;
+  team_id?: string | null;
+  reassessed_by_user_id?: string | null;
+  created_at?: string | null;
+}
+
+export interface DecisionReassessmentHistoryResponseDTO {
+  decision_id: string;
+  reassessments: DecisionReassessmentResponseDTO[];
   total: number;
 }
 

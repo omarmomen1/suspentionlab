@@ -50,13 +50,29 @@ from suspensionlab.backend.services.parameter_trust_robustness_service import (
     MissingUncertaintyEvidenceError,
     NumericalConvergenceFailure,
 )
+from suspensionlab.backend.services.parameter_trust_validation_service import (
+    ParameterTrustValidationService,
+    ValidationPlanningError,
+    PlanNotFoundError,
+    InvalidPlanStateTransitionError,
+    CriteriaImmutableAfterAuthorizationError,
+    MissingEvidenceProvenanceError,
+    SimulationMasqueradingAsPhysicalError,
+    InvalidEvidenceScopeError,
+    UnauthorizedValidationActionError,
+)
 from suspensionlab.backend.database.models.parameter_trust import (
     ParameterTrustFleetReport,
     ParameterTrustAssemblyImpactRecord,
     DecisionParameterDependencyRecord,
     DecisionExposureAssessmentRecord,
     DecisionRobustnessAnalysisRecord,
+    EngineeringValidationPlanRecord,
+    ValidationEvidenceItemRecord,
+    ValidationEvidenceClosureRecord,
+    ValidationDecisionReassessmentRecord,
     CURRENT_ROBUSTNESS_POLICY_VERSION,
+    CURRENT_VALIDATION_PLANNING_POLICY_VERSION,
 )
 from suspensionlab.backend.services.evidence_graph_service import (
     EntityNotFoundError,
@@ -1035,6 +1051,573 @@ async def get_decision_robustness_history_endpoint(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
 
 
+# ── PHASE 6.6 VALIDATION PLANNING & EVIDENCE CLOSURE DTO SCHEMAS ─────────────
+
+class ValidationPlanCreateRequestDTO(BaseModel):
+    decision_id: str
+    parameter_name: str
+    evidence_gap_id: Optional[str] = None
+    parameter_path: Optional[str] = None
+    validation_objective: Optional[str] = None
+    validation_method: Optional[str] = None
+    unit: Optional[str] = None
+    measurement_definition: Optional[str] = None
+    acceptance_criteria: Optional[List[Dict[str, Any]]] = None
+    input_artifact_requirements: Optional[List[str]] = None
+    operating_conditions: Optional[Dict[str, Any]] = None
+    applicability_envelope: Optional[Dict[str, Any]] = None
+    expected_outputs: Optional[List[str]] = None
+    required_reviewer_role: Optional[str] = "VALIDATION_LEAD"
+
+
+class ValidationPlanResponseDTO(BaseModel):
+    id: str
+    plan_id: str
+    decision_id: str
+    decision_type: Optional[str] = None
+    parameter_name: str
+    parameter_path: Optional[str] = None
+    evidence_gap_id: Optional[str] = None
+    validation_objective: Optional[str] = None
+    validation_method: Optional[str] = None
+    status: str
+    plan_version: int
+    parent_plan_id: Optional[str] = None
+    exposure_assessment_id: Optional[str] = None
+    robustness_analysis_id: Optional[str] = None
+    analysis_snapshot_hash: Optional[str] = None
+    input_artifact_requirements: Optional[List[str]] = None
+    operating_conditions: Optional[Dict[str, Any]] = None
+    applicability_envelope: Optional[Dict[str, Any]] = None
+    unit: Optional[str] = None
+    measurement_definition: Optional[str] = None
+    acceptance_criteria: Optional[List[Dict[str, Any]]] = None
+    criteria_established_at: Optional[str] = None
+    criteria_authorized_by_user_id: Optional[str] = None
+    expected_outputs: Optional[List[str]] = None
+    required_reviewer_role: Optional[str] = None
+    authorized_by_user_id: Optional[str] = None
+    authorized_at: Optional[str] = None
+    plan_hash: Optional[str] = None
+    is_active: bool = True
+    governance_separation_notice: Optional[str] = None
+    deployment_safety_inferred: bool = False
+    deployment_authorization: str = "NOT_ESTABLISHED"
+    organization_id: Optional[str] = None
+    team_id: Optional[str] = None
+    created_by_user_id: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    evidence_items: Optional[List[Dict[str, Any]]] = None
+    closures: Optional[List[Dict[str, Any]]] = None
+    reassessments: Optional[List[Dict[str, Any]]] = None
+
+
+class ValidationPlanListResponseDTO(BaseModel):
+    decision_id: str
+    plans: List[ValidationPlanResponseDTO]
+    total: int
+
+
+class ValidationPlanTransitionRequestDTO(BaseModel):
+    target_status: str
+    reason: Optional[str] = None
+    authorized_by_role: Optional[str] = None
+
+
+class EvidenceSubmissionRequestDTO(BaseModel):
+    evidence_source_type: str = "PHYSICAL_RIG_MEASUREMENT"
+    source_identifier: str
+    parameter_name: Optional[str] = None
+    observed_value: Optional[float] = None
+    observed_interval: Optional[List[float]] = None
+    observed_samples: Optional[List[float]] = None
+    unit: Optional[str] = None
+    operating_scope: Optional[Dict[str, Any]] = None
+    integrity_hash: Optional[str] = None
+    provenance: Optional[Dict[str, Any]] = None
+    calibration_metadata: Optional[Dict[str, Any]] = None
+    is_physically_validated: bool = False
+    physical_limitations: Optional[str] = None
+    source_timestamp: Optional[str] = None
+
+
+class EvidenceItemResponseDTO(BaseModel):
+    id: str
+    plan_id: str
+    evidence_source_type: str
+    source_identifier: str
+    source_timestamp: Optional[str] = None
+    parameter_name: str
+    observed_value: Optional[float] = None
+    observed_interval: Optional[List[float]] = None
+    observed_samples: Optional[List[float]] = None
+    unit: Optional[str] = None
+    operating_scope: Optional[Dict[str, Any]] = None
+    integrity_hash: Optional[str] = None
+    provenance: Optional[Dict[str, Any]] = None
+    calibration_metadata: Optional[Dict[str, Any]] = None
+    is_physically_validated: bool = False
+    physical_limitations: Optional[str] = None
+    review_status: str
+    review_notes: Optional[str] = None
+    reviewed_by_user_id: Optional[str] = None
+    reviewed_at: Optional[str] = None
+    organization_id: Optional[str] = None
+    team_id: Optional[str] = None
+    submitted_by_user_id: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class EvidenceReviewRequestDTO(BaseModel):
+    review_status: str
+    review_notes: Optional[str] = None
+    reviewer_role: Optional[str] = None
+
+
+class ClosureAssessmentRequestDTO(BaseModel):
+    reviewer_notes: Optional[str] = None
+    evidence_item_ids: Optional[List[str]] = None
+
+
+class ClosureAssessmentResponseDTO(BaseModel):
+    id: str
+    plan_id: str
+    decision_id: str
+    parameter_name: str
+    evidence_gap_id: Optional[str] = None
+    closure_verdict: str
+    criteria_met: bool
+    criteria_evaluated: Optional[List[Dict[str, Any]]] = None
+    applicability_check: Optional[Dict[str, Any]] = None
+    conflict_assessment: Optional[Dict[str, Any]] = None
+    uncertainty_update: Optional[Dict[str, Any]] = None
+    requires_robustness_reassessment: bool = False
+    closure_summary: Optional[str] = None
+    closure_hash: Optional[str] = None
+    governance_separation_notice: Optional[str] = None
+    finite_sample_notice: Optional[str] = None
+    deployment_safety_inferred: bool = False
+    deployment_authorization: str = "NOT_ESTABLISHED"
+    is_active: bool = True
+    superseded_by: Optional[str] = None
+    organization_id: Optional[str] = None
+    team_id: Optional[str] = None
+    evaluated_by_user_id: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class DecisionReassessmentRequestDTO(BaseModel):
+    closure_id: Optional[str] = None
+    rationale: Optional[str] = None
+
+
+class DecisionReassessmentResponseDTO(BaseModel):
+    id: str
+    decision_id: str
+    decision_type: Optional[str] = None
+    plan_id: str
+    closure_id: str
+    original_exposure_assessment_id: Optional[str] = None
+    original_robustness_analysis_id: Optional[str] = None
+    new_robustness_analysis_id: Optional[str] = None
+    reassessment_delta: Optional[Dict[str, Any]] = None
+    reversal_status: str
+    envelope_coverage_statement: Optional[str] = None
+    governance_separation_notice: Optional[str] = None
+    deployment_safety_inferred: bool = False
+    deployment_authorization: str = "NOT_ESTABLISHED"
+    reassessment_hash: Optional[str] = None
+    is_active: bool = True
+    superseded_by: Optional[str] = None
+    organization_id: Optional[str] = None
+    team_id: Optional[str] = None
+    reassessed_by_user_id: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class DecisionReassessmentHistoryResponseDTO(BaseModel):
+    decision_id: str
+    reassessments: List[DecisionReassessmentResponseDTO]
+    total: int
+
+
+# ── PHASE 6.6 VALIDATION PLANNING & EVIDENCE CLOSURE ENDPOINTS ───────────────
+
+@router.post(
+    "/validation/plans",
+    response_model=ValidationPlanResponseDTO,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_validation_plan_endpoint(
+    req: ValidationPlanCreateRequestDTO,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Creates an Engineering Validation Plan bound to an engineering decision,
+    target parameter, and specific evidence gap.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        res = await ParameterTrustValidationService.create_validation_plan(
+            db=db,
+            decision_id=req.decision_id,
+            parameter_name=req.parameter_name,
+            user_context=user,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+            evidence_gap_id=req.evidence_gap_id,
+            parameter_path=req.parameter_path,
+            validation_objective=req.validation_objective,
+            validation_method=req.validation_method,
+            unit=req.unit,
+            measurement_definition=req.measurement_definition,
+            acceptance_criteria=req.acceptance_criteria or [],
+            input_artifact_requirements=req.input_artifact_requirements or [],
+            operating_conditions=req.operating_conditions or {},
+            applicability_envelope=req.applicability_envelope or {},
+            expected_outputs=req.expected_outputs or [],
+            required_reviewer_role=req.required_reviewer_role or "VALIDATION_LEAD",
+        )
+        return ValidationPlanResponseDTO(**res)
+    except (DecisionNotFoundError, EntityNotFoundError, MalformedIdentifierError) as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except (TenantIsolationError, PreRevealFirewallViolation, UnauthorizedValidationActionError) as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except (
+        CriteriaImmutableAfterAuthorizationError,
+        SimulationMasqueradingAsPhysicalError,
+        MissingEvidenceProvenanceError,
+        InvalidPlanStateTransitionError,
+        InvalidEvidenceScopeError,
+        ValidationPlanningError,
+        ValueError,
+    ) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get(
+    "/validation/plans/{plan_id}",
+    response_model=ValidationPlanResponseDTO,
+)
+async def get_validation_plan_endpoint(
+    plan_id: str,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Retrieves a validation plan, including criteria, status, and related evidence items.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        res = await ParameterTrustValidationService.get_validation_plan(
+            db=db,
+            plan_id=plan_id,
+            user_context=user,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        return ValidationPlanResponseDTO(**res)
+    except PlanNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.get(
+    "/decision/{decision_id}/validation-plans",
+    response_model=ValidationPlanListResponseDTO,
+)
+async def list_decision_validation_plans_endpoint(
+    decision_id: str,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Lists all validation plans associated with an engineering decision.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        res = await ParameterTrustValidationService.list_plans_for_decision(
+            db=db,
+            decision_id=decision_id,
+            user_context=user,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        return ValidationPlanListResponseDTO(**res)
+    except DecisionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.post(
+    "/validation/plans/{plan_id}/transition",
+    response_model=ValidationPlanResponseDTO,
+)
+async def transition_validation_plan_endpoint(
+    plan_id: str,
+    req: ValidationPlanTransitionRequestDTO,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Transitions plan status (DRAFT -> PROPOSED -> AUTHORIZED -> IN_PROGRESS -> etc.).
+    Enforces criteria sealing upon authorization and RBAC reviewer validation.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        res = await ParameterTrustValidationService.transition_plan_status(
+            db=db,
+            plan_id=plan_id,
+            target_status=req.target_status,
+            user_context=user,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        return ValidationPlanResponseDTO(**res)
+    except PlanNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except UnauthorizedValidationActionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except (InvalidPlanStateTransitionError, ValidationPlanningError, ValueError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/validation/plans/{plan_id}/version",
+    response_model=ValidationPlanResponseDTO,
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_new_plan_version_endpoint(
+    plan_id: str,
+    req: ValidationPlanCreateRequestDTO = None,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Creates a new immutable version of a plan when authorized criteria require modification.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    kwargs = {}
+    if req:
+        if req.acceptance_criteria is not None:
+            kwargs["acceptance_criteria"] = req.acceptance_criteria
+        if req.validation_objective is not None:
+            kwargs["validation_objective"] = req.validation_objective
+        if req.validation_method is not None:
+            kwargs["validation_method"] = req.validation_method
+        if req.operating_conditions is not None:
+            kwargs["operating_conditions"] = req.operating_conditions
+    try:
+        res = await ParameterTrustValidationService.create_new_plan_version(
+            db=db,
+            plan_id=plan_id,
+            user_context=user,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+            **kwargs,
+        )
+        return ValidationPlanResponseDTO(**res)
+    except PlanNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except UnauthorizedValidationActionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ValidationPlanningError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/validation/plans/{plan_id}/evidence",
+    response_model=EvidenceItemResponseDTO,
+    status_code=status.HTTP_201_CREATED,
+)
+async def submit_validation_evidence_endpoint(
+    plan_id: str,
+    req: EvidenceSubmissionRequestDTO,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Submits an observed validation evidence item. Enforces provenance tracking,
+    Phase 5 pre-reveal firewall, and blocks simulated data masquerading as physical evidence.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        evidence_dict = req.model_dump()
+        res = await ParameterTrustValidationService.submit_evidence(
+            db=db,
+            plan_id=plan_id,
+            evidence_data=evidence_dict,
+            user_context=user,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        return EvidenceItemResponseDTO(**res)
+    except PlanNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except PreRevealFirewallViolation as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except (
+        SimulationMasqueradingAsPhysicalError,
+        MissingEvidenceProvenanceError,
+        InvalidPlanStateTransitionError,
+        InvalidEvidenceScopeError,
+        ValidationPlanningError,
+        ValueError,
+    ) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/validation/plans/{plan_id}/evidence/{evidence_id}/review",
+    response_model=EvidenceItemResponseDTO,
+)
+async def review_validation_evidence_endpoint(
+    plan_id: str,
+    evidence_id: str,
+    req: EvidenceReviewRequestDTO,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Reviews a submitted validation evidence item (ACCEPTED, REJECTED, REVISION_REQUESTED).
+    Requires authorized reviewer role.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        res = await ParameterTrustValidationService.review_evidence_item(
+            db=db,
+            evidence_id=evidence_id,
+            disposition=req.review_status,
+            user_context=user,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+            review_notes=req.review_notes,
+        )
+        return EvidenceItemResponseDTO(**res)
+    except PlanNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except UnauthorizedValidationActionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ValidationPlanningError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/validation/plans/{plan_id}/closure-assessment",
+    response_model=ClosureAssessmentResponseDTO,
+)
+async def evaluate_evidence_closure_endpoint(
+    plan_id: str,
+    req: Optional[ClosureAssessmentRequestDTO] = None,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Evaluates whether submitted evidence satisfies authorized acceptance criteria and closes the gap.
+    Emits an immutable closure verdict without inferring deployment safety.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    reviewer_notes = req.reviewer_notes if req else None
+    evidence_ids = req.evidence_item_ids if req else None
+    try:
+        res = await ParameterTrustValidationService.evaluate_evidence_closure(
+            db=db,
+            plan_id=plan_id,
+            user_context=user,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+            reviewer_notes=reviewer_notes,
+            evidence_item_ids=evidence_ids,
+        )
+        return ClosureAssessmentResponseDTO(**res)
+    except PlanNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ValidationPlanningError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/validation/plans/{plan_id}/reassess",
+    response_model=DecisionReassessmentResponseDTO,
+)
+async def execute_decision_reassessment_endpoint(
+    plan_id: str,
+    req: Optional[DecisionReassessmentRequestDTO] = None,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Triggers decision robustness reassessment using newly closed evidence.
+    Computes before-and-after deltas, reversal resolution status, and finite-sample notice.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    closure_id = req.closure_id if req else None
+    rationale = req.rationale if req else None
+    try:
+        res = await ParameterTrustValidationService.execute_decision_reassessment(
+            db=db,
+            plan_id=plan_id,
+            closure_id=closure_id,
+            rationale=rationale,
+            user_context=user,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        return DecisionReassessmentResponseDTO(**res)
+    except PlanNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except DecisionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except ValidationPlanningError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get(
+    "/decision/{decision_id}/reassessments",
+    response_model=DecisionReassessmentHistoryResponseDTO,
+)
+async def get_decision_reassessments_endpoint(
+    decision_id: str,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Retrieves historical decision reassessments for an engineering decision.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        res = await ParameterTrustValidationService.get_decision_reassessments(
+            db=db,
+            decision_id=decision_id,
+            user_context=user,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        return DecisionReassessmentHistoryResponseDTO(**res)
+    except DecisionNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
 # ── ENDPOINTS ──────────────────────────────────────────────────────────────────
 
 @router.get(
@@ -1535,8 +2118,5 @@ async def analyze_parameter_sweep_endpoint(
         return ParameterSweepAnalysisResponseDTO(**report)
     except UnsupportedEntityTypeError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
-
-
-
 
 
