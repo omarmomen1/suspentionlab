@@ -125,6 +125,12 @@ class SolverExecutionJob(Base):
     failure_reason = Column(Text, nullable=True)
     error_category = Column(String(64), nullable=True)
 
+    # Lease & Concurrency Hardening (Phase 7.4)
+    lease_expires_at = Column(DateTime(timezone=True), nullable=True)
+    heartbeat_at = Column(DateTime(timezone=True), nullable=True)
+    execution_mode = Column(String(32), nullable=False, default="TRUSTED_ALLOWLIST")
+    benchmark_reference_type = Column(String(64), nullable=True)
+
     # Epistemic Invariants
     is_executed = Column(Boolean, nullable=False, default=False)
     is_physically_validated = Column(Boolean, nullable=False, default=False)
@@ -144,6 +150,7 @@ class SolverExecutionJob(Base):
         Index("ix_solver_execution_jobs_user_state", "user_id", "state", "created_at"),
         Index("ix_solver_execution_jobs_idemp", "user_id", "idempotency_key"),
         Index("ix_solver_execution_jobs_hash", "input_artifact_hash"),
+        Index("ix_solver_execution_jobs_lease", "state", "lease_expires_at"),
     )
 
     def assert_mutable(self) -> None:

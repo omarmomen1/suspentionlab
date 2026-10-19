@@ -21,7 +21,7 @@ import os
 import pathlib
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
@@ -53,6 +53,12 @@ from suspensionlab.interop.reconciliation.engine import (
     ReconciliationReport,
     ResultReconciliationEngine,
 )
+from suspensionlab.interop.benchmarks.independent_solver import (
+    BenchmarkMethod,
+    BenchmarkScenario,
+    IndependentSolverBenchmark,
+    QuarterCarBenchmarkParams,
+)
 from suspensionlab.interop.runners.external_cae_solver import solve_rk4_quarter_car
 from suspensionlab.interop.security import (
     InteropSecurityError,
@@ -62,6 +68,12 @@ from suspensionlab.interop.security import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Security & Isolation Capabilities (Phase 7.4)
+UNTRUSTED_FMU_ISOLATION_AVAILABLE: bool = False
+VETTED_FMU_SHA256 = {
+    "b4a0247de1e3ba24cc2c5922a4f08259dcd7c45c588167444dafcf7e08bbfbd0",  # QuarterCarRideModel.fmu
+}
 
 
 class RuntimeUnavailableError(InteropSecurityError):
@@ -225,12 +237,15 @@ class SolverExecutionService:
 
         art_bytes = pathlib.Path(artifact.storage_path).read_bytes()
 
-        # Transition QUEUED -> RUNNING
+        # Transition QUEUED -> RUNNING with Lease and Execution Mode Hardening (Phase 7.4)
         job.transition_to(ExecutionJobState.RUNNING)
+        timeout_sec = float(job.resource_limits.get("timeout_seconds", DEFAULT_TIMEOUT_SECONDS))
+        job.lease_expires_at = datetime.now(timezone.utc) + timedelta(seconds=timeout_sec + 30.0)
+        job.heartbeat_at = datetime.now(timezone.utc)
+        job.execution_mode = "TRUSTED_ALLOWLIST"
         await db.commit()
 
         # Initialize sandbox
-        timeout_sec = float(job.resource_limits.get("timeout_seconds", DEFAULT_TIMEOUT_SECONDS))
         sandbox = ExecutionSandbox(
             job_id=str(job.id),
             timeout_seconds=timeout_sec,
@@ -241,6 +256,22 @@ class SolverExecutionService:
 
         # Stage input artifact
         staged_input = sandbox.stage_file(artifact.artifact_name, art_bytes)
+
+        # TOCTOU Verification Gate (Phase 7.4):
+        # Re-hash staged artifact directly from disk inside the sandbox directory.
+        staged_disk_sha = hashlib.sha256(staged_input.read_bytes()).hexdigest()
+        if staged_disk_sha != artifact.sha256_hash:
+            job.transition_to(
+                ExecutionJobState.FAILED,
+                exit_code=1,
+                failure_reason=(
+                    f"TOCTOU_INTEGRITY_VIOLATION: Staged file hash ({staged_disk_sha}) does not match "
+                    f"registered artifact sha256_hash ({artifact.sha256_hash})."
+                ),
+                error_category="TOCTOU_INTEGRITY_VIOLATION",
+            )
+            await db.commit()
+            return job
 
         # Build execution command
         runtime_info = SolverRuntimeRegistry.get_runtime(job.solver_name)
@@ -253,24 +284,21 @@ class SolverExecutionService:
         bump_time = float(job.execution_config.get("bump_time", 0.1))
 
         if job.solver_name == "FMI_COSIMULATION":
-            # CRITICAL TASK 5: Untrusted FMU Native Library Isolation Gate
-            # Native binaries inside FMUs run with host OS worker privileges. Enterprise policy
-            # strictly restricts execution to vetted, allowlisted FMUs.
-            VETTED_FMU_SHA256 = {
-                "b4a0247de1e3ba24cc2c5922a4f08259dcd7c45c588167444dafcf7e08bbfbd0",  # QuarterCarRideModel.fmu
-            }
+            # Strict Cryptographic Allowlist Gate (Mode 1 & Mode 2 fail-closed)
+            # Untrusted FMU native binaries execute with worker privileges. Enterprise policy
+            # strictly restricts execution to cryptographically vetted hashes (no filename bypass).
             if staged_input.suffix.lower() == ".fmu":
-                staged_sha = hashlib.sha256(staged_input.read_bytes()).hexdigest()
-                is_vetted = (staged_sha in VETTED_FMU_SHA256) or (artifact.sha256_hash in VETTED_FMU_SHA256) or (artifact.artifact_name == "QuarterCarRideModel.fmu")
+                is_vetted = (staged_disk_sha in VETTED_FMU_SHA256) or (artifact.sha256_hash in VETTED_FMU_SHA256)
                 if not is_vetted and not job.execution_config.get("bypass_fmu_vetting"):
                     job.transition_to(
                         ExecutionJobState.FAILED,
                         exit_code=1,
                         failure_reason=(
                             f"UNTRUSTED_FMU_EXECUTION_REJECTED: FMU '{artifact.artifact_name}' "
-                            f"(SHA256: {staged_sha[:16]}...) is not in the vetted allowlist. "
+                            f"(SHA256: {staged_disk_sha[:16]}...) is not in the vetted allowlist. "
                             "Untrusted native DLL/SO execution is blocked by sandbox security policy."
                         ),
+                        error_category="UNTRUSTED_FMU_EXECUTION_REJECTED",
                     )
                     await db.commit()
                     return job
@@ -468,15 +496,51 @@ class SolverExecutionService:
         res = await db.execute(stmt)
         return list(res.scalars().all())
 
+    async def recover_crashed_jobs(self, db: AsyncSession) -> List[SolverExecutionJob]:
+        """
+        Identifies orphaned or dead-worker execution jobs left in RUNNING state
+        whose lease has expired, and transitions them safely to FAILED with error category WORKER_CRASH_ORPHAN.
+        """
+        now = datetime.now(timezone.utc)
+        stmt = select(SolverExecutionJob).where(
+            SolverExecutionJob.state == ExecutionJobState.RUNNING.value,
+            SolverExecutionJob.lease_expires_at != None,
+            SolverExecutionJob.lease_expires_at < now,
+        )
+        res = await db.execute(stmt)
+        crashed_jobs = list(res.scalars().all())
+
+        recovered = []
+        for job in crashed_jobs:
+            logger.warning(
+                "Recovering crashed/orphaned execution job %s (lease expired at %s, current %s)",
+                job.id, job.lease_expires_at, now
+            )
+            job.transition_to(
+                ExecutionJobState.FAILED,
+                exit_code=-9,
+                error_category="WORKER_CRASH_ORPHAN",
+                failure_reason="Execution lease expired or worker process terminated unexpectedly without reporting exit status.",
+            )
+            recovered.append(job)
+
+        if recovered:
+            await db.commit()
+        return recovered
+
     async def reconcile_job_results(
         self,
         db: AsyncSession,
         job_id: uuid.UUID,
         user: Any,
         custom_tolerances: Optional[Dict[str, float]] = None,
+        custom_absolute_tolerances: Optional[Dict[str, float]] = None,
+        benchmark_method: Optional[str] = None,
+        required_signals: Optional[List[str]] = None,
     ) -> ReconciliationReport:
         """
         Reconciles completed external simulation output against reference 2-DOF dynamics.
+        Supports internal RK4, exact matrix exponential, and adaptive high-order solvers.
         """
         job = await self.get_job(db, job_id, user)
         if job.state != ExecutionJobState.COMPLETED.value or not job.is_executed:
@@ -498,7 +562,7 @@ class SolverExecutionService:
 
         ext_data = ResultReconciliationEngine.parse_time_series_csv(pathlib.Path(csv_art.storage_path))
 
-        # Generate independent reference response for identical input parameters
+        # Generate reference response for identical input parameters
         cfg = job.execution_config or {}
         duration = float(cfg.get("duration", 2.0))
         dt = float(cfg.get("step_size", cfg.get("step", 0.002)))
@@ -520,35 +584,60 @@ class SolverExecutionService:
             k_t = float(cfg.get("k_t", 190000.0))
             MR = float(cfg.get("MR", 1.0))
 
-        ref_times, ref_zs, ref_zu, ref_susp, ref_tire, ref_acc = solve_rk4_quarter_car(
+        bench_method = benchmark_method or cfg.get("benchmark_method") or "INTERNAL_RK4_REFERENCE"
+        job.benchmark_reference_type = bench_method
+
+        params = QuarterCarBenchmarkParams(
             m_s=m_s,
             m_u=m_u,
             k_s=k_s,
             c=c,
             k_t=k_t,
             MR=MR,
-            duration=duration,
-            dt=dt,
-            bump_height=bump_h,
-            bump_time=bump_t,
+            c_t=0.0,
         )
 
-        import numpy as np
-        ref_data = {
-            "time": np.array(ref_times, dtype=np.float64),
-            "z_s": np.array(ref_zs, dtype=np.float64),
-            "z_u": np.array(ref_zu, dtype=np.float64),
-            "susp_travel": np.array(ref_susp, dtype=np.float64),
-            "tire_load_dynamic": np.array(ref_tire, dtype=np.float64),
-            "body_accel": np.array(ref_acc, dtype=np.float64),
-        }
+        if bench_method == BenchmarkMethod.EXACT_ANALYTICAL_MATRIX_EXPONENTIAL.value:
+            bench = IndependentSolverBenchmark(params=params)
+            road_fn = (lambda t: (bump_h, 0.0) if t >= bump_t else (0.0, 0.0)) if bump_h > 0 else (lambda t: (0.0, 0.0))
+            ref_data = bench.solve_matrix_exponential((0.0, duration), dt, road_func=road_fn)
+            ref_model_name = "IndependentBenchmark_ExactMatrixExponential_2DOF"
+        elif bench_method == BenchmarkMethod.HIGH_ORDER_ADAPTIVE_NUMERICAL.value:
+            bench = IndependentSolverBenchmark(params=params)
+            road_fn = (lambda t: (bump_h, 0.0) if t >= bump_t else (0.0, 0.0)) if bump_h > 0 else (lambda t: (0.0, 0.0))
+            ref_data = bench.solve_adaptive_high_order((0.0, duration), dt, road_func=road_fn, method="DOP853")
+            ref_model_name = "IndependentBenchmark_AdaptiveDOP853_2DOF"
+        else:
+            ref_times, ref_zs, ref_zu, ref_susp, ref_tire, ref_acc = solve_rk4_quarter_car(
+                m_s=m_s,
+                m_u=m_u,
+                k_s=k_s,
+                c=c,
+                k_t=k_t,
+                MR=MR,
+                duration=duration,
+                dt=dt,
+                bump_height=bump_h,
+                bump_time=bump_t,
+            )
+            ref_data = {
+                "time": np.array(ref_times, dtype=np.float64),
+                "z_s": np.array(ref_zs, dtype=np.float64),
+                "z_u": np.array(ref_zu, dtype=np.float64),
+                "susp_travel": np.array(ref_susp, dtype=np.float64),
+                "tire_load_dynamic": np.array(ref_tire, dtype=np.float64),
+                "body_accel": np.array(ref_acc, dtype=np.float64),
+            }
+            ref_model_name = "AnalyticalQuarterCar_RK4_2DOF"
 
         report = ResultReconciliationEngine.reconcile(
             external_data=ext_data,
             reference_data=ref_data,
             solver_name=job.solver_name,
-            reference_model="AnalyticalQuarterCar_RK4_2DOF",
+            reference_model=ref_model_name,
             custom_tolerances=custom_tolerances,
+            custom_absolute_tolerances=custom_absolute_tolerances,
+            required_signals=required_signals,
         )
 
         job.reconciliation_summary = report.to_dict()

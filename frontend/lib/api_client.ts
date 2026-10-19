@@ -4301,6 +4301,10 @@ export interface JobResponseDTO {
   stderr_excerpt?: string | null;
   failure_reason?: string | null;
   error_category?: string | null;
+  lease_expires_at?: string | null;
+  heartbeat_at?: string | null;
+  execution_mode?: string;
+  benchmark_reference_type?: string | null;
   is_executed: boolean;
   is_physically_validated: boolean;
   execution_provenance: Record<string, any>;
@@ -4343,6 +4347,10 @@ export class SolverExecutionApi {
     return apiJson<RuntimeEnvironmentInfoDTO[]>("/api/v1/interop/runtimes");
   }
 
+  static async getBenchmarkCapabilities(): Promise<any> {
+    return apiJson<any>("/api/v1/interop/benchmarks/capabilities");
+  }
+
   static async preflightExecution(req: JobPreflightRequestDTO): Promise<JobPreflightResponseDTO> {
     return apiJson<JobPreflightResponseDTO>("/api/v1/interop/execute/preflight", {
       method: "POST",
@@ -4371,10 +4379,34 @@ export class SolverExecutionApi {
     });
   }
 
-  static async reconcileJob(jobId: string, customTolerances?: Record<string, any>): Promise<ReconciliationReportDTO> {
-    return apiJson<ReconciliationReportDTO>(`/api/v1/interop/jobs/${encodeURIComponent(jobId)}/reconcile`, {
+  static async recoverCrashedJobs(): Promise<JobResponseDTO[]> {
+    return apiJson<JobResponseDTO[]>("/api/v1/interop/jobs/recover-crashed", {
       method: "POST",
-      body: JSON.stringify({ custom_tolerances: customTolerances || {} }),
+    });
+  }
+
+  static async reconcileJob(
+    jobId: string,
+    customTolerances?: Record<string, any>,
+    benchmarkMethod?: string,
+    customAbsoluteTolerances?: Record<string, any>,
+    requiredSignals?: string[]
+  ): Promise<any> {
+    const payload: Record<string, any> = {
+      custom_tolerances: customTolerances || {},
+    };
+    if (customAbsoluteTolerances !== undefined) {
+      payload.custom_absolute_tolerances = customAbsoluteTolerances;
+    }
+    if (benchmarkMethod !== undefined) {
+      payload.benchmark_method = benchmarkMethod;
+    }
+    if (requiredSignals !== undefined) {
+      payload.required_signals = requiredSignals;
+    }
+    return apiJson<any>(`/api/v1/interop/jobs/${encodeURIComponent(jobId)}/reconcile`, {
+      method: "POST",
+      body: JSON.stringify(payload),
     });
   }
 }

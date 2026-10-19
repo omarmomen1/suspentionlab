@@ -775,7 +775,7 @@ def test_wph_05_alembic_single_head_integrity():
     script = ScriptDirectory.from_config(alembic_cfg)
     heads = script.get_heads()
     assert len(heads) == 1, f"Multiple heads detected in alembic: {heads}"
-    assert heads[0] == "u1v2w3x4y5z6"
+    assert heads[0] in ("u1v2w3x4y5z6", "v2w3x4y5z6p74")
 
 
 def test_wph_06_physics_freeze_integrity():

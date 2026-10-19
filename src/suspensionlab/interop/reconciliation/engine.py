@@ -1,17 +1,20 @@
 """
 src/suspensionlab/interop/reconciliation/engine.py
 ==================================================
-SuspensionLab PRO — Engineering Result Reconciliation Engine (Phase 7.3).
+SuspensionLab PRO — Engineering Result Reconciliation Engine (Phase 7.3 & 7.4).
 
 Provides rigorous, unit-aware, mathematically verified comparison between external CAE solver
-simulation results and analytical / reference vehicle dynamics models.
+simulation results and independent reference vehicle dynamics models.
 
 Features:
-- Time-base alignment and uniform interpolation.
+- Time-base alignment and uniform interpolation (zero time-base extrapolation).
 - Peak error, RMS error, Normalized RMS error (NRMSE), and phase/delay analysis.
+- Absolute threshold gating to eliminate division-by-near-zero distortion on quiescent signals.
+- Pre-registered physical channel tolerance provenance (ISO 2631, sensor resolutions).
 - Energy and dynamic envelope consistency diagnostics.
-- Preregistered engineering tolerance verification.
-- Epistemic invariants: Mathematical consistency != Physical proving-ground validation.
+- Strict Epistemic Invariants:
+  * NUMERICAL AGREEMENT != PHYSICAL VALIDATION
+  * EXECUTED != VERIFIED CORRECT
 """
 from __future__ import annotations
 
@@ -25,6 +28,20 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
+
+
+@dataclass
+class ChannelToleranceProvenance:
+    """Documented tolerance provenance and physical sensor thresholds for a signal channel."""
+    signal_name: str
+    unit: str
+    dimension: str
+    nrmse_threshold: float
+    absolute_threshold: float
+    provenance_rationale: str
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass
@@ -42,6 +59,9 @@ class SignalMetricResult:
     tolerance_threshold: float
     is_within_tolerance: bool
     status: str  # "PASS" or "FAIL"
+    absolute_threshold: float = 0.0
+    denominator_mode: str = "PEAK_TO_PEAK_RANGE"  # "PEAK_TO_PEAK_RANGE" or "ABSOLUTE_THRESHOLD"
+    provenance_rationale: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -59,6 +79,11 @@ class ReconciliationReport:
     summary: Dict[str, Any]
     epistemic_notice: str
     created_at: str
+    epistemic_invariants: Dict[str, Any] = field(default_factory=lambda: {
+        "numerical_agreement_is_not_physical_validation": True,
+        "executed_is_not_verified_correct": True,
+        "physical_proving_ground_validation": False,
+    })
 
     def to_dict(self) -> Dict[str, Any]:
         d = asdict(self)
@@ -71,25 +96,66 @@ class ResultReconciliationEngine:
     Compares external time-series simulation outputs against independent reference dynamics.
     """
 
+    CHANNEL_PROVENANCE: Dict[str, ChannelToleranceProvenance] = {
+        "z_s": ChannelToleranceProvenance(
+            signal_name="z_s",
+            unit="m",
+            dimension="length",
+            nrmse_threshold=0.05,
+            absolute_threshold=0.002,  # 2 mm
+            provenance_rationale="Chassis ride height sensor resolution and primary body heave motion tolerance.",
+        ),
+        "z_u": ChannelToleranceProvenance(
+            signal_name="z_u",
+            unit="m",
+            dimension="length",
+            nrmse_threshold=0.08,
+            absolute_threshold=0.003,  # 3 mm
+            provenance_rationale="Wheel center hop vertical displacement measurement uncertainty and hub accelerometer integration.",
+        ),
+        "susp_travel": ChannelToleranceProvenance(
+            signal_name="susp_travel",
+            unit="m",
+            dimension="length",
+            nrmse_threshold=0.05,
+            absolute_threshold=0.002,  # 2 mm
+            provenance_rationale="Damper linear potentiometer stroke accuracy and bump stop engagement threshold.",
+        ),
+        "tire_load_dynamic": ChannelToleranceProvenance(
+            signal_name="tire_load_dynamic",
+            unit="N",
+            dimension="force",
+            nrmse_threshold=0.08,
+            absolute_threshold=50.0,  # 50 N
+            provenance_rationale="Dynamic wheel force transducer load cell calibration noise floor and contact patch compliance.",
+        ),
+        "body_accel": ChannelToleranceProvenance(
+            signal_name="body_accel",
+            unit="m/s2",
+            dimension="acceleration",
+            nrmse_threshold=0.10,
+            absolute_threshold=0.2,  # 0.2 m/s²
+            provenance_rationale="ISO 2631-1 whole-body vibration sensor sensitivity and road input spectral noise floor.",
+        ),
+    }
+
     SIGNAL_UNITS: Dict[str, Tuple[str, str]] = {
-        "z_s": ("m", "length"),
-        "z_u": ("m", "length"),
-        "susp_travel": ("m", "length"),
-        "tire_load_dynamic": ("N", "force"),
-        "body_accel": ("m/s2", "acceleration"),
+        k: (v.unit, v.dimension) for k, v in CHANNEL_PROVENANCE.items()
     }
 
     DEFAULT_TOLERANCES: Dict[str, float] = {
-        "z_s": 0.05,            # Max 5% NRMSE
-        "z_u": 0.08,            # Max 8% NRMSE
-        "susp_travel": 0.05,    # Max 5% NRMSE
-        "tire_load_dynamic": 0.08,  # Max 8% NRMSE
-        "body_accel": 0.10,     # Max 10% NRMSE
+        k: v.nrmse_threshold for k, v in CHANNEL_PROVENANCE.items()
     }
+
+    DEFAULT_ABSOLUTE_TOLERANCES: Dict[str, float] = {
+        k: v.absolute_threshold for k, v in CHANNEL_PROVENANCE.items()
+    }
+
+    MIN_OVERLAP_RATIO: float = 0.90
 
     EPISTEMIC_NOTICE: str = (
         "Strict Epistemic Governance: Numerical result reconciliation verifies mathematical consistency "
-        "and numerical convergence between external solver outputs and internal reference models under specified "
+        "and numerical convergence between external solver outputs and independent reference models under specified "
         "operating conditions. It does NOT claim or imply physical vehicle validation, road correlation, or deployment safety."
     )
 
@@ -142,13 +208,19 @@ class ResultReconciliationEngine:
         solver_name: str = "EXTERNAL_SOLVER",
         reference_model: str = "QuarterCarReference_2DOF",
         custom_tolerances: Optional[Dict[str, float]] = None,
+        custom_absolute_tolerances: Optional[Dict[str, float]] = None,
+        required_signals: Optional[List[str]] = None,
     ) -> ReconciliationReport:
         """
-        Reconciles external simulation series against reference series.
+        Reconciles external simulation series against independent reference series.
         """
         tolerances = dict(cls.DEFAULT_TOLERANCES)
         if custom_tolerances:
             tolerances.update(custom_tolerances)
+
+        abs_tolerances = dict(cls.DEFAULT_ABSOLUTE_TOLERANCES)
+        if custom_absolute_tolerances:
+            abs_tolerances.update(custom_absolute_tolerances)
 
         if "time" not in external_data or "time" not in reference_data:
             raise ValueError("Both datasets must provide a 'time' series.")
@@ -165,7 +237,29 @@ class ResultReconciliationEngine:
         if t_common_max <= t_common_min:
             raise ValueError(f"No overlapping time range between external [{t_ext[0]}, {t_ext[-1]}] and reference [{t_ref[0]}, {t_ref[-1]}].")
 
-        # Create uniform evaluation grid using finer of the two resolutions
+        # Guard against insufficient overlap and time-base extrapolation
+        t_ext_span = float(t_ext[-1] - t_ext[0])
+        t_ref_span = float(t_ref[-1] - t_ref[0])
+        overlap_span = float(t_common_max - t_common_min)
+        max_span = max(t_ext_span, t_ref_span)
+
+        overlap_ratio = overlap_span / max_span if max_span > 0 else 0.0
+        if overlap_ratio < cls.MIN_OVERLAP_RATIO:
+            raise ValueError(
+                f"Insufficient time overlap ({overlap_ratio * 100:.1f}% < {cls.MIN_OVERLAP_RATIO * 100:.0f}% required). "
+                "Reconciliation policy prohibits time-base extrapolation."
+            )
+
+        # Check required signals guard if specified
+        if required_signals is not None:
+            missing_ext = [s for s in required_signals if s not in external_data]
+            missing_ref = [s for s in required_signals if s not in reference_data]
+            if missing_ext or missing_ref:
+                raise ValueError(
+                    f"Required signals missing: external missing {missing_ext}, reference missing {missing_ref}."
+                )
+
+        # Create uniform evaluation grid strictly within common intersection [t_common_min, t_common_max]
         dt = min(float(np.mean(np.diff(t_ext))), float(np.mean(np.diff(t_ref))))
         if dt <= 0:
             dt = 0.002
@@ -175,17 +269,16 @@ class ResultReconciliationEngine:
         all_passed = True
         nrmse_values: List[float] = []
 
-        # Compare signals present in both
-        common_signals = [s for s in cls.SIGNAL_UNITS if s in external_data and s in reference_data]
+        # Determine common signals to evaluate
+        common_signals = [s for s in cls.CHANNEL_PROVENANCE if s in external_data and s in reference_data]
         if not common_signals:
-            # Fallback to any common column except time
             common_signals = [s for s in external_data if s in reference_data and s != "time"]
 
         for sig in common_signals:
             y_ext_raw = external_data[sig]
             y_ref_raw = reference_data[sig]
 
-            # Interpolate onto common grid
+            # Interpolate strictly onto common grid
             y_ext = np.interp(t_grid, t_ext, y_ext_raw)
             y_ref = np.interp(t_grid, t_ref, y_ref_raw)
 
@@ -196,10 +289,21 @@ class ResultReconciliationEngine:
             rms_err = float(np.sqrt(np.mean(diff ** 2)))
 
             ref_range = float(np.ptp(y_ref))
-            if ref_range < 1e-6:
-                ref_range = peak_ref if peak_ref > 1e-6 else 1.0
+            abs_tol = abs_tolerances.get(sig, 1e-3)
+            tol = tolerances.get(sig, 0.05)
 
-            nrmse = float(rms_err / ref_range)
+            # Division-by-near-zero hardening:
+            # If reference signal is near-zero / quiescent (range < abs_tol):
+            if ref_range < abs_tol:
+                # Quiescent signal: evaluate against absolute RMS error directly
+                is_pass = bool(rms_err <= abs_tol)
+                nrmse = float(rms_err / abs_tol) if abs_tol > 0 else 0.0
+                denominator_mode = "ABSOLUTE_THRESHOLD"
+            else:
+                nrmse = float(rms_err / ref_range)
+                is_pass = bool(nrmse <= tol)
+                denominator_mode = "PEAK_TO_PEAK_RANGE"
+
             nrmse_values.append(nrmse)
 
             # Phase delay via peak location
@@ -212,12 +316,12 @@ class ResultReconciliationEngine:
             e_ref = float(np.sum(y_ref ** 2) * dt)
             energy_ratio = float(e_ext / (e_ref + 1e-12)) if e_ref > 1e-12 else 1.0
 
-            tol = tolerances.get(sig, 0.05)
-            is_pass = bool(nrmse <= tol)
             if not is_pass:
                 all_passed = False
 
-            unit, dim = cls.SIGNAL_UNITS.get(sig, ("-", "dimensionless"))
+            prov = cls.CHANNEL_PROVENANCE.get(sig)
+            unit, dim = (prov.unit, prov.dimension) if prov else ("-", "dimensionless")
+            rationale = prov.provenance_rationale if prov else None
 
             metrics_map[sig] = SignalMetricResult(
                 signal_name=sig,
@@ -233,6 +337,9 @@ class ResultReconciliationEngine:
                 tolerance_threshold=tol,
                 is_within_tolerance=is_pass,
                 status="PASS" if is_pass else "FAIL",
+                absolute_threshold=abs_tol,
+                denominator_mode=denominator_mode,
+                provenance_rationale=rationale,
             )
 
         summary = {
@@ -241,6 +348,7 @@ class ResultReconciliationEngine:
             "total_signals_evaluated": len(metrics_map),
             "signals_passed": sum(1 for m in metrics_map.values() if m.is_within_tolerance),
             "signals_failed": sum(1 for m in metrics_map.values() if not m.is_within_tolerance),
+            "overlap_ratio": round(overlap_ratio, 4),
         }
 
         return ReconciliationReport(
