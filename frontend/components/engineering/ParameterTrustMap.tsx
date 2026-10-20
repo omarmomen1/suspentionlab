@@ -59,6 +59,11 @@ import {
   ClosureAssessmentResponseDTO,
   DecisionReassessmentResponseDTO,
   AcceptanceCriterionDTO,
+  DecisionDossierApi,
+  EngineeringDecisionDossierResponseDTO,
+  SourceVerificationResponseDTO,
+  ReviewActionType,
+  TrustedSourceRegistryResponseDTO,
 } from "../../lib/api_client";
 
 interface ParameterTrustMapProps {
@@ -83,7 +88,7 @@ export function ParameterTrustMap({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<
-    "overview" | "evidence" | "history" | "sweep" | "ingestion" | "fleet" | "propagation" | "decisions" | "robustness" | "validation"
+    "overview" | "evidence" | "history" | "sweep" | "ingestion" | "fleet" | "propagation" | "decisions" | "robustness" | "validation" | "dossiers"
   >("overview");
 
   // Phase 6.2 Ingestion & Sweep State
@@ -248,6 +253,25 @@ export function ParameterTrustMap({
   const [reassessmentLoading, setReassessmentLoading] = useState(false);
   const [historicalReassessments, setHistoricalReassessments] = useState<DecisionReassessmentResponseDTO[]>([]);
 
+  // Phase 6.7 Decision Dossiers & Source Verification State
+  const [dossiers, setDossiers] = useState<EngineeringDecisionDossierResponseDTO[]>([]);
+  const [selectedDossier, setSelectedDossier] = useState<EngineeringDecisionDossierResponseDTO | null>(null);
+  const [dossierLoading, setDossierLoading] = useState(false);
+  const [dossierError, setDossierError] = useState<string | null>(null);
+  const [showCompileModal, setShowCompileModal] = useState(false);
+  const [compilePlanId, setCompilePlanId] = useState("");
+  const [compileClosureId, setCompileClosureId] = useState("");
+  const [compileReassessmentId, setCompileReassessmentId] = useState("");
+  const [compileQuestion, setCompileQuestion] = useState("Is front spring stiffness robust against reversal under measured bump loads?");
+  const [compileDecisionType, setCompileDecisionType] = useState("EngineeringDecision");
+
+  // Source Verification Modal State
+  const [showVerifySourceModal, setShowVerifySourceModal] = useState(false);
+  const [verifyingEvidenceId, setVerifyingEvidenceId] = useState<string | null>(null);
+  const [verifyMethod, setVerifyMethod] = useState<string>("AUTHORIZED_CUSTODIAN_REVIEW");
+  const [verifierIdentity, setVerifierIdentity] = useState("Lead Validation Auditor");
+  const [verificationNotes, setVerificationNotes] = useState("Source calibration certificate and raw telemetry records verified.");
+
   const fetchValidationPlans = async (targetDecisionId: string) => {
     if (!targetDecisionId) return;
     setValidationLoading(true);
@@ -411,6 +435,123 @@ export function ParameterTrustMap({
       setValidationError(err?.message || "Failed to execute decision reassessment.");
     } finally {
       setReassessmentLoading(false);
+    }
+  };
+
+  // Phase 6.7 Decision Dossier & Verification Handlers
+  const fetchDossiers = async (targetDecisionId: string) => {
+    if (!targetDecisionId) return;
+    setDossierLoading(true);
+    setDossierError(null);
+    try {
+      const res = await DecisionDossierApi.listDossiersForDecision(targetDecisionId);
+      setDossiers(res.dossiers || []);
+      if (res.dossiers && res.dossiers.length > 0) {
+        setSelectedDossier(res.dossiers[0]);
+      } else {
+        setSelectedDossier(null);
+      }
+    } catch (err: any) {
+      setDossierError(err?.message || "Failed to fetch decision dossiers.");
+      setDossiers([]);
+      setSelectedDossier(null);
+    } finally {
+      setDossierLoading(false);
+    }
+  };
+
+  const handleCompileDossier = async () => {
+    setDossierLoading(true);
+    setDossierError(null);
+    try {
+      const created = await DecisionDossierApi.compileDecisionDossier({
+        decision_id: validationDecisionId,
+        plan_id: compilePlanId || (selectedPlan?.id ?? ""),
+        closure_id: compileClosureId || (closureAssessment?.id ?? ""),
+        reassessment_id: compileReassessmentId || (reassessmentResult?.id ?? ""),
+        engineering_question: compileQuestion,
+        decision_type: compileDecisionType,
+      });
+      setShowCompileModal(false);
+      await fetchDossiers(validationDecisionId);
+      setSelectedDossier(created);
+    } catch (err: any) {
+      setDossierError(err?.message || "Failed to compile decision dossier.");
+    } finally {
+      setDossierLoading(false);
+    }
+  };
+
+  const handleAdvanceDossierGovernance = async (dossierId: string, actionType: ReviewActionType, rationale?: string) => {
+    setDossierLoading(true);
+    setDossierError(null);
+    try {
+      const updated = await DecisionDossierApi.advanceDossierGovernance(dossierId, {
+        action_type: actionType,
+        rationale: rationale || `Executed governance transition: ${actionType}`,
+      });
+      setSelectedDossier(updated);
+      await fetchDossiers(validationDecisionId);
+    } catch (err: any) {
+      setDossierError(err?.message || `Failed to execute ${actionType} on dossier.`);
+    } finally {
+      setDossierLoading(false);
+    }
+  };
+
+  const handleSupersedeDossier = async (dossierId: string) => {
+    setDossierLoading(true);
+    setDossierError(null);
+    try {
+      const superseded = await DecisionDossierApi.supersedeDossier(dossierId, {
+        reason: "Superseded with updated empirical evidence and reassessment cycle.",
+      });
+      await fetchDossiers(validationDecisionId);
+      setSelectedDossier(superseded);
+    } catch (err: any) {
+      setDossierError(err?.message || "Failed to supersede dossier.");
+    } finally {
+      setDossierLoading(false);
+    }
+  };
+
+  const handleVerifyEvidenceSource = async (evidenceId: string) => {
+    setValidationLoading(true);
+    setValidationError(null);
+    try {
+      await DecisionDossierApi.verifyEvidenceSource(evidenceId, {
+        verification_method: verifyMethod,
+        verifier_identity: verifierIdentity,
+        verification_notes: verificationNotes,
+      });
+      setShowVerifySourceModal(false);
+      setVerifyingEvidenceId(null);
+      if (selectedPlan) {
+        const updated = await ValidationPlanningApi.getValidationPlan(selectedPlan.id);
+        setSelectedPlan(updated);
+      }
+    } catch (err: any) {
+      setValidationError(err?.message || "Failed to verify evidence source.");
+    } finally {
+      setValidationLoading(false);
+    }
+  };
+
+  const handleRevokeEvidenceSource = async (evidenceId: string) => {
+    setValidationLoading(true);
+    setValidationError(null);
+    try {
+      await DecisionDossierApi.revokeEvidenceSource(evidenceId, {
+        reason: "Source authorization revoked due to calibration dispute or custodian notice.",
+      });
+      if (selectedPlan) {
+        const updated = await ValidationPlanningApi.getValidationPlan(selectedPlan.id);
+        setSelectedPlan(updated);
+      }
+    } catch (err: any) {
+      setValidationError(err?.message || "Failed to revoke evidence source.");
+    } finally {
+      setValidationLoading(false);
     }
   };
 
@@ -881,6 +1022,22 @@ export function ParameterTrustMap({
               data-testid="tab-validation-planning"
             >
               Validation Planning
+            </button>
+            <button
+              onClick={() => {
+                setActiveTab("dossiers");
+                if (dossiers.length === 0) {
+                  fetchDossiers(validationDecisionId);
+                }
+              }}
+              className={`px-3 py-1.5 text-xs font-semibold rounded transition ${
+                activeTab === "dossiers"
+                  ? "bg-zinc-800 text-white border border-zinc-700"
+                  : "text-zinc-400 hover:text-white"
+              }`}
+              data-testid="tab-decision-dossiers"
+            >
+              Decision Dossiers
             </button>
           </div>
 
@@ -2852,6 +3009,28 @@ export function ParameterTrustMap({
                               </div>
                               <div className="flex items-center gap-2">
                                 <span
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                    ev.integrity_stage === "SOURCE_IDENTITY_VERIFIED" || ev.integrity_stage === "EVIDENCE_ACCEPTED"
+                                      ? "bg-emerald-950 text-emerald-300 border border-emerald-500/40"
+                                      : "bg-amber-950 text-amber-300 border border-amber-500/40"
+                                  }`}
+                                  data-testid={`badge-integrity-stage-${ev.id}`}
+                                >
+                                  {ev.integrity_stage || "SOURCE_CLAIMED"}
+                                </span>
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                    ev.source_verification_status === "VERIFIED"
+                                      ? "bg-emerald-950 text-emerald-300 border border-emerald-500/40"
+                                      : ev.source_verification_status === "REJECTED" || ev.source_verification_status === "REVOKED"
+                                      ? "bg-rose-950 text-rose-300 border border-rose-500/40"
+                                      : "bg-zinc-800 text-zinc-400 border border-zinc-700"
+                                  }`}
+                                  data-testid={`badge-source-status-${ev.id}`}
+                                >
+                                  {ev.source_verification_status || "UNVERIFIED"}
+                                </span>
+                                <span
                                   className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                     ev.review_status === "ACCEPTED"
                                       ? "bg-emerald-950 text-emerald-300 border border-emerald-500/40"
@@ -2863,6 +3042,28 @@ export function ParameterTrustMap({
                                 >
                                   {ev.review_status}
                                 </span>
+                                {ev.source_verification_status === "VERIFIED" ? (
+                                  <button
+                                    onClick={() => handleRevokeEvidenceSource(ev.id)}
+                                    disabled={validationLoading}
+                                    className="px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-700 hover:bg-rose-900 text-[10px]"
+                                    data-testid={`btn-revoke-source-${ev.id}`}
+                                  >
+                                    Revoke
+                                  </button>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      setVerifyingEvidenceId(ev.id);
+                                      setShowVerifySourceModal(true);
+                                    }}
+                                    disabled={validationLoading}
+                                    className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-600 hover:bg-emerald-900 text-[10px]"
+                                    data-testid={`btn-open-verify-source-${ev.id}`}
+                                  >
+                                    Verify Source
+                                  </button>
+                                )}
                               </div>
                             </div>
 
@@ -3335,6 +3536,562 @@ export function ParameterTrustMap({
                         data-testid="btn-submit-evidence"
                       >
                         Submit Evidence
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Tab 10: Decision Dossiers & Closure Governance (Phase 6.7) */}
+          {activeTab === "dossiers" && (
+            <div className="space-y-6" data-testid="container-decision-dossiers">
+              {/* Governance & Decision Separation Policy Banner */}
+              <div
+                className="p-4 rounded-lg bg-zinc-900/80 border border-amber-500/40 text-xs space-y-2"
+                data-testid="governance-separation-notice-v2"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-bold text-amber-400 uppercase font-mono tracking-wider">
+                    <Scale className="w-4 h-4 text-amber-400" />
+                    Governance & Decision Separation Policy (Phase 6.7)
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-300 border border-zinc-700"
+                      data-testid="badge-dossier-safety-inferred"
+                    >
+                      deployment_safety_inferred = false
+                    </span>
+                    <span
+                      className="px-2 py-0.5 rounded text-[10px] font-mono bg-rose-950/70 text-rose-300 border border-rose-500/40"
+                      data-testid="badge-dossier-deployment-auth"
+                    >
+                      Deployment: NOT_ESTABLISHED
+                    </span>
+                  </div>
+                </div>
+                <p className="text-zinc-300 font-sans leading-relaxed">
+                  Strict Separation Invariant: Source verification != Criteria evaluation != Gap closure != Dossier approval != Deployment authorization.
+                  Satisfying epistemic evidence thresholds establishes scientific defensibility for a specific engineering decision, strictly decoupled from operational deployment safety certification.
+                </p>
+              </div>
+
+              {/* Dossier Query & Compilation Bar */}
+              <div className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-lg bg-zinc-900/50 border border-zinc-800 gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="text-xs font-mono uppercase text-zinc-400">Decision ID:</span>
+                  <input
+                    type="text"
+                    value={validationDecisionId}
+                    onChange={(e) => setValidationDecisionId(e.target.value)}
+                    className="px-3 py-1.5 text-xs bg-zinc-950 border border-zinc-700 rounded text-white font-mono w-44"
+                    placeholder="e.g. DEC-12"
+                    data-testid="input-dossier-decision-id"
+                  />
+                  <button
+                    onClick={() => fetchDossiers(validationDecisionId)}
+                    disabled={dossierLoading}
+                    className="px-3 py-1.5 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-400 text-black transition flex items-center gap-1.5 disabled:opacity-50"
+                    data-testid="btn-fetch-dossiers"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${dossierLoading ? "animate-spin" : ""}`} />
+                    Load Dossiers
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      setCompilePlanId(selectedPlan?.id || "");
+                      setCompileClosureId(closureAssessment?.id || "");
+                      setCompileReassessmentId(reassessmentResult?.id || "");
+                      setShowCompileModal(true);
+                    }}
+                    className="px-3 py-1.5 text-xs font-semibold rounded bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 transition flex items-center gap-1.5"
+                    data-testid="btn-open-compile-dossier"
+                  >
+                    <FileCheck2 className="w-3.5 h-3.5 text-amber-400" />
+                    Compile Decision Dossier
+                  </button>
+                </div>
+              </div>
+
+              {/* Error Alert */}
+              {dossierError && (
+                <div className="p-3 rounded-lg bg-rose-950/60 border border-rose-500/50 text-rose-200 text-xs flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
+                  <span>{dossierError}</span>
+                </div>
+              )}
+
+              {/* Dossier Selection Pills */}
+              {dossiers.length > 0 && (
+                <div className="flex items-center gap-2 overflow-x-auto pb-1" data-testid="dossier-selector-list">
+                  {dossiers.map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={() => setSelectedDossier(d)}
+                      className={`px-3 py-1.5 text-xs font-mono rounded border transition flex items-center gap-2 ${
+                        selectedDossier?.id === d.id
+                          ? "bg-amber-500/10 border-amber-500 text-amber-300"
+                          : "bg-zinc-900 border-zinc-800 text-zinc-400 hover:text-zinc-200"
+                      }`}
+                      data-testid={`btn-select-dossier-${d.dossier_number}`}
+                    >
+                      <span className="font-bold">{d.dossier_number}</span>
+                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+                        {d.governance_state}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Active Dossier View */}
+              {selectedDossier ? (
+                <div className="space-y-6" data-testid="card-decision-dossier">
+                  {/* Header & Governance State */}
+                  <div className="p-5 rounded-lg bg-zinc-900/60 border border-zinc-800 space-y-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between pb-3 border-b border-zinc-800 gap-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold font-mono text-white" data-testid="dossier-number">
+                            {selectedDossier.dossier_number}
+                          </span>
+                          <span className="text-xs px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-400 border border-amber-500/40" data-testid="dossier-version">
+                            v{selectedDossier.dossier_version}
+                          </span>
+                          <span
+                            className="text-xs px-2.5 py-0.5 rounded font-mono font-bold bg-zinc-800 text-zinc-200 border border-zinc-700"
+                            data-testid="dossier-governance-state"
+                          >
+                            {selectedDossier.governance_state}
+                          </span>
+                          {selectedDossier.is_active ? (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-emerald-950 text-emerald-400 border border-emerald-500/40">
+                              ACTIVE
+                            </span>
+                          ) : (
+                            <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-zinc-800 text-zinc-400">
+                              SUPERSEDED
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-zinc-300 mt-1 font-sans">{selectedDossier.engineering_question}</p>
+                      </div>
+
+                      {/* Governance Transition Action Buttons */}
+                      <div className="flex items-center gap-2 flex-wrap" data-testid="dossier-governance-controls">
+                        {selectedDossier.governance_state === "DRAFT" && (
+                          <button
+                            onClick={() => handleAdvanceDossierGovernance(selectedDossier.id, "ADMIT_EVIDENCE")}
+                            disabled={dossierLoading}
+                            className="px-2.5 py-1 text-xs font-semibold rounded bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700 transition"
+                            data-testid="btn-dossier-admit-evidence"
+                          >
+                            Admit Evidence
+                          </button>
+                        )}
+                        {selectedDossier.governance_state === "IN_REVIEW" && (
+                          <button
+                            onClick={() => handleAdvanceDossierGovernance(selectedDossier.id, "EVALUATE_CRITERIA")}
+                            disabled={dossierLoading}
+                            className="px-2.5 py-1 text-xs font-semibold rounded bg-blue-700 hover:bg-blue-600 text-white transition"
+                            data-testid="btn-dossier-evaluate-criteria"
+                          >
+                            Evaluate Criteria
+                          </button>
+                        )}
+                        {selectedDossier.governance_state === "EVIDENCE_ACCEPTED" && (
+                          <button
+                            onClick={() => handleAdvanceDossierGovernance(selectedDossier.id, "REVIEW_CONCLUSION")}
+                            disabled={dossierLoading}
+                            className="px-2.5 py-1 text-xs font-semibold rounded bg-amber-600 hover:bg-amber-500 text-black font-bold transition"
+                            data-testid="btn-dossier-review-conclusion"
+                          >
+                            Review Conclusion
+                          </button>
+                        )}
+                        {selectedDossier.governance_state === "CONCLUSION_REVIEWED" && (
+                          <button
+                            onClick={() => handleAdvanceDossierGovernance(selectedDossier.id, "APPROVE_DECISION")}
+                            disabled={dossierLoading}
+                            className="px-2.5 py-1 text-xs font-semibold rounded bg-emerald-600 hover:bg-emerald-500 text-white transition flex items-center gap-1 font-bold"
+                            data-testid="btn-dossier-approve-decision"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            Approve Decision
+                          </button>
+                        )}
+                        {selectedDossier.governance_state === "DECISION_APPROVED" && selectedDossier.is_active && (
+                          <button
+                            onClick={() => handleSupersedeDossier(selectedDossier.id)}
+                            disabled={dossierLoading}
+                            className="px-2.5 py-1 text-xs font-semibold rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 border border-zinc-700 transition"
+                            data-testid="btn-dossier-supersede"
+                          >
+                            Supersede Dossier
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Metadata & Lineage Grid */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
+                      <div>
+                        <span className="text-zinc-500 block text-[10px] uppercase">Decision Type</span>
+                        <span className="text-white font-bold">{selectedDossier.decision_type}</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block text-[10px] uppercase">Parent Dossier</span>
+                        <span className="text-zinc-400">{selectedDossier.parent_dossier_id ? `${selectedDossier.parent_dossier_id.slice(0, 12)}...` : "None (Root v1)"}</span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block text-[10px] uppercase">Dossier Content Hash</span>
+                        <span className="text-amber-400 truncate block font-bold" title={selectedDossier.dossier_content_hash} data-testid="dossier-content-hash">
+                          {selectedDossier.dossier_content_hash.slice(0, 16)}...
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block text-[10px] uppercase">Plan Hash</span>
+                        <span className="text-zinc-400 truncate block" title={selectedDossier.plan_hash} data-testid="dossier-plan-hash">
+                          {selectedDossier.plan_hash.slice(0, 16)}...
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Sub-Stage Gate Status Badges */}
+                    <div className="pt-2 border-t border-zinc-800 grid grid-cols-2 md:grid-cols-5 gap-2 text-center text-[10px] font-mono">
+                      <div className="p-2 rounded bg-zinc-950 border border-zinc-800">
+                        <span className="text-zinc-500 block uppercase">Admissibility</span>
+                        <span className="text-white font-bold">{selectedDossier.admissibility_status}</span>
+                      </div>
+                      <div className="p-2 rounded bg-zinc-950 border border-zinc-800">
+                        <span className="text-zinc-500 block uppercase">Criteria Satisfaction</span>
+                        <span className="text-white font-bold">{selectedDossier.criteria_satisfaction_status}</span>
+                      </div>
+                      <div className="p-2 rounded bg-zinc-950 border border-zinc-800">
+                        <span className="text-zinc-500 block uppercase">Closure</span>
+                        <span className="text-white font-bold">{selectedDossier.closure_status}</span>
+                      </div>
+                      <div className="p-2 rounded bg-zinc-950 border border-zinc-800">
+                        <span className="text-zinc-500 block uppercase">Conclusion Review</span>
+                        <span className="text-white font-bold">{selectedDossier.conclusion_review_status}</span>
+                      </div>
+                      <div className="p-2 rounded bg-zinc-950 border border-zinc-800">
+                        <span className="text-zinc-500 block uppercase">Decision Approval</span>
+                        <span className="text-emerald-400 font-bold">{selectedDossier.decision_approval_status}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Before / After Robustness Delta Card */}
+                  {selectedDossier.before_after_comparison && (
+                    <div className="p-5 rounded-lg bg-zinc-900/40 border border-zinc-800 space-y-3" data-testid="section-dossier-comparison">
+                      <div className="flex items-center gap-2">
+                        <TrendingUp className="w-4 h-4 text-amber-400" />
+                        <h3 className="text-xs font-semibold uppercase font-mono text-zinc-200">
+                          Before / After Decision Robustness Delta
+                        </h3>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs" data-testid="grid-dossier-delta">
+                        <div className="p-3 rounded bg-zinc-950 border border-zinc-800">
+                          <span className="text-[10px] text-zinc-500 block uppercase">Baseline State</span>
+                          <span className="text-zinc-400 font-bold">{selectedDossier.before_after_comparison.baseline_robustness_state || "—"}</span>
+                        </div>
+                        <div className="p-3 rounded bg-zinc-950 border border-amber-500/40">
+                          <span className="text-[10px] text-amber-400 block uppercase font-bold">Reassessed State</span>
+                          <span className="text-emerald-400 font-bold">{selectedDossier.before_after_comparison.reassessed_robustness_state || "—"}</span>
+                        </div>
+                        <div className="p-3 rounded bg-zinc-950 border border-zinc-800">
+                          <span className="text-[10px] text-zinc-500 block uppercase">Reversals Count</span>
+                          <span className="text-white">
+                            {selectedDossier.before_after_comparison.baseline_reversals_count ?? "—"} →{" "}
+                            <span className="font-bold text-emerald-400">{selectedDossier.before_after_comparison.reassessed_reversals_count ?? "—"}</span>
+                          </span>
+                        </div>
+                        <div className="p-3 rounded bg-zinc-950 border border-zinc-800">
+                          <span className="text-[10px] text-zinc-500 block uppercase">Closure Verdict</span>
+                          <span className="text-emerald-400 font-bold">{selectedDossier.before_after_comparison.closure_verdict || "—"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Contradictory Evidence & Unresolved Assumptions Card */}
+                  <div className="p-5 rounded-lg bg-zinc-900/40 border border-zinc-800 space-y-4" data-testid="section-dossier-contradictions">
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-amber-400" />
+                      <h3 className="text-xs font-semibold uppercase font-mono text-zinc-200">
+                        Contradictory Evidence & Unresolved Assumptions
+                      </h3>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+                      <div className="p-3.5 rounded bg-zinc-950 border border-zinc-800 space-y-2">
+                        <span className="text-[10px] text-zinc-400 block uppercase font-bold">
+                          Contradictory Evidence Summary
+                        </span>
+                        {selectedDossier.contradictory_evidence_summary &&
+                        selectedDossier.contradictory_evidence_summary.items &&
+                        selectedDossier.contradictory_evidence_summary.items.length > 0 ? (
+                          <div className="space-y-1 text-rose-300">
+                            {selectedDossier.contradictory_evidence_summary.items.map((item: any, idx: number) => (
+                              <div key={idx} className="p-2 rounded bg-rose-950/40 border border-rose-500/30">
+                                {JSON.stringify(item)}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-zinc-500 font-sans text-xs">No contradictory evidence records observed.</p>
+                        )}
+                      </div>
+
+                      <div className="p-3.5 rounded bg-zinc-950 border border-zinc-800 space-y-2">
+                        <span className="text-[10px] text-zinc-400 block uppercase font-bold">
+                          Unresolved Assumptions ({selectedDossier.unresolved_assumptions ? selectedDossier.unresolved_assumptions.length : 0})
+                        </span>
+                        {selectedDossier.unresolved_assumptions && selectedDossier.unresolved_assumptions.length > 0 ? (
+                          <div className="space-y-1">
+                            {selectedDossier.unresolved_assumptions.map((u: any, idx: number) => (
+                              <div key={idx} className="p-2 rounded bg-zinc-900 text-zinc-300 text-[11px]">
+                                {u.assumption || JSON.stringify(u)}
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-zinc-500 font-sans text-xs">No unresolved epistemic assumptions.</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Review Audit Trail Table */}
+                  <div className="p-5 rounded-lg bg-zinc-900/40 border border-zinc-800 space-y-3" data-testid="section-dossier-audit">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <History className="w-4 h-4 text-amber-400" />
+                        <h3 className="text-xs font-semibold uppercase font-mono text-zinc-200">
+                          Review Audit Trail ({selectedDossier.review_audit_trail ? selectedDossier.review_audit_trail.length : 0})
+                        </h3>
+                      </div>
+                      <span className="text-[10px] font-mono text-zinc-500">Tamper-evident governance ledger</span>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left font-mono border border-zinc-800 rounded" data-testid="table-dossier-audit-trail">
+                        <thead className="bg-zinc-950 text-zinc-400 text-[10px] uppercase">
+                          <tr>
+                            <th className="p-2.5">Action</th>
+                            <th className="p-2.5">Reviewer</th>
+                            <th className="p-2.5">Role</th>
+                            <th className="p-2.5">Timestamp</th>
+                            <th className="p-2.5">Rationale</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-zinc-800">
+                          {selectedDossier.review_audit_trail && selectedDossier.review_audit_trail.length > 0 ? (
+                            selectedDossier.review_audit_trail.map((entry: any, idx: number) => (
+                              <tr key={idx} className="hover:bg-zinc-800/30">
+                                <td className="p-2.5 text-amber-300 font-bold">{entry.action_type}</td>
+                                <td className="p-2.5 text-white">{entry.reviewer_identity || entry.reviewer_user_id || "—"}</td>
+                                <td className="p-2.5 text-zinc-400">{entry.reviewer_role}</td>
+                                <td className="p-2.5 text-zinc-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleString() : "—"}</td>
+                                <td className="p-2.5 text-zinc-300 font-sans">{entry.rationale || "—"}</td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td colSpan={5} className="p-3 text-center text-zinc-500 font-sans">
+                                No governance review actions recorded.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="p-8 text-center rounded-lg bg-zinc-900/20 border border-zinc-800 text-zinc-500 text-xs">
+                  No decision dossier selected. Click "Compile Decision Dossier" or select an existing dossier above.
+                </div>
+              )}
+
+              {/* Modal: Compile Decision Dossier */}
+              {showCompileModal && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div
+                    className="w-full max-w-lg rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-100 p-6 shadow-2xl space-y-4"
+                    data-testid="modal-compile-dossier"
+                  >
+                    <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <FileCheck2 className="w-4 h-4 text-amber-400" />
+                        Compile Engineering Decision Dossier
+                      </h3>
+                      <button
+                        onClick={() => setShowCompileModal(false)}
+                        className="text-zinc-500 hover:text-zinc-300 text-sm"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="space-y-3 text-xs">
+                      <div>
+                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                          Engineering Question
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={compileQuestion}
+                          onChange={(e) => setCompileQuestion(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-sans"
+                          data-testid="input-compile-question"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">Plan ID (UUID)</label>
+                          <input
+                            type="text"
+                            value={compilePlanId}
+                            onChange={(e) => setCompilePlanId(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-mono"
+                            placeholder="Plan Record UUID"
+                            data-testid="input-compile-plan-id"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">Closure ID (UUID)</label>
+                          <input
+                            type="text"
+                            value={compileClosureId}
+                            onChange={(e) => setCompileClosureId(e.target.value)}
+                            className="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-mono"
+                            placeholder="Closure Record UUID"
+                            data-testid="input-compile-closure-id"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                          Reassessment ID (UUID)
+                        </label>
+                        <input
+                          type="text"
+                          value={compileReassessmentId}
+                          onChange={(e) => setCompileReassessmentId(e.target.value)}
+                          className="w-full px-2.5 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-mono"
+                          placeholder="Reassessment Record UUID"
+                          data-testid="input-compile-reassessment-id"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
+                      <button
+                        onClick={() => setShowCompileModal(false)}
+                        className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleCompileDossier}
+                        disabled={dossierLoading}
+                        className="px-3.5 py-1.5 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-400 text-black font-bold"
+                        data-testid="btn-submit-compile-dossier"
+                      >
+                        Compile Dossier
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal: Verify Evidence Source */}
+              {showVerifySourceModal && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                  <div
+                    className="w-full max-w-lg rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-100 p-6 shadow-2xl space-y-4"
+                    data-testid="modal-verify-source"
+                  >
+                    <div className="flex items-center justify-between pb-3 border-b border-zinc-800">
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                        Verify Evidence Source Authenticity
+                      </h3>
+                      <button
+                        onClick={() => setShowVerifySourceModal(false)}
+                        className="text-zinc-500 hover:text-zinc-300 text-sm"
+                      >
+                        ✕
+                      </button>
+                    </div>
+
+                    <div className="space-y-3 text-xs">
+                      <div>
+                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                          Verification Method
+                        </label>
+                        <select
+                          value={verifyMethod}
+                          onChange={(e) => setVerifyMethod(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-mono"
+                          data-testid="select-verify-method"
+                        >
+                          <option value="AUTHORIZED_CUSTODIAN_REVIEW">AUTHORIZED_CUSTODIAN_REVIEW</option>
+                          <option value="TRUSTED_REGISTRY_CHECK">TRUSTED_REGISTRY_CHECK</option>
+                          <option value="AUTHENTICATED_SUPPLIER_ATTESTATION">AUTHENTICATED_SUPPLIER_ATTESTATION</option>
+                          <option value="CRYPTOGRAPHIC_SIGNATURE">CRYPTOGRAPHIC_SIGNATURE</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                          Verifier Identity
+                        </label>
+                        <input
+                          type="text"
+                          value={verifierIdentity}
+                          onChange={(e) => setVerifierIdentity(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-mono"
+                          data-testid="input-verifier-identity"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                          Verification Audit Notes
+                        </label>
+                        <textarea
+                          rows={2}
+                          value={verificationNotes}
+                          onChange={(e) => setVerificationNotes(e.target.value)}
+                          className="w-full px-3 py-1.5 bg-zinc-950 border border-zinc-800 rounded text-white font-sans"
+                          data-testid="input-verification-notes"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
+                      <button
+                        onClick={() => setShowVerifySourceModal(false)}
+                        className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={() => verifyingEvidenceId && handleVerifyEvidenceSource(verifyingEvidenceId)}
+                        disabled={validationLoading}
+                        className="px-3.5 py-1.5 text-xs font-semibold rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold"
+                        data-testid="btn-submit-verify-source"
+                      >
+                        Verify Source
                       </button>
                     </div>
                   </div>

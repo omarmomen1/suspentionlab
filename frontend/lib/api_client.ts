@@ -3820,7 +3820,117 @@ export class ValidationPlanningApi {
       `/api/v1/parameter-trust/decision/${encodeURIComponent(decisionId)}/reassessments`
     );
   }
+
+  // ── Phase 6.7 Evidence Integrity & Decision Dossiers Methods ─────────────────
+
+  static async verifyEvidenceSource(
+    itemId: string,
+    payload: SourceVerificationRequestDTO
+  ): Promise<SourceVerificationResponseDTO> {
+    return apiJson<SourceVerificationResponseDTO>(
+      `/api/v1/parameter-trust/validation/evidence/${encodeURIComponent(itemId)}/verify-source`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  }
+
+  static async revokeEvidenceSource(
+    itemId: string,
+    payload: SourceRevocationRequestDTO
+  ): Promise<SourceVerificationResponseDTO> {
+    return apiJson<SourceVerificationResponseDTO>(
+      `/api/v1/parameter-trust/validation/evidence/${encodeURIComponent(itemId)}/revoke-source`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  }
+
+  static async getEvidenceSourceVerification(
+    itemId: string
+  ): Promise<SourceVerificationResponseDTO> {
+    return apiJson<SourceVerificationResponseDTO>(
+      `/api/v1/parameter-trust/validation/evidence/${encodeURIComponent(itemId)}/source-verification`
+    );
+  }
+
+  static async compileDecisionDossier(
+    payload: DecisionDossierCompileRequestDTO
+  ): Promise<EngineeringDecisionDossierResponseDTO> {
+    return apiJson<EngineeringDecisionDossierResponseDTO>(
+      "/api/v1/parameter-trust/validation/dossiers/compile",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  }
+
+  static async getDecisionDossier(
+    dossierId: string
+  ): Promise<EngineeringDecisionDossierResponseDTO> {
+    return apiJson<EngineeringDecisionDossierResponseDTO>(
+      `/api/v1/parameter-trust/validation/dossiers/${encodeURIComponent(dossierId)}`
+    );
+  }
+
+  static async listDossiersForDecision(
+    decisionId: string
+  ): Promise<DecisionDossierListResponseDTO> {
+    return apiJson<DecisionDossierListResponseDTO>(
+      `/api/v1/parameter-trust/validation/dossiers/by-decision/${encodeURIComponent(decisionId)}`
+    );
+  }
+
+  static async advanceDossierGovernance(
+    dossierId: string,
+    payload: DecisionDossierGovernanceTransitionRequestDTO
+  ): Promise<EngineeringDecisionDossierResponseDTO> {
+    return apiJson<EngineeringDecisionDossierResponseDTO>(
+      `/api/v1/parameter-trust/validation/dossiers/${encodeURIComponent(dossierId)}/governance-transition`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  }
+
+  static async supersedeDossier(
+    dossierId: string,
+    payload: DecisionDossierSupersedeRequestDTO
+  ): Promise<EngineeringDecisionDossierResponseDTO> {
+    return apiJson<EngineeringDecisionDossierResponseDTO>(
+      `/api/v1/parameter-trust/validation/dossiers/${encodeURIComponent(dossierId)}/supersede`,
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  }
+
+  static async registerTrustedSource(
+    payload: TrustedSourceRegisterRequestDTO
+  ): Promise<TrustedSourceRegistryResponseDTO> {
+    return apiJson<TrustedSourceRegistryResponseDTO>(
+      "/api/v1/parameter-trust/validation/registries/trusted-sources",
+      {
+        method: "POST",
+        body: JSON.stringify(payload),
+      }
+    );
+  }
+
+  static async listTrustedSources(): Promise<TrustedSourceRegistryResponseDTO[]> {
+    return apiJson<TrustedSourceRegistryResponseDTO[]>(
+      "/api/v1/parameter-trust/validation/registries/trusted-sources"
+    );
+  }
 }
+
+export const DecisionDossierApi = ValidationPlanningApi;
 
 export const ParameterTrustValidationApi = ValidationPlanningApi;
 
@@ -4347,6 +4457,175 @@ export interface DecisionReassessmentResponseDTO {
 export interface DecisionReassessmentHistoryResponseDTO {
   decision_id: string;
   reassessments: DecisionReassessmentResponseDTO[];
+  total: number;
+}
+
+// ── Phase 6.7 Evidence Integrity & Decision Dossiers DTOs ─────────────────────
+
+export type SourceVerificationMethodType =
+  | "TRUSTED_REGISTRY_CHECK"
+  | "AUTHENTICATED_SUPPLIER_ATTESTATION"
+  | "AUTHORIZED_CUSTODIAN_REVIEW"
+  | "CRYPTOGRAPHIC_SIGNATURE";
+
+export type SourceVerificationStatusType =
+  | "UNVERIFIED"
+  | "VERIFIED"
+  | "REJECTED"
+  | "REVOKED";
+
+export type EvidenceIntegrityStageType =
+  | "SOURCE_CLAIMED"
+  | "PROVENANCE_DOCUMENTED"
+  | "SOURCE_IDENTITY_VERIFIED"
+  | "MEASUREMENT_QUALITY_ASSESSED"
+  | "CRITERIA_EVALUATED"
+  | "EVIDENCE_ACCEPTED";
+
+export type DossierGovernanceStateType =
+  | "DRAFT"
+  | "IN_REVIEW"
+  | "EVIDENCE_ACCEPTED"
+  | "CONCLUSION_REVIEWED"
+  | "DECISION_APPROVED"
+  | "SUPERSEDED"
+  | "REJECTED";
+
+export type ReviewActionType =
+  | "VERIFY_SOURCE"
+  | "ADMIT_EVIDENCE"
+  | "EVALUATE_CRITERIA"
+  | "CLOSE_GAP"
+  | "REVIEW_CONCLUSION"
+  | "APPROVE_DECISION"
+  | "REJECT"
+  | "SUPERSEDE";
+
+export interface SourceVerificationRequestDTO {
+  verification_method: SourceVerificationMethodType | string;
+  verifier_identity?: string | null;
+  supporting_references?: Record<string, any> | null;
+  scope?: Record<string, any> | null;
+  verification_notes?: string | null;
+  signature_hex?: string | null;
+  public_key_pem?: string | null;
+  expected_artifact_hash?: string | null;
+}
+
+export interface SourceVerificationResponseDTO {
+  id: string;
+  evidence_item_id: string;
+  verification_method: SourceVerificationMethodType | string;
+  verification_status: SourceVerificationStatusType | string;
+  verifier_identity: string;
+  verifier_role: string;
+  verifier_user_id?: string | null;
+  verification_timestamp: string;
+  artifact_hash: string;
+  supporting_references: Record<string, any>;
+  scope: Record<string, any>;
+  verification_notes?: string | null;
+  verification_hash: string;
+  is_revoked: boolean;
+  revocation_reason?: string | null;
+  created_at: string;
+}
+
+export interface SourceRevocationRequestDTO {
+  reason?: string;
+}
+
+export interface DecisionDossierCompileRequestDTO {
+  decision_id: string;
+  plan_id: string;
+  closure_id: string;
+  reassessment_id: string;
+  engineering_question?: string | null;
+  decision_type?: string;
+}
+
+export interface DecisionDossierGovernanceTransitionRequestDTO {
+  action_type: ReviewActionType | string;
+  rationale?: string;
+}
+
+export interface DecisionDossierSupersedeRequestDTO {
+  new_plan_id?: string | null;
+  new_closure_id?: string | null;
+  new_reassessment_id?: string | null;
+  reason?: string;
+}
+
+export interface TrustedSourceRegisterRequestDTO {
+  source_identifier: string;
+  source_name: string;
+  source_type: string;
+  certificate_ref?: string | null;
+  public_key_pem?: string | null;
+  valid_until?: string | null;
+}
+
+export interface TrustedSourceRegistryResponseDTO {
+  id: string;
+  source_identifier: string;
+  source_name: string;
+  source_type: string;
+  is_authorized: boolean;
+  certificate_ref?: string | null;
+  public_key_pem?: string | null;
+  valid_from: string;
+  valid_until?: string | null;
+  created_at: string;
+}
+
+export interface EngineeringDecisionDossierResponseDTO {
+  id: string;
+  dossier_number: string;
+  decision_id: string;
+  decision_type: string;
+  engineering_question: string;
+  dossier_version: number;
+  parent_dossier_id?: string | null;
+  plan_id: string;
+  plan_version: number;
+  plan_hash: string;
+  sealed_acceptance_criteria: Array<Record<string, any>>;
+  exposure_assessment_id?: string | null;
+  exposure_hash?: string | null;
+  baseline_robustness_analysis_id?: string | null;
+  baseline_robustness_hash?: string | null;
+  closure_id: string;
+  closure_hash: string;
+  reassessment_id: string;
+  reassessment_hash: string;
+  reassessed_robustness_analysis_id?: string | null;
+  reassessed_robustness_hash?: string | null;
+  evidence_item_ids: string[];
+  source_verification_ids: string[];
+  evidence_lineage_summary: Record<string, any>;
+  contradictory_evidence_summary: Record<string, any>;
+  unresolved_assumptions: Array<Record<string, any>>;
+  before_after_comparison: Record<string, any>;
+  governance_state: DossierGovernanceStateType | string;
+  admissibility_status: string;
+  criteria_satisfaction_status: string;
+  closure_status: string;
+  conclusion_review_status: string;
+  decision_approval_status: string;
+  governance_separation_notice: string;
+  deployment_authorization_status: string;
+  deployment_safety_inferred: boolean;
+  review_audit_trail: Array<Record<string, any>>;
+  dossier_content_hash: string;
+  is_active: boolean;
+  superseded_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DecisionDossierListResponseDTO {
+  decision_id: string;
+  dossiers: EngineeringDecisionDossierResponseDTO[];
   total: number;
 }
 

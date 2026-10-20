@@ -1,7 +1,7 @@
 """phase7_5_cosimulation_contracts
 
-Revision ID: x7y8z9a0b1c2
-Revises: w7x7y7z7a7b7
+Revision ID: y8z9a0b1c2d3
+Revises: x7y8z9a0b1c2
 Create Date: 2026-10-20 05:00:00.000000
 
 Phase 7.5: Multi-Domain Co-Simulation Contracts, Time Synchronization & Worker Fencing:
@@ -16,8 +16,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'x7y8z9a0b1c2'
-down_revision: Union[str, None] = 'w7x7y7z7a7b7'
+revision: str = 'y8z9a0b1c2d3'
+down_revision: Union[str, None] = 'x7y8z9a0b1c2'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 

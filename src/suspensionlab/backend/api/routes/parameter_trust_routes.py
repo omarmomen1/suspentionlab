@@ -19,7 +19,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, select
+from sqlalchemy import and_, desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from suspensionlab.backend.database.core import get_db_dependency
@@ -61,6 +61,22 @@ from suspensionlab.backend.services.parameter_trust_validation_service import (
     InvalidEvidenceScopeError,
     UnauthorizedValidationActionError,
 )
+from suspensionlab.backend.services.parameter_trust_dossier_service import (
+    ParameterTrustDossierService,
+    DossierGovernanceError,
+    EvidenceNotFoundError,
+    DossierNotFoundError,
+    UnverifiedSourceError,
+    RevokedSourceAuthorizationError,
+    InvalidSignatureError,
+    ArtifactIntegrityBreachError,
+    UnauthorizedReviewerError,
+    InvalidGovernanceTransitionError,
+    ImmutableDossierError,
+    ContradictoryEvidenceError,
+    CrossTenantAccessError,
+    _safe_uuid,
+)
 from suspensionlab.backend.database.models.parameter_trust import (
     ParameterTrustFleetReport,
     ParameterTrustAssemblyImpactRecord,
@@ -71,8 +87,18 @@ from suspensionlab.backend.database.models.parameter_trust import (
     ValidationEvidenceItemRecord,
     ValidationEvidenceClosureRecord,
     ValidationDecisionReassessmentRecord,
+    TrustedSourceRegistryRecord,
+    SourceVerificationRecord,
+    EngineeringDecisionDossierRecord,
+    SourceVerificationMethod,
+    SourceVerificationStatus,
+    EvidenceIntegrityStage,
+    DossierGovernanceState,
+    ReviewActionType,
     CURRENT_ROBUSTNESS_POLICY_VERSION,
     CURRENT_VALIDATION_PLANNING_POLICY_VERSION,
+    EVIDENCE_INTEGRITY_POLICY_V1,
+    CURRENT_EVIDENCE_INTEGRITY_POLICY_VERSION,
 )
 from suspensionlab.backend.services.evidence_graph_service import (
     EntityNotFoundError,
@@ -1242,6 +1268,136 @@ class DecisionReassessmentHistoryResponseDTO(BaseModel):
     total: int
 
 
+# ── PHASE 6.7 EVIDENCE INTEGRITY & DECISION DOSSIERS DTO SCHEMAS ─────────────
+
+class SourceVerificationRequestDTO(BaseModel):
+    verification_method: str
+    verifier_identity: Optional[str] = None
+    supporting_references: Optional[Dict[str, Any]] = None
+    scope: Optional[Dict[str, Any]] = None
+    verification_notes: Optional[str] = None
+    signature_hex: Optional[str] = None
+    public_key_pem: Optional[str] = None
+    expected_artifact_hash: Optional[str] = None
+
+
+class SourceVerificationResponseDTO(BaseModel):
+    id: str
+    evidence_item_id: str
+    verification_method: str
+    verification_status: str
+    verifier_identity: str
+    verifier_role: str
+    verifier_user_id: Optional[str] = None
+    verification_timestamp: str
+    artifact_hash: str
+    supporting_references: Dict[str, Any]
+    scope: Dict[str, Any]
+    verification_notes: Optional[str] = None
+    verification_hash: str
+    is_revoked: bool
+    revocation_reason: Optional[str] = None
+    created_at: str
+
+
+class SourceRevocationRequestDTO(BaseModel):
+    reason: Optional[str] = "Source verification revoked by authorized engineer."
+
+
+class DecisionDossierCompileRequestDTO(BaseModel):
+    decision_id: str
+    plan_id: str
+    closure_id: str
+    reassessment_id: str
+    engineering_question: Optional[str] = None
+    decision_type: Optional[str] = "EngineeringDecision"
+
+
+class DecisionDossierGovernanceTransitionRequestDTO(BaseModel):
+    action_type: str
+    rationale: Optional[str] = ""
+
+
+class DecisionDossierSupersedeRequestDTO(BaseModel):
+    new_plan_id: Optional[str] = None
+    new_closure_id: Optional[str] = None
+    new_reassessment_id: Optional[str] = None
+    reason: Optional[str] = "Dossier superseded with updated evidence."
+
+
+class TrustedSourceRegisterRequestDTO(BaseModel):
+    source_identifier: str
+    source_name: str
+    source_type: str
+    certificate_ref: Optional[str] = None
+    public_key_pem: Optional[str] = None
+    valid_until: Optional[str] = None
+
+
+class TrustedSourceRegistryResponseDTO(BaseModel):
+    id: str
+    source_identifier: str
+    source_name: str
+    source_type: str
+    is_authorized: bool
+    certificate_ref: Optional[str] = None
+    public_key_pem: Optional[str] = None
+    valid_from: str
+    valid_until: Optional[str] = None
+    created_at: str
+
+
+class EngineeringDecisionDossierResponseDTO(BaseModel):
+    id: str
+    dossier_number: str
+    decision_id: str
+    decision_type: str
+    engineering_question: str
+    dossier_version: int
+    parent_dossier_id: Optional[str] = None
+    plan_id: str
+    plan_version: int
+    plan_hash: str
+    sealed_acceptance_criteria: List[Dict[str, Any]]
+    exposure_assessment_id: Optional[str] = None
+    exposure_hash: Optional[str] = None
+    baseline_robustness_analysis_id: Optional[str] = None
+    baseline_robustness_hash: Optional[str] = None
+    closure_id: str
+    closure_hash: str
+    reassessment_id: str
+    reassessment_hash: str
+    reassessed_robustness_analysis_id: Optional[str] = None
+    reassessed_robustness_hash: Optional[str] = None
+    evidence_item_ids: List[str]
+    source_verification_ids: List[str]
+    evidence_lineage_summary: Dict[str, Any]
+    contradictory_evidence_summary: Dict[str, Any]
+    unresolved_assumptions: List[Dict[str, Any]]
+    before_after_comparison: Dict[str, Any]
+    governance_state: str
+    admissibility_status: str
+    criteria_satisfaction_status: str
+    closure_status: str
+    conclusion_review_status: str
+    decision_approval_status: str
+    governance_separation_notice: str
+    deployment_authorization_status: str
+    deployment_safety_inferred: bool
+    review_audit_trail: List[Dict[str, Any]]
+    dossier_content_hash: str
+    is_active: bool
+    superseded_by: Optional[str] = None
+    created_at: str
+    updated_at: str
+
+
+class DecisionDossierListResponseDTO(BaseModel):
+    decision_id: str
+    dossiers: List[EngineeringDecisionDossierResponseDTO]
+    total: int
+
+
 # ── PHASE 6.6 VALIDATION PLANNING & EVIDENCE CLOSURE ENDPOINTS ───────────────
 
 @router.post(
@@ -1616,6 +1772,421 @@ async def get_decision_reassessments_endpoint(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except TenantIsolationError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+# ── PHASE 6.7 EVIDENCE INTEGRITY & DECISION DOSSIERS ENDPOINTS ────────────────
+
+def _source_verif_to_dto(rec: SourceVerificationRecord) -> SourceVerificationResponseDTO:
+    return SourceVerificationResponseDTO(
+        id=str(rec.id),
+        evidence_item_id=str(rec.evidence_item_id),
+        verification_method=rec.verification_method,
+        verification_status=rec.verification_status,
+        verifier_identity=rec.verifier_identity,
+        verifier_role=rec.verifier_role,
+        verifier_user_id=str(rec.verifier_user_id) if rec.verifier_user_id else None,
+        verification_timestamp=rec.verification_timestamp.isoformat() if rec.verification_timestamp else "",
+        artifact_hash=rec.artifact_hash,
+        supporting_references=rec.supporting_references or {},
+        scope=rec.scope or {},
+        verification_notes=rec.verification_notes,
+        verification_hash=rec.verification_hash,
+        is_revoked=rec.is_revoked,
+        revocation_reason=rec.revocation_reason,
+        created_at=rec.created_at.isoformat() if rec.created_at else "",
+    )
+
+
+def _dossier_to_dto(d: EngineeringDecisionDossierRecord) -> EngineeringDecisionDossierResponseDTO:
+    return EngineeringDecisionDossierResponseDTO(
+        id=str(d.id),
+        dossier_number=d.dossier_number,
+        decision_id=d.decision_id,
+        decision_type=d.decision_type,
+        engineering_question=d.engineering_question,
+        dossier_version=d.dossier_version,
+        parent_dossier_id=str(d.parent_dossier_id) if d.parent_dossier_id else None,
+        plan_id=str(d.plan_id),
+        plan_version=d.plan_version,
+        plan_hash=d.plan_hash,
+        sealed_acceptance_criteria=d.sealed_acceptance_criteria or [],
+        exposure_assessment_id=str(d.exposure_assessment_id) if d.exposure_assessment_id else None,
+        exposure_hash=d.exposure_hash,
+        baseline_robustness_analysis_id=str(d.baseline_robustness_analysis_id) if d.baseline_robustness_analysis_id else None,
+        baseline_robustness_hash=d.baseline_robustness_hash,
+        closure_id=str(d.closure_id),
+        closure_hash=d.closure_hash,
+        reassessment_id=str(d.reassessment_id),
+        reassessment_hash=d.reassessment_hash,
+        reassessed_robustness_analysis_id=str(d.reassessed_robustness_analysis_id) if d.reassessed_robustness_analysis_id else None,
+        reassessed_robustness_hash=d.reassessed_robustness_hash,
+        evidence_item_ids=d.evidence_item_ids or [],
+        source_verification_ids=d.source_verification_ids or [],
+        evidence_lineage_summary=d.evidence_lineage_summary or {},
+        contradictory_evidence_summary=d.contradictory_evidence_summary or {},
+        unresolved_assumptions=d.unresolved_assumptions or [],
+        before_after_comparison=d.before_after_comparison or {},
+        governance_state=d.governance_state,
+        admissibility_status=d.admissibility_status,
+        criteria_satisfaction_status=d.criteria_satisfaction_status,
+        closure_status=d.closure_status,
+        conclusion_review_status=d.conclusion_review_status,
+        decision_approval_status=d.decision_approval_status,
+        governance_separation_notice=d.governance_separation_notice,
+        deployment_authorization_status="NOT_ESTABLISHED",
+        deployment_safety_inferred=False,
+        review_audit_trail=d.review_audit_trail or [],
+        dossier_content_hash=d.dossier_content_hash,
+        is_active=d.is_active,
+        superseded_by=str(d.superseded_by) if d.superseded_by else None,
+        created_at=d.created_at.isoformat() if d.created_at else "",
+        updated_at=d.updated_at.isoformat() if d.updated_at else "",
+    )
+
+
+def _reg_to_dto(r: TrustedSourceRegistryRecord) -> TrustedSourceRegistryResponseDTO:
+    return TrustedSourceRegistryResponseDTO(
+        id=str(r.id),
+        source_identifier=r.source_identifier,
+        source_name=r.source_name,
+        source_type=r.source_type,
+        is_authorized=r.is_authorized,
+        certificate_ref=r.certificate_ref,
+        public_key_pem=r.public_key_pem,
+        valid_from=r.valid_from.isoformat() if r.valid_from else "",
+        valid_until=r.valid_until.isoformat() if r.valid_until else None,
+        created_at=r.created_at.isoformat() if r.created_at else "",
+    )
+
+
+@router.post(
+    "/validation/evidence/{item_id}/verify-source",
+    response_model=SourceVerificationResponseDTO,
+)
+async def verify_evidence_source_endpoint(
+    item_id: str,
+    req: SourceVerificationRequestDTO,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Formally verifies source identity of an ingested evidence item.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        rec = await ParameterTrustDossierService.verify_source_identity(
+            db=db,
+            evidence_item_id=item_id,
+            verification_method=req.verification_method,
+            user_context=user,
+            supporting_references=req.supporting_references,
+            scope=req.scope,
+            verification_notes=req.verification_notes,
+            signature_hex=req.signature_hex,
+            public_key_pem=req.public_key_pem,
+            expected_artifact_hash=req.expected_artifact_hash,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        return _source_verif_to_dto(rec)
+    except EvidenceNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except (PreRevealFirewallViolation, UnauthorizedReviewerError, CrossTenantAccessError) as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except (SimulationMasqueradingAsPhysicalError, ArtifactIntegrityBreachError, InvalidSignatureError, RevokedSourceAuthorizationError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/validation/evidence/{item_id}/revoke-source",
+    response_model=SourceVerificationResponseDTO,
+)
+async def revoke_evidence_source_endpoint(
+    item_id: str,
+    req: SourceRevocationRequestDTO,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Revokes source authorization for an evidence verification record.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        stmt = select(SourceVerificationRecord).where(
+            SourceVerificationRecord.evidence_item_id == _safe_uuid(item_id),
+            SourceVerificationRecord.is_revoked == False,
+        ).order_by(desc(SourceVerificationRecord.created_at))
+        res = await db.execute(stmt)
+        verif = res.scalar_one_or_none()
+        if not verif:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No active verification found for evidence '{item_id}'.")
+
+        rec = await ParameterTrustDossierService.revoke_source_verification(
+            db=db,
+            verification_id=verif.id,
+            user_context=user,
+            reason=req.reason,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        return _source_verif_to_dto(rec)
+    except UnauthorizedReviewerError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except DossierGovernanceError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get(
+    "/validation/evidence/{item_id}/source-verification",
+    response_model=SourceVerificationResponseDTO,
+)
+async def get_evidence_source_verification_endpoint(
+    item_id: str,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Retrieves the source verification record for an evidence item.
+    """
+    stmt = select(SourceVerificationRecord).where(
+        SourceVerificationRecord.evidence_item_id == _safe_uuid(item_id)
+    ).order_by(desc(SourceVerificationRecord.created_at))
+    res = await db.execute(stmt)
+    rec = res.scalar_one_or_none()
+    if not rec:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No source verification record found for evidence '{item_id}'.")
+    return _source_verif_to_dto(rec)
+
+
+@router.post(
+    "/validation/dossiers/compile",
+    response_model=EngineeringDecisionDossierResponseDTO,
+)
+async def compile_decision_dossier_endpoint(
+    req: DecisionDossierCompileRequestDTO,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Compiles an authoritative Engineering Decision Dossier.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        dossier = await ParameterTrustDossierService.compile_decision_dossier(
+            db=db,
+            decision_id=req.decision_id,
+            plan_id=req.plan_id,
+            closure_id=req.closure_id,
+            reassessment_id=req.reassessment_id,
+            user_context=user,
+            engineering_question=req.engineering_question,
+            decision_type=req.decision_type or "EngineeringDecision",
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        return _dossier_to_dto(dossier)
+    except DossierNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except CrossTenantAccessError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except DossierGovernanceError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get(
+    "/validation/dossiers/{dossier_id}",
+    response_model=EngineeringDecisionDossierResponseDTO,
+)
+async def get_decision_dossier_endpoint(
+    dossier_id: str,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Retrieves an Engineering Decision Dossier by ID.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    team_uuid = _safe_uuid(team_id)
+    org_uuid = _safe_uuid(org_id)
+    stmt = select(EngineeringDecisionDossierRecord).where(
+        EngineeringDecisionDossierRecord.id == _safe_uuid(dossier_id)
+    )
+    if org_uuid:
+        stmt = stmt.where(or_(EngineeringDecisionDossierRecord.organization_id == org_uuid, EngineeringDecisionDossierRecord.organization_id.is_(None)))
+    if team_uuid:
+        stmt = stmt.where(or_(EngineeringDecisionDossierRecord.team_id == team_uuid, EngineeringDecisionDossierRecord.team_id.is_(None)))
+
+    res = await db.execute(stmt)
+    d = res.scalar_one_or_none()
+    if not d:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Decision dossier '{dossier_id}' not found.")
+    return _dossier_to_dto(d)
+
+
+@router.get(
+    "/validation/dossiers/by-decision/{decision_id}",
+    response_model=DecisionDossierListResponseDTO,
+)
+async def get_decision_dossiers_for_decision_endpoint(
+    decision_id: str,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Lists all decision dossiers compiled for an engineering decision.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    team_uuid = _safe_uuid(team_id)
+    org_uuid = _safe_uuid(org_id)
+    stmt = select(EngineeringDecisionDossierRecord).where(
+        EngineeringDecisionDossierRecord.decision_id == str(decision_id)
+    )
+    if org_uuid:
+        stmt = stmt.where(or_(EngineeringDecisionDossierRecord.organization_id == org_uuid, EngineeringDecisionDossierRecord.organization_id.is_(None)))
+    if team_uuid:
+        stmt = stmt.where(or_(EngineeringDecisionDossierRecord.team_id == team_uuid, EngineeringDecisionDossierRecord.team_id.is_(None)))
+
+    stmt = stmt.order_by(desc(EngineeringDecisionDossierRecord.dossier_version))
+    res = await db.execute(stmt)
+    dossiers = list(res.scalars().all())
+    return DecisionDossierListResponseDTO(
+        decision_id=decision_id,
+        dossiers=[_dossier_to_dto(d) for d in dossiers],
+        total=len(dossiers),
+    )
+
+
+@router.post(
+    "/validation/dossiers/{dossier_id}/governance-transition",
+    response_model=EngineeringDecisionDossierResponseDTO,
+)
+async def advance_dossier_governance_endpoint(
+    dossier_id: str,
+    req: DecisionDossierGovernanceTransitionRequestDTO,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Advances a decision dossier through formal, role-controlled governance gates.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        d = await ParameterTrustDossierService.advance_dossier_governance(
+            db=db,
+            dossier_id=dossier_id,
+            action_type=req.action_type,
+            user_context=user,
+            rationale=req.rationale,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        return _dossier_to_dto(d)
+    except DossierNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except (UnauthorizedReviewerError, CrossTenantAccessError) as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except (InvalidGovernanceTransitionError, ImmutableDossierError) as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/validation/dossiers/{dossier_id}/supersede",
+    response_model=EngineeringDecisionDossierResponseDTO,
+)
+async def supersede_dossier_endpoint(
+    dossier_id: str,
+    req: DecisionDossierSupersedeRequestDTO,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Supersedes an existing decision dossier, creating version N+1.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        d = await ParameterTrustDossierService.supersede_dossier(
+            db=db,
+            parent_dossier_id=dossier_id,
+            user_context=user,
+            new_plan_id=req.new_plan_id,
+            new_closure_id=req.new_closure_id,
+            new_reassessment_id=req.new_reassessment_id,
+            reason=req.reason,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        return _dossier_to_dto(d)
+    except DossierNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except (UnauthorizedReviewerError, CrossTenantAccessError) as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except DossierGovernanceError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post(
+    "/validation/registries/trusted-sources",
+    response_model=TrustedSourceRegistryResponseDTO,
+)
+async def register_trusted_source_endpoint(
+    req: TrustedSourceRegisterRequestDTO,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Registers an authoritative trusted evidence source in the registry.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    try:
+        valid_until_dt = datetime.fromisoformat(req.valid_until) if req.valid_until else None
+        rec = await ParameterTrustDossierService.register_trusted_source(
+            db=db,
+            source_identifier=req.source_identifier,
+            source_name=req.source_name,
+            source_type=req.source_type,
+            user_context=user,
+            certificate_ref=req.certificate_ref,
+            public_key_pem=req.public_key_pem,
+            valid_until=valid_until_dt,
+            team_id=team_id,
+            organization_id=org_id,
+            user_id=user_id,
+        )
+        return _reg_to_dto(rec)
+    except UnauthorizedReviewerError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except DossierGovernanceError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get(
+    "/validation/registries/trusted-sources",
+    response_model=List[TrustedSourceRegistryResponseDTO],
+)
+async def list_trusted_sources_endpoint(
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+):
+    """
+    Lists registered trusted evidence sources for the tenant.
+    """
+    team_id, org_id, user_id = _extract_tenant_scope(user)
+    team_uuid = _safe_uuid(team_id)
+    org_uuid = _safe_uuid(org_id)
+    stmt = select(TrustedSourceRegistryRecord)
+    if org_uuid:
+        stmt = stmt.where(or_(TrustedSourceRegistryRecord.organization_id == org_uuid, TrustedSourceRegistryRecord.organization_id.is_(None)))
+    if team_uuid:
+        stmt = stmt.where(or_(TrustedSourceRegistryRecord.team_id == team_uuid, TrustedSourceRegistryRecord.team_id.is_(None)))
+
+    res = await db.execute(stmt)
+    records = list(res.scalars().all())
+    return [_reg_to_dto(r) for r in records]
 
 
 # ── ENDPOINTS ──────────────────────────────────────────────────────────────────
