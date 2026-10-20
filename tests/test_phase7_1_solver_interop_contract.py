@@ -780,7 +780,7 @@ def test_32_alembic_topology_remains_valid():
     script_dir = alembic.script.ScriptDirectory.from_config(cfg)
     heads = script_dir.get_heads()
     assert len(heads) == 1, f"Expected exactly 1 Alembic head, got {heads}"
-    assert heads[0] in ("q7r8s9t0u1v2", "r8s9t0u1v2w3", "s9t0u1v2w3x4", "t0u1v2w3x4y5", "u1v2w3x4y5z6", "v6w6x6y6z6a6", "v2w3x4y5z6p74", "w7x7y7z7a7b7")
+    assert heads[0] in ("q7r8s9t0u1v2", "r8s9t0u1v2w3", "s9t0u1v2w3x4", "t0u1v2w3x4y5", "u1v2w3x4y5z6", "v6w6x6y6z6a6", "v2w3x4y5z6p74", "w7x7y7z7a7b7", "x7y8z9a0b1c2")
 
 
 

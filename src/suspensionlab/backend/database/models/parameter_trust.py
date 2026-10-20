@@ -824,11 +824,20 @@ class ValidationEvidenceItemRecord(Base):
     reviewed_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
+    # ── Phase 6.7 Source Verification & Integrity Tracking ───────────────────
+    integrity_stage = Column(String(64), nullable=False, default="SOURCE_CLAIMED")
+    source_verification_status = Column(String(32), nullable=False, default="UNVERIFIED")
+    source_verification_id = Column(UUID_TYPE, ForeignKey("source_verification_records.id", ondelete="SET NULL"), nullable=True)
+
     organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
     submitted_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+    @property
+    def raw_artifact_hash(self) -> str:
+        return self.integrity_hash
 
 
 class ValidationEvidenceClosureRecord(Base):
@@ -924,6 +933,240 @@ class ValidationDecisionReassessmentRecord(Base):
     reassessed_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PHASE 6.7: VALIDATION EVIDENCE INTEGRITY & DECISION DOSSIER GOVERNANCE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class SourceVerificationMethod(str, enum.Enum):
+    """
+    Authoritative verification methods for evidence source authenticity (Phase 6.7).
+    """
+    TRUSTED_REGISTRY_CHECK = "TRUSTED_REGISTRY_CHECK"
+    AUTHENTICATED_SUPPLIER_ATTESTATION = "AUTHENTICATED_SUPPLIER_ATTESTATION"
+    AUTHORIZED_CUSTODIAN_REVIEW = "AUTHORIZED_CUSTODIAN_REVIEW"
+    CRYPTOGRAPHIC_SIGNATURE = "CRYPTOGRAPHIC_SIGNATURE"
+
+
+class SourceVerificationStatus(str, enum.Enum):
+    """
+    Authenticity status of an evidence item source identity (Phase 6.7).
+    """
+    UNVERIFIED = "UNVERIFIED"
+    VERIFIED = "VERIFIED"
+    REJECTED = "REJECTED"
+    REVOKED = "REVOKED"
+
+
+class EvidenceIntegrityStage(str, enum.Enum):
+    """
+    Sequential integrity maturation stages for evidence closure (Phase 6.7).
+    """
+    SOURCE_CLAIMED = "SOURCE_CLAIMED"
+    PROVENANCE_DOCUMENTED = "PROVENANCE_DOCUMENTED"
+    SOURCE_IDENTITY_VERIFIED = "SOURCE_IDENTITY_VERIFIED"
+    MEASUREMENT_QUALITY_ASSESSED = "MEASUREMENT_QUALITY_ASSESSED"
+    CRITERIA_EVALUATED = "CRITERIA_EVALUATED"
+    EVIDENCE_ACCEPTED = "EVIDENCE_ACCEPTED"
+
+
+class DossierGovernanceState(str, enum.Enum):
+    """
+    Role-controlled engineering decision dossier review states (Phase 6.7).
+    """
+    DRAFT = "DRAFT"
+    IN_REVIEW = "IN_REVIEW"
+    EVIDENCE_ACCEPTED = "EVIDENCE_ACCEPTED"
+    CONCLUSION_REVIEWED = "CONCLUSION_REVIEWED"
+    DECISION_APPROVED = "DECISION_APPROVED"
+    REJECTED = "REJECTED"
+    SUPERSEDED = "SUPERSEDED"
+
+
+class ReviewActionType(str, enum.Enum):
+    """
+    Formally controlled review actions executed by authorized engineers (Phase 6.7).
+    """
+    ADMIT_EVIDENCE = "ADMIT_EVIDENCE"
+    EVALUATE_CRITERIA = "EVALUATE_CRITERIA"
+    CLOSE_GAP = "CLOSE_GAP"
+    REVIEW_CONCLUSION = "REVIEW_CONCLUSION"
+    APPROVE_DECISION = "APPROVE_DECISION"
+    REJECT = "REJECT"
+    SUPERSEDE = "SUPERSEDE"
+
+
+GOVERNANCE_SEPARATION_NOTICE_V2 = (
+    "GOVERNANCE & SAFETY SEPARATION: Engineering decision closure and evidence dossier approval "
+    "establish verification and criteria satisfaction only. Deployment authorization, functional safety "
+    "certification (ISO 26262), and operational release require separate statutory authorization and "
+    "are NEVER established or inferred by evidence closure or parameter trust reassessments. "
+    "STRICT NON-ELEVATION POLICY ENFORCED."
+)
+
+UNVERIFIED_SOURCE_NOTICE = (
+    "UNVERIFIED EVIDENCE WARNING: The source identity of this evidence item has not been "
+    "independently verified. Claimed provenance is not proof of authenticity. Acceptance or "
+    "review does not establish source truthfulness."
+)
+
+EVIDENCE_INTEGRITY_POLICY_V1 = "PHASE_6_7_EVIDENCE_INTEGRITY_POLICY_V1"
+CURRENT_EVIDENCE_INTEGRITY_POLICY_VERSION = "1.0.0"
+
+
+class TrustedSourceRegistryRecord(Base):
+    """
+    Trusted Source Registry Record (Phase 6.7).
+    Maintains an authoritative registry of known, certified evidence sources
+    (e.g., specific calibrated rigs, certified test benches, supplier labs).
+    """
+    __tablename__ = "trusted_source_registries"
+    __table_args__ = (
+        Index("ix_trusted_source_identifier", "source_identifier"),
+        Index("ix_trusted_source_tenant", "organization_id", "team_id"),
+    )
+
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    source_identifier = Column(String(256), nullable=False, unique=True)
+    source_name = Column(String(128), nullable=False)
+    source_type = Column(String(64), nullable=False)  # e.g. "AUTHORITATIVE_LAB_FACILITY"
+
+    is_authorized = Column(Boolean, nullable=False, default=True)
+    certificate_ref = Column(String(256), nullable=True)
+    public_key_pem = Column(Text, nullable=True)
+
+    valid_from = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    valid_until = Column(DateTime(timezone=True), nullable=True)
+
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+
+class SourceVerificationRecord(Base):
+    """
+    Source Verification Record (Phase 6.7).
+    Documents the explicit verification of an evidence item's source authenticity.
+    """
+    __tablename__ = "source_verification_records"
+    __table_args__ = (
+        Index("ix_src_verif_evidence_id", "evidence_item_id"),
+        Index("ix_src_verif_status", "verification_status"),
+        Index("ix_src_verif_tenant", "organization_id", "team_id"),
+    )
+
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    evidence_item_id = Column(UUID_TYPE, ForeignKey("validation_evidence_items.id", ondelete="CASCADE"), nullable=False)
+
+    verification_method = Column(String(64), nullable=False)  # SourceVerificationMethod value
+    verification_status = Column(String(32), nullable=False, default="UNVERIFIED")
+    verifier_identity = Column(String(256), nullable=False)
+    verifier_role = Column(String(64), nullable=False)
+    verifier_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+
+    verification_timestamp = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    artifact_hash = Column(String(64), nullable=False)
+    supporting_references = Column(JSON_TYPE, nullable=False, default=dict)
+    scope = Column(JSON_TYPE, nullable=False, default=dict)
+    verification_notes = Column(Text, nullable=True)
+    verification_hash = Column(String(64), nullable=False)
+
+    is_revoked = Column(Boolean, nullable=False, default=False)
+    revocation_reason = Column(Text, nullable=True)
+    revoked_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+
+
+class EngineeringDecisionDossierRecord(Base):
+    """
+    Engineering Decision Dossier Record (Phase 6.7).
+    A comprehensive, versioned, immutable engineering decision dossier linking:
+    - Engineering question / decision
+    - Parameter trust profiles & decision exposure assessment
+    - Baseline robustness & uncertainty envelope
+    - Sealed validation plan & immutable acceptance criteria
+    - Evidence items & formal source verification records
+    - Evidence closure verdicts & reassessed robustness delta
+    - Contradictory evidence & unresolved assumptions
+    - Review audit trail & historical supersession lineage
+    """
+    __tablename__ = "engineering_decision_dossiers"
+    __table_args__ = (
+        Index("ix_dossier_decision_lookup", "decision_id"),
+        Index("ix_dossier_number", "dossier_number"),
+        Index("ix_dossier_plan_id", "plan_id"),
+        Index("ix_dossier_gov_state", "governance_state"),
+        Index("ix_dossier_active", "is_active"),
+        Index("ix_dossier_tenant", "organization_id", "team_id"),
+    )
+
+    id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
+    dossier_number = Column(String(64), nullable=False, unique=True)
+    decision_id = Column(String(128), nullable=False)
+    decision_type = Column(String(64), nullable=False, default="EngineeringDecision")
+    engineering_question = Column(Text, nullable=False)
+    dossier_version = Column(Integer, nullable=False, default=1)
+    parent_dossier_id = Column(UUID_TYPE, ForeignKey("engineering_decision_dossiers.id", ondelete="SET NULL"), nullable=True)
+
+    plan_id = Column(UUID_TYPE, ForeignKey("engineering_validation_plans.id", ondelete="CASCADE"), nullable=False)
+    plan_version = Column(Integer, nullable=False, default=1)
+    plan_hash = Column(String(64), nullable=False)
+    sealed_acceptance_criteria = Column(JSON_TYPE, nullable=False, default=list)
+
+    exposure_assessment_id = Column(UUID_TYPE, ForeignKey("decision_exposure_assessments.id", ondelete="SET NULL"), nullable=True)
+    exposure_hash = Column(String(64), nullable=True)
+
+    baseline_robustness_analysis_id = Column(UUID_TYPE, ForeignKey("decision_robustness_analyses.id", ondelete="SET NULL"), nullable=True)
+    baseline_robustness_hash = Column(String(64), nullable=True)
+
+    closure_id = Column(UUID_TYPE, ForeignKey("validation_evidence_closures.id", ondelete="CASCADE"), nullable=False)
+    closure_hash = Column(String(64), nullable=False)
+
+    reassessment_id = Column(UUID_TYPE, ForeignKey("validation_decision_reassessments.id", ondelete="CASCADE"), nullable=False)
+    reassessment_hash = Column(String(64), nullable=False)
+
+    reassessed_robustness_analysis_id = Column(UUID_TYPE, ForeignKey("decision_robustness_analyses.id", ondelete="SET NULL"), nullable=True)
+    reassessed_robustness_hash = Column(String(64), nullable=True)
+
+    evidence_item_ids = Column(JSON_TYPE, nullable=False, default=list)
+    source_verification_ids = Column(JSON_TYPE, nullable=False, default=list)
+
+    evidence_lineage_summary = Column(JSON_TYPE, nullable=False, default=dict)
+    contradictory_evidence_summary = Column(JSON_TYPE, nullable=False, default=dict)
+    unresolved_assumptions = Column(JSON_TYPE, nullable=False, default=list)
+    before_after_comparison = Column(JSON_TYPE, nullable=False, default=dict)
+
+    governance_state = Column(String(64), nullable=False, default="DRAFT")
+    admissibility_status = Column(String(32), nullable=False, default="PENDING")
+    criteria_satisfaction_status = Column(String(32), nullable=False, default="PENDING")
+    closure_status = Column(String(32), nullable=False, default="PENDING")
+    conclusion_review_status = Column(String(32), nullable=False, default="PENDING")
+    decision_approval_status = Column(String(32), nullable=False, default="PENDING")
+
+    governance_separation_notice = Column(Text, nullable=False, default=GOVERNANCE_SEPARATION_NOTICE_V2)
+    deployment_authorization_status = Column(String(32), nullable=False, default="NOT_ESTABLISHED")
+    deployment_safety_inferred = Column(Boolean, nullable=False, default=False)
+
+    review_audit_trail = Column(JSON_TYPE, nullable=False, default=list)
+    dossier_content_hash = Column(String(64), nullable=False)
+
+    is_active = Column(Boolean, nullable=False, default=True)
+    superseded_by = Column(UUID_TYPE, ForeignKey("engineering_decision_dossiers.id", ondelete="SET NULL"), nullable=True)
+
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
+    compiled_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
+
 
 
 

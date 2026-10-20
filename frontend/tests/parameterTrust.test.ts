@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   ParameterTrustApi,
   ValidationPlanningApi,
+  DecisionDossierApi,
   ParameterTrustResponseDTO,
   ParameterTrustExplanationResponseDTO,
   ParameterTrustHistoryResponseDTO,
@@ -10,6 +11,9 @@ import {
   ValidationPlanResponseDTO,
   ClosureAssessmentResponseDTO,
   DecisionReassessmentResponseDTO,
+  EngineeringDecisionDossierResponseDTO,
+  SourceVerificationResponseDTO,
+  TrustedSourceRegistryResponseDTO,
 } from "../lib/api_client";
 import * as apiModule from "../lib/api";
 
@@ -928,6 +932,348 @@ describe("ParameterTrustApi & Trust Map Frontend Unit Tests", () => {
       expect(reassessment.reassessment_delta?.reversals_after_count).toBe(0);
       expect(reassessment.deployment_safety_inferred).toBe(false);
       expect(reassessment.deployment_authorization).toBe("NOT_ESTABLISHED");
+    });
+  });
+
+  describe("Phase 6.7 Decision Dossiers, Source Verification & Closure Governance", () => {
+    it("verifyEvidenceSource calls verify-source endpoint with verifier details and returns verified status", async () => {
+      const mockVerification: SourceVerificationResponseDTO = {
+        id: "sv-uuid-1",
+        evidence_item_id: "ev-uuid-1",
+        verification_method: "AUTHORIZED_CUSTODIAN_REVIEW",
+        verification_status: "VERIFIED",
+        verifier_identity: "Lead Validation Auditor",
+        verifier_role: "SYSTEM_AUDITOR",
+        verifier_user_id: "auditor-01",
+        verification_timestamp: "2026-10-20T05:00:00Z",
+        artifact_hash: "artifacthash123",
+        supporting_references: { calibration_cert: "CERT-2026-99" },
+        scope: { test_rig: "RIG-4P-A" },
+        verification_notes: "Source calibration certificate and raw telemetry records verified.",
+        verification_hash: "vhash123",
+        is_revoked: false,
+        revocation_reason: null,
+        created_at: "2026-10-20T05:00:00Z",
+      };
+
+      const spy = vi.spyOn(apiModule, "apiJson").mockResolvedValueOnce(mockVerification);
+
+      const res = await DecisionDossierApi.verifyEvidenceSource("ev-uuid-1", {
+        verification_method: "AUTHORIZED_CUSTODIAN_REVIEW",
+        verifier_identity: "Lead Validation Auditor",
+        verification_notes: "Source calibration certificate and raw telemetry records verified.",
+      });
+
+      expect(spy).toHaveBeenCalledWith(
+        "/api/v1/parameter-trust/validation/evidence/ev-uuid-1/verify-source",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            verification_method: "AUTHORIZED_CUSTODIAN_REVIEW",
+            verifier_identity: "Lead Validation Auditor",
+            verification_notes: "Source calibration certificate and raw telemetry records verified.",
+          }),
+        })
+      );
+      expect(res.id).toBe("sv-uuid-1");
+      expect(res.verification_status).toBe("VERIFIED");
+      expect(res.is_revoked).toBe(false);
+    });
+
+    it("revokeEvidenceSource cascades revocation and returns REVOKED status", async () => {
+      const mockRevoked: SourceVerificationResponseDTO = {
+        id: "sv-uuid-1",
+        evidence_item_id: "ev-uuid-1",
+        verification_method: "AUTHORIZED_CUSTODIAN_REVIEW",
+        verification_status: "REVOKED",
+        verifier_identity: "Lead Validation Auditor",
+        verifier_role: "SYSTEM_AUDITOR",
+        verifier_user_id: "auditor-01",
+        verification_timestamp: "2026-10-20T05:00:00Z",
+        artifact_hash: "artifacthash123",
+        supporting_references: {},
+        scope: {},
+        verification_notes: "Revoked due to calibration dispute.",
+        verification_hash: "vhash123",
+        is_revoked: true,
+        revocation_reason: "Disputed sensor calibration.",
+        created_at: "2026-10-20T05:00:00Z",
+      };
+
+      const spy = vi.spyOn(apiModule, "apiJson").mockResolvedValueOnce(mockRevoked);
+
+      const res = await DecisionDossierApi.revokeEvidenceSource("ev-uuid-1", {
+        reason: "Disputed sensor calibration.",
+      });
+
+      expect(spy).toHaveBeenCalledWith(
+        "/api/v1/parameter-trust/validation/evidence/ev-uuid-1/revoke-source",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ reason: "Disputed sensor calibration." }),
+        })
+      );
+      expect(res.verification_status).toBe("REVOKED");
+      expect(res.is_revoked).toBe(true);
+      expect(res.revocation_reason).toBe("Disputed sensor calibration.");
+    });
+
+    it("compileDecisionDossier creates deterministic dossier with strict non-elevation guarantees", async () => {
+      const mockDossier: EngineeringDecisionDossierResponseDTO = {
+        id: "dossier-uuid-1",
+        dossier_number: "DOS-DEC-12-001",
+        decision_id: "DEC-12",
+        decision_type: "EngineeringDecision",
+        engineering_question: "Is front spring stiffness robust against reversal under measured bump loads?",
+        dossier_version: 1,
+        parent_dossier_id: null,
+        plan_id: "plan-uuid-1",
+        plan_version: 1,
+        plan_hash: "planhash123",
+        sealed_acceptance_criteria: [
+          { metric_name: "spring_rate_tolerance", target_value: 80.0, status: "AUTHORIZED" },
+        ],
+        exposure_assessment_id: "exp-uuid-1",
+        exposure_hash: "exphash123",
+        baseline_robustness_analysis_id: "rob-base-1",
+        baseline_robustness_hash: "robbasehash123",
+        closure_id: "closure-uuid-1",
+        closure_hash: "closurehash123",
+        reassessment_id: "reassess-uuid-1",
+        reassessment_hash: "reassesshash123",
+        reassessed_robustness_analysis_id: "rob-reassess-1",
+        reassessed_robustness_hash: "robreassesshash123",
+        evidence_item_ids: ["ev-uuid-1"],
+        source_verification_ids: ["sv-uuid-1"],
+        evidence_lineage_summary: { total_evidence_items: 1, verified_sources: 1 },
+        contradictory_evidence_summary: { contradictory_count: 0, items: [] },
+        unresolved_assumptions: [],
+        before_after_comparison: {
+          baseline_robustness_state: "VULNERABLE_TO_REVERSAL",
+          reassessed_robustness_state: "ROBUST_WITHIN_CREDIBLE_RANGE",
+          baseline_reversals_count: 1,
+          reassessed_reversals_count: 0,
+          closure_verdict: "CLOSED_WITH_SUPPORTING_EVIDENCE",
+        },
+        governance_state: "DRAFT",
+        admissibility_status: "PENDING_ADMISSIBILITY",
+        criteria_satisfaction_status: "PENDING_EVALUATION",
+        closure_status: "PENDING_CLOSURE",
+        conclusion_review_status: "PENDING_REVIEW",
+        decision_approval_status: "PENDING_APPROVAL",
+        governance_separation_notice:
+          "STRICT NON-ELEVATION POLICY: Dossier approval != Deployment authorization != Operational safety certification. " +
+          "Engineering decision closure establishes epistemic bounding based on admissible evidence; deployment safety must be established through independent system-level safety cases.",
+        deployment_authorization_status: "NOT_ESTABLISHED",
+        deployment_safety_inferred: false,
+        review_audit_trail: [
+          {
+            action_type: "COMPILE_DOSSIER",
+            reviewer_identity: "Automated Evidence Compiler",
+            reviewer_role: "SYSTEM",
+            timestamp: "2026-10-20T05:00:00Z",
+            rationale: "Compiled initial engineering decision dossier for DEC-12.",
+          },
+        ],
+        dossier_content_hash: "deterministicdossierhash1234567890abcdef",
+        is_active: true,
+        superseded_by: null,
+        created_at: "2026-10-20T05:00:00Z",
+        updated_at: "2026-10-20T05:00:00Z",
+      };
+
+      const spy = vi.spyOn(apiModule, "apiJson").mockResolvedValueOnce(mockDossier);
+
+      const res = await DecisionDossierApi.compileDecisionDossier({
+        decision_id: "DEC-12",
+        plan_id: "plan-uuid-1",
+        closure_id: "closure-uuid-1",
+        reassessment_id: "reassess-uuid-1",
+        engineering_question: "Is front spring stiffness robust against reversal under measured bump loads?",
+      });
+
+      expect(spy).toHaveBeenCalledWith(
+        "/api/v1/parameter-trust/validation/dossiers/compile",
+        expect.objectContaining({ method: "POST" })
+      );
+      expect(res.dossier_number).toBe("DOS-DEC-12-001");
+      expect(res.governance_state).toBe("DRAFT");
+      expect(res.dossier_content_hash).toBe("deterministicdossierhash1234567890abcdef");
+      expect(res.deployment_safety_inferred).toBe(false);
+      expect(res.deployment_authorization_status).toBe("NOT_ESTABLISHED");
+      expect(res.governance_separation_notice).toContain("STRICT NON-ELEVATION POLICY");
+      expect(res.governance_separation_notice).toContain("deployment safety must be established through independent system-level safety cases");
+    });
+
+    it("advanceDossierGovernance advances state through sequential authorized gates and enforces safety separation", async () => {
+      const mockApprovedDossier: EngineeringDecisionDossierResponseDTO = {
+        id: "dossier-uuid-1",
+        dossier_number: "DOS-DEC-12-001",
+        decision_id: "DEC-12",
+        decision_type: "EngineeringDecision",
+        engineering_question: "Is front spring stiffness robust against reversal under measured bump loads?",
+        dossier_version: 1,
+        parent_dossier_id: null,
+        plan_id: "plan-uuid-1",
+        plan_version: 1,
+        plan_hash: "planhash123",
+        sealed_acceptance_criteria: [],
+        closure_id: "closure-uuid-1",
+        closure_hash: "closurehash123",
+        reassessment_id: "reassess-uuid-1",
+        reassessment_hash: "reassesshash123",
+        evidence_item_ids: ["ev-uuid-1"],
+        source_verification_ids: ["sv-uuid-1"],
+        evidence_lineage_summary: {},
+        contradictory_evidence_summary: { items: [] },
+        unresolved_assumptions: [],
+        before_after_comparison: {},
+        governance_state: "DECISION_APPROVED",
+        admissibility_status: "EVIDENCE_ADMITTED",
+        criteria_satisfaction_status: "CRITERIA_SATISFIED",
+        closure_status: "GAP_CLOSED",
+        conclusion_review_status: "CONCLUSION_ACCEPTED",
+        decision_approval_status: "DECISION_FORMALLY_APPROVED",
+        governance_separation_notice: "STRICT NON-ELEVATION POLICY: Dossier approval != Deployment authorization.",
+        deployment_authorization_status: "NOT_ESTABLISHED",
+        deployment_safety_inferred: false,
+        review_audit_trail: [
+          { action_type: "APPROVE_DECISION", reviewer_role: "LEAD_ENGINEER", timestamp: "2026-10-20T05:10:00Z" },
+        ],
+        dossier_content_hash: "hashapproved123",
+        is_active: true,
+        superseded_by: null,
+        created_at: "2026-10-20T05:00:00Z",
+        updated_at: "2026-10-20T05:10:00Z",
+      };
+
+      const spy = vi.spyOn(apiModule, "apiJson").mockResolvedValueOnce(mockApprovedDossier);
+
+      const res = await DecisionDossierApi.advanceDossierGovernance("dossier-uuid-1", {
+        action_type: "APPROVE_DECISION",
+        rationale: "Approved by Lead Chassis Engineer after conclusion review.",
+      });
+
+      expect(spy).toHaveBeenCalledWith(
+        "/api/v1/parameter-trust/validation/dossiers/dossier-uuid-1/governance-transition",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            action_type: "APPROVE_DECISION",
+            rationale: "Approved by Lead Chassis Engineer after conclusion review.",
+          }),
+        })
+      );
+      expect(res.governance_state).toBe("DECISION_APPROVED");
+      expect(res.decision_approval_status).toBe("DECISION_FORMALLY_APPROVED");
+      // Critical check: Even upon final approval, safety is NOT inferred
+      expect(res.deployment_safety_inferred).toBe(false);
+      expect(res.deployment_authorization_status).toBe("NOT_ESTABLISHED");
+    });
+
+    it("supersedeDossier creates version 2, links parent, and preserves immutable lineage", async () => {
+      const mockSupersededV2: EngineeringDecisionDossierResponseDTO = {
+        id: "dossier-uuid-2",
+        dossier_number: "DOS-DEC-12-001",
+        decision_id: "DEC-12",
+        decision_type: "EngineeringDecision",
+        engineering_question: "Is front spring stiffness robust against reversal under measured bump loads?",
+        dossier_version: 2,
+        parent_dossier_id: "dossier-uuid-1",
+        plan_id: "plan-uuid-2",
+        plan_version: 2,
+        plan_hash: "planhash456",
+        sealed_acceptance_criteria: [],
+        closure_id: "closure-uuid-2",
+        closure_hash: "closurehash456",
+        reassessment_id: "reassess-uuid-2",
+        reassessment_hash: "reassesshash456",
+        evidence_item_ids: ["ev-uuid-2"],
+        source_verification_ids: ["sv-uuid-2"],
+        evidence_lineage_summary: {},
+        contradictory_evidence_summary: { items: [] },
+        unresolved_assumptions: [],
+        before_after_comparison: {},
+        governance_state: "DRAFT",
+        admissibility_status: "PENDING_ADMISSIBILITY",
+        criteria_satisfaction_status: "PENDING_EVALUATION",
+        closure_status: "PENDING_CLOSURE",
+        conclusion_review_status: "PENDING_REVIEW",
+        decision_approval_status: "PENDING_APPROVAL",
+        governance_separation_notice: "STRICT NON-ELEVATION POLICY",
+        deployment_authorization_status: "NOT_ESTABLISHED",
+        deployment_safety_inferred: false,
+        review_audit_trail: [
+          {
+            action_type: "SUPERSEDE_DOSSIER",
+            reviewer_role: "SYSTEM",
+            timestamp: "2026-10-20T05:20:00Z",
+            rationale: "Superseded with updated empirical evidence and reassessment cycle.",
+          },
+        ],
+        dossier_content_hash: "hashv2content789",
+        is_active: true,
+        superseded_by: null,
+        created_at: "2026-10-20T05:20:00Z",
+        updated_at: "2026-10-20T05:20:00Z",
+      };
+
+      const spy = vi.spyOn(apiModule, "apiJson").mockResolvedValueOnce(mockSupersededV2);
+
+      const res = await DecisionDossierApi.supersedeDossier("dossier-uuid-1", {
+        reason: "Superseded with updated empirical evidence and reassessment cycle.",
+      });
+
+      expect(spy).toHaveBeenCalledWith(
+        "/api/v1/parameter-trust/validation/dossiers/dossier-uuid-1/supersede",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            reason: "Superseded with updated empirical evidence and reassessment cycle.",
+          }),
+        })
+      );
+      expect(res.dossier_version).toBe(2);
+      expect(res.parent_dossier_id).toBe("dossier-uuid-1");
+      expect(res.is_active).toBe(true);
+      expect(res.deployment_safety_inferred).toBe(false);
+      expect(res.deployment_authorization_status).toBe("NOT_ESTABLISHED");
+    });
+
+    it("registerTrustedSource and listTrustedSources manages authoritative trusted registries", async () => {
+      const mockSource: TrustedSourceRegistryResponseDTO = {
+        id: "source-reg-1",
+        source_identifier: "FACILITY-DYNO-CHASSIS-01",
+        source_name: "Chassis Dyno Test Facility 01",
+        source_type: "AUTHORITATIVE_LAB_FACILITY",
+        is_authorized: true,
+        certificate_ref: "ISO-17025-CAL-2026",
+        public_key_pem: null,
+        valid_from: "2026-01-01T00:00:00Z",
+        valid_until: "2027-01-01T00:00:00Z",
+        created_at: "2026-10-20T05:00:00Z",
+      };
+
+      const spyRegister = vi.spyOn(apiModule, "apiJson").mockResolvedValueOnce(mockSource);
+      const registered = await DecisionDossierApi.registerTrustedSource({
+        source_identifier: "FACILITY-DYNO-CHASSIS-01",
+        source_name: "Chassis Dyno Test Facility 01",
+        source_type: "AUTHORITATIVE_LAB_FACILITY",
+        certificate_ref: "ISO-17025-CAL-2026",
+      });
+
+      expect(spyRegister).toHaveBeenCalledWith(
+        "/api/v1/parameter-trust/validation/registries/trusted-sources",
+        expect.objectContaining({ method: "POST" })
+      );
+      expect(registered.source_identifier).toBe("FACILITY-DYNO-CHASSIS-01");
+      expect(registered.is_authorized).toBe(true);
+
+      const spyList = vi.spyOn(apiModule, "apiJson").mockResolvedValueOnce([mockSource]);
+      const list = await DecisionDossierApi.listTrustedSources();
+      expect(spyList).toHaveBeenCalledWith("/api/v1/parameter-trust/validation/registries/trusted-sources");
+      expect(list).toHaveLength(1);
+      expect(list[0].certificate_ref).toBe("ISO-17025-CAL-2026");
     });
   });
 });

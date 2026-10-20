@@ -179,6 +179,9 @@ from suspensionlab.backend.database.models.parameter_trust import (
     ValidationEvidenceItemRecord,
     ValidationEvidenceClosureRecord,
     ValidationDecisionReassessmentRecord,
+    TrustedSourceRegistryRecord,
+    SourceVerificationRecord,
+    EngineeringDecisionDossierRecord,
     TrustState,
     ValidationCoverage,
     ProvenanceClass,
@@ -194,7 +197,11 @@ from suspensionlab.backend.database.models.parameter_trust import (
     CURRENT_ROBUSTNESS_POLICY_VERSION,
     VALIDATION_PLANNING_POLICY_V1,
     CURRENT_VALIDATION_PLANNING_POLICY_VERSION,
+    EVIDENCE_INTEGRITY_POLICY_V1,
+    CURRENT_EVIDENCE_INTEGRITY_POLICY_VERSION,
     GOVERNANCE_VALIDATION_SEPARATION_NOTICE,
+    GOVERNANCE_SEPARATION_NOTICE_V2,
+    UNVERIFIED_SOURCE_NOTICE,
     FINITE_SAMPLE_SCOPE_NOTICE,
     FleetComparabilityStatus,
     SensitivityStatus,
@@ -213,6 +220,11 @@ from suspensionlab.backend.database.models.parameter_trust import (
     EvidenceDataSourceType,
     EvidenceClosureVerdict,
     ReversalResolutionStatus,
+    SourceVerificationMethod,
+    SourceVerificationStatus,
+    EvidenceIntegrityStage,
+    DossierGovernanceState,
+    ReviewActionType,
 )
 
 from suspensionlab.backend.database.models.solver_exchange import (
