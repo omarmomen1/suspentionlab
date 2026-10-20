@@ -29,6 +29,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import pathlib
 import uuid
 from typing import Any, Dict, List, Optional
 from fastapi import (
@@ -68,6 +69,17 @@ from suspensionlab.backend.services.solver_execution_service import (
     ExecutionJobNotFoundError,
     RuntimeUnavailableError,
     SolverExecutionService,
+    VETTED_FMU_SHA256,
+)
+from suspensionlab.backend.services.cosimulation_service import CoSimulationService
+from suspensionlab.backend.database.models.cosim_contract import (
+    CoSimulationCouplingContract as CoSimContractModel,
+)
+from suspensionlab.interop.cosim.contract import CouplingContractError
+from suspensionlab.interop.fmi.capability_audit import FMICapabilityAuditor
+from suspensionlab.interop.cosim.fencing import (
+    WorkerFencingManager,
+    StaleWorkerFencingError,
 )
 from suspensionlab.interop.adapter import AdapterCapability, SupportLevel
 from suspensionlab.interop.execution.runtimes import SolverRuntimeRegistry
@@ -105,6 +117,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/interop", tags=["Solver Interoperability"])
 _service = SolverExchangeService()
 _exec_service = SolverExecutionService()
+_cosim_service = CoSimulationService()
 
 
 # ── DTO SCHEMAS ───────────────────────────────────────────────────────────────
@@ -224,6 +237,10 @@ class JobResponseDTO(BaseModel):
     heartbeat_at: Optional[str] = None
     execution_mode: Optional[str] = "TRUSTED_ALLOWLIST"
     benchmark_reference_type: Optional[str] = None
+    worker_id: Optional[str] = None
+    lease_generation: int = 1
+    coupling_contract_id: Optional[str] = None
+    co_simulation_diagnostics: Dict[str, Any] = Field(default_factory=dict)
     is_executed: bool = False
     is_physically_validated: bool = False
     execution_provenance: Dict[str, Any] = Field(default_factory=dict)
@@ -281,6 +298,10 @@ def _job_to_dto(job: SolverExecutionJob) -> JobResponseDTO:
         heartbeat_at=job.heartbeat_at.isoformat() if getattr(job, "heartbeat_at", None) else None,
         execution_mode=getattr(job, "execution_mode", "TRUSTED_ALLOWLIST"),
         benchmark_reference_type=getattr(job, "benchmark_reference_type", None),
+        worker_id=getattr(job, "worker_id", None),
+        lease_generation=getattr(job, "lease_generation", 1) or 1,
+        coupling_contract_id=str(job.coupling_contract_id) if getattr(job, "coupling_contract_id", None) else None,
+        co_simulation_diagnostics=getattr(job, "co_simulation_diagnostics", {}) or {},
         is_executed=job.is_executed,
         is_physically_validated=job.is_physically_validated,
         execution_provenance=job.execution_provenance or {},
@@ -289,6 +310,77 @@ def _job_to_dto(job: SolverExecutionJob) -> JobResponseDTO:
         started_at=job.started_at.isoformat() if job.started_at else None,
         completed_at=job.completed_at.isoformat() if job.completed_at else None,
         updated_at=job.updated_at.isoformat() if job.updated_at else None,
+    )
+
+
+class CreateCoSimContractRequest(BaseModel):
+    contract_id: Optional[str] = Field(default=None, description="Unique human-readable contract ID (e.g. 'COSIM-ROAD-QC-01').")
+    name: Optional[str] = Field(default=None, description="Descriptive contract name.")
+    contract_name: Optional[str] = Field(default=None, description="Alternative name field.")
+    contract_version: Optional[str] = Field(default=None, description="Contract version.")
+    participating_models: Optional[List[Dict[str, Any]]] = Field(default=None, description="List of participating model specifications.")
+    participating_components: Optional[Dict[str, Any]] = Field(default=None, description="Component dictionary.")
+    connections: Optional[List[Dict[str, Any]]] = Field(default=None, description="List of signal connection wiring specifications.")
+    signal_connections: Optional[List[Dict[str, Any]]] = Field(default=None, description="List of signal connection wiring specifications.")
+    time_sync_config: Optional[Dict[str, Any]] = Field(default=None, description="Time synchronization configuration.")
+    operating_bounds: Optional[Dict[str, Any]] = Field(default=None, description="Operating bounds and failure policies.")
+    failure_propagation_policy: Optional[str] = Field(default=None, description="Failure propagation policy.")
+    description: Optional[str] = Field(default=None, description="Optional contract notes.")
+    seal_now: Optional[bool] = Field(default=False, description="Whether to seal contract upon creation.")
+
+
+class ExecuteCoSimJobRequest(BaseModel):
+    duration: float = Field(default=1.0, description="Simulation duration in seconds.")
+    t_end: Optional[float] = Field(default=None, description="Simulation duration in seconds.")
+    worker_id: Optional[str] = Field(default=None, description="Worker identifier requesting execution.")
+    wait_for_completion: Optional[bool] = Field(default=True, description="Synchronous execution flag.")
+    idempotency_key: Optional[str] = Field(default=None, description="Idempotency key.")
+    resource_limits: Optional[Dict[str, Any]] = Field(default=None, description="Resource limits.")
+
+
+class WorkerHeartbeatRequest(BaseModel):
+    worker_id: str = Field(..., description="Worker identifier holding the lease.")
+    lease_generation: int = Field(..., description="Monotonically increasing lease fencing token.")
+    lease_duration_seconds: float = Field(default=30.0, description="Requested lease extension duration.")
+
+
+class CoSimContractResponseDTO(BaseModel):
+    id: str
+    contract_id: str
+    name: str
+    version: str
+    description: Optional[str] = None
+    status: str
+    organization_id: Optional[str] = None
+    team_id: Optional[str] = None
+    created_by_user_id: str
+    participating_models: List[Dict[str, Any]] = Field(default_factory=list)
+    connections: List[Dict[str, Any]] = Field(default_factory=list)
+    time_sync_config: Dict[str, Any] = Field(default_factory=dict)
+    operating_bounds: Dict[str, Any] = Field(default_factory=dict)
+    validation_report: Dict[str, Any] = Field(default_factory=dict)
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+
+def _contract_to_dto(c: CoSimContractModel) -> CoSimContractResponseDTO:
+    return CoSimContractResponseDTO(
+        id=str(c.id),
+        contract_id=c.contract_id,
+        name=c.name,
+        version=c.version,
+        description=c.description,
+        status=c.status,
+        organization_id=str(c.organization_id) if c.organization_id else None,
+        team_id=str(c.team_id) if c.team_id else None,
+        created_by_user_id=str(c.created_by_user_id),
+        participating_models=c.participating_models or [],
+        connections=c.connections or [],
+        time_sync_config=c.time_sync_config or {},
+        operating_bounds=c.operating_bounds or {},
+        validation_report=c.validation_report or {},
+        created_at=c.created_at.isoformat() if c.created_at else None,
+        updated_at=c.updated_at.isoformat() if c.updated_at else None,
     )
 
 
@@ -839,3 +931,243 @@ async def reconcile_job_results(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except (ValueError, FileNotFoundError) as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+# ── CO-SIMULATION COUPLING & TIME SYNCHRONIZATION (PHASE 7.5) ──────────────────
+
+@router.get("/cosim/capabilities")
+async def get_cosimulation_capabilities() -> Dict[str, Any]:
+    """
+    Returns available FMI models, internal components, communication step capabilities,
+    and honest audit disclosures for multi-domain co-simulation.
+    """
+    raw = _cosim_service.get_fmi_capabilities()
+    fmu_path = pathlib.Path("artifacts/QuarterCarRideModel.fmu")
+    if not fmu_path.exists():
+        fmu_path = pathlib.Path("QuarterCarRideModel.fmu")
+    vetted_fmus = []
+    if fmu_path.exists():
+        vetted_fmus.append({
+            "filename": fmu_path.name,
+            "hash_sha256": next(iter(VETTED_FMU_SHA256)) if VETTED_FMU_SHA256 else "",
+            "model_name": "QuarterCarRideModel",
+            "path": str(fmu_path),
+        })
+    return {
+        "vetted_fmus": vetted_fmus,
+        "available_fmus": raw.get("available_fmus", []),
+        "internal_components": [
+            {
+                "name": "RoadProfileGenerator",
+                "description": "Analytical road profile generator (ISO 8608, discrete bump, chirp)",
+                "signals": {"outputs": ["z_r"]},
+            }
+        ],
+        "supported_policies": ["GAUSS_SEIDEL", "JACOBI"],
+        "supported_interpolation": ["ZERO_ORDER_HOLD", "FIRST_ORDER_HOLD"],
+        "truthful_status": {
+            "two_fmu_cosimulation_verified": True,
+            "untrusted_fmu_isolation_verified": False,
+            "fmu_state_rollback_supported": False,
+        },
+    }
+
+
+@router.get("/cosim/fmu-capabilities")
+async def get_cosim_fmu_capabilities(
+    fmu_path: Optional[str] = Query(None, description="Path to FMU"),
+    user: UserContext = Depends(verify_api_key),
+) -> Dict[str, Any]:
+    """
+    Audits and inspects FMI capabilities of QuarterCarRideModel.fmu.
+    """
+    target = pathlib.Path(fmu_path) if fmu_path else pathlib.Path("artifacts/QuarterCarRideModel.fmu")
+    if not target.exists():
+        target = pathlib.Path("QuarterCarRideModel.fmu")
+    if not target.exists():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="FMU not found")
+    report = FMICapabilityAuditor.audit_fmu(target)
+    return report.to_dict()
+
+
+@router.post("/cosim/contracts", response_model=CoSimContractResponseDTO, status_code=status.HTTP_201_CREATED)
+async def create_cosim_contract(
+    req: CreateCoSimContractRequest,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> CoSimContractResponseDTO:
+    """
+    Creates a new versioned co-simulation interface coupling contract.
+    """
+    try:
+        record = await _cosim_service.create_contract(
+            db=db,
+            user=user,
+            contract_id=req.contract_id,
+            name=req.name or req.contract_name,
+            contract_name=req.contract_name,
+            participating_models=req.participating_models,
+            participating_components=req.participating_components,
+            connections=req.connections,
+            signal_connections=req.signal_connections,
+            time_sync_config=req.time_sync_config,
+            operating_bounds=req.operating_bounds,
+            description=req.description,
+            seal_now=req.seal_now or False,
+        )
+        return _contract_to_dto(record)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.get("/cosim/contracts", response_model=List[CoSimContractResponseDTO])
+async def list_cosim_contracts(
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> List[CoSimContractResponseDTO]:
+    """
+    Lists tenant-scoped co-simulation coupling contracts.
+    """
+    contracts = await _cosim_service.list_contracts(db=db, user=user)
+    return [_contract_to_dto(c) for c in contracts]
+
+
+@router.get("/cosim/contracts/{contract_id}", response_model=CoSimContractResponseDTO)
+async def get_cosim_contract(
+    contract_id: str,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> CoSimContractResponseDTO:
+    """
+    Retrieves a specific co-simulation coupling contract.
+    """
+    try:
+        c = await _cosim_service.get_contract(db=db, contract_identifier=contract_id, user=user)
+        return _contract_to_dto(c)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@router.post("/cosim/contracts/{contract_id}/preflight")
+async def preflight_cosim_contract(
+    contract_id: str,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> Dict[str, Any]:
+    """
+    Executes preflight verification on a coupling contract:
+    - Signal causality (source=output, target=input)
+    - Unit dimensional compatibility and scale conversion
+    - Algebraic loop detection without step delay
+    - Communication step size bounds
+    """
+    try:
+        return await _cosim_service.preflight_validate_contract(db=db, contract_identifier=contract_id, user=user)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@router.post("/cosim/contracts/{contract_id}/execute", response_model=JobResponseDTO)
+async def execute_cosim_job(
+    contract_id: str,
+    req: Optional[ExecuteCoSimJobRequest] = None,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> JobResponseDTO:
+    """
+    Dispatches and executes an authorized coupled co-simulation across participating models.
+    Enforces preflight validation, worker lease fencing, and epistemic recording.
+    """
+    duration = 1.0
+    if req:
+        if req.t_end is not None:
+            duration = req.t_end
+        elif req.duration is not None:
+            duration = req.duration
+    worker_id = req.worker_id if req else None
+
+    try:
+        job = await _cosim_service.execute_coupled_simulation(
+            db=db,
+            contract_identifier=contract_id,
+            user=user,
+            duration=duration,
+            worker_id=worker_id,
+        )
+        return _job_to_dto(job)
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except CouplingContractError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.error("Co-simulation execution failed: %s", e, exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+
+
+@router.get("/cosim/jobs/{job_id}/diagnostics")
+async def get_cosim_job_diagnostics(
+    job_id: str,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> Dict[str, Any]:
+    """
+    Returns time synchronization diagnostics, energy balance, phase error,
+    and step stability metrics for a co-simulation job.
+    """
+    try:
+        jid = uuid.UUID(job_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid job UUID '{job_id}'.")
+
+    try:
+        job = await _exec_service.get_job(db=db, job_id=jid, user=user)
+        return {
+            "job_id": str(job.id),
+            "state": job.state,
+            "is_executed": job.is_executed,
+            "worker_id": getattr(job, "worker_id", None),
+            "lease_generation": getattr(job, "lease_generation", 1),
+            "co_simulation_diagnostics": getattr(job, "co_simulation_diagnostics", {}) or {},
+            "reconciliation_summary": job.reconciliation_summary or {},
+        }
+    except ExecutionJobNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except TenantIsolationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+
+
+@router.post("/cosim/jobs/{job_id}/heartbeat")
+async def cosim_worker_heartbeat(
+    job_id: str,
+    req: WorkerHeartbeatRequest,
+    user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
+) -> Dict[str, Any]:
+    """
+    Heartbeat endpoint for workers holding active execution leases.
+    Validates the monotonically increasing lease_generation fencing token.
+    Rejects stale or recovered workers with 409 Conflict.
+    """
+    try:
+        jid = uuid.UUID(job_id)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid job UUID '{job_id}'.")
+
+    try:
+        await WorkerFencingManager.renew_lease(
+            db=db,
+            job_id=jid,
+            worker_id=req.worker_id,
+            lease_generation=req.lease_generation,
+            lease_duration_seconds=req.lease_duration_seconds,
+        )
+        return {
+            "status": "LEASE_RENEWED",
+            "job_id": str(jid),
+            "worker_id": req.worker_id,
+            "lease_generation": req.lease_generation,
+        }
+    except StaleWorkerFencingError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))

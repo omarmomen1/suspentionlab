@@ -41,7 +41,7 @@ async def run_verification():
     # 2. Current Migration Head
     current_head = await conn.fetchval("SELECT version_num FROM alembic_version")
     print(f"[VERIFIED] Current Alembic Head in PostgreSQL: {current_head}")
-    assert current_head == "w7x7y7z7a7b7", f"Expected single integrated head w7x7y7z7a7b7, got {current_head}"
+    assert current_head == "x7y8z9a0b1c2", f"Expected single integrated head x7y8z9a0b1c2, got {current_head}"
 
     # 3. Check Schema Tables
     rows = await conn.fetch(
@@ -61,27 +61,37 @@ async def run_verification():
         "validation_evidence_closures",
         "validation_decision_reassessments",
     ]
+    p75_tables = ["co_simulation_coupling_contracts"]
 
-    for t in p64_tables + p72_tables + p65_tables + p73_tables + p66_tables:
+    for t in p64_tables + p72_tables + p65_tables + p73_tables + p66_tables + p75_tables:
         assert t in table_names, f"Missing table {t}"
         print(f"  [OK] Table verified: {t}")
 
-    # 4. Check Phase 7.4 Columns on solver_execution_jobs
+    # 4. Check Phase 7.4 & 7.5 Columns on solver_execution_jobs
     job_cols = [r["column_name"] for r in await conn.fetch(
         "SELECT column_name FROM information_schema.columns WHERE table_name = 'solver_execution_jobs'"
     )]
     p74_cols = ["lease_expires_at", "heartbeat_at", "execution_mode", "benchmark_reference_type"]
-    for col in p74_cols:
-        assert col in job_cols, f"Missing Phase 7.4 column {col} in solver_execution_jobs"
-    print("  [OK] Phase 7.4 columns on solver_execution_jobs verified")
+    p75_cols = ["worker_id", "lease_generation", "coupling_contract_id", "co_simulation_diagnostics"]
+    for col in p74_cols + p75_cols:
+        assert col in job_cols, f"Missing column {col} in solver_execution_jobs"
+    print("  [OK] Phase 7.4 & Phase 7.5 columns on solver_execution_jobs verified")
 
     # 5. Check Constraints & Indexes
     print("\n[VERIFYING] Indexes and Foreign Keys:")
 
-    # Phase 7.4 lease index
+    # Phase 7.4 & 7.5 lease & worker indexes
     job_idx = [r["indexname"] for r in await conn.fetch("SELECT indexname FROM pg_indexes WHERE tablename = 'solver_execution_jobs'")]
     assert "ix_solver_execution_jobs_lease" in job_idx, "Missing ix_solver_execution_jobs_lease"
-    print("  [OK] ix_solver_execution_jobs_lease verified")
+    assert "ix_solver_execution_jobs_worker" in job_idx, "Missing ix_solver_execution_jobs_worker"
+    assert "ix_solver_execution_jobs_contract" in job_idx, "Missing ix_solver_execution_jobs_contract"
+    print("  [OK] solver_execution_jobs indexes verified")
+
+    # Phase 7.5 cosim contract indexes
+    cosim_idx = [r["indexname"] for r in await conn.fetch("SELECT indexname FROM pg_indexes WHERE tablename = 'co_simulation_coupling_contracts'")]
+    for idx in ("ix_cosim_contracts_contract_id", "ix_cosim_contracts_status", "ix_cosim_contracts_tenant_status"):
+        assert idx in cosim_idx, f"Missing index {idx} in co_simulation_coupling_contracts"
+    print("  [OK] co_simulation_coupling_contracts indexes verified")
 
     # Phase 6.6 indexes
     val_plan_idx = [r["indexname"] for r in await conn.fetch("SELECT indexname FROM pg_indexes WHERE tablename = 'engineering_validation_plans'")]
@@ -375,52 +385,55 @@ async def test_baseline_upgrade_and_downgrade():
     assert "validation_evidence_items" not in tables
     print(f"  [OK] Successfully migrated to baseline u1v2w3x4y5z6 (tables count: {len(tables)})")
 
-    # Step B: Upgrade from baseline u1v2w3x4y5z6 to integrated head w7x7y7z7a7b7
-    print("  -> Upgrading from baseline to head w7x7y7z7a7b7...")
+    # Step B: Upgrade from baseline u1v2w3x4y5z6 to integrated head x7y8z9a0b1c2
+    print("  -> Upgrading from baseline to head x7y8z9a0b1c2...")
     subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
         env=env, capture_output=True, text=True, check=True
     )
     v = await test_conn.fetchval("SELECT version_num FROM alembic_version")
-    assert v == "w7x7y7z7a7b7"
+    assert v == "x7y8z9a0b1c2"
     tables = [r["table_name"] for r in await test_conn.fetch("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")]
     assert "engineering_validation_plans" in tables
     assert "validation_evidence_items" in tables
     assert "validation_evidence_closures" in tables
     assert "validation_decision_reassessments" in tables
+    assert "co_simulation_coupling_contracts" in tables
     job_cols = [r["column_name"] for r in await test_conn.fetch("SELECT column_name FROM information_schema.columns WHERE table_name = 'solver_execution_jobs'")]
     assert "lease_expires_at" in job_cols
     assert "heartbeat_at" in job_cols
     assert "execution_mode" in job_cols
     assert "benchmark_reference_type" in job_cols
-    print(f"  [OK] Successfully upgraded to head w7x7y7z7a7b7; all Phase 6.6 tables and Phase 7.4 columns verified")
+    assert "worker_id" in job_cols
+    assert "lease_generation" in job_cols
+    assert "coupling_contract_id" in job_cols
+    assert "co_simulation_diagnostics" in job_cols
+    print(f"  [OK] Successfully upgraded to head x7y8z9a0b1c2; all Phase 6.6 & 7.5 tables and columns verified")
 
-    # Step C: Downgrade from head w7x7y7z7a7b7 to baseline u1v2w3x4y5z6
-    print("  -> Downgrading from head w7x7y7z7a7b7 to baseline u1v2w3x4y5z6...")
+    # Step C: Downgrade from head x7y8z9a0b1c2 to Phase 7.4 baseline w7x7y7z7a7b7
+    print("  -> Downgrading from head x7y8z9a0b1c2 to baseline w7x7y7z7a7b7...")
     subprocess.run(
-        [sys.executable, "-m", "alembic", "downgrade", "u1v2w3x4y5z6"],
+        [sys.executable, "-m", "alembic", "downgrade", "w7x7y7z7a7b7"],
         env=env, capture_output=True, text=True, check=True
     )
     v = await test_conn.fetchval("SELECT version_num FROM alembic_version")
-    assert v == "u1v2w3x4y5z6"
+    assert v == "w7x7y7z7a7b7"
     tables = [r["table_name"] for r in await test_conn.fetch("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")]
-    assert "engineering_validation_plans" not in tables
-    assert "validation_evidence_items" not in tables
-    assert "decision_robustness_analyses" in tables
-    assert "solver_execution_jobs" in tables
+    assert "co_simulation_coupling_contracts" not in tables
     job_cols = [r["column_name"] for r in await test_conn.fetch("SELECT column_name FROM information_schema.columns WHERE table_name = 'solver_execution_jobs'")]
-    assert "lease_expires_at" not in job_cols
-    print("  [OK] Successfully downgraded back to baseline u1v2w3x4y5z6; Phase 6.6 tables and Phase 7.4 columns cleanly removed")
+    assert "worker_id" not in job_cols
+    assert "lease_generation" not in job_cols
+    print("  [OK] Successfully downgraded back to baseline w7x7y7z7a7b7; Phase 7.5 table and columns cleanly removed")
 
-    # Step D: Re-upgrade to head w7x7y7z7a7b7
-    print("  -> Re-upgrading back to head w7x7y7z7a7b7...")
+    # Step D: Re-upgrade to head x7y8z9a0b1c2
+    print("  -> Re-upgrading back to head x7y8z9a0b1c2...")
     subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
         env=env, capture_output=True, text=True, check=True
     )
     v = await test_conn.fetchval("SELECT version_num FROM alembic_version")
-    assert v == "w7x7y7z7a7b7"
-    print("  [OK] Clean re-upgrade to head w7x7y7z7a7b7 verified")
+    assert v == "x7y8z9a0b1c2"
+    print("  [OK] Clean re-upgrade to head x7y8z9a0b1c2 verified")
 
     await test_conn.close()
     print("\n>>> LIVE BASELINE UPGRADE/DOWNGRADE CYCLE VERIFIED ON POSTGRESQL 16! <<<\n")

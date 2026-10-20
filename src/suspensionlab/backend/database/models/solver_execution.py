@@ -125,11 +125,17 @@ class SolverExecutionJob(Base):
     failure_reason = Column(Text, nullable=True)
     error_category = Column(String(64), nullable=True)
 
-    # Lease & Concurrency Hardening (Phase 7.4)
+    # Lease & Concurrency Hardening (Phase 7.4 & 7.5)
     lease_expires_at = Column(DateTime(timezone=True), nullable=True)
     heartbeat_at = Column(DateTime(timezone=True), nullable=True)
     execution_mode = Column(String(32), nullable=False, default="TRUSTED_ALLOWLIST")
     benchmark_reference_type = Column(String(64), nullable=True)
+    worker_id = Column(String(128), nullable=True)
+    lease_generation = Column(Integer, nullable=False, default=1, server_default="1")
+
+    # Co-Simulation Coupling & Diagnostics (Phase 7.5)
+    coupling_contract_id = Column(UUID_TYPE, ForeignKey("co_simulation_coupling_contracts.id", ondelete="SET NULL"), nullable=True)
+    co_simulation_diagnostics = Column(JSON_TYPE, nullable=False, default=dict)
 
     # Epistemic Invariants
     is_executed = Column(Boolean, nullable=False, default=False)
@@ -151,6 +157,8 @@ class SolverExecutionJob(Base):
         Index("ix_solver_execution_jobs_idemp", "user_id", "idempotency_key"),
         Index("ix_solver_execution_jobs_hash", "input_artifact_hash"),
         Index("ix_solver_execution_jobs_lease", "state", "lease_expires_at"),
+        Index("ix_solver_execution_jobs_worker", "worker_id", "lease_generation"),
+        Index("ix_solver_execution_jobs_contract", "coupling_contract_id"),
     )
 
     def assert_mutable(self) -> None:

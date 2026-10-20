@@ -164,6 +164,10 @@ __all__ = [
     'ExecutionJobState',
     'ImmutableExecutionError',
     'InvalidExecutionStateTransitionError',
+    'CoSimulationCouplingContract',
+    'ContractStatus',
+    'SynchronizationPolicy',
+    'InterpolationMode',
 ]
 
 from suspensionlab.backend.database.models.parameter_trust import (
@@ -230,6 +234,13 @@ from suspensionlab.backend.database.models.solver_execution import (
     ExecutionJobState,
     ImmutableExecutionError,
     InvalidExecutionStateTransitionError,
+)
+
+from suspensionlab.backend.database.models.cosim_contract import (
+    CoSimulationCouplingContract,
+    ContractStatus,
+    SynchronizationPolicy,
+    InterpolationMode,
 )
 
 

@@ -59,6 +59,7 @@ from suspensionlab.interop.benchmarks.independent_solver import (
     IndependentSolverBenchmark,
     QuarterCarBenchmarkParams,
 )
+from suspensionlab.interop.cosim.fencing import WorkerFencingManager
 from suspensionlab.interop.runners.external_cae_solver import solve_rk4_quarter_car
 from suspensionlab.interop.security import (
     InteropSecurityError,
@@ -527,16 +528,15 @@ class SolverExecutionService:
                 "Recovering crashed/orphaned execution job %s (lease expired at %s, current %s)",
                 job.id, job.lease_expires_at, now
             )
-            job.transition_to(
-                ExecutionJobState.FAILED,
-                exit_code=-9,
-                error_category="WORKER_CRASH_ORPHAN",
-                failure_reason="Execution lease expired or worker process terminated unexpectedly without reporting exit status.",
+            rec = await WorkerFencingManager.recover_expired_job_atomic(
+                db=db,
+                job_id=job.id,
+                recovery_worker_id=f"recovery-worker-{uuid.uuid4().hex[:6]}",
+                verify_pid_liveness=True,
             )
-            recovered.append(job)
+            if rec is not None:
+                recovered.append(rec)
 
-        if recovered:
-            await db.commit()
         return recovered
 
     async def reconcile_job_results(

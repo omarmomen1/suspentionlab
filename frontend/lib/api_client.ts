@@ -4708,6 +4708,10 @@ export interface JobResponseDTO {
   heartbeat_at?: string | null;
   execution_mode?: string;
   benchmark_reference_type?: string | null;
+  worker_id?: string | null;
+  lease_generation?: number;
+  coupling_contract_id?: string | null;
+  co_simulation_diagnostics?: Record<string, any>;
   is_executed: boolean;
   is_physically_validated: boolean;
   execution_provenance: Record<string, any>;
@@ -4813,4 +4817,185 @@ export class SolverExecutionApi {
     });
   }
 }
+
+export interface CoSimVariableDTO {
+  name: string;
+  causality: "input" | "output" | "parameter" | "calculatedParameter" | "local" | "independent";
+  variability: "constant" | "fixed" | "tunable" | "discrete" | "continuous";
+  data_type: string;
+  unit?: string | null;
+  description?: string | null;
+}
+
+export interface FMICapabilityReportDTO {
+  fmi_version: string;
+  model_name: string;
+  guid: string;
+  generation_tool?: string | null;
+  supports_model_exchange: boolean;
+  supports_cosimulation: boolean;
+  can_handle_variable_communication_step_size: boolean;
+  can_interpolate_inputs: boolean;
+  max_output_derivative_order: number;
+  can_run_asynchronuously: boolean;
+  can_be_instantiated_only_once_per_process: boolean;
+  can_not_use_memory_management_functions: boolean;
+  can_get_and_set_fmu_state: boolean;
+  can_serialize_fmu_state: boolean;
+  provides_directional_derivative: boolean;
+  variables: CoSimVariableDTO[];
+  available_binaries: string[];
+  feedthrough_matrix: Record<string, string[]>;
+  algebraic_loop_risk: boolean;
+  truthful_limitations: string[];
+}
+
+export interface SignalConnectionDTO {
+  source_component: string;
+  source_variable: string;
+  target_component: string;
+  target_variable: string;
+  source_unit: string;
+  target_unit: string;
+  scale_factor: number;
+  offset: number;
+  delay_steps: number;
+  extrapolation_allowed: boolean;
+}
+
+export interface TimeSyncConfigDTO {
+  policy: "GAUSS_SEIDEL" | "JACOBI";
+  communication_step_size: number;
+  interpolation_mode: "ZERO_ORDER_HOLD" | "FIRST_ORDER_HOLD" | "HERMITE";
+  max_macro_steps: number;
+  relative_tolerance: number;
+  absolute_tolerance: number;
+  energy_drift_tolerance_pct: number;
+  time_master: string;
+  allow_rollback: boolean;
+}
+
+export interface CoSimContractDTO {
+  id: string;
+  organization_id?: string | null;
+  team_id?: string | null;
+  user_id: string;
+  contract_name: string;
+  contract_version: string;
+  status: "DRAFT" | "SEALED" | "SUPERSEDED" | "REJECTED";
+  time_sync_config: TimeSyncConfigDTO;
+  participating_components: Record<string, any>;
+  signal_connections: SignalConnectionDTO[];
+  operating_bounds: Record<string, any>;
+  failure_propagation_policy: "FAIL_STOP" | "BEST_EFFORT" | "CLAMP_TO_BOUNDS";
+  contract_hash?: string | null;
+  preflight_report?: Record<string, any>;
+  sealed_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface CoSimPreflightReportDTO {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+  algebraic_loops: string[][];
+  causality_violations: string[];
+  unit_mismatches: string[];
+  operating_bounds_status: string;
+  time_sync_feasibility: string;
+}
+
+export interface CoSimCapabilitiesDTO {
+  vetted_fmus: Array<{
+    filename: string;
+    hash_sha256: string;
+    model_name: string;
+    path: string;
+  }>;
+  internal_components: Array<{
+    name: string;
+    description: string;
+    signals: Record<string, any>;
+  }>;
+  supported_policies: string[];
+  supported_interpolation: string[];
+  truthful_status: {
+    two_fmu_cosimulation_verified: boolean;
+    untrusted_fmu_isolation_verified: boolean;
+    fmu_state_rollback_supported: boolean;
+  };
+}
+
+export interface CreateContractRequestDTO {
+  contract_name: string;
+  contract_version?: string;
+  time_sync_config?: Partial<TimeSyncConfigDTO>;
+  participating_components: Record<string, any>;
+  signal_connections: SignalConnectionDTO[];
+  operating_bounds?: Record<string, any>;
+  failure_propagation_policy?: "FAIL_STOP" | "BEST_EFFORT" | "CLAMP_TO_BOUNDS";
+  seal_now?: boolean;
+}
+
+export interface ExecuteCoupledRequestDTO {
+  t_end?: number;
+  idempotency_key?: string;
+  worker_id?: string;
+  resource_limits?: Record<string, any>;
+  wait_for_completion?: boolean;
+}
+
+export class CoSimulationApi {
+  static async getCapabilities(): Promise<CoSimCapabilitiesDTO> {
+    return apiJson<CoSimCapabilitiesDTO>("/api/v1/interop/cosim/capabilities");
+  }
+
+  static async inspectFmu(fmuPath?: string): Promise<FMICapabilityReportDTO> {
+    const url = fmuPath
+      ? `/api/v1/interop/cosim/fmu-capabilities?fmu_path=${encodeURIComponent(fmuPath)}`
+      : "/api/v1/interop/cosim/fmu-capabilities";
+    return apiJson<FMICapabilityReportDTO>(url);
+  }
+
+  static async createContract(req: CreateContractRequestDTO): Promise<CoSimContractDTO> {
+    return apiJson<CoSimContractDTO>("/api/v1/interop/cosim/contracts", {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  }
+
+  static async listContracts(limit = 50): Promise<CoSimContractDTO[]> {
+    return apiJson<CoSimContractDTO[]>(`/api/v1/interop/cosim/contracts?limit=${limit}`);
+  }
+
+  static async getContract(contractId: string): Promise<CoSimContractDTO> {
+    return apiJson<CoSimContractDTO>(`/api/v1/interop/cosim/contracts/${encodeURIComponent(contractId)}`);
+  }
+
+  static async preflightContract(contractId: string): Promise<CoSimPreflightReportDTO> {
+    return apiJson<CoSimPreflightReportDTO>(`/api/v1/interop/cosim/contracts/${encodeURIComponent(contractId)}/preflight`, {
+      method: "POST",
+    });
+  }
+
+  static async executeCoupled(contractId: string, req: ExecuteCoupledRequestDTO = {}): Promise<JobResponseDTO> {
+    return apiJson<JobResponseDTO>(`/api/v1/interop/cosim/contracts/${encodeURIComponent(contractId)}/execute`, {
+      method: "POST",
+      body: JSON.stringify(req),
+    });
+  }
+
+  static async getDiagnostics(jobId: string): Promise<any> {
+    return apiJson<any>(`/api/v1/interop/cosim/jobs/${encodeURIComponent(jobId)}/diagnostics`);
+  }
+
+  static async heartbeat(jobId: string, workerId: string, leaseGeneration: number): Promise<any> {
+    return apiJson<any>(`/api/v1/interop/cosim/jobs/${encodeURIComponent(jobId)}/heartbeat`, {
+      method: "POST",
+      body: JSON.stringify({ worker_id: workerId, lease_generation: leaseGeneration }),
+    });
+  }
+}
+
 
