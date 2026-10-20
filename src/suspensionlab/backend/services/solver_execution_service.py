@@ -496,10 +496,15 @@ class SolverExecutionService:
         res = await db.execute(stmt)
         return list(res.scalars().all())
 
-    async def recover_crashed_jobs(self, db: AsyncSession) -> List[SolverExecutionJob]:
+    async def recover_crashed_jobs(
+        self,
+        db: AsyncSession,
+        user: Optional[UserContext] = None,
+    ) -> List[SolverExecutionJob]:
         """
         Identifies orphaned or dead-worker execution jobs left in RUNNING state
         whose lease has expired, and transitions them safely to FAILED with error category WORKER_CRASH_ORPHAN.
+        Enforces tenant scoping when user context is supplied.
         """
         now = datetime.now(timezone.utc)
         stmt = select(SolverExecutionJob).where(
@@ -507,6 +512,12 @@ class SolverExecutionService:
             SolverExecutionJob.lease_expires_at != None,
             SolverExecutionJob.lease_expires_at < now,
         )
+        if user is not None:
+            if getattr(user, "team_id", None):
+                stmt = stmt.where(SolverExecutionJob.team_id == uuid.UUID(user.team_id))
+            elif getattr(user, "user_id", None):
+                stmt = stmt.where(SolverExecutionJob.user_id == uuid.UUID(user.user_id))
+
         res = await db.execute(stmt)
         crashed_jobs = list(res.scalars().all())
 

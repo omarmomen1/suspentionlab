@@ -3103,7 +3103,7 @@ export function ParameterTrustMap({
                 </div>
               ) : (
                 <div className="p-8 text-center rounded-lg bg-zinc-900/20 border border-zinc-800 text-zinc-500 text-xs">
-                  No validation plan selected. Click "New Validation Plan" or select an existing plan above.
+                  No validation plan selected. Click &quot;New Validation Plan&quot; or select an existing plan above.
                 </div>
               )}
 

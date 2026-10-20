@@ -423,7 +423,7 @@ class ParameterTrustValidationService:
         if db is None and args_list and hasattr(args_list[0], "execute"):
             db = args_list.pop(0)
 
-        plan_id = args_list[0] if len(args_list) > 0 else kwargs.pop("plan_id", None)
+        plan_id = args_list[0] if len(args_list) > 0 else kwargs.pop("plan_id", kwargs.pop("parent_plan_id", None))
         user_context = args_list[1] if len(args_list) > 1 else kwargs.pop("user_context", None)
 
         team_id = kwargs.pop("team_id", None)
@@ -439,7 +439,7 @@ class ParameterTrustValidationService:
         if not parent_plan:
             raise PlanNotFoundError(f"Parent validation plan '{plan_id}' not found.")
 
-        new_criteria = kwargs.pop("acceptance_criteria", parent_plan.acceptance_criteria)
+        new_criteria = kwargs.pop("acceptance_criteria", kwargs.pop("updated_criteria", parent_plan.acceptance_criteria))
         new_objective = kwargs.pop("validation_objective", parent_plan.validation_objective)
         new_method = kwargs.pop("validation_method", parent_plan.validation_method)
         new_scope = kwargs.pop("operating_conditions", parent_plan.operating_conditions)

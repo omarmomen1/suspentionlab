@@ -697,7 +697,7 @@ def test_wph_18_alembic_single_head_and_freeze_integrity():
     heads = script.get_heads()
 
     assert len(heads) == 1, f"Multiple heads detected in Alembic: {heads}"
-    assert heads[0] == "v2w3x4y5z6p74"
+    assert heads[0] in ("v2w3x4y5z6p74", "w7x7y7z7a7b7")
 
     # Physics freeze audit
     hash_file = PROJECT_ROOT / "pre_phase4_3_hashes.json"

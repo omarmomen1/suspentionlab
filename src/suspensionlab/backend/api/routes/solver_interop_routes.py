@@ -763,8 +763,9 @@ async def recover_crashed_jobs_endpoint(
 ) -> List[JobResponseDTO]:
     """
     Identifies and recovers orphaned solver execution jobs whose lease expired or worker crashed.
+    Enforces tenant scoping so ordinary users only recover their own tenant's jobs.
     """
-    recovered = await _exec_service.recover_crashed_jobs(db=db)
+    recovered = await _exec_service.recover_crashed_jobs(db=db, user=user)
     return [_job_to_dto(j) for j in recovered]
 
 
