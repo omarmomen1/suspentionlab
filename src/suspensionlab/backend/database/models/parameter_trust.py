@@ -827,7 +827,7 @@ class ValidationEvidenceItemRecord(Base):
     # ── Phase 6.7 Source Verification & Integrity Tracking ───────────────────
     integrity_stage = Column(String(64), nullable=False, default="SOURCE_CLAIMED")
     source_verification_status = Column(String(32), nullable=False, default="UNVERIFIED")
-    source_verification_id = Column(UUID_TYPE, ForeignKey("source_verification_records.id", ondelete="SET NULL"), nullable=True)
+    source_verification_id = Column(UUID_TYPE, ForeignKey("source_verification_records.id", ondelete="SET NULL", use_alter=True), nullable=True)
 
     organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)

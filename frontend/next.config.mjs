@@ -43,6 +43,8 @@ const nextConfig = {
 
   experimental: {
     optimizePackageImports: ["lucide-react", "framer-motion", "three"],
+    workerThreads: false,
+    cpus: 1,
   },
 };
 

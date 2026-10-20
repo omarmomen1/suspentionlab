@@ -3915,7 +3915,7 @@ export function ParameterTrustMap({
                 </div>
               ) : (
                 <div className="p-8 text-center rounded-lg bg-zinc-900/20 border border-zinc-800 text-zinc-500 text-xs">
-                  No decision dossier selected. Click "Compile Decision Dossier" or select an existing dossier above.
+                  No decision dossier selected. Click &quot;Compile Decision Dossier&quot; or select an existing dossier above.
                 </div>
               )}
 
