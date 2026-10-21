@@ -35,11 +35,11 @@ from typing import Any, Dict, List, Optional, Sequence, Set, Tuple, Union
 from sqlalchemy import and_, desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Cryptographic signatures (Ed25519)
+# Cryptographic signatures (Ed25519 / RSA-PSS)
 try:
-    from cryptography.hazmat.primitives.asymmetric import ed25519
+    from cryptography.hazmat.primitives.asymmetric import ed25519, rsa, padding
+    from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.exceptions import InvalidSignature as CryptoInvalidSignature
-    from cryptography.hazmat.primitives import serialization
     HAS_CRYPTOGRAPHY = True
 except ImportError:
     HAS_CRYPTOGRAPHY = False
@@ -407,6 +407,7 @@ class ParameterTrustDossierService:
 
             # Resolve public key: either explicit parameter or from trusted registry
             pub_key_str = public_key_pem
+            reg_entry = None
             if not pub_key_str:
                 reg_stmt = select(TrustedSourceRegistryRecord).where(
                     TrustedSourceRegistryRecord.source_identifier == item.source_identifier
@@ -414,6 +415,18 @@ class ParameterTrustDossierService:
                 reg_res = await db.execute(reg_stmt)
                 reg_entry = reg_res.scalar_one_or_none()
                 if reg_entry:
+                    if not reg_entry.is_authorized:
+                        raise RevokedSourceAuthorizationError(
+                            f"REVOKED SOURCE: Signer '{item.source_identifier}' authorization has been revoked in trusted registry."
+                        )
+                    if reg_entry.valid_until and reg_entry.valid_until < datetime.now(timezone.utc):
+                        raise UnverifiedSourceError(
+                            f"UNVERIFIED SOURCE: Trusted signer attestation for '{item.source_identifier}' has expired."
+                        )
+                    if reg_entry.organization_id and item.organization_id and reg_entry.organization_id != item.organization_id:
+                        raise TenantIsolationError(
+                            f"TENANT ISOLATION VIOLATION: Signer belongs to org '{reg_entry.organization_id}', cannot sign evidence for org '{item.organization_id}'."
+                        )
                     pub_key_str = reg_entry.public_key_pem
 
             if not pub_key_str:
@@ -428,12 +441,34 @@ class ParameterTrustDossierService:
                 public_key = serialization.load_pem_public_key(pub_key_str.encode("utf-8"))
                 sig_bytes = bytes.fromhex(signature_hex)
                 msg_bytes = item.integrity_hash.encode("utf-8")
-                public_key.verify(sig_bytes, msg_bytes)
+
+                scheme = "UNKNOWN"
+                if isinstance(public_key, ed25519.Ed25519PublicKey):
+                    public_key.verify(sig_bytes, msg_bytes)
+                    scheme = "Ed25519"
+                elif isinstance(public_key, rsa.RSAPublicKey):
+                    public_key.verify(
+                        sig_bytes,
+                        msg_bytes,
+                        padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH),
+                        hashes.SHA256(),
+                    )
+                    scheme = "RSA-PSS-SHA256"
+                else:
+                    public_key.verify(sig_bytes, msg_bytes)
+                    scheme = type(public_key).__name__
+
                 v_status = SourceVerificationStatus.VERIFIED.value
-                supporting_references["signature_scheme"] = "Ed25519"
+                supporting_references["signature_scheme"] = scheme
                 supporting_references["verified_hash"] = item.integrity_hash
+                if reg_entry:
+                    supporting_references["registry_record_id"] = str(reg_entry.id)
+                    supporting_references["registry_source_name"] = reg_entry.source_name
+                    supporting_references["certificate_ref"] = reg_entry.certificate_ref
             except (CryptoInvalidSignature, ValueError) as err:
                 raise InvalidSignatureError(f"CRYPTOGRAPHIC SIGNATURE INVALID: Verification failed ({err}).")
+            except (RevokedSourceAuthorizationError, UnverifiedSourceError, TenantIsolationError):
+                raise
             except Exception as err:
                 raise InvalidSignatureError(f"CRYPTOGRAPHIC SIGNATURE VERIFICATION ERROR: {err}")
 

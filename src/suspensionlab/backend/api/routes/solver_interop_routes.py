@@ -37,6 +37,7 @@ from fastapi import (
     Depends,
     File,
     Form,
+    Header,
     HTTPException,
     Query,
     Response,
@@ -80,6 +81,7 @@ from suspensionlab.interop.fmi.capability_audit import FMICapabilityAuditor
 from suspensionlab.interop.cosim.fencing import (
     WorkerFencingManager,
     StaleWorkerFencingError,
+    WorkerAuthenticationError,
 )
 from suspensionlab.interop.adapter import AdapterCapability, SupportLevel
 from suspensionlab.interop.execution.runtimes import SolverRuntimeRegistry
@@ -342,6 +344,7 @@ class WorkerHeartbeatRequest(BaseModel):
     worker_id: str = Field(..., description="Worker identifier holding the lease.")
     lease_generation: int = Field(..., description="Monotonically increasing lease fencing token.")
     lease_duration_seconds: float = Field(default=30.0, description="Requested lease extension duration.")
+    worker_token: Optional[str] = Field(default=None, description="Worker principal authentication token.")
 
 
 class CoSimContractResponseDTO(BaseModel):
@@ -1144,23 +1147,27 @@ async def cosim_worker_heartbeat(
     req: WorkerHeartbeatRequest,
     user: UserContext = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db_dependency),
+    worker_token: Optional[str] = Header(None, alias="X-Worker-Token"),
 ) -> Dict[str, Any]:
     """
     Heartbeat endpoint for workers holding active execution leases.
-    Validates the monotonically increasing lease_generation fencing token.
+    Validates the worker principal token and monotonically increasing lease_generation fencing token.
     Rejects stale or recovered workers with 409 Conflict.
+    Rejects unauthorized worker impersonators with 403 Forbidden.
     """
     try:
         jid = uuid.UUID(job_id)
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid job UUID '{job_id}'.")
 
+    effective_worker_token = worker_token or req.worker_token
     try:
         await WorkerFencingManager.renew_lease(
             db=db,
             job_id=jid,
             worker_id=req.worker_id,
             lease_generation=req.lease_generation,
+            worker_token=effective_worker_token,
             lease_duration_seconds=req.lease_duration_seconds,
         )
         return {
@@ -1169,5 +1176,7 @@ async def cosim_worker_heartbeat(
             "worker_id": req.worker_id,
             "lease_generation": req.lease_generation,
         }
+    except WorkerAuthenticationError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except StaleWorkerFencingError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))

@@ -521,23 +521,29 @@ class SolverExecutionService:
 
         res = await db.execute(stmt)
         crashed_jobs = list(res.scalars().all())
+        job_items = [(job.id, job.lease_expires_at) for job in crashed_jobs]
 
-        recovered = []
-        for job in crashed_jobs:
+        recovered_ids = []
+        for j_id, l_exp in job_items:
             logger.warning(
                 "Recovering crashed/orphaned execution job %s (lease expired at %s, current %s)",
-                job.id, job.lease_expires_at, now
+                j_id, l_exp, now
             )
             rec = await WorkerFencingManager.recover_expired_job_atomic(
                 db=db,
-                job_id=job.id,
+                job_id=j_id,
                 recovery_worker_id=f"recovery-worker-{uuid.uuid4().hex[:6]}",
                 verify_pid_liveness=True,
             )
             if rec is not None:
-                recovered.append(rec)
+                recovered_ids.append(j_id)
 
-        return recovered
+        if recovered_ids:
+            stmt_fresh = select(SolverExecutionJob).where(SolverExecutionJob.id.in_(recovered_ids))
+            res_fresh = await db.execute(stmt_fresh)
+            return list(res_fresh.scalars().all())
+
+        return []
 
     async def reconcile_job_results(
         self,

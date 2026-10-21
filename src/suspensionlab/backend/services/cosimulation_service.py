@@ -469,6 +469,8 @@ class CoSimulationService:
         w_id = worker_id or f"worker-{uuid.uuid4().hex[:8]}"
         job_id = uuid.uuid4()
         now = datetime.now(timezone.utc)
+        worker_token = WorkerFencingManager.generate_worker_token(job_id, w_id)
+        worker_token_hash = WorkerFencingManager.hash_worker_token(worker_token)
 
         job = SolverExecutionJob(
             id=job_id,
@@ -488,7 +490,9 @@ class CoSimulationService:
             coupling_contract_id=contract_record.id,
             execution_mode="TRUSTED_ALLOWLIST",
             started_at=now,
+            execution_provenance={"worker_token_hash": worker_token_hash},
         )
+        job._worker_token = worker_token
         db.add(job)
         await db.commit()
 
@@ -552,6 +556,7 @@ class CoSimulationService:
             job_id=job.id,
             worker_id=w_id,
             lease_generation=1,
+            worker_token=worker_token,
             output_artifact_ids=[art_id],
             co_simulation_diagnostics=result.diagnostics,
             reconciliation_summary={

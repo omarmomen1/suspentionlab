@@ -17,7 +17,10 @@ Core Invariants:
 """
 from __future__ import annotations
 
+import hashlib
+import hmac
 import os
+import secrets
 import signal
 import subprocess
 import sys
@@ -33,6 +36,11 @@ from suspensionlab.backend.database.models.solver_execution import (
     SolverExecutionJob,
     TERMINAL_EXECUTION_STATES,
 )
+
+
+class WorkerAuthenticationError(PermissionError):
+    """Raised when an execution worker request lacks a valid worker principal authentication token."""
+    pass
 
 
 class StaleWorkerFencingError(RuntimeError):
@@ -109,8 +117,27 @@ class ProcessLivenessChecker:
 
 class WorkerFencingManager:
     """
-    Manages atomic worker leases, heartbeat updates, and race-safe recovery.
+    Manages atomic worker leases, heartbeat updates, worker principal authentication, and race-safe recovery.
     """
+
+    @staticmethod
+    def generate_worker_token(job_id: uuid.UUID, worker_id: str) -> str:
+        """Generates a high-entropy, cryptographically secure worker principal authentication token."""
+        entropy = secrets.token_urlsafe(32)
+        return f"wtoken_{entropy}"
+
+    @staticmethod
+    def hash_worker_token(token: str) -> str:
+        """Returns deterministic SHA-256 fingerprint of worker token for secure persistent storage."""
+        return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+    @staticmethod
+    def verify_worker_token(stored_hash: Optional[str], token: Optional[str]) -> bool:
+        """Constant-time verification of worker principal token against stored fingerprint."""
+        if not stored_hash or not token:
+            return False
+        candidate_hash = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        return hmac.compare_digest(stored_hash, candidate_hash)
 
     @staticmethod
     async def renew_lease(
@@ -118,12 +145,27 @@ class WorkerFencingManager:
         job_id: uuid.UUID,
         worker_id: str,
         lease_generation: int,
+        worker_token: Optional[str] = None,
         lease_duration_seconds: float = 30.0,
     ) -> bool:
         """
         Renews a worker's active execution lease.
         Enforces that worker_id and lease_generation match DB record.
+        If job has a registered worker_token_hash, enforces worker_token authenticity.
         """
+        job_stmt = select(SolverExecutionJob).where(SolverExecutionJob.id == job_id)
+        job_res = await db.execute(job_stmt)
+        job = job_res.scalar_one_or_none()
+        if not job:
+            raise StaleWorkerFencingError(f"Job '{job_id}' does not exist.")
+
+        stored_token_hash = (job.execution_provenance or {}).get("worker_token_hash")
+        if stored_token_hash:
+            if not worker_token or not WorkerFencingManager.verify_worker_token(stored_token_hash, worker_token):
+                raise WorkerAuthenticationError(
+                    f"Heartbeat rejected: Worker '{worker_id}' failed principal authentication for job '{job_id}'."
+                )
+
         now = datetime.now(timezone.utc)
         expires_at = now + timedelta(seconds=lease_duration_seconds)
 
@@ -159,14 +201,28 @@ class WorkerFencingManager:
         job_id: uuid.UUID,
         worker_id: str,
         lease_generation: int,
+        worker_token: Optional[str] = None,
         output_artifact_ids: Optional[List[uuid.UUID]] = None,
         reconciliation_summary: Optional[Dict[str, Any]] = None,
         co_simulation_diagnostics: Optional[Dict[str, Any]] = None,
     ) -> SolverExecutionJob:
         """
-        Atomically marks a job COMPLETED verifying the worker's fencing token.
+        Atomically marks a job COMPLETED verifying the worker's fencing token and principal token.
         Rejects stale workers attempting to commit outputs after lease recovery.
         """
+        job_stmt = select(SolverExecutionJob).where(SolverExecutionJob.id == job_id)
+        job_res = await db.execute(job_stmt)
+        job = job_res.scalar_one_or_none()
+        if not job:
+            raise StaleWorkerFencingError(f"Job '{job_id}' does not exist.")
+
+        stored_token_hash = (job.execution_provenance or {}).get("worker_token_hash")
+        if stored_token_hash:
+            if not worker_token or not WorkerFencingManager.verify_worker_token(stored_token_hash, worker_token):
+                raise WorkerAuthenticationError(
+                    f"Result publication rejected: Worker '{worker_id}' failed principal authentication for job '{job_id}'."
+                )
+
         now = datetime.now(timezone.utc)
         stmt = (
             update(SolverExecutionJob)
