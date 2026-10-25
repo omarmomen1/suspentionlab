@@ -398,12 +398,21 @@ class CoSimulationCouplingContract:
                         break
 
                 if undelayed_cycle:
-                    # Check direct feedthrough in models
-                    any_feedthrough = any(
-                        self.participants[m_id].capabilities.get("has_direct_feedthrough", True)
+                    # An algebraic loop exists if ALL models in the closed cycle have direct feedthrough
+                    # (instantaneous output dependency on inputs without internal state integration or delay).
+                    def _model_has_feedthrough(m_spec) -> bool:
+                        caps = m_spec.capabilities or {}
+                        if "has_direct_feedthrough" in caps:
+                            return bool(caps["has_direct_feedthrough"])
+                        if "direct_feedthrough" in caps:
+                            return bool(caps["direct_feedthrough"])
+                        return True
+
+                    all_feedthrough = all(
+                        _model_has_feedthrough(self.participants[m_id])
                         for m_id in cycle
                     )
-                    if any_feedthrough:
+                    if all_feedthrough:
                         chains.append(" -> ".join(cycle + [cycle[0]]))
                         if self.time_sync.sync_policy == SyncPolicy.GAUSS_SEIDEL:
                             errors.append(

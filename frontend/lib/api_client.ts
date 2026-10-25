@@ -5167,6 +5167,9 @@ export interface CoSimContractDTO {
   signal_connections: SignalConnectionDTO[];
   operating_bounds: Record<string, any>;
   failure_propagation_policy: "FAIL_STOP" | "BEST_EFFORT" | "CLAMP_TO_BOUNDS";
+  feedback_topology?: string;
+  staggered_execution_order?: string[];
+  energy_residual_tolerance?: number;
   contract_hash?: string | null;
   preflight_report?: Record<string, any>;
   sealed_at?: string | null;
@@ -5201,6 +5204,8 @@ export interface CoSimCapabilitiesDTO {
   supported_interpolation: string[];
   truthful_status: {
     two_fmu_cosimulation_verified: boolean;
+    feedback_cosimulation_verified?: boolean;
+    plant_controller_feedback_verified?: boolean;
     untrusted_fmu_isolation_verified: boolean;
     fmu_state_rollback_supported: boolean;
   };

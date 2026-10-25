@@ -133,9 +133,11 @@ class SolverExecutionJob(Base):
     worker_id = Column(String(128), nullable=True)
     lease_generation = Column(Integer, nullable=False, default=1, server_default="1")
 
-    # Co-Simulation Coupling & Diagnostics (Phase 7.5)
+    # Co-Simulation Coupling & Diagnostics (Phase 7.5 & Phase 7.6)
     coupling_contract_id = Column(UUID_TYPE, ForeignKey("co_simulation_coupling_contracts.id", ondelete="SET NULL"), nullable=True)
     co_simulation_diagnostics = Column(JSON_TYPE, nullable=False, default=dict)
+    feedback_metrics = Column(JSON_TYPE, nullable=False, default=dict)
+    cosim_synchronization_mode = Column(String(64), nullable=False, default="GAUSS_SEIDEL")
 
     # Epistemic Invariants
     is_executed = Column(Boolean, nullable=False, default=False)

@@ -43,6 +43,7 @@ from suspensionlab.interop.cosim.contract import (
     CouplingContractError,
     SignalConnection,
     SyncPolicy,
+    TopologyType,
 )
 from suspensionlab.interop.cosim.time_sync import (
     CouplingDivergenceError,
@@ -141,14 +142,15 @@ class CoSimulationMasterOrchestrator:
                         raise RuntimeError("FMPy runtime is required for FMI 2.0 Co-Simulation.")
 
                     # Locate FMU
-                    fmu_file = self.fmu_lookup.get(m_id)
+                    fmu_file = self.fmu_lookup.get(m_id) or self.fmu_lookup.get(model_spec.name)
                     if not fmu_file:
-                        # Fallback: look for QuarterCarRideModel.fmu in workspace
-                        candidate = pathlib.Path("QuarterCarRideModel.fmu")
-                        if candidate.exists():
-                            fmu_file = candidate
-                        else:
-                            raise FileNotFoundError(f"FMU file for participant '{m_id}' not found.")
+                        for candidate_name in [f"{model_spec.name}.fmu", f"{m_id}.fmu", "QuarterCarRideModel.fmu"]:
+                            candidate = pathlib.Path(candidate_name)
+                            if candidate.exists():
+                                fmu_file = candidate
+                                break
+                    if not fmu_file:
+                        raise FileNotFoundError(f"FMU file for participant '{m_id}' ({model_spec.name}) not found.")
 
                     fmu_path = pathlib.Path(fmu_file)
                     if not fmu_path.exists():
@@ -218,120 +220,211 @@ class CoSimulationMasterOrchestrator:
             step_count = 0
             n_steps = int(math.ceil((duration - start_time) / H_c))
 
+            # Determine execution order for Gauss-Seidel staggered execution
+            contract_order = getattr(self.contract, "staggered_execution_order", None)
+            if contract_order and isinstance(contract_order, list) and len(contract_order) > 0:
+                execution_order = [m for m in contract_order if m in slaves]
+                for m in slaves:
+                    if m not in execution_order:
+                        execution_order.append(m)
+            else:
+                def _order_key(m_id: str) -> int:
+                    role = self.contract.participants[m_id].role.upper()
+                    if "EXCITATION" in role or "ROAD" in role:
+                        return 0
+                    if "CONTROLLER" in role or "ACTUATOR" in role:
+                        return 1
+                    if "PLANT" in role:
+                        return 2
+                    return 3
+                execution_order = sorted(list(slaves.keys()), key=_order_key)
+
+            # Initialize current_outputs with initial values (t=start_time)
+            current_outputs: Dict[str, Dict[str, float]] = {}
+            for m_id, s in slaves.items():
+                if isinstance(s, RoadProfileGenerator):
+                    current_outputs[m_id] = s.get_outputs()
+                elif isinstance(s, FMU2Slave):
+                    m_spec = self.contract.participants[m_id]
+                    refs_map = val_refs[m_id]
+                    out_vars = [v["name"] for v in m_spec.variables if v.get("causality") == "output"]
+                    out_refs = [refs_map[v] for v in out_vars if v in refs_map]
+                    vals = s.getReal(out_refs)
+                    current_outputs[m_id] = dict(zip(out_vars, vals))
+
             while current_t < duration - 1e-9:
                 step_count += 1
                 next_t = current_t + H_c
 
-                # A. Read source outputs
-                current_outputs: Dict[str, Dict[str, float]] = {}
-                for m_id, s in slaves.items():
-                    if isinstance(s, RoadProfileGenerator):
-                        current_outputs[m_id] = s.get_outputs()
-                    elif isinstance(s, FMU2Slave):
-                        # Read all declared outputs
-                        m_spec = self.contract.participants[m_id]
-                        refs_map = val_refs[m_id]
-                        out_vars = [v["name"] for v in m_spec.variables if v.get("causality") == "output"]
-                        out_refs = [refs_map[v] for v in out_vars if v in refs_map]
-                        vals = s.getReal(out_refs)
-                        current_outputs[m_id] = dict(zip(out_vars, vals))
+                if sync_policy == SyncPolicy.GAUSS_SEIDEL:
+                    # Sequential Staggered Gauss-Seidel Execution
+                    for m_id in execution_order:
+                        s = slaves[m_id]
+                        # 1. Determine inputs for this specific model from current_outputs
+                        m_inputs: Dict[str, float] = {}
+                        for conn in self.contract.connections:
+                            if conn.target_model_id == m_id:
+                                src_m = conn.source_model_id
+                                src_v = conn.source_variable
+                                raw_val = current_outputs.get(src_m, {}).get(src_v, 0.0)
+                                scaled_val = raw_val * conn.conversion_scale + conn.conversion_offset
+                                m_inputs[conn.target_variable] = scaled_val
 
-                # B. Route signals across connections (Unit conversion + Offset)
-                inputs_to_set: Dict[str, Dict[str, float]] = {m_id: {} for m_id in slaves}
-                for conn in self.contract.connections:
-                    src_m = conn.source_model_id
-                    src_v = conn.source_variable
-                    tgt_m = conn.target_model_id
-                    tgt_v = conn.target_variable
-
-                    raw_val = current_outputs.get(src_m, {}).get(src_v, 0.0)
-                    scaled_val = raw_val * conn.conversion_scale + conn.conversion_offset
-                    inputs_to_set[tgt_m][tgt_v] = scaled_val
-
-                # C. Set inputs on slaves
-                for m_id, s in slaves.items():
-                    m_inputs = inputs_to_set.get(m_id, {})
-                    if isinstance(s, RoadProfileGenerator):
-                        s.set_inputs(m_inputs)
-                    elif isinstance(s, FMU2Slave):
-                        refs_map = val_refs[m_id]
-                        in_refs = []
-                        in_vals = []
-                        for in_name, in_val in m_inputs.items():
-                            if in_name in refs_map:
-                                in_refs.append(refs_map[in_name])
-                                in_vals.append(float(in_val))
-                        if in_refs:
-                            s.setReal(in_refs, in_vals)
-
-                # D. Advance step for each participant
-                step_success = True
-                failed_model: Optional[str] = None
-                for m_id, s in slaves.items():
-                    try:
+                        # 2. Set inputs on slave
                         if isinstance(s, RoadProfileGenerator):
-                            s.do_step(current_t, H_c)
+                            s.set_inputs(m_inputs)
                         elif isinstance(s, FMU2Slave):
-                            status = s.doStep(currentCommunicationPoint=current_t, communicationStepSize=H_c)
-                            if status is not None and status != 0:  # fmi2OK = 0
-                                step_success = False
-                                failed_model = m_id
-                                break
-                    except Exception as e:
-                        step_success = False
-                        failed_model = m_id
-                        break
+                            refs_map = val_refs[m_id]
+                            in_refs = []
+                            in_vals = []
+                            for in_name, in_val in m_inputs.items():
+                                if in_name in refs_map:
+                                    in_refs.append(refs_map[in_name])
+                                    in_vals.append(float(in_val))
+                            if in_refs:
+                                s.setReal(in_refs, in_vals)
 
-                # E. Handle Step Rejection & Rollback Policy
-                if not step_success:
-                    # Check rollback support
-                    can_rollback_all = all(rollback_capabilities.values())
-                    if not can_rollback_all:
-                        raise RollbackNotSupportedError(
-                            f"Step failure at t={current_t:.4f}s on model '{failed_model}'. "
-                            "State rollback is not supported by participating model (canGetAndSetFMUstate=False). "
-                            "Simulation terminated fail-closed."
-                        )
-                    else:
-                        raise RuntimeError(f"Step failed at t={current_t:.4f}s on model '{failed_model}'.")
+                        # 3. Advance step for this model
+                        try:
+                            if isinstance(s, RoadProfileGenerator):
+                                s.do_step(current_t, H_c)
+                            elif isinstance(s, FMU2Slave):
+                                status = s.doStep(currentCommunicationPoint=current_t, communicationStepSize=H_c)
+                                if status is not None and status != 0:
+                                    raise RuntimeError(f"Slave '{m_id}' returned non-OK status {status} in doStep.")
+                        except Exception as e:
+                            can_rollback = all(rollback_capabilities.values())
+                            if not can_rollback:
+                                raise RollbackNotSupportedError(
+                                    f"Step failure at t={current_t:.4f}s on model '{m_id}'. "
+                                    "State rollback is not supported by participating model (canGetAndSetFMUstate=False). "
+                                    "Simulation terminated fail-closed."
+                                ) from e
+                            raise
 
-                # F. Read post-step outputs and monitor stability
+                        # 4. Read updated outputs from this model immediately for subsequent models in the chain
+                        if isinstance(s, RoadProfileGenerator):
+                            current_outputs[m_id] = s.get_outputs()
+                        elif isinstance(s, FMU2Slave):
+                            m_spec = self.contract.participants[m_id]
+                            refs_map = val_refs[m_id]
+                            out_vars = [v["name"] for v in m_spec.variables if v.get("causality") == "output"]
+                            out_refs = [refs_map[v] for v in out_vars if v in refs_map]
+                            vals = s.getReal(out_refs)
+                            current_outputs[m_id] = dict(zip(out_vars, vals))
+
+                else:
+                    # Jacobi Parallel Execution
+                    # A. Route signals across connections from t_k outputs
+                    inputs_to_set: Dict[str, Dict[str, float]] = {m_id: {} for m_id in slaves}
+                    for conn in self.contract.connections:
+                        src_m = conn.source_model_id
+                        src_v = conn.source_variable
+                        tgt_m = conn.target_model_id
+                        tgt_v = conn.target_variable
+
+                        raw_val = current_outputs.get(src_m, {}).get(src_v, 0.0)
+                        scaled_val = raw_val * conn.conversion_scale + conn.conversion_offset
+                        inputs_to_set[tgt_m][tgt_v] = scaled_val
+
+                    # B. Set inputs on all slaves
+                    for m_id, s in slaves.items():
+                        m_inputs = inputs_to_set.get(m_id, {})
+                        if isinstance(s, RoadProfileGenerator):
+                            s.set_inputs(m_inputs)
+                        elif isinstance(s, FMU2Slave):
+                            refs_map = val_refs[m_id]
+                            in_refs = []
+                            in_vals = []
+                            for in_name, in_val in m_inputs.items():
+                                if in_name in refs_map:
+                                    in_refs.append(refs_map[in_name])
+                                    in_vals.append(float(in_val))
+                            if in_refs:
+                                s.setReal(in_refs, in_vals)
+
+                    # C. Advance step for each participant
+                    for m_id, s in slaves.items():
+                        try:
+                            if isinstance(s, RoadProfileGenerator):
+                                s.do_step(current_t, H_c)
+                            elif isinstance(s, FMU2Slave):
+                                status = s.doStep(currentCommunicationPoint=current_t, communicationStepSize=H_c)
+                                if status is not None and status != 0:
+                                    raise RuntimeError(f"Slave '{m_id}' returned non-OK status {status} in doStep.")
+                        except Exception as e:
+                            can_rollback = all(rollback_capabilities.values())
+                            if not can_rollback:
+                                raise RollbackNotSupportedError(
+                                    f"Step failure at t={current_t:.4f}s on model '{m_id}'. "
+                                    "State rollback is not supported by participating model. "
+                                    "Simulation terminated fail-closed."
+                                ) from e
+                            raise
+
+                    # D. Read post-step outputs
+                    for m_id, s in slaves.items():
+                        if isinstance(s, RoadProfileGenerator):
+                            current_outputs[m_id] = s.get_outputs()
+                        elif isinstance(s, FMU2Slave):
+                            m_spec = self.contract.participants[m_id]
+                            refs_map = val_refs[m_id]
+                            out_vars = [v["name"] for v in m_spec.variables if v.get("causality") == "output"]
+                            out_refs = [refs_map[v] for v in out_vars if v in refs_map]
+                            vals = s.getReal(out_refs)
+                            current_outputs[m_id] = dict(zip(out_vars, vals))
+
+                # F. Record signal history for all participants
                 for m_id, s in slaves.items():
-                    if isinstance(s, RoadProfileGenerator):
-                        out_dict = s.get_outputs()
-                        for k, v in out_dict.items():
-                            key = f"{m_id}.{k}"
-                            if key in signal_history:
-                                signal_history[key].append(v)
-                    elif isinstance(s, FMU2Slave):
-                        m_spec = self.contract.participants[m_id]
-                        refs_map = val_refs[m_id]
-                        for v in m_spec.variables:
-                            v_name = v["name"]
-                            if v_name in refs_map:
-                                val = s.getReal([refs_map[v_name]])[0]
-                                signal_history[f"{m_id}.{v_name}"].append(val)
+                    m_spec = self.contract.participants[m_id]
+                    m_outs = current_outputs.get(m_id, {})
+                    for v in m_spec.variables:
+                        v_name = v["name"]
+                        if v_name in m_outs:
+                            signal_history[f"{m_id}.{v_name}"].append(m_outs[v_name])
 
-                # G. Stability & Energy Consistency Check
-                # Check 2-DOF energy if quarter car signals are present
-                qc_id = next((m_id for m_id, m in self.contract.participants.items() if m.role == "SUSPENSION_PLANT"), None)
-                if qc_id:
-                    zs_hist = signal_history.get(f"{qc_id}.z_s", [])
-                    zu_hist = signal_history.get(f"{qc_id}.z_u", [])
-                    zr_hist = signal_history.get(f"{qc_id}.z_road", []) or signal_history.get(f"{qc_id}.z_r", [])
-                    if len(zs_hist) >= 2:
-                        vs = (zs_hist[-1] - zs_hist[-2]) / H_c
-                        vu = (zu_hist[-1] - zu_hist[-2]) / H_c if len(zu_hist) >= 2 else 0.0
-                        zs = zs_hist[-1]
-                        zu = zu_hist[-1] if zu_hist else 0.0
-                        zr = zr_hist[-1] if zr_hist else 0.0
-                        is_active = abs(zr) > 0.001
-                        energy_monitor.record_step(next_t, zs, vs, zu, vu, zr, is_excitation_active=is_active)
+                # G. Stability, Actuator Work & Energy Consistency Check
+                qc_id = next((m_id for m_id, m in self.contract.participants.items() if "PLANT" in m.role.upper()), None)
+                if not qc_id:
+                    qc_id = next((m_id for m_id in slaves if "plant" in m_id.lower() or "quarter_car" in m_id.lower()), None)
 
-                        if energy_monitor.divergence_flag:
-                            raise CouplingDivergenceError(
-                                f"Coupling Instability Detected at t={next_t:.4f}s: {energy_monitor.divergence_reason}"
-                            )
+                if qc_id and qc_id in current_outputs:
+                    qc_outs = current_outputs[qc_id]
+                    zs = qc_outs.get("z_s", 0.0)
+                    vs = qc_outs.get("v_s", 0.0)
+                    zu = qc_outs.get("z_u", 0.0)
+                    vu = qc_outs.get("v_u", 0.0)
+                    zr = qc_outs.get("z_road", 0.0)
+                    dzr = qc_outs.get("dz_road", 0.0)
+
+                    # Actuator force: search plant f_act or controller f_act output
+                    ctrl_id = next((m_id for m_id, m in self.contract.participants.items() if "CONTROLLER" in m.role.upper() or "ACTUATOR" in m.role.upper()), None)
+                    fact = 0.0
+                    if ctrl_id and ctrl_id in current_outputs and "f_act" in current_outputs[ctrl_id]:
+                        fact = current_outputs[ctrl_id]["f_act"]
+                    elif "f_act" in qc_outs:
+                        fact = qc_outs["f_act"]
+
+                    ftire = qc_outs.get("tire_load_dynamic", None)
+                    is_active = (abs(zr) > 0.0005 or abs(dzr) > 0.0005)
+
+                    energy_monitor.record_step_with_actuator(
+                        t=next_t,
+                        z_s=zs,
+                        v_s=vs,
+                        z_u=zu,
+                        v_u=vu,
+                        z_road=zr,
+                        v_road=dzr,
+                        f_act=fact,
+                        f_tire=ftire,
+                        is_excitation_active=is_active,
+                    )
+
+                    if energy_monitor.divergence_flag:
+                        raise CouplingDivergenceError(
+                            f"Coupling Instability Detected at t={next_t:.4f}s: {energy_monitor.divergence_reason}"
+                        )
 
                 # H. Check Operating Bounds
                 for sig_name, bounds_tuple in self.contract.bounds.signal_bounds.items():
@@ -361,6 +454,17 @@ class CoSimulationMasterOrchestrator:
                 "rollback_attempts": 0,
                 "rejected_steps": 0,
                 "sync_policy": sync_policy.value,
+                "topology": report.topology.value,
+                "feedback_metrics": {
+                    "accumulated_actuator_work_joules": float(energy_monitor.accumulated_actuator_work),
+                    "accumulated_road_work_joules": float(energy_monitor.accumulated_road_work),
+                    "accumulated_dissipated_energy_joules": float(energy_monitor.accumulated_dissipated_energy),
+                    "energy_residual_absolute_joules": float(energy_monitor.energy_residual_absolute),
+                    "energy_residual_relative": float(energy_monitor.energy_residual_relative),
+                    "max_observed_energy_joules": float(energy_monitor.max_observed_energy),
+                    "is_feedback_coupled": (report.topology == TopologyType.FEEDBACK_COUPLED),
+                    "staggered_execution_order": execution_order,
+                },
             }
 
             epistemic = {

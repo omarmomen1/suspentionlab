@@ -49,6 +49,11 @@ class BenchmarkScenario(str, enum.Enum):
     STIFF_DAMPED = "STIFF_DAMPED"
     NEAR_RESONANCE = "NEAR_RESONANCE"
     INTENTIONALLY_INCORRECT = "INTENTIONALLY_INCORRECT"
+    # Phase 7.6 Active Suspension Benchmark Scenarios
+    ACTIVE_SKYHOOK_STEP = "ACTIVE_SKYHOOK_STEP"
+    ACTIVE_SKYHOOK_HARMONIC = "ACTIVE_SKYHOOK_HARMONIC"
+    ACTIVE_SATURATED_STEP = "ACTIVE_SATURATED_STEP"
+    ACTIVE_DELAYED_STEP = "ACTIVE_DELAYED_STEP"
 
 
 # ── ARCHITECTURAL TAXONOMY DEFINITIONS ───────────────────────────────────────
@@ -190,6 +195,16 @@ class QuarterCarBenchmarkParams:
         return A, B, C, D
 
 
+@dataclass
+class ActiveControllerParams:
+    """Feedback controller & actuator parameters for active quarter-car benchmarks."""
+    c_sky: float = 2000.0   # Skyhook damping (Ns/m)
+    k_p: float = 0.0        # Deflection proportional gain (N/m)
+    c_rel: float = 0.0      # Relative velocity damping (Ns/m)
+    f_max: float = 5000.0   # Actuator force saturation limit (N)
+    delay_s: float = 0.0    # Actuator first-order lag filter time constant (s)
+
+
 class IndependentSolverBenchmark:
     """
     Independent vehicle dynamics solver benchmark implementation.
@@ -319,6 +334,259 @@ class IndependentSolverBenchmark:
             "susp_travel": outputs[:, 2],
             "tire_load_dynamic": outputs[:, 3],
             "body_accel": outputs[:, 4],
+        }
+
+    def build_active_closed_loop_matrices(
+        self,
+        ctrl: ActiveControllerParams
+    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+        """
+        Builds continuous linear closed-loop state space matrices (A_cl, B_cl, C_cl, D_cl)
+        for state x = [z_s, v_s, z_u, v_u]^T and input u = [z_r, dz_r]^T under linear feedback:
+            F_act = -c_sky * v_s - k_p * (z_s - z_u) - c_rel * (v_s - v_u)
+        Governing dynamics:
+            m_s * ddz_s = -k_s * (z_s - z_u) - c_s * (v_s - v_u) + F_act
+            m_u * ddz_u = +k_s * (z_s - z_u) + c_s * (v_s - v_u) - k_t * (z_u - z_r) - c_t * (v_u - dz_r) - F_act
+        """
+        m_s = self.params.m_s
+        m_u = self.params.m_u
+        kw = self.params.k_w
+        cw = self.params.c_w
+        kt = self.params.k_t
+        ct = self.params.c_t
+
+        k_eff = kw + ctrl.k_p
+        c_eff = cw + ctrl.c_rel
+
+        A_cl = np.array([
+            [0.0, 1.0, 0.0, 0.0],
+            [-k_eff / m_s, -(c_eff + ctrl.c_sky) / m_s, k_eff / m_s, c_eff / m_s],
+            [0.0, 0.0, 0.0, 1.0],
+            [k_eff / m_u, (c_eff + ctrl.c_sky) / m_u, -(k_eff + kt) / m_u, -(c_eff + ct) / m_u],
+        ], dtype=np.float64)
+
+        B_cl = np.array([
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [kt / m_u, ct / m_u],
+        ], dtype=np.float64)
+
+        # Outputs: [z_s, v_s, z_u, v_u, susp_travel, tire_load_dynamic, body_accel, f_act]
+        C_cl = np.array([
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [0.0, 0.0, 0.0, 1.0],
+            [1.0, 0.0, -1.0, 0.0],
+            [0.0, 0.0, kt, ct],
+            [-k_eff / m_s, -(c_eff + ctrl.c_sky) / m_s, k_eff / m_s, c_eff / m_s],
+            [-ctrl.k_p, -(ctrl.c_sky + ctrl.c_rel), ctrl.k_p, ctrl.c_rel],
+        ], dtype=np.float64)
+
+        D_cl = np.array([
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [0.0, 0.0],
+            [-kt, -ct],
+            [0.0, 0.0],
+            [0.0, 0.0],
+        ], dtype=np.float64)
+
+        return A_cl, B_cl, C_cl, D_cl
+
+    def solve_active_matrix_exponential(
+        self,
+        t_span: Tuple[float, float],
+        dt: float,
+        ctrl: Optional[ActiveControllerParams] = None,
+        x0: Optional[np.ndarray] = None,
+        road_func: Optional[Callable[[float], Tuple[float, float]]] = None,
+    ) -> Dict[str, np.ndarray]:
+        """
+        Exact continuous-time state-space matrix exponential solution for active quarter-car.
+        Zero numerical integration truncation error for linear continuous dynamics.
+        """
+        ctrl = ctrl or ActiveControllerParams()
+        t_start, t_end = t_span
+        t_eval = np.arange(t_start, t_end + 1e-9, dt)
+        n_steps = len(t_eval)
+
+        A, B, C, D = self.build_active_closed_loop_matrices(ctrl)
+        x_init = np.zeros(A.shape[0], dtype=np.float64) if x0 is None else np.array(x0, dtype=np.float64)
+
+        Phi = scipy.linalg.expm(A * dt)
+        if np.linalg.cond(A) < 1e12:
+            Gamma = np.linalg.solve(A, (Phi - np.eye(A.shape[0])) @ B)
+        else:
+            Gamma = scipy.linalg.pinv(A) @ (Phi - np.eye(A.shape[0])) @ B
+
+        states = np.zeros((n_steps, A.shape[0]), dtype=np.float64)
+        inputs = np.zeros((n_steps, B.shape[1]), dtype=np.float64)
+        x = x_init.copy()
+
+        for i, t in enumerate(t_eval):
+            states[i] = x
+            if road_func is not None:
+                zr, dzr = road_func(float(t))
+            else:
+                zr, dzr = 0.0, 0.0
+            u_t = np.array([zr, dzr], dtype=np.float64)
+            inputs[i] = u_t
+            x = Phi @ x + Gamma @ u_t
+
+        outputs = (C @ states.T + D @ inputs.T).T
+        power_act = outputs[:, 7] * (outputs[:, 1] - outputs[:, 3])
+        actuator_work = scipy.integrate.cumulative_trapezoid(power_act, t_eval, initial=0.0)
+
+        return {
+            "time": t_eval,
+            "z_s": outputs[:, 0],
+            "v_s": outputs[:, 1],
+            "z_u": outputs[:, 2],
+            "v_u": outputs[:, 3],
+            "susp_travel": outputs[:, 4],
+            "tire_load_dynamic": outputs[:, 5],
+            "body_accel": outputs[:, 6],
+            "f_act": outputs[:, 7],
+            "power_act": power_act,
+            "actuator_work": actuator_work,
+        }
+
+    def solve_active_adaptive_high_order(
+        self,
+        t_span: Tuple[float, float],
+        dt: float,
+        ctrl: Optional[ActiveControllerParams] = None,
+        x0: Optional[np.ndarray] = None,
+        road_func: Optional[Callable[[float], Tuple[float, float]]] = None,
+        method: str = "DOP853",
+        rtol: float = 1e-10,
+        atol: float = 1e-12,
+    ) -> Dict[str, np.ndarray]:
+        """
+        Integrates active suspension dynamics with nonlinear actuator saturation (f_max)
+        and optional first-order actuator lag filter (delay_s) using high-order SciPy solvers.
+        """
+        ctrl = ctrl or ActiveControllerParams()
+        t_start, t_end = t_span
+        t_eval = np.arange(t_start, t_end + 1e-9, dt)
+
+        m_s = self.params.m_s
+        m_u = self.params.m_u
+        kw = self.params.k_w
+        cw = self.params.c_w
+        kt = self.params.k_t
+        ct = self.params.c_t
+
+        has_filter = ctrl.delay_s > 1e-6
+        if has_filter:
+            y_init = np.zeros(5, dtype=np.float64)
+            if x0 is not None:
+                y_init[:4] = x0[:4]
+        else:
+            y_init = np.zeros(4, dtype=np.float64)
+            if x0 is not None:
+                y_init[:4] = x0[:4]
+
+        def ode_func(t: float, y: np.ndarray) -> np.ndarray:
+            zs, vs, zu, vu = y[0], y[1], y[2], y[3]
+            if road_func is not None:
+                zr, dzr = road_func(float(t))
+            else:
+                zr, dzr = 0.0, 0.0
+
+            stroke = zs - zu
+            rel_vel = vs - vu
+            f_cmd = -ctrl.c_sky * vs - ctrl.k_p * stroke - ctrl.c_rel * rel_vel
+            if ctrl.f_max > 0:
+                f_sat = float(np.clip(f_cmd, -ctrl.f_max, ctrl.f_max))
+            else:
+                f_sat = f_cmd
+
+            if has_filter:
+                fact = y[4]
+                dfact_dt = (f_sat - fact) / ctrl.delay_s
+            else:
+                fact = f_sat
+                dfact_dt = 0.0
+
+            f_susp = kw * stroke + cw * rel_vel
+            f_tire = kt * (zu - zr) + ct * (vu - dzr)
+
+            ddzs = (-f_susp + fact) / m_s
+            ddzu = (f_susp - f_tire - fact) / m_u
+
+            if has_filter:
+                return np.array([vs, ddzs, vu, ddzu, dfact_dt], dtype=np.float64)
+            return np.array([vs, ddzs, vu, ddzu], dtype=np.float64)
+
+        sol = scipy.integrate.solve_ivp(
+            fun=ode_func,
+            t_span=(t_start, t_end),
+            y0=y_init,
+            t_eval=t_eval,
+            method=method,
+            rtol=rtol,
+            atol=atol,
+        )
+
+        if not sol.success:
+            raise RuntimeError(f"Active adaptive solver failed: {sol.message}")
+
+        zs = sol.y[0]
+        vs = sol.y[1]
+        zu = sol.y[2]
+        vu = sol.y[3]
+
+        n_pts = len(sol.t)
+        fact_arr = np.zeros(n_pts, dtype=np.float64)
+        acc_arr = np.zeros(n_pts, dtype=np.float64)
+        tire_arr = np.zeros(n_pts, dtype=np.float64)
+
+        for i in range(n_pts):
+            t = sol.t[i]
+            if road_func is not None:
+                zr, dzr = road_func(float(t))
+            else:
+                zr, dzr = 0.0, 0.0
+
+            stroke = zs[i] - zu[i]
+            rel_vel = vs[i] - vu[i]
+            f_cmd = -ctrl.c_sky * vs[i] - ctrl.k_p * stroke - ctrl.c_rel * rel_vel
+            if ctrl.f_max > 0:
+                f_sat = float(np.clip(f_cmd, -ctrl.f_max, ctrl.f_max))
+            else:
+                f_sat = f_cmd
+
+            if has_filter:
+                fact = sol.y[4][i]
+            else:
+                fact = f_sat
+
+            fact_arr[i] = fact
+            f_susp = kw * stroke + cw * rel_vel
+            f_tire = kt * (zu[i] - zr) + ct * (vu[i] - dzr)
+            tire_arr[i] = f_tire
+            acc_arr[i] = (-f_susp + fact) / m_s
+
+        power_act = fact_arr * (vs - vu)
+        actuator_work = scipy.integrate.cumulative_trapezoid(power_act, sol.t, initial=0.0)
+
+        return {
+            "time": sol.t,
+            "z_s": zs,
+            "v_s": vs,
+            "z_u": zu,
+            "v_u": vu,
+            "susp_travel": zs - zu,
+            "tire_load_dynamic": tire_arr,
+            "body_accel": acc_arr,
+            "f_act": fact_arr,
+            "power_act": power_act,
+            "actuator_work": actuator_work,
         }
 
 

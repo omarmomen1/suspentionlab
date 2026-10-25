@@ -70,10 +70,12 @@ from suspensionlab.interop.security import (
 
 logger = logging.getLogger(__name__)
 
-# Security & Isolation Capabilities (Phase 7.4)
+# Security & Isolation Capabilities (Phase 7.4 + Phase 7.6)
 UNTRUSTED_FMU_ISOLATION_AVAILABLE: bool = False
 VETTED_FMU_SHA256 = {
     "b4a0247de1e3ba24cc2c5922a4f08259dcd7c45c588167444dafcf7e08bbfbd0",  # QuarterCarRideModel.fmu
+    "3ae6b9f223a259bf055368b38437e52c9d154eaa0d2308aa4b7966d57cf258bf",  # ActiveQuarterCarModel.fmu (Phase 7.6)
+    "96d3b708eeffdf4245beb179baf8ba4b35d58e926e2206b28a3f721523114746",  # ActiveSuspensionController.fmu (Phase 7.6)
 }
 
 

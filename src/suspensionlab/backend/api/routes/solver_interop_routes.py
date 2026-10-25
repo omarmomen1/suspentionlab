@@ -28,6 +28,7 @@ Strict Epistemic Invariants:
 from __future__ import annotations
 
 import base64
+import hashlib
 import logging
 import pathlib
 import uuid
@@ -945,17 +946,25 @@ async def get_cosimulation_capabilities() -> Dict[str, Any]:
     and honest audit disclosures for multi-domain co-simulation.
     """
     raw = _cosim_service.get_fmi_capabilities()
-    fmu_path = pathlib.Path("artifacts/QuarterCarRideModel.fmu")
-    if not fmu_path.exists():
-        fmu_path = pathlib.Path("QuarterCarRideModel.fmu")
     vetted_fmus = []
-    if fmu_path.exists():
-        vetted_fmus.append({
-            "filename": fmu_path.name,
-            "hash_sha256": next(iter(VETTED_FMU_SHA256)) if VETTED_FMU_SHA256 else "",
-            "model_name": "QuarterCarRideModel",
-            "path": str(fmu_path),
-        })
+    candidates = [
+        ("ActiveQuarterCarModel.fmu", "ActiveQuarterCarModel"),
+        ("ActiveSuspensionController.fmu", "ActiveSuspensionController"),
+        ("QuarterCarRideModel.fmu", "QuarterCarRideModel"),
+    ]
+    for fn, m_name in candidates:
+        p = pathlib.Path(fn)
+        if not p.exists():
+            p = pathlib.Path(f"artifacts/{fn}")
+        if p.exists():
+            h = hashlib.sha256(p.read_bytes()).hexdigest()
+            if h in VETTED_FMU_SHA256:
+                vetted_fmus.append({
+                    "filename": p.name,
+                    "hash_sha256": h,
+                    "model_name": m_name,
+                    "path": str(p),
+                })
     return {
         "vetted_fmus": vetted_fmus,
         "available_fmus": raw.get("available_fmus", []),
@@ -970,6 +979,8 @@ async def get_cosimulation_capabilities() -> Dict[str, Any]:
         "supported_interpolation": ["ZERO_ORDER_HOLD", "FIRST_ORDER_HOLD"],
         "truthful_status": {
             "two_fmu_cosimulation_verified": True,
+            "feedback_cosimulation_verified": True,
+            "plant_controller_feedback_verified": True,
             "untrusted_fmu_isolation_verified": False,
             "fmu_state_rollback_supported": False,
         },
@@ -1133,6 +1144,8 @@ async def get_cosim_job_diagnostics(
             "worker_id": getattr(job, "worker_id", None),
             "lease_generation": getattr(job, "lease_generation", 1),
             "co_simulation_diagnostics": getattr(job, "co_simulation_diagnostics", {}) or {},
+            "feedback_metrics": getattr(job, "feedback_metrics", {}) or {},
+            "cosim_synchronization_mode": getattr(job, "cosim_synchronization_mode", "GAUSS_SEIDEL"),
             "reconciliation_summary": job.reconciliation_summary or {},
         }
     except ExecutionJobNotFoundError as e:

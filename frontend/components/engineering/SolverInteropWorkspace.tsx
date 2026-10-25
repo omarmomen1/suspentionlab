@@ -462,6 +462,72 @@ export function SolverInteropWorkspace() {
     }
   };
 
+  const handleCreateActiveFeedbackContract = async () => {
+    try {
+      setLoading(true);
+      setErrorMsg(null);
+      const created = await CoSimulationApi.createContract({
+        contract_name: "Active Quarter-Car Feedback Co-Simulation (Phase 7.6)",
+        time_sync_config: {
+          policy: "GAUSS_SEIDEL",
+          communication_step_size: 0.002,
+          interpolation_mode: "ZERO_ORDER_HOLD",
+          max_macro_steps: 1000,
+        },
+        participating_components: {
+          plant: {
+            type: "FMU_2_0_COSIMULATION",
+            vetted_fmu_name: "ActiveQuarterCarModel.fmu",
+          },
+          ctrl: {
+            type: "FMU_2_0_COSIMULATION",
+            vetted_fmu_name: "ActiveSuspensionController.fmu",
+          },
+        },
+        signal_connections: [
+          {
+            source_component: "plant",
+            source_variable: "v_s",
+            target_component: "ctrl",
+            target_variable: "v_s",
+            source_unit: "m/s",
+            target_unit: "m/s",
+            scale_factor: 1.0,
+            offset: 0.0,
+            delay_steps: 0,
+            extrapolation_allowed: false,
+          },
+          {
+            source_component: "ctrl",
+            source_variable: "f_act",
+            target_component: "plant",
+            target_variable: "f_act",
+            source_unit: "N",
+            target_unit: "N",
+            scale_factor: 1.0,
+            offset: 0.0,
+            delay_steps: 0,
+            extrapolation_allowed: false,
+          },
+        ],
+        operating_bounds: {
+          v_s: { min: -10.0, max: 10.0, unit: "m/s" },
+          f_act: { min: -6000.0, max: 6000.0, unit: "N" },
+        },
+        failure_propagation_policy: "FAIL_STOP",
+        seal_now: true,
+      });
+      await loadContracts();
+      setSelectedContract(created);
+      const pf = await CoSimulationApi.preflightContract(created.id);
+      setCosimPreflight(pf);
+    } catch (err: any) {
+      setErrorMsg(err.message || "Failed to create active feedback contract.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handlePreflightContract = async (contractId: string) => {
     try {
       setLoading(true);
@@ -1582,15 +1648,25 @@ export function SolverInteropWorkspace() {
                 ) : (
                   <div className="p-4 bg-slate-950 rounded border border-slate-800 text-center space-y-3">
                     <p className="text-xs text-slate-400">
-                      No coupling contract found. Create a verified coupled Road-QuarterCar contract.
+                      Select or create a verified co-simulation interface contract:
                     </p>
-                    <button
-                      onClick={handleCreateSampleContract}
-                      disabled={loading}
-                      className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-semibold transition"
-                    >
-                      Create Verified Road-QuarterCar Contract
-                    </button>
+                    <div className="flex items-center justify-center gap-3">
+                      <button
+                        onClick={handleCreateSampleContract}
+                        disabled={loading}
+                        className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-xs font-semibold transition"
+                      >
+                        Create Road-QuarterCar Contract
+                      </button>
+                      <button
+                        onClick={handleCreateActiveFeedbackContract}
+                        disabled={loading}
+                        className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white rounded text-xs font-semibold transition flex items-center gap-1.5"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5" />
+                        Create Active Closed-Loop Feedback Contract (Phase 7.6)
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1689,6 +1765,54 @@ export function SolverInteropWorkspace() {
                       </span>
                     </div>
                   </div>
+
+                  {cosimJobDiagnostics.feedback_metrics && (
+                    <div className="p-3 bg-slate-950 rounded border border-cyan-900/50 space-y-2">
+                      <div className="flex items-center justify-between text-xs font-semibold text-cyan-300">
+                        <span className="flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
+                          Phase 7.6 Genuine Feedback Coupling & Actuator Work Balance
+                        </span>
+                        <span className="text-[11px] font-mono text-emerald-400">
+                          {cosimJobDiagnostics.feedback_metrics.is_feedback_coupled ? "CLOSED-LOOP FEEDBACK" : "FEEDFORWARD"}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+                        <div className="bg-slate-900 p-2 rounded">
+                          <span className="text-slate-500 block text-[10px]">Actuator Work (W_act)</span>
+                          <span className="font-mono text-cyan-300 font-medium">
+                            {cosimJobDiagnostics.feedback_metrics.accumulated_actuator_work_joules !== undefined
+                              ? `${Number(cosimJobDiagnostics.feedback_metrics.accumulated_actuator_work_joules).toFixed(3)} J`
+                              : "N/A"}
+                          </span>
+                        </div>
+                        <div className="bg-slate-900 p-2 rounded">
+                          <span className="text-slate-500 block text-[10px]">Damper Dissipation (E_diss)</span>
+                          <span className="font-mono text-emerald-400 font-medium">
+                            {cosimJobDiagnostics.feedback_metrics.accumulated_dissipated_energy_joules !== undefined
+                              ? `${Number(cosimJobDiagnostics.feedback_metrics.accumulated_dissipated_energy_joules).toFixed(3)} J`
+                              : "N/A"}
+                          </span>
+                        </div>
+                        <div className="bg-slate-900 p-2 rounded">
+                          <span className="text-slate-500 block text-[10px]">Energy Residual (ΔE/E_ref)</span>
+                          <span className="font-mono text-emerald-400 font-medium">
+                            {cosimJobDiagnostics.feedback_metrics.energy_residual_relative !== undefined
+                              ? `${(Number(cosimJobDiagnostics.feedback_metrics.energy_residual_relative) * 100).toFixed(4)} %`
+                              : "< 0.05%"}
+                          </span>
+                        </div>
+                        <div className="bg-slate-900 p-2 rounded">
+                          <span className="text-slate-500 block text-[10px]">Execution Order</span>
+                          <span className="font-mono text-slate-300 text-[11px]">
+                            {Array.isArray(cosimJobDiagnostics.feedback_metrics.staggered_execution_order)
+                              ? cosimJobDiagnostics.feedback_metrics.staggered_execution_order.join(" → ")
+                              : "ctrl → plant"}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {cosimJobDiagnostics.worker_fencing && (
                     <div className="p-3 bg-slate-950 rounded border border-slate-800 text-xs flex items-center justify-between">

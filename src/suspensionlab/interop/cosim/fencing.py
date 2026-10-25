@@ -205,6 +205,8 @@ class WorkerFencingManager:
         output_artifact_ids: Optional[List[uuid.UUID]] = None,
         reconciliation_summary: Optional[Dict[str, Any]] = None,
         co_simulation_diagnostics: Optional[Dict[str, Any]] = None,
+        feedback_metrics: Optional[Dict[str, Any]] = None,
+        cosim_synchronization_mode: Optional[str] = None,
     ) -> SolverExecutionJob:
         """
         Atomically marks a job COMPLETED verifying the worker's fencing token and principal token.
@@ -241,6 +243,8 @@ class WorkerFencingManager:
                 output_artifact_ids=[str(a) for a in (output_artifact_ids or [])],
                 reconciliation_summary=reconciliation_summary or {},
                 co_simulation_diagnostics=co_simulation_diagnostics or {},
+                feedback_metrics=feedback_metrics or {},
+                cosim_synchronization_mode=cosim_synchronization_mode or "GAUSS_SEIDEL",
             )
             .execution_options(synchronize_session=False)
         )

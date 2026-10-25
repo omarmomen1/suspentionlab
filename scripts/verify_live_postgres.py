@@ -40,7 +40,7 @@ async def run_verification():
     # 2. Current Migration Head
     current_head = await conn.fetchval("SELECT version_num FROM alembic_version")
     print(f"[VERIFIED] Current Alembic Head in PostgreSQL: {current_head}")
-    assert current_head == "y8z9a0b1c2d3", f"Expected single integrated head y8z9a0b1c2d3, got {current_head}"
+    assert current_head == "z9a0b1c2d3e4", f"Expected single integrated head z9a0b1c2d3e4, got {current_head}"
 
     # 3. Check Schema Tables
     rows = await conn.fetch(
@@ -588,28 +588,46 @@ async def test_baseline_upgrade_and_downgrade():
     assert "co_simulation_coupling_contracts" not in tables
     print("  [OK] Phase 6.7 tables created upon upgrade to x7y8z9a0b1c2")
 
-    # Step C: Upgrade to Phase 7.5 integrated head (y8z9a0b1c2d3)
-    print("  -> Upgrading to Phase 7.5 integrated head y8z9a0b1c2d3...")
+    # Step C: Upgrade to Phase 7.6 integrated head (z9a0b1c2d3e4)
+    print("  -> Upgrading to Phase 7.6 integrated head z9a0b1c2d3e4...")
     subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
         env=env, capture_output=True, text=True, check=True
     )
     v = await test_conn.fetchval("SELECT version_num FROM alembic_version")
-    assert v == "y8z9a0b1c2d3"
+    assert v == "z9a0b1c2d3e4"
     tables = [r["table_name"] for r in await test_conn.fetch("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'")]
     assert "trusted_source_registries" in tables
     assert "source_verification_records" in tables
     assert "engineering_decision_dossiers" in tables
     assert "co_simulation_coupling_contracts" in tables
+    contract_cols = [r["column_name"] for r in await test_conn.fetch("SELECT column_name FROM information_schema.columns WHERE table_name = 'co_simulation_coupling_contracts'")]
+    assert "feedback_topology" in contract_cols
+    assert "staggered_execution_order" in contract_cols
+    assert "energy_residual_tolerance" in contract_cols
     job_cols = [r["column_name"] for r in await test_conn.fetch("SELECT column_name FROM information_schema.columns WHERE table_name = 'solver_execution_jobs'")]
     assert "worker_id" in job_cols
     assert "lease_generation" in job_cols
     assert "coupling_contract_id" in job_cols
     assert "co_simulation_diagnostics" in job_cols
-    print("  [OK] Phase 7.5 table and columns created upon upgrade to y8z9a0b1c2d3")
+    assert "feedback_metrics" in job_cols
+    assert "cosim_synchronization_mode" in job_cols
+    print("  [OK] Phase 7.6 table and columns created upon upgrade to z9a0b1c2d3e4")
 
-    # Step D: Downgrade from head y8z9a0b1c2d3 to Phase 6.7 x7y8z9a0b1c2
-    print("  -> Downgrading from head y8z9a0b1c2d3 to x7y8z9a0b1c2...")
+    # Step D: Downgrade from head z9a0b1c2d3e4 to Phase 7.5 y8z9a0b1c2d3
+    print("  -> Downgrading from head z9a0b1c2d3e4 to Phase 7.5 y8z9a0b1c2d3...")
+    subprocess.run(
+        [sys.executable, "-m", "alembic", "downgrade", "y8z9a0b1c2d3"],
+        env=env, capture_output=True, text=True, check=True
+    )
+    v = await test_conn.fetchval("SELECT version_num FROM alembic_version")
+    assert v == "y8z9a0b1c2d3"
+    contract_cols_down = [r["column_name"] for r in await test_conn.fetch("SELECT column_name FROM information_schema.columns WHERE table_name = 'co_simulation_coupling_contracts'")]
+    assert "feedback_topology" not in contract_cols_down
+    print("  [OK] Successfully downgraded back to Phase 7.5 y8z9a0b1c2d3; Phase 7.6 columns removed")
+
+    # Step E: Downgrade from y8z9a0b1c2d3 to Phase 6.7 x7y8z9a0b1c2
+    print("  -> Downgrading from y8z9a0b1c2d3 to x7y8z9a0b1c2...")
     subprocess.run(
         [sys.executable, "-m", "alembic", "downgrade", "x7y8z9a0b1c2"],
         env=env, capture_output=True, text=True, check=True
@@ -621,7 +639,7 @@ async def test_baseline_upgrade_and_downgrade():
     assert "trusted_source_registries" in tables
     print("  [OK] Successfully downgraded back to Phase 6.7 x7y8z9a0b1c2; Phase 7.5 table cleanly removed")
 
-    # Step E: Downgrade from x7y8z9a0b1c2 to w7x7y7z7a7b7 (undo Phase 6.7)
+    # Step F: Downgrade from x7y8z9a0b1c2 to w7x7y7z7a7b7 (undo Phase 6.7)
     print("  -> Downgrading from x7y8z9a0b1c2 to w7x7y7z7a7b7...")
     subprocess.run(
         [sys.executable, "-m", "alembic", "downgrade", "w7x7y7z7a7b7"],
@@ -635,14 +653,14 @@ async def test_baseline_upgrade_and_downgrade():
     assert "engineering_decision_dossiers" not in tables
     print("  [OK] Phase 6.7 tables dropped cleanly upon downgrade")
 
-    # Step F: Clean re-upgrade to head (y8z9a0b1c2d3)
-    print("  -> Re-upgrading to head y8z9a0b1c2d3...")
+    # Step G: Clean re-upgrade to head (z9a0b1c2d3e4)
+    print("  -> Re-upgrading to head z9a0b1c2d3e4...")
     subprocess.run(
         [sys.executable, "-m", "alembic", "upgrade", "head"],
         env=env, capture_output=True, text=True, check=True
     )
     v = await test_conn.fetchval("SELECT version_num FROM alembic_version")
-    assert v == "y8z9a0b1c2d3"
+    assert v == "z9a0b1c2d3e4"
     print(f"  [OK] Full clean upgrade back to head {v} verified")
 
     await test_conn.close()

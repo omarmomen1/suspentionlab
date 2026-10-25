@@ -25,6 +25,7 @@ from sqlalchemy import (
     Boolean,
     Column,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -105,6 +106,11 @@ class CoSimulationCouplingContract(Base):
     # Preflight Validation Diagnostics Report
     # {is_valid, validation_errors, warnings, algebraic_loops_detected, feedthrough_summary, validated_at}
     validation_report = Column(JSON_TYPE, nullable=False, default=dict)
+
+    # Phase 7.6 Genuine Feedback Co-Simulation Fields
+    feedback_topology = Column(String(64), nullable=False, default="FEEDFORWARD", index=True)
+    staggered_execution_order = Column(JSON_TYPE, nullable=False, default=list)
+    energy_residual_tolerance = Column(Float, nullable=False, default=0.05)
 
     created_at = Column(DateTime(timezone=True), default=_utcnow, server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, server_default=func.now(), nullable=False)

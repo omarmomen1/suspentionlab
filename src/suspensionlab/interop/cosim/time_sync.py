@@ -67,13 +67,19 @@ class EnergyConsistencyMonitor:
         m_u: float = 40.0,
         k_s: float = 25000.0,
         k_t: float = 190000.0,
+        c_s: float = 1500.0,
+        c_t: float = 0.0,
         max_energy_drift_joules: float = 200.0,
+        energy_floor: float = 1.0,
     ):
         self.m_s = m_s
         self.m_u = m_u
         self.k_s = k_s
         self.k_t = k_t
+        self.c_s = c_s
+        self.c_t = c_t
         self.max_drift = max_energy_drift_joules
+        self.energy_floor = energy_floor
 
         self.initial_energy: Optional[float] = None
         self.previous_energy: Optional[float] = None
@@ -81,6 +87,20 @@ class EnergyConsistencyMonitor:
         self.total_energy_history: List[float] = []
         self.divergence_flag: bool = False
         self.divergence_reason: Optional[str] = None
+
+        # Work Package H: Cumulative Actuator Work & Energy Conservation Integrators
+        self.accumulated_actuator_work: float = 0.0
+        self.accumulated_road_work: float = 0.0
+        self.accumulated_dissipated_energy: float = 0.0
+        self.energy_residual_absolute: float = 0.0
+        self.energy_residual_relative: float = 0.0
+
+        self.prev_time: Optional[float] = None
+        self.prev_vs: float = 0.0
+        self.prev_vu: float = 0.0
+        self.prev_vroad: float = 0.0
+        self.prev_fact: float = 0.0
+        self.prev_ftire: float = 0.0
 
     def calculate_energy(
         self,
@@ -130,6 +150,96 @@ class EnergyConsistencyMonitor:
 
         self.previous_energy = energy
         return energy
+
+    def record_step_with_actuator(
+        self,
+        t: float,
+        z_s: float,
+        v_s: float,
+        z_u: float,
+        v_u: float,
+        z_road: float,
+        v_road: float = 0.0,
+        f_act: float = 0.0,
+        f_tire: Optional[float] = None,
+        is_excitation_active: bool = False,
+    ) -> Dict[str, float]:
+        """
+        Phase 7.6: Tracks instantaneous mechanical energy, accumulated actuator work,
+        accumulated road input work, cumulative damper dissipation, and First Law residual.
+        """
+        e_mech = self.calculate_energy(z_s, v_s, z_u, v_u, z_road)
+        self.total_energy_history.append(e_mech)
+        self.max_observed_energy = max(self.max_observed_energy, e_mech)
+
+        if self.initial_energy is None:
+            self.initial_energy = e_mech
+            self.prev_time = t
+            self.prev_vs = v_s
+            self.prev_vu = v_u
+            self.prev_vroad = v_road
+            self.prev_fact = f_act
+            self.prev_ftire = f_tire if f_tire is not None else (self.k_t * (z_u - z_road))
+
+        dt = t - (self.prev_time if self.prev_time is not None else t)
+        if dt > 1e-9:
+            # 1. Actuator mechanical work: W_act = integral( F_act * (v_s - v_u) dt )
+            p_act_curr = f_act * (v_s - v_u)
+            p_act_prev = self.prev_fact * (self.prev_vs - self.prev_vu)
+            dW_act = 0.5 * (p_act_curr + p_act_prev) * dt
+            self.accumulated_actuator_work += dW_act
+
+            # 2. Damper dissipation: E_diss = integral( c_s * (v_s - v_u)^2 + c_t * (v_u - v_road)^2 dt )
+            p_diss_curr = self.c_s * ((v_s - v_u) ** 2) + self.c_t * ((v_u - v_road) ** 2)
+            p_diss_prev = self.c_s * ((self.prev_vs - self.prev_vu) ** 2) + self.c_t * ((self.prev_vu - self.prev_vroad) ** 2)
+            dE_diss = 0.5 * (p_diss_curr + p_diss_prev) * dt
+            self.accumulated_dissipated_energy += dE_diss
+
+            # 3. Road input work: W_road = integral( F_tire * v_road dt )
+            curr_ftire = f_tire if f_tire is not None else (self.k_t * (z_u - z_road) + self.c_t * (v_u - v_road))
+            p_road_curr = curr_ftire * v_road
+            p_road_prev = self.prev_ftire * self.prev_vroad
+            dW_road = 0.5 * (p_road_curr + p_road_prev) * dt
+            self.accumulated_road_work += dW_road
+
+            # 4. Energy Conservation Residual:
+            # Delta_E = | E_mech(t) + E_diss(t) - E_mech(0) - W_road(t) - W_act(t) |
+            delta_e = abs(
+                e_mech + self.accumulated_dissipated_energy - self.initial_energy
+                - self.accumulated_road_work - self.accumulated_actuator_work
+            )
+            self.energy_residual_absolute = float(delta_e)
+
+            denom = max(
+                abs(self.initial_energy) + abs(self.accumulated_road_work) + abs(self.accumulated_actuator_work),
+                self.energy_floor
+            )
+            self.energy_residual_relative = float(delta_e / denom)
+
+            # Update historical previous values
+            self.prev_time = t
+            self.prev_vs = v_s
+            self.prev_vu = v_u
+            self.prev_vroad = v_road
+            self.prev_fact = f_act
+            self.prev_ftire = curr_ftire
+
+        # Stability checks
+        if abs(z_s) > 2.0 or abs(z_u) > 2.0 or abs(v_s) > 50.0:
+            self.divergence_flag = True
+            self.divergence_reason = (
+                f"COUPLING_STATE_BLOWUP: Unbounded state growth (z_s={z_s:.2f}m, z_u={z_u:.2f}m, v_s={v_s:.2f}m/s)."
+            )
+
+        self.previous_energy = e_mech
+        return {
+            "mechanical_energy": e_mech,
+            "accumulated_actuator_work": self.accumulated_actuator_work,
+            "accumulated_road_work": self.accumulated_road_work,
+            "accumulated_dissipated_energy": self.accumulated_dissipated_energy,
+            "energy_residual_absolute": self.energy_residual_absolute,
+            "energy_residual_relative": self.energy_residual_relative,
+        }
 
 
 class StepSizeConvergenceAuditor:

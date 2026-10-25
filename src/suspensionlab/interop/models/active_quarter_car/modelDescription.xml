@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<fmiModelDescription fmiVersion="2.0" modelName="ActiveQuarterCarModel" guid="{a1b2c3d4-e5f6-7a8b-9c0d-1e2f3a4b5c6d}" generationTool="SuspensionLab PRO FMI Exporter v2.0" generationDateAndTime="2026-10-25T06:30:00Z" variableNamingConvention="flat" description="SuspensionLab 2-DOF Active Quarter-Car Suspension Plant Co-Simulation Model" numberOfEventIndicators="0">
+  <CoSimulation modelIdentifier="ActiveQuarterCarModel" canHandleVariableCommunicationStepSize="true" canInterpolateInputs="true" maxOutputDerivativeOrder="0"/>
+  <UnitDefinitions>
+    <Unit name="kg">
+      <BaseUnit kg="1"/>
+    </Unit>
+    <Unit name="N/m">
+      <BaseUnit kg="1" s="-2"/>
+    </Unit>
+    <Unit name="Ns/m">
+      <BaseUnit kg="1" s="-1"/>
+    </Unit>
+    <Unit name="m">
+      <BaseUnit m="1"/>
+    </Unit>
+    <Unit name="m/s">
+      <BaseUnit m="1" s="-1"/>
+    </Unit>
+    <Unit name="m/s2">
+      <BaseUnit m="1" s="-2"/>
+    </Unit>
+    <Unit name="N">
+      <BaseUnit kg="1" m="1" s="-2"/>
+    </Unit>
+    <Unit name="W">
+      <BaseUnit kg="1" m="2" s="-3"/>
+    </Unit>
+    <Unit name="s">
+      <BaseUnit s="1"/>
+    </Unit>
+    <Unit name="-"/>
+  </UnitDefinitions>
+  <ModelVariables>
+    <!-- Parameters (indices 1..7) -->
+    <ScalarVariable name="m_s" valueReference="1" causality="parameter" variability="fixed" initial="exact" description="Sprung mass">
+      <Real start="300.0" unit="kg"/>
+    </ScalarVariable>
+    <ScalarVariable name="m_u" valueReference="2" causality="parameter" variability="fixed" initial="exact" description="Unsprung mass">
+      <Real start="40.0" unit="kg"/>
+    </ScalarVariable>
+    <ScalarVariable name="k_s" valueReference="3" causality="parameter" variability="fixed" initial="exact" description="Suspension spring rate">
+      <Real start="25000.0" unit="N/m"/>
+    </ScalarVariable>
+    <ScalarVariable name="c" valueReference="4" causality="parameter" variability="fixed" initial="exact" description="Damper damping rate">
+      <Real start="1500.0" unit="Ns/m"/>
+    </ScalarVariable>
+    <ScalarVariable name="k_t" valueReference="5" causality="parameter" variability="fixed" initial="exact" description="Tire radial stiffness">
+      <Real start="190000.0" unit="N/m"/>
+    </ScalarVariable>
+    <ScalarVariable name="MR" valueReference="6" causality="parameter" variability="fixed" initial="exact" description="Motion ratio (spring travel / wheel travel)">
+      <Real start="1.0" unit="-"/>
+    </ScalarVariable>
+    <ScalarVariable name="c_t" valueReference="7" causality="parameter" variability="fixed" initial="exact" description="Tire damping rate">
+      <Real start="0.0" unit="Ns/m"/>
+    </ScalarVariable>
+
+    <!-- Inputs (indices 8..10) -->
+    <ScalarVariable name="z_road" valueReference="10" causality="input" variability="continuous" description="Road surface vertical displacement profile">
+      <Real start="0.0" unit="m"/>
+    </ScalarVariable>
+    <ScalarVariable name="dz_road" valueReference="11" causality="input" variability="continuous" description="Road vertical velocity">
+      <Real start="0.0" unit="m/s"/>
+    </ScalarVariable>
+    <ScalarVariable name="f_act" valueReference="12" causality="input" variability="continuous" description="Actuator force applied between sprung and unsprung mass">
+      <Real start="0.0" unit="N"/>
+    </ScalarVariable>
+
+    <!-- Outputs (indices 11..19) -->
+    <ScalarVariable name="z_s" valueReference="20" causality="output" variability="continuous" initial="calculated" description="Sprung mass vertical displacement">
+      <Real unit="m"/>
+    </ScalarVariable>
+    <ScalarVariable name="v_s" valueReference="21" causality="output" variability="continuous" initial="calculated" description="Sprung mass vertical velocity">
+      <Real unit="m/s"/>
+    </ScalarVariable>
+    <ScalarVariable name="z_u" valueReference="22" causality="output" variability="continuous" initial="calculated" description="Unsprung mass vertical displacement">
+      <Real unit="m"/>
+    </ScalarVariable>
+    <ScalarVariable name="v_u" valueReference="23" causality="output" variability="continuous" initial="calculated" description="Unsprung mass vertical velocity">
+      <Real unit="m/s"/>
+    </ScalarVariable>
+    <ScalarVariable name="susp_travel" valueReference="24" causality="output" variability="continuous" initial="calculated" description="Suspension stroke deflection (z_s - z_u)">
+      <Real unit="m"/>
+    </ScalarVariable>
+    <ScalarVariable name="tire_load_dynamic" valueReference="25" causality="output" variability="continuous" initial="calculated" description="Dynamic tire contact load variation">
+      <Real unit="N"/>
+    </ScalarVariable>
+    <ScalarVariable name="body_accel" valueReference="26" causality="output" variability="continuous" initial="calculated" description="Sprung mass vertical acceleration">
+      <Real unit="m/s2"/>
+    </ScalarVariable>
+    <ScalarVariable name="power_act" valueReference="27" causality="output" variability="continuous" initial="calculated" description="Instantaneous actuator mechanical power">
+      <Real unit="W"/>
+    </ScalarVariable>
+    <ScalarVariable name="time" valueReference="28" causality="output" variability="continuous" initial="calculated" description="Simulation elapsed time">
+      <Real unit="s"/>
+    </ScalarVariable>
+  </ModelVariables>
+  <ModelStructure>
+    <Outputs>
+      <Unknown index="11"/>
+      <Unknown index="12"/>
+      <Unknown index="13"/>
+      <Unknown index="14"/>
+      <Unknown index="15"/>
+      <Unknown index="16"/>
+      <Unknown index="17"/>
+      <Unknown index="18"/>
+      <Unknown index="19"/>
+    </Outputs>
+    <InitialUnknowns>
+      <Unknown index="11"/>
+      <Unknown index="12"/>
+      <Unknown index="13"/>
+      <Unknown index="14"/>
+      <Unknown index="15"/>
+      <Unknown index="16"/>
+      <Unknown index="17"/>
+      <Unknown index="18"/>
+      <Unknown index="19"/>
+    </InitialUnknowns>
+  </ModelStructure>
+</fmiModelDescription>
