@@ -221,14 +221,18 @@ class ParetoFrontier:
         """Serialize the full frontier to a JSON-safe dict."""
         frontier = self.get_frontier()
         all_pts  = self.all_feasible()
+        cand_id_map = {id(pt): f"CAND-{idx + 1:02d}" for idx, pt in enumerate(all_pts)}
 
-        def _pt(p: ParetoPoint) -> dict:
+        def _pt(p: ParetoPoint, fallback_idx: int = 0) -> dict:
+            cid = cand_id_map.get(id(p), f"CAND-{fallback_idx + 1:02d}")
             return {
-                "params":       p.params,
-                "objectives":   {k: round(v, 6) for k, v in p.objectives.items()},
-                "constraints":  {k: round(v, 6) for k, v in p.constraints.items()},
-                "feasible":     p.feasible,
-                "pareto_rank":  p.pareto_rank,
+                "candidate_id":    cid,
+                "params":          p.params,
+                "objectives":      {k: round(v, 6) for k, v in p.objectives.items()},
+                "constraints":     {k: round(v, 6) for k, v in p.constraints.items()},
+                "feasible":        p.feasible,
+                "pareto_rank":     p.pareto_rank,
+                "is_pareto_optimal": bool(p.pareto_rank == 0 and p.feasible),
             }
 
         best = self.best_compromise()
@@ -237,9 +241,9 @@ class ParetoFrontier:
             "n_feasible":       len(all_pts),
             "n_pareto_optimal": len(frontier),
             "objectives":       [o.name for o in self.objectives],
-            "frontier":         [_pt(p) for p in frontier],
-            "all_feasible":     [_pt(p) for p in all_pts[:50]],  # cap for API
-            "best_compromise":  _pt(best) if best else None,
+            "frontier":         [_pt(p, i) for i, p in enumerate(frontier)],
+            "all_feasible":     [_pt(p, i) for i, p in enumerate(all_pts[:50])],  # cap for API
+            "best_compromise":  _pt(best, 0) if best else None,
         }
 
     # ── Private ───────────────────────────────────────────────────────────────
@@ -408,7 +412,7 @@ class SuspensionParetoOptimizer:
         -------
         dict with: rms_body_accel, peak_susp_travel, tire_load_variation, ride_freq
         """
-        from suspensionlab.physics.quarter_car import QuarterCarParams
+        from suspensionlab.physics.quarter_car import QuarterCarParams, SolverMode
 
         try:
             p_dict = {
@@ -423,7 +427,10 @@ class SuspensionParetoOptimizer:
             p_dict.update({k: float(v) for k, v in params.items()})
             p = QuarterCarParams(**p_dict)
 
-            result = run_analysis_fn(p, profile, f_min=0.5, f_max=25.0, n_freq=300)
+            try:
+                result = run_analysis_fn(p, profile, f_min=0.5, f_max=25.0, n_freq=20, solver_mode=SolverMode.FAST)
+            except TypeError:
+                result = run_analysis_fn(p, profile, f_min=0.5, f_max=25.0, n_freq=20)
 
             rms_accel   = float(getattr(result, "rms_body_accel",    0.0))
             peak_travel = float(getattr(result, "peak_susp_travel",  0.0)) * 1000.0  # m → mm

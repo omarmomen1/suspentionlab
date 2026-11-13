@@ -3,11 +3,13 @@
 import React, { useState } from "react";
 import { Download, FileText, Code2, X, CheckCircle2 } from "lucide-react";
 import { KinematicsApi } from "../../lib/api_client";
+import PlanGate from "../PlanGate";
 
 interface KinematicsExportModalProps {
   isOpen: boolean;
   onClose: () => void;
   hardpoints: Record<string, number[]>;
+  sweepData?: any;
   setupName: string;
   zMin: number;
   zMax: number;
@@ -18,6 +20,7 @@ export default function KinematicsExportModal({
   isOpen,
   onClose,
   hardpoints,
+  sweepData,
   setupName,
   zMin,
   zMax,
@@ -33,7 +36,9 @@ export default function KinematicsExportModal({
     try {
       setDownloadingCsv(true);
       const blob = await KinematicsApi.exportCsv({
+        sweep_data: sweepData ?? undefined,
         hardpoints,
+        format: "csv",
         setup_name: setupName,
         z_min_mm: zMin,
         z_max_mm: zMax,
@@ -60,7 +65,9 @@ export default function KinematicsExportModal({
     try {
       setDownloadingJson(true);
       const blob = await KinematicsApi.exportJson({
+        sweep_data: sweepData ?? undefined,
         hardpoints,
+        format: "json",
         setup_name: setupName,
         z_min_mm: zMin,
         z_max_mm: zMax,
@@ -118,35 +125,37 @@ export default function KinematicsExportModal({
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3 pt-1">
-          <button
-            onClick={handleExportCsv}
-            disabled={downloadingCsv}
-            className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-indigo-500/50 transition group disabled:opacity-50"
-          >
-            <FileText className="w-6 h-6 text-indigo-400 group-hover:scale-110 transition" />
-            <div className="text-center">
-              <div className="text-xs font-semibold text-slate-200">
-                {downloadingCsv ? "Generating..." : "Download CSV"}
+        <PlanGate required="PRO" feature="Kinematics CSV & JSON Export">
+          <div className="grid grid-cols-2 gap-3 pt-1">
+            <button
+              onClick={handleExportCsv}
+              disabled={downloadingCsv}
+              className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-indigo-500/50 transition group disabled:opacity-50"
+            >
+              <FileText className="w-6 h-6 text-indigo-400 group-hover:scale-110 transition" />
+              <div className="text-center">
+                <div className="text-xs font-semibold text-slate-200">
+                  {downloadingCsv ? "Generating..." : "Download CSV"}
+                </div>
+                <div className="text-[10px] text-slate-400">Excel / MATLAB / MoTeC</div>
               </div>
-              <div className="text-[10px] text-slate-400">Excel / MATLAB / MoTeC</div>
-            </div>
-          </button>
+            </button>
 
-          <button
-            onClick={handleExportJson}
-            disabled={downloadingJson}
-            className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-indigo-500/50 transition group disabled:opacity-50"
-          >
-            <Code2 className="w-6 h-6 text-emerald-400 group-hover:scale-110 transition" />
-            <div className="text-center">
-              <div className="text-xs font-semibold text-slate-200">
-                {downloadingJson ? "Generating..." : "Download JSON"}
+            <button
+              onClick={handleExportJson}
+              disabled={downloadingJson}
+              className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 hover:border-indigo-500/50 transition group disabled:opacity-50"
+            >
+              <Code2 className="w-6 h-6 text-emerald-400 group-hover:scale-110 transition" />
+              <div className="text-center">
+                <div className="text-xs font-semibold text-slate-200">
+                  {downloadingJson ? "Generating..." : "Download JSON"}
+                </div>
+                <div className="text-[10px] text-slate-400">CAE / Python / REST API</div>
               </div>
-              <div className="text-[10px] text-slate-400">CAE / Python / REST API</div>
-            </div>
-          </button>
-        </div>
+            </button>
+          </div>
+        </PlanGate>
 
         <div className="flex justify-end pt-2 border-t border-slate-800">
           <button

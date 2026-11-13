@@ -23,6 +23,7 @@ import {
   Filter,
 } from "lucide-react";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
+import PlanGate from "../../components/PlanGate";
 import {
   ExperimentApi,
   ParetoFrontierResponse,
@@ -112,7 +113,7 @@ function OptimizeContent() {
   const displayedCandidates = useMemo(() => {
     if (!frontierData?.candidates) return [];
     if (filterMode === "pareto") {
-      return frontierData.candidates.filter((c) => c.is_pareto_optimal);
+      return frontierData.candidates.filter((c) => c.pareto_rank === 0 || c.is_pareto_optimal);
     }
     if (filterMode === "feasible") {
       return frontierData.candidates.filter((c) => c.feasible);
@@ -171,16 +172,16 @@ function OptimizeContent() {
               <span>/</span>
               <Link href="/experiment" className="hover:text-white transition-colors">Hypothesis Testing</Link>
               <span>/</span>
-              <span className="text-purple-400 font-medium">Pareto Optimization</span>
+              <span className="text-cyan-400 font-medium">Pareto Optimization</span>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
+              <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
                 <Sparkles size={20} className="animate-pulse" />
               </div>
               <div>
                 <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center gap-2">
                   Multi-Objective Pareto Optimization
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-purple-950/60 text-purple-300 font-mono border border-purple-500/30">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-cyan-950/60 text-cyan-300 font-mono border border-cyan-500/30">
                     Non-Dominated Tradeoff Space
                   </span>
                 </h1>
@@ -197,9 +198,9 @@ function OptimizeContent() {
               type="button"
               onClick={() => runBatchOptimization(true)}
               disabled={isRunning}
-              className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold flex items-center gap-2 transition-all shadow-lg shadow-purple-950/50 disabled:opacity-50"
+              className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold flex items-center gap-2 transition-all shadow-md disabled:opacity-50"
             >
-              <Play size={13} className={isRunning ? "animate-spin" : "fill-white"} />
+              <Play size={13} className={isRunning ? "animate-spin" : "fill-black"} />
               <span>{isRunning ? "Evaluating Candidates..." : "Run Batch Candidate Optimization"}</span>
             </button>
           </div>
@@ -555,8 +556,8 @@ function OptimizeContent() {
                   </text>
 
                   {/* Utopia Point Indicator */}
-                  <circle cx="50" cy="290" r="4" fill="#a855f7" />
-                  <text x="58" y="285" fill="#c084fc" fontSize="9" fontFamily="monospace">Utopia (Ideal)</text>
+                  <circle cx="50" cy="290" r="4" fill="#06B6D4" />
+                  <text x="58" y="285" fill="#38bdf8" fontSize="9" fontFamily="monospace">Utopia (Ideal)</text>
 
                   {/* Connect Pareto optimal points in sorted order */}
                   {(() => {
@@ -592,7 +593,7 @@ function OptimizeContent() {
                     const cx = 50 + ((rawX - plotBounds.minX) / (plotBounds.maxX - plotBounds.minX)) * 500;
                     const cy = 290 - ((rawY - plotBounds.minY) / (plotBounds.maxY - plotBounds.minY)) * 260;
                     const isSelected = selectedCandidate?.candidate_id === cand.candidate_id;
-                    const isOptimal = cand.is_pareto_optimal;
+                    const isOptimal = cand.pareto_rank === 0 || cand.is_pareto_optimal;
 
                     return (
                       <g
@@ -637,9 +638,13 @@ function OptimizeContent() {
                     <div className="font-bold text-white flex items-center justify-between gap-3">
                       <span>{hoveredCandidate.candidate_id}</span>
                       <span className={`text-[10px] font-mono px-1 rounded ${
-                        hoveredCandidate.is_pareto_optimal ? "bg-amber-500/20 text-amber-300" : "bg-blue-500/20 text-blue-300"
+                        (hoveredCandidate.pareto_rank === 0 || hoveredCandidate.is_pareto_optimal)
+                          ? "bg-amber-500/20 text-amber-300"
+                          : "bg-blue-500/20 text-blue-300"
                       }`}>
-                        {hoveredCandidate.is_pareto_optimal ? "PARETO OPTIMAL" : "FEASIBLE"}
+                        {(hoveredCandidate.pareto_rank === 0 || hoveredCandidate.is_pareto_optimal)
+                          ? "PARETO OPTIMAL"
+                          : "FEASIBLE"}
                       </span>
                     </div>
                     <div className="text-[11px] text-gray-300 font-mono">
@@ -677,11 +682,13 @@ function OptimizeContent() {
                     <div className="flex items-center justify-between">
                       <span className="text-gray-400">Classification:</span>
                       <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
-                        selectedCandidate.is_pareto_optimal
+                        selectedCandidate.pareto_rank === 0 || selectedCandidate.is_pareto_optimal
                           ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
                           : "bg-blue-500/20 text-blue-300 border border-blue-500/40"
                       }`}>
-                        {selectedCandidate.is_pareto_optimal ? "Non-Dominated (Rank 0)" : `Dominated (Rank ${selectedCandidate.pareto_rank})`}
+                        {selectedCandidate.pareto_rank === 0 || selectedCandidate.is_pareto_optimal
+                          ? "Pareto Optimal (Rank 0)"
+                          : `Dominated (Rank ${selectedCandidate.pareto_rank})`}
                       </span>
                     </div>
 
@@ -782,7 +789,7 @@ function OptimizeContent() {
                   onClick={() => setFilterMode("pareto")}
                   className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
                     filterMode === "pareto"
-                      ? "bg-purple-600 text-white font-semibold"
+                      ? "bg-amber-500 text-black font-bold shadow-sm"
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
@@ -792,7 +799,7 @@ function OptimizeContent() {
                   onClick={() => setFilterMode("feasible")}
                   className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
                     filterMode === "feasible"
-                      ? "bg-purple-600 text-white font-semibold"
+                      ? "bg-amber-500 text-black font-bold shadow-sm"
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
@@ -802,7 +809,7 @@ function OptimizeContent() {
                   onClick={() => setFilterMode("all")}
                   className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
                     filterMode === "all"
-                      ? "bg-purple-600 text-white font-semibold"
+                      ? "bg-amber-500 text-black font-bold shadow-sm"
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
@@ -857,7 +864,7 @@ function OptimizeContent() {
                         </td>
                         <td className="py-2.5 px-3">
                           <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
-                            cand.pareto_rank === 0 ? "bg-amber-500/20 text-amber-300" : "bg-white/5 text-gray-400"
+                            (cand.pareto_rank === 0 || cand.is_pareto_optimal) ? "bg-amber-500/20 text-amber-300" : "bg-white/5 text-gray-400"
                           }`}>
                             Rank {cand.pareto_rank}
                           </span>
@@ -867,8 +874,8 @@ function OptimizeContent() {
                             <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-semibold border border-purple-500/30 font-sans">
                               Best Compromise
                             </span>
-                          ) : cand.is_pareto_optimal ? (
-                            <span className="text-amber-400 text-[11px] font-sans">Pareto Frontier</span>
+                          ) : (cand.pareto_rank === 0 || cand.is_pareto_optimal) ? (
+                            <span className="text-amber-400 text-[11px] font-sans">Pareto Optimal</span>
                           ) : (
                             <span className="text-gray-500 text-[11px] font-sans">Dominated</span>
                           )}
@@ -903,7 +910,9 @@ function OptimizeContent() {
 export default function OptimizePage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-[#070709] text-white p-8">Loading Pareto optimization...</div>}>
-      <OptimizeContent />
+      <PlanGate required="PRO" feature="Multi-Objective Pareto Setup Optimizer">
+        <OptimizeContent />
+      </PlanGate>
     </Suspense>
   );
 }

@@ -593,16 +593,30 @@ async def post_track_delta_analysis_endpoint(
 from pydantic import BaseModel, Field
 from typing import List
 
+MAX_DECIMATE_POINTS = 100_000
+
+
 class DecimateRequest(BaseModel):
-    timestamps: List[float] = Field(..., description="Array of time coordinates [s]")
-    values: List[float] = Field(..., description="Array of channel values")
+    timestamps: List[float] = Field(
+        ...,
+        max_length=MAX_DECIMATE_POINTS,
+        description="Array of time coordinates [s]",
+    )
+    values: List[float] = Field(
+        ...,
+        max_length=MAX_DECIMATE_POINTS,
+        description="Array of channel values",
+    )
     channel_name: str = Field("damper_velocity_fl", description="Channel name for event detection")
     target_points: int = Field(2000, ge=10, le=50000, description="Target decimated point budget")
     detect_events: bool = Field(True, description="Whether to detect engineering spikes/events")
 
 
 @router.post("/decimate")
-async def decimate_telemetry_endpoint(req: DecimateRequest):
+async def decimate_telemetry_endpoint(
+    req: DecimateRequest,
+    user: UserContext = Depends(verify_api_key),
+):
     """
     Downsample high-frequency telemetry channel using peak-preserving min-max bucketing.
     Preserves all physical spikes and extrema without smoothing out transients.

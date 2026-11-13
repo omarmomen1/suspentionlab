@@ -27,6 +27,7 @@ from scipy.optimize import brentq
 
 from suspensionlab.physics.handling_model import (
     HandlingParams,
+    effective_roll_dist,
     simulate_maneuver,
 )
 from suspensionlab.physics.magic_formula import calc_tire_forces
@@ -250,9 +251,10 @@ def compute_handling_diagram(
         delta_Fz_geom_f = (p.m_s * (p.b / L) * ay_val * h_rc_f) / p.tw_f
         delta_Fz_geom_r = (p.m_s * (p.a / L) * ay_val * h_rc_r) / p.tw_r
 
+        r_dist = effective_roll_dist(p)
         M_roll = p.m_s * ay_val * (p.h_cg_s - h_rc_cg)
-        delta_Fz_elast_f = (M_roll * p.roll_dist) / p.tw_f
-        delta_Fz_elast_r = (M_roll * (1.0 - p.roll_dist)) / p.tw_r
+        delta_Fz_elast_f = (M_roll * r_dist) / p.tw_f
+        delta_Fz_elast_r = (M_roll * (1.0 - r_dist)) / p.tw_r
 
         delta_Fz_lat_f = delta_Fz_u_f + delta_Fz_geom_f + delta_Fz_elast_f
         delta_Fz_lat_r = delta_Fz_u_r + delta_Fz_geom_r + delta_Fz_elast_r
@@ -351,10 +353,31 @@ def compute_handling_diagram(
     fy_curve_rl = [calc_tire_forces(Fz_r_total/2.0, a*np.pi/180.0, 0.0, 0.0, p.tire_coeffs)[1] for a in alpha_envelope]
     fy_curve_rr = [calc_tire_forces(Fz_r_total/2.0, a*np.pi/180.0, 0.0, 0.0, p.tire_coeffs)[1] for a in alpha_envelope]
 
+    # Critical speed evaluation for oversteering vehicles (Kus < 0)
+    v_crit_ms = None
+    v_crit_kph = None
+    stability_warning = None
+    if kus_linear < -0.05:
+        # Oversteer: unstable above critical speed v_crit = sqrt(L * g / (-K_us_rad))
+        kus_rad = kus_linear * np.pi / (180.0 * 9.81)
+        if kus_rad < -1e-7:
+            v_crit_ms = math.sqrt(max(L / (-kus_rad), 0.1))
+            v_crit_kph = round(v_crit_ms * 3.6, 2)
+            v_crit_ms = round(v_crit_ms, 2)
+            if (speed_kph / 3.6) > v_crit_ms:
+                stability_warning = (
+                    f"Operating speed ({speed_kph:.1f} km/h) exceeds critical oversteer speed "
+                    f"({v_crit_kph:.1f} km/h). Vehicle is dynamically unstable (divergent yaw mode)."
+                )
+
     return {
         "speed_kph": speed_kph,
         "speed_ms": round(V, 2),
         "kus_linear_deg_per_g": round(kus_linear, 3),
+        "critical_speed_ms": v_crit_ms,
+        "critical_speed_kph": v_crit_kph,
+        "stability_warning": stability_warning,
+        "is_unstable_oversteer": bool(stability_warning is not None),
         "ay_peak_g": round(ay_peak_g, 3),
         "neutral_steer_ay_g": neutral_steer_ay_g,
         "limiting_axle": "FRONT" if "FRONT" in saturation_reason else ("REAR" if "REAR" in saturation_reason else "BALANCED"),
@@ -367,8 +390,8 @@ def compute_handling_diagram(
             "fy_rr_n": [round(f, 1) for f in fy_curve_rr],
         },
         "load_transfer_summary": {
-            "front_roll_stiffness_pct": round(p.roll_dist * 100.0, 1),
-            "rear_roll_stiffness_pct": round((1.0 - p.roll_dist) * 100.0, 1),
+            "front_roll_stiffness_pct": round(effective_roll_dist(p) * 100.0, 1),
+            "rear_roll_stiffness_pct": round((1.0 - effective_roll_dist(p)) * 100.0, 1),
             "front_weight_pct": round(W_f_static / (W_f_static + W_r_static) * 100.0, 1),
             "front_aero_downforce_n": round(F_aero_f, 1),
             "rear_aero_downforce_n": round(F_aero_r, 1),
@@ -488,7 +511,16 @@ def simulate_yaw_response_scenario(
     
     post_steer_idx = np.where((t_arr >= steer_onset_t) & (np.abs(yaw_arr) >= np.abs(yaw_target_63)))[0]
     if len(post_steer_idx) > 0:
-        t_63 = t_arr[post_steer_idx[0]]
+        idx0 = int(post_steer_idx[0])
+        if idx0 > 0 and t_arr[idx0 - 1] >= steer_onset_t:
+            y0 = float(abs(yaw_arr[idx0 - 1]))
+            y1 = float(abs(yaw_arr[idx0]))
+            yt = float(abs(yaw_target_63))
+            frac = (yt - y0) / (y1 - y0) if abs(y1 - y0) > 1e-12 else 0.0
+            frac = max(0.0, min(1.0, frac))
+            t_63 = float(t_arr[idx0 - 1] + frac * (t_arr[idx0] - t_arr[idx0 - 1]))
+        else:
+            t_63 = float(t_arr[idx0])
         time_constant_ms = max(float((t_63 - steer_onset_t) * 1000.0), 10.0)
 
     peak_yaw = float(np.max(np.abs(yaw_arr)))
@@ -554,7 +586,9 @@ def compare_handling_setups(
     step_b = simulate_yaw_response_scenario(setup_b, scenario_type="step_steer", v_kph=speed_kph, steer_amplitude_deg=3.0)
 
     # 3. Calculate parameter deltas
-    delta_roll_dist = setup_b.roll_dist - setup_a.roll_dist
+    r_dist_a = effective_roll_dist(setup_a)
+    r_dist_b = effective_roll_dist(setup_b)
+    delta_roll_dist = r_dist_b - r_dist_a
     delta_k_arb_f = setup_b.K_arb_f - setup_a.K_arb_f
     delta_k_arb_r = setup_b.K_arb_r - setup_a.K_arb_r
     delta_hcg = setup_b.h_cg_s - setup_a.h_cg_s
@@ -578,8 +612,8 @@ def compare_handling_setups(
     if abs(delta_roll_dist) > 0.005:
         what_changed.append({
             "parameter": "Roll Stiffness Distribution (Front %)",
-            "setup_a": f"{setup_a.roll_dist * 100:.1f}%",
-            "setup_b": f"{setup_b.roll_dist * 100:.1f}%",
+            "setup_a": f"{r_dist_a * 100:.1f}%",
+            "setup_b": f"{r_dist_b * 100:.1f}%",
             "delta": f"{delta_roll_dist * 100:+.1f}%",
             "direction": "STIFFER_FRONT" if delta_roll_dist > 0 else "STIFFER_REAR"
         })
@@ -594,7 +628,7 @@ def compare_handling_setups(
     if abs(delta_k_arb_r) > 50.0:
         what_changed.append({
             "parameter": "Rear Anti-Roll Bar Stiffness",
-            "setup_a": f"{setup_b.K_arb_r:.0f} Nm/rad",
+            "setup_a": f"{setup_a.K_arb_r:.0f} Nm/rad",
             "setup_b": f"{setup_b.K_arb_r:.0f} Nm/rad",
             "delta": f"{delta_k_arb_r:+.0f} Nm/rad",
             "direction": "STIFFER" if delta_k_arb_r > 0 else "SOFTER"
@@ -639,7 +673,7 @@ def compare_handling_setups(
     # Step-by-step physical causality explanation
     if delta_roll_dist > 0.01 or delta_k_arb_f > 100.0:
         why_explanation = (
-            f"Stiffening the front roll stiffness ({setup_a.roll_dist*100:.1f}% -> {setup_b.roll_dist*100:.1f}%) "
+            f"Stiffening the front roll stiffness ({r_dist_a*100:.1f}% -> {r_dist_b*100:.1f}%) "
             f"increases the elastic lateral load transfer borne by the front axle by +{delta_roll_dist*100:+.1f}%. "
             f"Due to the non-linear degressive nature of tire friction (Pacejka MF 5.2 load sensitivity), the heavily "
             f"loaded outer front tire experiences a reduction in peak friction coefficient (mu_peak), while the unloaded "
@@ -649,7 +683,7 @@ def compare_handling_setups(
         )
     elif delta_roll_dist < -0.01 or delta_k_arb_r > 100.0:
         why_explanation = (
-            f"Softening the front roll stiffness ({setup_a.roll_dist*100:.1f}% -> {setup_b.roll_dist*100:.1f}%) "
+            f"Softening the front roll stiffness ({r_dist_a*100:.1f}% -> {r_dist_b*100:.1f}%) "
             f"shifts lateral load transfer toward the rear axle. This relieves the outer front tire, boosting front "
             f"effective cornering stiffness C_alpha_f and lowering the understeer gradient by {abs(delta_kus):.2f} deg/g. "
             f"However, the rear axle now carries a higher share of the roll overturning moment, causing rear tire "
@@ -728,11 +762,12 @@ def assess_handling_validity(
     else:
         checks.append({"label": "Vehicle Mass Envelope", "status": "pass", "detail": f"Mass {p.m:.0f} kg within normal automotive range."})
 
-    if p.roll_dist < 0.35 or p.roll_dist > 0.75:
+    r_dist = effective_roll_dist(p)
+    if r_dist < 0.35 or r_dist > 0.75:
         phys_pass = False
-        checks.append({"label": "Roll Stiffness Distribution", "status": "warn", "detail": f"Front roll stiffness {p.roll_dist*100:.1f}% exceeds typical 40-70% design envelope."})
+        checks.append({"label": "Roll Stiffness Distribution", "status": "warn", "detail": f"Front roll stiffness {r_dist*100:.1f}% exceeds typical 40-70% design envelope."})
     else:
-        checks.append({"label": "Roll Stiffness Distribution", "status": "pass", "detail": f"Front roll stiffness {p.roll_dist*100:.1f}% within balanced tuning envelope."})
+        checks.append({"label": "Roll Stiffness Distribution", "status": "pass", "detail": f"Front roll stiffness {r_dist*100:.1f}% within balanced tuning envelope."})
 
     if p.h_cg_s > 0.75:
         phys_pass = False

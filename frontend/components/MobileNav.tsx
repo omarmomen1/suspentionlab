@@ -10,65 +10,19 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
+import { Menu, Sparkles, X } from "lucide-react";
+import {
+  FULL_MOBILE_SECTIONS,
+  STUDIO_PRICING_CTA,
+  STUDIO_TOOLS,
+  isStudioModeEnabled,
+  matchesRoute,
+} from "../lib/navigation";
 
-const SECTIONS: Array<{ title: string; links: Array<{ href: string; label: string }> }> = [
-  {
-    title: "Hypothesis & Decisions",
-    links: [
-      { href: "/experiment", label: "⚗ 1-Click Experiment" },
-      { href: "/compare", label: "⇄ Deep Compare (A vs B)" },
-      { href: "/optimize", label: "✦ Pareto Optimizer" },
-      { href: "/correlation", label: "⚡ Correlation Cockpit" },
-      { href: "/timeline", label: "⏱ Timeline & Decisions" },
-      { href: "/cae", label: "⛭ CAE Interoperability Hub" },
-    ],
-  },
-  {
-    title: "Simulation",
-    links: [
-      { href: "/quarter-car", label: "Quarter Car" },
-      { href: "/half-car", label: "Half Car" },
-      { href: "/full-car", label: "Full Car" },
-      { href: "/active", label: "Active" },
-      { href: "/handling", label: "Handling" },
-    ],
-  },
-  {
-    title: "Analysis",
-    links: [
-      { href: "/kinematics", label: "Kinematics" },
-      { href: "/lap-sim", label: "Lap Sim" },
-      { href: "/setup-sensitivity", label: "Setup Sensitivity" },
-      { href: "/yaw-dynamics", label: "Yaw / MMM" },
-      { href: "/digital-twin", label: "Digital Twin" },
-      { href: "/sensitivity", label: "Sensitivity" },
-      { href: "/nvh", label: "NVH" },
-      { href: "/durability", label: "Durability" },
-    ],
-  },
-  {
-    title: "Workspace",
-    links: [
-      { href: "/ai-engineer", label: "✦ AI Engineer" },
-      { href: "/garage", label: "Garage" },
-      { href: "/pricing", label: "Pricing" },
-      { href: "/docs", label: "Docs" },
-    ],
-  },
-  {
-    title: "Account",
-    links: [
-      { href: "/auth/login", label: "Sign In" },
-      { href: "/auth/register", label: "Create Account" },
-      { href: "/settings", label: "Settings" },
-    ],
-  },
-];
-
-export default function MobileNav() {
-  const [open, setOpen] = useState(false);
+export default function MobileNav({ defaultOpen = false }: { defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   const pathname = usePathname();
+  const studioMode = isStudioModeEnabled();
   const triggerRef = React.useRef<HTMLButtonElement>(null);
   const drawerRef = React.useRef<HTMLDivElement>(null);
   const closeButtonRef = React.useRef<HTMLButtonElement>(null);
@@ -164,32 +118,112 @@ export default function MobileNav() {
               </button>
             </div>
 
-            <nav className="py-2" aria-label="Mobile navigation links">
-              {SECTIONS.map((section) => (
-                <div key={section.title} className="mb-2">
-                  <div className="px-4 pt-3 pb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-gray-400">
-                    {section.title}
+            <nav
+              className="py-2"
+              aria-label="Mobile navigation links"
+              data-studio-mode={studioMode ? "true" : undefined}
+            >
+              {studioMode ? (
+                <div className="space-y-1">
+                  <div className="px-4 pt-3 pb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-ansys-yellow">
+                    Engineering Studio Tools
                   </div>
-                  {section.links.map((link) => {
-                    const active = pathname === link.href;
+                  {STUDIO_TOOLS.map((tool) => {
+                    if (tool.routes.length === 1) {
+                      const route = tool.routes[0];
+                      const active = matchesRoute(pathname, route.href, route.aliases);
+                      return (
+                        <Link
+                          key={tool.id}
+                          href={route.href}
+                          prefetch={true}
+                          aria-current={active ? "page" : undefined}
+                          className={`block px-4 py-2.5 text-sm transition-colors ${
+                            active
+                              ? "text-ansys-yellow bg-ansys-yellow/5 border-l-2 border-ansys-yellow font-semibold"
+                              : "text-gray-300 hover:text-white hover:bg-white/5 border-l-2 border-transparent"
+                          }`}
+                        >
+                          <div>{tool.label}</div>
+                          <div className="text-[10px] text-gray-400 mt-0.5 leading-tight">
+                            {route.desc}
+                          </div>
+                        </Link>
+                      );
+                    }
+
                     return (
-                      <Link
-                        key={link.href}
-                        href={link.href}
-                        prefetch={true}
-                        aria-current={active ? "page" : undefined}
-                        className={`block px-4 py-2 text-sm transition-colors ${
-                          active
-                            ? "text-ansys-yellow bg-ansys-yellow/5 border-l-2 border-ansys-yellow font-semibold"
-                            : "text-gray-300 hover:text-white hover:bg-white/5 border-l-2 border-transparent"
-                        }`}
-                      >
-                        {link.label}
-                      </Link>
+                      <div key={tool.id} className="pt-2">
+                        <div className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400">
+                          {tool.label}
+                        </div>
+                        {tool.routes.map((route) => {
+                          const active = matchesRoute(pathname, route.href, route.aliases);
+                          return (
+                            <Link
+                              key={route.href}
+                              href={route.href}
+                              prefetch={true}
+                              aria-current={active ? "page" : undefined}
+                              className={`block pl-6 pr-4 py-2 text-sm transition-colors ${
+                                active
+                                  ? "text-ansys-yellow bg-ansys-yellow/5 border-l-2 border-ansys-yellow font-semibold"
+                                  : "text-gray-300 hover:text-white hover:bg-white/5 border-l-2 border-transparent"
+                              }`}
+                            >
+                              {route.label}
+                            </Link>
+                          );
+                        })}
+                      </div>
                     );
                   })}
+                  <div className="px-4 pt-4 pb-2 border-t border-white/10 mt-3">
+                    <Link
+                      href={STUDIO_PRICING_CTA.href}
+                      prefetch={true}
+                      aria-current={pathname === STUDIO_PRICING_CTA.href ? "page" : undefined}
+                      className={`flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                        pathname === STUDIO_PRICING_CTA.href
+                          ? "bg-ansys-yellow text-black ring-2 ring-ansys-yellow/50 shadow-[0_0_12px_rgba(242,169,0,0.35)]"
+                          : "bg-ansys-yellow text-black hover:brightness-110 shadow-[0_0_10px_rgba(242,169,0,0.2)]"
+                      }`}
+                    >
+                      <Sparkles size={13} className="shrink-0" />
+                      <span>{STUDIO_PRICING_CTA.mobileLabel}</span>
+                    </Link>
+                    <p className="text-[10px] text-gray-400 text-center mt-1.5">
+                      {STUDIO_PRICING_CTA.subtitle}
+                    </p>
+                  </div>
                 </div>
-              ))}
+              ) : (
+                FULL_MOBILE_SECTIONS.map((section) => (
+                  <div key={section.title} className="mb-2">
+                    <div className="px-4 pt-3 pb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-gray-400">
+                      {section.title}
+                    </div>
+                    {section.links.map((link) => {
+                      const active = matchesRoute(pathname, link.href, link.aliases);
+                      return (
+                        <Link
+                          key={link.href}
+                          href={link.href}
+                          prefetch={true}
+                          aria-current={active ? "page" : undefined}
+                          className={`block px-4 py-2 text-sm transition-colors ${
+                            active
+                              ? "text-ansys-yellow bg-ansys-yellow/5 border-l-2 border-ansys-yellow font-semibold"
+                              : "text-gray-300 hover:text-white hover:bg-white/5 border-l-2 border-transparent"
+                          }`}
+                        >
+                          {link.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ))
+              )}
             </nav>
           </div>
         </div>

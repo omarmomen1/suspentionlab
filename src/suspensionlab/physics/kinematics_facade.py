@@ -958,6 +958,8 @@ def solve_kinematics(
     **kwargs,
 ) -> KinematicsResult:
     """Canonical top-level entry point for kinematics sweeps with explicit metadata and validation."""
+    if "tire_radius" in kwargs and kwargs["tire_radius"] is not None:
+        tire_radius_m = float(kwargs["tire_radius"])
     is_prod = strict_mode or (os.environ.get("SUSPENSIONLAB_PRODUCTION_MODE", "0") == "1")
 
     # Disambiguate positional arguments: solve_kinematics(hardpoints, z_min, z_max, n_steps)

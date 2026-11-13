@@ -63,7 +63,7 @@ class TrialAuthResponse(BaseModel):
 
 
 class TrialSimulateRequest(BaseModel):
-    params: Optional[Dict[str, float]] = None
+    params: Optional[Dict[str, Any]] = None
     road_profile: Optional[Dict[str, Any]] = None
 
 
@@ -71,7 +71,7 @@ class TrialExperimentRequest(BaseModel):
     question: str = Field(..., min_length=5, description="Engineering hypothesis question")
     hypothesis: Optional[str] = None
     parameter_changes: Optional[Dict[str, Any]] = None
-    parent_setup: Optional[Dict[str, float]] = None
+    parent_setup: Optional[Dict[str, Any]] = None
 
 
 class TrialOptimizeRequest(BaseModel):

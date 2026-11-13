@@ -26,7 +26,7 @@ router = APIRouter(prefix="/telemetry", tags=["telemetry-correlation"])
 class InvestigateDivergenceRequest(BaseModel):
     current_session: str = Field(..., description="Active session ID, e.g. SESS-FP2-004")
     previous_session: Optional[str] = Field(None, description="Baseline comparison session ID, e.g. SESS-FP1-003")
-    parameter_deltas: Optional[Dict[str, float]] = Field(None, description="Known setup adjustments")
+    parameter_deltas: Optional[Dict[str, Any]] = Field(None, description="Known setup adjustments")
 
 
 @router.get("/correlation-cockpit")
@@ -109,7 +109,7 @@ from suspensionlab.physics.telemetry_analysis import compare_telemetry_sessions
 class CompareModelRequest(BaseModel):
     telemetry_data: Optional[Dict[str, Any]] = Field(None, description="Recorded telemetry channel dictionary")
     model_type: str = Field("quarter_car", description="quarter_car | half_car | full_car | handling | lap_sim | digital_twin")
-    model_params: Optional[Dict[str, float]] = Field(None, description="Optional setup parameter overrides")
+    model_params: Optional[Dict[str, Any]] = Field(None, description="Optional setup parameter overrides")
     event_window: Optional[Tuple[float, float]] = Field(None, description="Optional [t_start, t_end] window")
 
 

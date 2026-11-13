@@ -100,12 +100,12 @@ def test_jwt_key_rotation(monkeypatch):
         assert decode_access_token(old_token) is not None
         assert decode_access_token(new_token) is not None
         
-        # But if we decode old_token with a strictly different secret using PyJWT manually to check:
-        from jose import jwt
-        unverified = jwt.get_unverified_headers(old_token)
+        # But if we inspect old_token headers directly with PyJWT:
+        import jwt
+        unverified = jwt.get_unverified_header(old_token)
         assert unverified.get("kid") == "v1"
         
-        unverified_new = jwt.get_unverified_headers(new_token)
+        unverified_new = jwt.get_unverified_header(new_token)
         assert unverified_new.get("kid") == "v2"
         
     finally:
@@ -123,3 +123,101 @@ def test_jwt_invalid_token_type():
     
     # decode_access_token on a refresh token should fail
     assert decode_access_token(refresh_token) is None
+
+
+def test_jwt_malformed_and_nonstring_kid_fail_closed():
+    """Malformed tokens and non-string kid headers must fail closed and return None."""
+    import base64
+    import json
+
+    assert decode_access_token("") is None
+    assert decode_access_token("not.a.jwt") is None
+    assert decode_access_token(None) is None  # type: ignore[arg-type]
+
+    header_b64 = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT", "kid": ["v1"]}).encode()).decode().rstrip("=")
+    payload_b64 = base64.urlsafe_b64encode(json.dumps({"sub": "user-123", "type": "access", "exp": time.time() + 300}).encode()).decode().rstrip("=")
+    bad_kid_token = f"{header_b64}.{payload_b64}.fakesig"
+    assert decode_access_token(bad_kid_token) is None
+
+
+@pytest.mark.asyncio
+async def test_sso_state_and_id_token_validation_pyjwt(monkeypatch):
+    """Verify OIDC state tokens and RS256/HS256 ID token validation via PyJWT."""
+    from unittest.mock import AsyncMock
+    import jwt
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from fastapi import HTTPException
+    from jwt.utils import to_base64url_uint
+    from suspensionlab.backend.api.routes import sso_routes
+
+    state = sso_routes._issue_state("nonce-abc", "verifier-xyz")
+    parsed = sso_routes._read_state(state)
+    assert parsed["nonce"] == "nonce-abc"
+    assert parsed["verifier"] == "verifier-xyz"
+
+    keys = get_jwt_keys()
+    no_exp_state = jwt.encode(
+        {"nonce": "n", "verifier": "v", "type": "sso_state"},
+        keys[JWT_ACTIVE_KEY],
+        algorithm="HS256",
+    )
+    with pytest.raises(HTTPException) as exc_info:
+        sso_routes._read_state(no_exp_state)
+    assert exc_info.value.status_code == 400
+
+    monkeypatch.setattr(sso_routes.settings, "oidc_client_id", "test-client")
+    monkeypatch.setattr(sso_routes.settings, "oidc_issuer", "https://idp.example.com")
+    monkeypatch.setattr(sso_routes.settings, "oidc_client_secret", "s" * 64)
+
+    priv = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    pub = priv.public_key().public_numbers()
+    jwks = {
+        "keys": [
+            {
+                "kty": "RSA",
+                "kid": "idp-key-1",
+                "n": to_base64url_uint(pub.n).decode(),
+                "e": to_base64url_uint(pub.e).decode(),
+            }
+        ]
+    }
+    rs256_token = jwt.encode(
+        {
+            "sub": "user-rs",
+            "aud": "test-client",
+            "iss": "https://idp.example.com",
+            "nonce": "nonce-rs",
+            "exp": int(time.time()) + 120,
+        },
+        priv,
+        algorithm="RS256",
+        headers={"kid": "idp-key-1"},
+    )
+    monkeypatch.setattr(sso_routes, "_get_jwks", AsyncMock(return_value=jwks))
+
+    claims_rs = await sso_routes._validate_id_token(
+        rs256_token, {"jwks_uri": "https://idp.example.com/jwks"}, "nonce-rs"
+    )
+    assert claims_rs["sub"] == "user-rs"
+
+    with pytest.raises(HTTPException) as nonce_exc:
+        await sso_routes._validate_id_token(
+            rs256_token, {"jwks_uri": "https://idp.example.com/jwks"}, "wrong-nonce"
+        )
+    assert nonce_exc.value.status_code == 401
+
+    hs256_token = jwt.encode(
+        {
+            "sub": "user-hs",
+            "aud": "test-client",
+            "iss": "https://idp.example.com",
+            "nonce": "nonce-hs",
+            "exp": int(time.time()) + 120,
+        },
+        "s" * 64,
+        algorithm="HS256",
+    )
+    claims_hs = await sso_routes._validate_id_token(
+        hs256_token, {"jwks_uri": "https://idp.example.com/jwks"}, "nonce-hs"
+    )
+    assert claims_hs["sub"] == "user-hs"

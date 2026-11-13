@@ -37,9 +37,10 @@ import time
 from typing import Any, Optional
 
 import httpx
+import jwt
 from fastapi import APIRouter, HTTPException, Query, Request, Response
 from fastapi.responses import RedirectResponse
-from jose import JWTError, jwt
+from jwt.exceptions import PyJWTError
 
 from suspensionlab.backend.config import settings
 from suspensionlab.backend.security.jwt_utils import create_access_token, create_refresh_token
@@ -139,8 +140,13 @@ def _read_state(state_token: str) -> dict[str, Any]:
     from suspensionlab.backend.security.jwt_utils import get_jwt_keys, JWT_ACTIVE_KEY
     keys = get_jwt_keys()
     try:
-        payload = jwt.decode(state_token, keys[JWT_ACTIVE_KEY], algorithms=["HS256"], options={"require_exp": True})
-    except JWTError:
+        payload = jwt.decode(
+            state_token,
+            keys[JWT_ACTIVE_KEY],
+            algorithms=["HS256"],
+            options={"require": ["exp"]},
+        )
+    except PyJWTError:
         raise HTTPException(status_code=400, detail="Invalid or expired SSO state.")
     if payload.get("type") != "sso_state":
         raise HTTPException(status_code=400, detail="Invalid SSO state type.")
@@ -149,7 +155,10 @@ def _read_state(state_token: str) -> dict[str, Any]:
 
 async def _validate_id_token(id_token: str, discovery: dict[str, Any], expected_nonce: str) -> dict[str, Any]:
     """Validate signature + iss + aud + exp + nonce per OIDC Core §3.1.3.7."""
-    unverified_headers = jwt.get_unverified_headers(id_token)
+    try:
+        unverified_headers = jwt.get_unverified_header(id_token)
+    except PyJWTError as exc:
+        raise HTTPException(status_code=401, detail=f"ID token validation failed: {exc}")
     alg = unverified_headers.get("alg", "")
 
     if alg == "RS256":
@@ -158,17 +167,14 @@ async def _validate_id_token(id_token: str, discovery: dict[str, Any], expected_
         key = next((k for k in jwks.get("keys", []) if k.get("kid") == kid), None)
         if key is None:
             raise HTTPException(status_code=502, detail="ID token kid not found in IdP JWKS.")
-        key_data = key
-        kwargs: dict[str, Any] = {}
-        from jose import jwk as jose_jwk
-        signing_key = jose_jwk.construct(key_data)
         try:
+            signing_key = jwt.PyJWK.from_dict(key).key
             claims = jwt.decode(
                 id_token, signing_key, algorithms=["RS256"],
                 audience=settings.oidc_client_id,
                 issuer=settings.oidc_issuer.rstrip("/"),
             )
-        except JWTError as exc:
+        except PyJWTError as exc:
             raise HTTPException(status_code=401, detail=f"ID token validation failed: {exc}")
     elif alg == "HS256":
         try:
@@ -177,7 +183,7 @@ async def _validate_id_token(id_token: str, discovery: dict[str, Any], expected_
                 audience=settings.oidc_client_id,
                 issuer=settings.oidc_issuer.rstrip("/"),
             )
-        except JWTError as exc:
+        except PyJWTError as exc:
             raise HTTPException(status_code=401, detail=f"ID token validation failed: {exc}")
     else:
         raise HTTPException(status_code=502, detail=f"Unsupported ID token algorithm '{alg}'.")

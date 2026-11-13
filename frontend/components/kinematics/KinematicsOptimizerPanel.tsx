@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import PlanGate from "../PlanGate";
 import {
   KinematicsApi,
   KinematicsOptimizationResponse,
@@ -109,10 +110,13 @@ export default function KinematicsOptimizerPanel({
       });
 
       setResults(res);
-      if (res.best_compromise_candidate) {
+      const resFrontier = (res as any)?.pareto_frontier || (res as any)?.pareto_candidates || [];
+      if (res?.best_compromise_candidate) {
         setSelectedCandidate(res.best_compromise_candidate);
-      } else if (res.pareto_frontier.length > 0) {
-        setSelectedCandidate(res.pareto_frontier[0]);
+      } else if (resFrontier.length > 0) {
+        setSelectedCandidate(resFrontier[0]);
+      } else if (res?.all_candidates && res.all_candidates.length > 0) {
+        setSelectedCandidate(res.all_candidates[0]);
       }
     } catch (err: any) {
       setError(err?.message || "Optimization failed to complete.");
@@ -121,15 +125,36 @@ export default function KinematicsOptimizerPanel({
     }
   };
 
+  const frontier = useMemo<KinematicsParetoCandidate[]>(() => {
+    if (!results) return [];
+    return (results as any).pareto_frontier || (results as any).pareto_candidates || [];
+  }, [results]);
+
+  const allCandidates = useMemo<KinematicsParetoCandidate[]>(() => {
+    if (!results) return [];
+    return results.all_candidates || frontier;
+  }, [results, frontier]);
+
+  const getMetricValue = (cand: KinematicsParetoCandidate | null | undefined, metricKey: string): number => {
+    if (!cand) return 0;
+    const objVals = cand.objective_values || {};
+    const metrics = cand.metrics || {};
+    const val = objVals[metricKey] ?? metrics[metricKey];
+    return typeof val === "number" && Number.isFinite(val) ? val : 0;
+  };
+
   const handleApplyToExperiment = async () => {
     if (!selectedCandidate) return;
     setTransferring(true);
     try {
+      const pVal = getMetricValue(selectedCandidate, primaryObj);
+      const sVal = getMetricValue(selectedCandidate, secondaryObj);
+      const uDist = typeof selectedCandidate.utopia_distance === "number" ? selectedCandidate.utopia_distance : 0;
       const res = await KinematicsApi.applyToExperiment({
         baseline_hardpoints: hardpoints,
         candidate_hardpoints: selectedCandidate.hardpoints,
         question: `Kinematics Multi-Objective Pareto Study: ${primaryObj} vs ${secondaryObj}`,
-        hypothesis: `Pareto Candidate ${selectedCandidate.candidate_id} balances ${primaryObj} (${selectedCandidate.metrics[primaryObj]?.toFixed(3)}) with ${secondaryObj} (${selectedCandidate.metrics[secondaryObj]?.toFixed(3)}) with Utopia distance ${selectedCandidate.utopia_distance.toFixed(4)}.`,
+        hypothesis: `Pareto Candidate ${selectedCandidate.candidate_id} balances ${primaryObj} (${pVal.toFixed(3)}) with ${secondaryObj} (${sVal.toFixed(3)}) with Utopia distance ${uDist.toFixed(4)}.`,
         candidate_id: selectedCandidate.candidate_id,
         optimization_id: results?.optimization_id,
       });
@@ -143,11 +168,10 @@ export default function KinematicsOptimizerPanel({
 
   // SVG Scatter plot bounds
   const scatterPlotData = useMemo(() => {
-    if (!results || !results.all_candidates || results.all_candidates.length === 0) return null;
+    if (allCandidates.length === 0) return null;
 
-    const all = results.all_candidates;
-    const xVals = all.map((c) => c.objective_values[primaryObj] ?? c.metrics[primaryObj] ?? 0);
-    const yVals = all.map((c) => c.objective_values[secondaryObj] ?? c.metrics[secondaryObj] ?? 0);
+    const xVals = allCandidates.map((c) => getMetricValue(c, primaryObj));
+    const yVals = allCandidates.map((c) => getMetricValue(c, secondaryObj));
 
     const minX = Math.min(...xVals);
     const maxX = Math.max(...xVals);
@@ -175,7 +199,8 @@ export default function KinematicsOptimizerPanel({
   };
 
   return (
-    <div className="space-y-5">
+    <PlanGate required="PRO" feature="Multi-Objective Kinematics Optimizer">
+      <div className="space-y-5">
       {/* ── Configuration Card ── */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-xl p-5 space-y-4 shadow-xl">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-800 pb-3">
@@ -381,7 +406,7 @@ export default function KinematicsOptimizerPanel({
                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
                   Multi-Objective Pareto Frontier
                   <span className="text-xs font-mono font-normal text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-800">
-                    {results.pareto_count} Non-Dominated Candidates
+                    {results.pareto_count ?? frontier.length} Non-Dominated Candidates
                   </span>
                 </h4>
                 <p className="text-[11px] text-slate-400">
@@ -423,11 +448,11 @@ export default function KinematicsOptimizerPanel({
                 </text>
 
                 {/* Plot Dominated Candidates */}
-                {results.all_candidates
-                  .filter((c) => !results.pareto_frontier.some((p) => p.candidate_id === c.candidate_id))
+                {allCandidates
+                  .filter((c) => !frontier.some((p) => p.candidate_id === c.candidate_id))
                   .map((cand) => {
-                    const x = cand.objective_values[primaryObj] ?? cand.metrics[primaryObj] ?? 0;
-                    const y = cand.objective_values[secondaryObj] ?? cand.metrics[secondaryObj] ?? 0;
+                    const x = getMetricValue(cand, primaryObj);
+                    const y = getMetricValue(cand, secondaryObj);
                     const { cx, cy } = mapToPlotCoords(x, y);
                     const isSelected = selectedCandidate?.candidate_id === cand.candidate_id;
 
@@ -447,14 +472,14 @@ export default function KinematicsOptimizerPanel({
                   })}
 
                 {/* Connect Pareto Frontier with Line */}
-                {results.pareto_frontier.length > 1 && (
+                {frontier.length > 1 && (
                   <path
-                    d={results.pareto_frontier
+                    d={frontier
                       .slice()
-                      .sort((a, b) => (a.objective_values[primaryObj] || 0) - (b.objective_values[primaryObj] || 0))
+                      .sort((a, b) => getMetricValue(a, primaryObj) - getMetricValue(b, primaryObj))
                       .map((p, idx) => {
-                        const x = p.objective_values[primaryObj] ?? p.metrics[primaryObj] ?? 0;
-                        const y = p.objective_values[secondaryObj] ?? p.metrics[secondaryObj] ?? 0;
+                        const x = getMetricValue(p, primaryObj);
+                        const y = getMetricValue(p, secondaryObj);
                         const { cx, cy } = mapToPlotCoords(x, y);
                         return `${idx === 0 ? "M" : "L"} ${cx} ${cy}`;
                       })
@@ -468,12 +493,12 @@ export default function KinematicsOptimizerPanel({
                 )}
 
                 {/* Plot Pareto Frontier Candidates */}
-                {results.pareto_frontier.map((cand) => {
-                  const x = cand.objective_values[primaryObj] ?? cand.metrics[primaryObj] ?? 0;
-                  const y = cand.objective_values[secondaryObj] ?? cand.metrics[secondaryObj] ?? 0;
+                {frontier.map((cand) => {
+                  const x = getMetricValue(cand, primaryObj);
+                  const y = getMetricValue(cand, secondaryObj);
                   const { cx, cy } = mapToPlotCoords(x, y);
                   const isSelected = selectedCandidate?.candidate_id === cand.candidate_id;
-                  const isBest = cand.is_best_compromise;
+                  const isBest = Boolean(cand.is_best_compromise);
 
                   return (
                     <g
@@ -508,7 +533,7 @@ export default function KinematicsOptimizerPanel({
             {/* Frontier Candidate Selector Chips */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
               <span className="text-slate-500 font-mono text-[11px] whitespace-nowrap">Pareto Set:</span>
-              {results.pareto_frontier.map((p, idx) => (
+              {frontier.map((p, idx) => (
                 <button
                   key={p.candidate_id}
                   onClick={() => setSelectedCandidate(p)}
@@ -543,7 +568,7 @@ export default function KinematicsOptimizerPanel({
                       )}
                     </div>
                     <div className="text-[11px] text-slate-400 font-mono mt-0.5">
-                      Utopia Distance d* = {selectedCandidate.utopia_distance.toFixed(4)}
+                      Utopia Distance d* = {typeof selectedCandidate.utopia_distance === "number" ? selectedCandidate.utopia_distance.toFixed(4) : "N/A"}
                     </div>
                   </div>
 
@@ -665,6 +690,7 @@ export default function KinematicsOptimizerPanel({
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </PlanGate>
   );
 }

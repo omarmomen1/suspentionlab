@@ -158,6 +158,7 @@ from suspensionlab.backend.api.routes.session_routes import router as session_ro
 from suspensionlab.backend.api.routes.device_sessions_routes import router as device_session_router
 app.include_router(stripe_billing_router, prefix="/api/v1")
 app.include_router(gumroad_billing_router, prefix="/api/v1")
+app.include_router(gumroad_billing_router)
 app.include_router(session_router, prefix="/api/v1")
 app.include_router(device_session_router, prefix="/api/v1")
 

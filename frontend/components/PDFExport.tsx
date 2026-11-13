@@ -1,6 +1,7 @@
 "use client";
 import { useState, useCallback } from "react";
 import { FileDown, Loader2 } from "lucide-react";
+import PlanGate from "./PlanGate";
 
 interface ParamChange {
   parameter: string;
@@ -683,16 +684,18 @@ export default function PDFExport({
   ]);
 
   return (
-    <button
-      onClick={handleExport}
-      disabled={exporting}
-      className="flex items-center gap-1.5 px-3 py-1.5 bg-[#141416] border border-[#252525]
-        hover:bg-[#1e1e20] rounded-lg text-xs font-medium transition-colors text-white disabled:opacity-40 shadow-sm"
-    >
-      {exporting
-        ? <><Loader2 size={13} className="animate-spin text-ansys-yellow" /> Generating 3-Page Vector PDF…</>
-        : <><FileDown size={13} className="text-ansys-yellow" /> Export 3-Page Vector PDF</>}
-    </button>
+    <PlanGate required="PRO" compact feature="Export PDF">
+      <button
+        onClick={handleExport}
+        disabled={exporting}
+        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#141416] border border-[#252525]
+          hover:bg-[#1e1e20] rounded-lg text-xs font-medium transition-colors text-white disabled:opacity-40 shadow-sm"
+      >
+        {exporting
+          ? <><Loader2 size={13} className="animate-spin text-ansys-yellow" /> Generating 3-Page Vector PDF…</>
+          : <><FileDown size={13} className="text-ansys-yellow" /> Export 3-Page Vector PDF</>}
+      </button>
+    </PlanGate>
   );
 }
 

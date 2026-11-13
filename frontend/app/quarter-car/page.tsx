@@ -20,6 +20,7 @@ import {
 import SimHistory, { saveSimulationToHistory } from "../../components/SimHistory";
 import PlanGate from "../../components/PlanGate";
 import DamperLUTInput from "../../components/DamperLUTInput";
+import RoadProfileUpload from "../../components/RoadProfileUpload";
 import { useAuth } from "../../contexts/AuthContext";
 import SuspensionRig3D from "../../components/SuspensionRig3D";
 import Rig3DPlayer from "../../components/Rig3DPlayer";
@@ -109,6 +110,14 @@ function QuarterCarDashboard() {
   const [activeTab, setActiveTab] = useState<number>(0);
   const [toast,     setToast]     = useState<Toast | null>(null);
   const [autoRun, setAutoRun] = useState(false);
+  const [customRoad, setCustomRoad] = useState<{
+    time: number[];
+    displacement: number[];
+    duration: number;
+    sampleRate: number;
+    pointCount: number;
+    fileName: string;
+  } | null>(null);
 
   const showToast = (msg: string, type: Toast["type"]) => {
     setToast({ msg, type });
@@ -358,10 +367,10 @@ function QuarterCarDashboard() {
             {autoRun ? "Live Update: ON" : "Live Update"}
           </button>
 
-          <PlanGate required="PRO">
+          <PlanGate required="PRO" compact feature="AI Auto-Tune">
             <button onClick={() => setIsMagicModalOpen(true)} disabled={isTuning}
-              className="px-4 py-1.5 bg-[#5e17eb] hover:bg-[#7c3aed] text-white rounded-lg text-xs font-bold
-                flex items-center gap-1.5 transition-colors shadow-[0_0_16px_rgba(94,23,235,0.3)]
+              className="px-4 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-bold
+                flex items-center gap-1.5 transition-colors border border-cyan-400/30
                 disabled:opacity-50 disabled:cursor-not-allowed">
               <Sparkles size={13} /> AI Auto-Tune
             </button>
@@ -478,33 +487,106 @@ function QuarterCarDashboard() {
                   <ParameterInput label="Speed" val={params.speed_mps} unit="m/s" step={5} min={1} onChange={(v) => setParams({ ...params, speed_mps: v })} />
                 </>
               )}
+              <div className="pt-2 border-t border-[#1e1e1e]">
+                <span className="text-[10px] text-gray-400 block mb-1.5">Custom Road CSV</span>
+                <RoadProfileUpload
+                  loaded={customRoad}
+                  onLoad={(prof) => {
+                    setCustomRoad(prof);
+                    const maxAmp = prof.displacement.reduce((acc, v) => Math.max(acc, Math.abs(v)), 0);
+                    setParams((prev) => ({
+                      ...prev,
+                      road_profile: "random",
+                      amplitude: Math.max(0.001, Number((maxAmp > 0 ? maxAmp : prev.amplitude).toFixed(4))),
+                      duration: Math.min(60, Math.max(0.5, Number(prof.duration.toFixed(2)))),
+                    }));
+                    showToast(`Loaded road CSV: ${prof.fileName} (${prof.pointCount} pts)`, "success");
+                  }}
+                  onClear={() => setCustomRoad(null)}
+                />
+              </div>
             </ParamSection>
 
             {/* Derived params display */}
             <ParamSection title="Derived">
-              <div className="space-y-1.5 font-mono text-[10px]">
-                <div className="flex justify-between text-gray-600">
-                  <span>Wheel Rate k_w</span>
-                  <span className="text-gray-400">{(params.k_s * params.MR * params.MR).toFixed(0)} N/m</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Mass Ratio μ</span>
-                  <span className="text-gray-400">{(params.m_u / params.m_s).toFixed(3)}</span>
-                </div>
-                <div className="flex justify-between text-gray-600">
-                  <span>Static Defl.</span>
-                  <span className="text-gray-400">{((params.m_s * 9.81) / (params.k_s * params.MR * params.MR) * 1000).toFixed(1)} mm</span>
-                </div>
-                <div className="pt-1 border-t border-[#1e1e1e] text-[9px] text-gray-700 leading-tight">
-                  k_w = k_s × MR²&nbsp;&nbsp;|&nbsp;&nbsp;MR = spring travel / wheel travel
-                </div>
-              </div>
+              {(() => {
+                const kw = params.k_s * params.MR * params.MR;
+                const cw = params.c * params.MR * params.MR;
+                const fs = (1 / (2 * Math.PI)) * Math.sqrt(kw / Math.max(params.m_s, 1e-6));
+                const fu = (1 / (2 * Math.PI)) * Math.sqrt((kw + params.k_t) / Math.max(params.m_u, 1e-6));
+                const zeta = cw / Math.max(1e-9, 2 * Math.sqrt(kw * Math.max(params.m_s, 1e-6)));
+                return (
+                  <div className="space-y-1.5 font-mono text-[10px]">
+                    <div className="flex justify-between text-gray-500">
+                      <span>Sprung Freq f_s</span>
+                      <span className="text-ansys-yellow font-bold">{fs.toFixed(2)} Hz</span>
+                    </div>
+                    <div className="flex justify-between text-gray-500">
+                      <span>Unsprung Freq f_u</span>
+                      <span className="text-cyan-400 font-bold">{fu.toFixed(2)} Hz</span>
+                    </div>
+                    <div className="flex justify-between text-gray-500">
+                      <span>Damping Ratio ζ</span>
+                      <span className="text-emerald-400 font-bold">{zeta.toFixed(3)}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Wheel Rate k_w</span>
+                      <span className="text-gray-400">{kw.toFixed(0)} N/m</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Mass Ratio μ</span>
+                      <span className="text-gray-400">{(params.m_u / params.m_s).toFixed(3)}</span>
+                    </div>
+                    <div className="flex justify-between text-gray-600">
+                      <span>Static Defl.</span>
+                      <span className="text-gray-400">{((params.m_s * 9.81) / kw * 1000).toFixed(1)} mm</span>
+                    </div>
+                    <div className="pt-1 border-t border-[#1e1e1e] text-[9px] text-gray-700 leading-tight">
+                      k_w = k_s × MR²&nbsp;&nbsp;|&nbsp;&nbsp;MR = spring travel / wheel travel
+                    </div>
+                  </div>
+                );
+              })()}
             </ParamSection>
           </div>
         </div>
 
         {/* Main Content */}
         <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-hidden">
+
+          {/* Instant Analytical Modal Strip */}
+          {(() => {
+            const kw = params.k_s * params.MR * params.MR;
+            const cw = params.c * params.MR * params.MR;
+            const fs = (1 / (2 * Math.PI)) * Math.sqrt(kw / Math.max(params.m_s, 1e-6));
+            const fu = (1 / (2 * Math.PI)) * Math.sqrt((kw + params.k_t) / Math.max(params.m_u, 1e-6));
+            const zeta = cw / Math.max(1e-9, 2 * Math.sqrt(kw * Math.max(params.m_s, 1e-6)));
+            return (
+              <div className="bg-[#111113] border border-[#1e1e1e] rounded-xl px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 font-mono text-xs">
+                <span className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">
+                  Analytical Modal Preview
+                </span>
+                <div className="flex flex-wrap items-center gap-5">
+                  <div>
+                    <span className="text-gray-500 mr-1.5">Sprung f_s:</span>
+                    <span className="text-ansys-yellow font-bold">{fs.toFixed(2)} Hz</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 mr-1.5">Unsprung f_u:</span>
+                    <span className="text-cyan-400 font-bold">{fu.toFixed(2)} Hz</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 mr-1.5">Damping ζ:</span>
+                    <span className="text-emerald-400 font-bold">{zeta.toFixed(3)}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500 mr-1.5">Wheel Rate k_w:</span>
+                    <span className="text-gray-200">{kw.toFixed(0)} N/m</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Empty state */}
           {!results && !isRunning && (
@@ -635,8 +717,8 @@ function QuarterCarDashboard() {
                         data={bDisp(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Displacement", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Displacement (mm)", font: { color: "#444", size: 10 } } },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#94A3B8", size: 10 } } },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Displacement (mm)", font: { color: "#94A3B8", size: 10 } } },
                           shapes: [...cursorShape],
                         })}
                         onHover={onTimePlotHover}
@@ -659,8 +741,8 @@ function QuarterCarDashboard() {
                         data={bVel(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Velocity", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Velocity (mm/s)", font: { color: "#444", size: 10 } } },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#94A3B8", size: 10 } } },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Velocity (mm/s)", font: { color: "#94A3B8", size: 10 } } },
                           shapes: [...cursorShape],
                         })}
                         onHover={onTimePlotHover}
@@ -683,8 +765,8 @@ function QuarterCarDashboard() {
                         data={bAccel(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Sprung Acceleration", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Acceleration (m/s²)", font: { color: "#444", size: 10 } } },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#94A3B8", size: 10 } } },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Acceleration (m/s²)", font: { color: "#94A3B8", size: 10 } } },
                           shapes: [
                             { type: "line", x0: 0, x1: 1, xref: "paper", y0:  0.315, y1:  0.315, line: { color: "rgba(52,211,153,0.3)", dash: "dot", width: 1 } },
                             { type: "line", x0: 0, x1: 1, xref: "paper", y0: -0.315, y1: -0.315, line: { color: "rgba(52,211,153,0.3)", dash: "dot", width: 1 } },
@@ -713,8 +795,8 @@ function QuarterCarDashboard() {
                         data={bTravel(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Suspension & Tire Deflection", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Deflection (mm)", font: { color: "#444", size: 10 } } },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#94A3B8", size: 10 } } },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Deflection (mm)", font: { color: "#94A3B8", size: 10 } } },
                           shapes: [
                             { type: "line", x0: 0, x1: 1, xref: "paper", y0:  60, y1:  60, line: { color: "rgba(245,158,11,0.4)", dash: "dash", width: 1 } },
                             { type: "line", x0: 0, x1: 1, xref: "paper", y0: -40, y1: -40, line: { color: "rgba(245,158,11,0.4)", dash: "dash", width: 1 } },
@@ -742,8 +824,8 @@ function QuarterCarDashboard() {
                         data={bTrans(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Transmissibility |H(jω)|", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#444", size: 10 } }, type: "log" },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Transmissibility (–)", font: { color: "#444", size: 10 } } },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#94A3B8", size: 10 } }, type: "log" },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Transmissibility (–)", font: { color: "#94A3B8", size: 10 } } },
                           shapes: [{ type: "line", x0: r.freq_at_peak_tx, x1: r.freq_at_peak_tx, y0: 0, y1: 1, yref: "paper",
                             line: { color: "rgba(242,169,0,0.2)", dash: "dot", width: 1 } }],
                           annotations: [{ x: Math.log10(r.freq_at_peak_tx), xref: "x", y: 0.98, yref: "paper",
@@ -760,8 +842,8 @@ function QuarterCarDashboard() {
                         data={bBodeMag(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Bode — Magnitude", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#444", size: 10 } }, type: "log" },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Magnitude (dB)", font: { color: "#444", size: 10 } } },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#94A3B8", size: 10 } }, type: "log" },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Magnitude (dB)", font: { color: "#94A3B8", size: 10 } } },
                           shapes: [
                             { type: "line", x0: 0, x1: 1, xref: "paper", y0: 0, y1: 0, line: { color: "#333", dash: "dot", width: 1 } },
                           ],
@@ -777,11 +859,11 @@ function QuarterCarDashboard() {
                         data={bBodePhase(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Bode — Phase", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#444", size: 10 } }, type: "log" },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#94A3B8", size: 10 } }, type: "log" },
                           // MIN-03: Auto-range phase axis based on actual data — clamp to [-200, 10] only as sensible default
                           ...(r.bode_phase_deg && r.bode_phase_deg.length > 0
                             ? { yaxis: { ...DARK_BASE.yaxis,
-                                title: { text: "Phase (°)", font: { color: "#444", size: 10 } },
+                                title: { text: "Phase (°)", font: { color: "#94A3B8", size: 10 } },
                                 range: [
                                   Math.min(-10, Math.floor(minOf(r.bode_phase_deg) / 10) * 10 - 10),
                                   Math.max(10, Math.ceil(maxOf(r.bode_phase_deg) / 10) * 10 + 10),
@@ -792,8 +874,8 @@ function QuarterCarDashboard() {
                             { type: "line", x0: 0, x1: 1, xref: "paper", y0: -180, y1: -180, line: { color: "#333", dash: "dot", width: 1 } },
                           ],
                           annotations: [
-                            { x: 0.02, xref: "paper", y: -90, yref: "y", text: "−90°", showarrow: false, font: { color: "#555", size: 9 }, xanchor: "left" },
-                            { x: 0.02, xref: "paper", y: -180, yref: "y", text: "−180°", showarrow: false, font: { color: "#555", size: 9 }, xanchor: "left" },
+                            { x: 0.02, xref: "paper", y: -90, yref: "y", text: "−90°", showarrow: false, font: { color: "#94A3B8", size: 9 }, xanchor: "left" },
+                            { x: 0.02, xref: "paper", y: -180, yref: "y", text: "−180°", showarrow: false, font: { color: "#94A3B8", size: 9 }, xanchor: "left" },
                           ],
                         })}
                         useResizeHandler style={{ width: "100%", height: "100%" }}
@@ -807,8 +889,8 @@ function QuarterCarDashboard() {
                         data={bDynLoad(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Dynamic Tire Load Variation", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "ΔF_z (N)", font: { color: "#444", size: 10 } } },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#94A3B8", size: 10 } } },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "ΔF_z (N)", font: { color: "#94A3B8", size: 10 } } },
                           shapes: [
                             { type: "line", x0: 0, x1: 1, xref: "paper", y0: 0, y1: 0, line: { color: "#2a2a2a", width: 1 } },
                           ],
@@ -829,8 +911,8 @@ function QuarterCarDashboard() {
                         data={bForces(r, params, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Suspension Forces", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Force (N)", font: { color: "#444", size: 10 } } },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#94A3B8", size: 10 } } },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Force (N)", font: { color: "#94A3B8", size: 10 } } },
                         })}
                         useResizeHandler style={{ width: "100%", height: "100%" }}
                         config={{ responsive: true, displayModeBar: true }}
@@ -843,8 +925,8 @@ function QuarterCarDashboard() {
                         data={bFV(r, params, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Damper Force–Velocity Diagram", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Relative Velocity (mm/s)", font: { color: "#444", size: 10 } } },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Damper Force (N)", font: { color: "#444", size: 10 } } },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Relative Velocity (mm/s)", font: { color: "#94A3B8", size: 10 } } },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Damper Force (N)", font: { color: "#94A3B8", size: 10 } } },
                           shapes: [
                             { type: "line", x0: 0, x1: 0, y0: 0, y1: 1, yref: "paper", line: { color: "#2a2a2a", width: 1 } },
                             { type: "line", x0: 0, x1: 1, xref: "paper", y0: 0, y1: 0, line: { color: "#2a2a2a", width: 1 } },
@@ -866,8 +948,8 @@ function QuarterCarDashboard() {
                         data={bFx(r, params, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Spring Force–Displacement (Hysteresis)", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Suspension Travel (mm)", font: { color: "#444", size: 10 } } },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Spring Force (N)", font: { color: "#444", size: 10 } } },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Suspension Travel (mm)", font: { color: "#94A3B8", size: 10 } } },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Spring Force (N)", font: { color: "#94A3B8", size: 10 } } },
                         })}
                         useResizeHandler style={{ width: "100%", height: "100%" }}
                         config={{ responsive: true, displayModeBar: true }}
@@ -880,8 +962,8 @@ function QuarterCarDashboard() {
                         data={bPower(r, params, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Damper Power Dissipation", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Power (W)", font: { color: "#444", size: 10 } } },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#94A3B8", size: 10 } } },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Power (W)", font: { color: "#94A3B8", size: 10 } } },
                         })}
                         useResizeHandler style={{ width: "100%", height: "100%" }}
                         config={{ responsive: true, displayModeBar: true }}
@@ -899,8 +981,8 @@ function QuarterCarDashboard() {
                         data={bPhaseS(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Phase Portrait — Sprung Mass", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "z_s (mm)", font: { color: "#444", size: 10 } } },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "ż_s (mm/s)", font: { color: "#444", size: 10 } } },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "z_s (mm)", font: { color: "#94A3B8", size: 10 } } },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "ż_s (mm/s)", font: { color: "#94A3B8", size: 10 } } },
                         })}
                         useResizeHandler style={{ width: "100%", height: "100%" }}
                         config={{ responsive: true, displayModeBar: true }}
@@ -913,8 +995,8 @@ function QuarterCarDashboard() {
                         data={bPhaseU(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Phase Portrait — Unsprung Mass", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "z_u (mm)", font: { color: "#444", size: 10 } } },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "ż_u (mm/s)", font: { color: "#444", size: 10 } } },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "z_u (mm)", font: { color: "#94A3B8", size: 10 } } },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "ż_u (mm/s)", font: { color: "#94A3B8", size: 10 } } },
                         })}
                         useResizeHandler style={{ width: "100%", height: "100%" }}
                         config={{ responsive: true, displayModeBar: true }}
@@ -952,8 +1034,8 @@ function QuarterCarDashboard() {
                         data={bComfortTravel(r, traces, deltaMode)}
                         layout={darkLayout({
                           title: { text: "Comfort–Travel Trade-off Space", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Susp. Travel (mm)", font: { color: "#444", size: 10 } } },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Body Accel (m/s²)", font: { color: "#444", size: 10 } } },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Susp. Travel (mm)", font: { color: "#94A3B8", size: 10 } } },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Body Accel (m/s²)", font: { color: "#94A3B8", size: 10 } } },
                         })}
                         useResizeHandler style={{ width: "100%", height: "100%" }}
                         config={{ responsive: true, displayModeBar: true }}
@@ -971,8 +1053,8 @@ function QuarterCarDashboard() {
                         data={bPSD(psdData, traces, deltaMode, r)}
                         layout={darkLayout({
                           title: { text: "PSD — Body Acceleration", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#444", size: 10 } }, type: "log", range: [Math.log10(0.1), Math.log10(50)] },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "PSD ((m/s²)²/Hz)", font: { color: "#444", size: 10 } }, type: "log" },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#94A3B8", size: 10 } }, type: "log", range: [Math.log10(0.1), Math.log10(50)] },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "PSD ((m/s²)²/Hz)", font: { color: "#94A3B8", size: 10 } }, type: "log" },
                           shapes: [
                             { type: "rect", x0: 1, x1: 1.5, y0: 0, y1: 1, yref: "paper", xref: "x",
                               fillcolor: "rgba(242,169,0,0.04)", line: { width: 0 } },
@@ -996,8 +1078,8 @@ function QuarterCarDashboard() {
                         ]}
                         layout={darkLayout({
                           title: { text: "Transmissibility with ISO Bands", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#444", size: 10 } }, type: "log" },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "|H(jω)| (–)", font: { color: "#444", size: 10 } } },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#94A3B8", size: 10 } }, type: "log" },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "|H(jω)| (–)", font: { color: "#94A3B8", size: 10 } } },
                           shapes: [
                             { type: "rect", x0: 1, x1: 2, y0: 0, y1: 1, yref: "paper", xref: "x", fillcolor: "rgba(52,211,153,0.04)", line: { width: 0 } },
                             { type: "rect", x0: 8, x1: 15, y0: 0, y1: 1, yref: "paper", xref: "x", fillcolor: "rgba(0,174,255,0.04)", line: { width: 0 } },
@@ -1074,8 +1156,8 @@ function QuarterCarDashboard() {
                         }]}
                         layout={darkLayout({
                           title: { text: "Cumulative RMS Acceleration", font: { color: "#888", size: 11 } },
-                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } },
-                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Cum. RMS (m/s²)", font: { color: "#444", size: 10 } } },
+                          xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#94A3B8", size: 10 } } },
+                          yaxis: { ...DARK_BASE.yaxis, title: { text: "Cum. RMS (m/s²)", font: { color: "#94A3B8", size: 10 } } },
                           shapes: [
                             { type: "line", x0: 0, x1: 1, xref: "paper", y0: 0.315, y1: 0.315, line: { color: "rgba(52,211,153,0.3)", dash: "dot", width: 1 } },
                           ],

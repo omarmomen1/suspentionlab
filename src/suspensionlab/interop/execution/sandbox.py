@@ -92,6 +92,56 @@ class ExecutionSandbox:
         target.write_bytes(content)
         return target
 
+    def _verify_fmu_command_args(self, command_args: List[str]) -> None:
+        """
+        Unconditionally verifies the live SHA-256 hash of any .fmu file (or fmpy simulate target)
+        against VETTED_FMU_SHA256 immediately before spawning a subprocess.
+        """
+        from suspensionlab.backend.services.solver_execution_service import VETTED_FMU_SHA256
+
+        exe_stem = pathlib.Path(command_args[0]).stem.lower()
+        is_fmpy_simulate = False
+        simulate_target_idx: Optional[int] = None
+        if exe_stem == "fmpy" and len(command_args) > 1 and command_args[1] == "simulate":
+            is_fmpy_simulate = True
+            simulate_target_idx = 2
+        elif (
+            len(command_args) >= 4
+            and command_args[1] == "-m"
+            and command_args[2] == "fmpy"
+            and command_args[3] == "simulate"
+        ):
+            is_fmpy_simulate = True
+            simulate_target_idx = 4
+
+        fmu_targets: List[pathlib.Path] = []
+        for idx, arg in enumerate(command_args):
+            if str(arg).lower().endswith(".fmu") or (is_fmpy_simulate and idx == simulate_target_idx):
+                p = pathlib.Path(arg)
+                if not p.is_absolute():
+                    p = self.sandbox_dir / p
+                if p not in fmu_targets:
+                    fmu_targets.append(p)
+
+        if is_fmpy_simulate and not fmu_targets:
+            raise PermissionError("UNTRUSTED_FMU_EXECUTION_REJECTED: No FMU target provided to fmpy simulate.")
+
+        for fmu_path in fmu_targets:
+            if not fmu_path.exists() or not fmu_path.is_file():
+                raise PermissionError(
+                    f"UNTRUSTED_FMU_EXECUTION_REJECTED: FMU file '{fmu_path}' does not exist."
+                )
+            hasher = hashlib.sha256()
+            with open(fmu_path, "rb") as f:
+                for chunk in iter(lambda: f.read(65536), b""):
+                    hasher.update(chunk)
+            disk_sha = hasher.hexdigest()
+            if disk_sha not in VETTED_FMU_SHA256:
+                raise PermissionError(
+                    f"UNTRUSTED_FMU_EXECUTION_REJECTED: FMU '{fmu_path.name}' "
+                    f"(SHA256: {disk_sha[:16]}...) is not in VETTED_FMU_SHA256."
+                )
+
     async def execute_command(
         self,
         command_args: List[str],
@@ -107,6 +157,9 @@ class ExecutionSandbox:
         # Ensure sandbox is created
         if not self.sandbox_dir.exists():
             self.initialize()
+
+        # Unconditionally verify any .fmu target immediately before spawning subprocess
+        self._verify_fmu_command_args(command_args)
 
         env = os.environ.copy()
         if env_vars:

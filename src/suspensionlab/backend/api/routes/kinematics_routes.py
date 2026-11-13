@@ -231,7 +231,13 @@ class KinematicsApplyToExperimentRequest(BaseModel):
 
 
 class KinematicsExportRequest(BaseModel):
-    sweep_data: dict = Field(..., description="Sweep result dictionary containing curves and metadata")
+    sweep_data: Optional[dict] = Field(default=None, description="Sweep result dictionary containing curves and metadata")
+    hardpoints: Optional[dict] = Field(default=None, description="Hardpoints dictionary in mm for on-the-fly sweep export")
+    setup_name: Optional[str] = Field(default="Baseline", description="Optional setup identifier/name")
+    z_min_mm: float = Field(default=-50.0, description="Rebound wheel travel bound [mm]")
+    z_max_mm: float = Field(default=50.0, description="Bump wheel travel bound [mm]")
+    n_steps: int = Field(default=21, ge=5, le=201, description="Number of sweep points")
+    tire_radius_m: float = Field(default=0.33, gt=0.1, le=1.0, description="Dynamic rolling tire radius [m]")
     format: str = Field(default="csv", description="Export format: 'csv' or 'json'")
 
 
@@ -276,7 +282,7 @@ class KinematicPointResponse(BaseModel):
     ic_z_mm:               float = 0.0
     ic_sv_x_mm:            float = 0.0
     ic_sv_z_mm:            float = 0.0
-    geometry:              dict[str, list[float]] = Field(default_factory=dict)
+    geometry:              dict[str, Any] = Field(default_factory=dict)
     metadata:              dict = Field(default_factory=dict)
 
 
@@ -296,18 +302,18 @@ BENCHMARK_PRESETS = {
         "tire_radius_m": 0.254,
         "half_track_mm": 600.0,
         "hardpoints": {
-            "UWI_fwd": [-50.0, 100.0, 240.0],
-            "UWI_aft": [ 50.0, 100.0, 240.0],
-            "UWO":     [  0.0, 520.0, 230.0],
-            "LWI_fwd": [-80.0, 100.0, 110.0],
-            "LWI_aft": [ 80.0, 100.0, 110.0],
-            "LWO":     [  0.0, 560.0, 100.0],
-            "TRI":     [  0.0, 120.0, 160.0],
-            "TRO":     [-15.0, 550.0, 150.0],
-            "WC":      [  0.0, 600.0, 230.0],
+            "UWI_fwd": [-50.0, 100.0, 295.0],
+            "UWI_aft": [ 50.0, 100.0, 295.0],
+            "UWO":     [ -7.5, 495.0, 340.0],
+            "LWI_fwd": [-80.0, 100.0, 172.0],
+            "LWI_aft": [ 80.0, 100.0, 172.0],
+            "LWO":     [  7.5, 535.0, 185.0],
+            "TRI":     [-15.0, 100.0, 215.1],
+            "TRO":     [-20.0, 511.0, 239.2],
+            "WC":      [  0.0, 600.0, 254.0],
             "CP":      [  0.0, 600.0,   0.0],
-            "PRI":     [-20.0, 220.0, 320.0],
-            "PRO":     [-15.0, 530.0, 170.0],
+            "PRI":     [-20.0, 280.0, 445.0],
+            "PRO":     [-15.0, 515.0, 200.0],
         },
     },
     "gt3_touring": {
@@ -319,18 +325,18 @@ BENCHMARK_PRESETS = {
         "tire_radius_m": 0.330,
         "half_track_mm": 760.0,
         "hardpoints": {
-            "UWI_fwd": [-50.0,  80.0, 300.0],
-            "UWI_aft": [ 50.0,  80.0, 300.0],
-            "UWO":     [  0.0, 650.0, 295.0],
-            "LWI_fwd": [-80.0,  80.0, 155.0],
-            "LWI_aft": [ 80.0,  80.0, 155.0],
-            "LWO":     [  0.0, 720.0, 145.0],
-            "TRI":     [  0.0, 150.0, 220.0],
-            "TRO":     [-15.0, 710.0, 205.0],
-            "WC":      [  0.0, 760.0, 220.0],
+            "UWI_fwd": [-50.0,  80.0, 365.0],
+            "UWI_aft": [ 50.0,  80.0, 365.0],
+            "UWO":     [ -9.0, 625.0, 435.0],
+            "LWI_fwd": [-80.0,  80.0, 215.0],
+            "LWI_aft": [ 80.0,  80.0, 215.0],
+            "LWO":     [  9.0, 675.0, 245.0],
+            "TRI":     [-15.0,  80.0, 267.5],
+            "TRO":     [-20.0, 647.5, 311.5],
+            "WC":      [  0.0, 760.0, 330.0],
             "CP":      [  0.0, 760.0,   0.0],
-            "PRI":     [-20.0, 300.0, 390.0],
-            "PRO":     [-15.0, 690.0, 250.0],
+            "PRI":     [-20.0, 380.0, 560.0],
+            "PRO":     [-15.0, 650.0, 275.0],
         },
     },
     "lmp_prototype": {
@@ -342,18 +348,18 @@ BENCHMARK_PRESETS = {
         "tire_radius_m": 0.340,
         "half_track_mm": 820.0,
         "hardpoints": {
-            "UWI_fwd": [-60.0,  90.0, 270.0],
-            "UWI_aft": [ 60.0,  90.0, 270.0],
-            "UWO":     [  0.0, 720.0, 260.0],
-            "LWI_fwd": [-90.0,  90.0, 120.0],
-            "LWI_aft": [ 90.0,  90.0, 120.0],
-            "LWO":     [  0.0, 780.0, 110.0],
-            "TRI":     [  0.0, 140.0, 190.0],
-            "TRO":     [-15.0, 770.0, 175.0],
-            "WC":      [  0.0, 820.0, 220.0],
+            "UWI_fwd": [-60.0,  90.0, 370.0],
+            "UWI_aft": [ 60.0,  90.0, 370.0],
+            "UWO":     [ -9.0, 685.0, 435.0],
+            "LWI_fwd": [-90.0,  90.0, 215.0],
+            "LWI_aft": [ 90.0,  90.0, 215.0],
+            "LWO":     [  9.0, 735.0, 240.0],
+            "TRI":     [-15.0,  90.0, 269.2],
+            "TRO":     [-20.0, 707.5, 308.2],
+            "WC":      [  0.0, 820.0, 340.0],
             "CP":      [  0.0, 820.0,   0.0],
-            "PRI":     [-25.0, 280.0, 370.0],
-            "PRO":     [-15.0, 740.0, 210.0],
+            "PRI":     [-25.0, 410.0, 550.0],
+            "PRO":     [-15.0, 710.0, 265.0],
         },
     },
 }
@@ -623,14 +629,54 @@ async def compare_setups_endpoint(
     )
 
 
+def _resolve_sweep_data_for_export(req: KinematicsExportRequest) -> dict:
+    """Return existing sweep_data or compute a sweep on the fly when hardpoints are supplied."""
+    from suspensionlab.backend.services.kinematics_study_service import KinematicsStudyService
+    if req.sweep_data:
+        return req.sweep_data
+    if req.hardpoints:
+        return KinematicsStudyService.run_sweep(
+            hardpoints=req.hardpoints,
+            z_min_mm=req.z_min_mm,
+            z_max_mm=req.z_max_mm,
+            n_steps=req.n_steps,
+            tire_radius_m=req.tire_radius_m,
+            setup_id=req.setup_name or "export",
+        )
+    raise HTTPException(
+        status_code=422,
+        detail="Either 'sweep_data' or 'hardpoints' must be provided for kinematics export.",
+    )
+
+
+@router.post("/export", summary="Export Kinematic Sweep Data as CSV or JSON")
+async def export_sweep_endpoint(
+    req: KinematicsExportRequest,
+):
+    """Unified kinematics export supporting precomputed sweep_data or on-the-fly hardpoints."""
+    from suspensionlab.backend.services.kinematics_study_service import KinematicsStudyService
+    sweep_data = _resolve_sweep_data_for_export(req)
+    fmt = (req.format or "csv").strip().lower()
+    if fmt == "json":
+        return KinematicsStudyService.export_json(sweep_data)
+    csv_content = KinematicsStudyService.export_csv(sweep_data)
+    run_id = sweep_data.get("run_id", "sweep")
+    return Response(
+        content=csv_content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="kinematics_{run_id}.csv"'},
+    )
+
+
 @router.post("/export/csv", summary="Export Kinematic Sweep Data as RFC-4180 CSV")
 async def export_sweep_csv_endpoint(
     req: KinematicsExportRequest,
 ) -> Response:
     """Generate downloadable CSV containing sweep channels, rates, and provenance headers."""
     from suspensionlab.backend.services.kinematics_study_service import KinematicsStudyService
-    csv_content = KinematicsStudyService.export_csv(req.sweep_data)
-    run_id = req.sweep_data.get("run_id", "sweep")
+    sweep_data = _resolve_sweep_data_for_export(req)
+    csv_content = KinematicsStudyService.export_csv(sweep_data)
+    run_id = sweep_data.get("run_id", "sweep")
     return Response(
         content=csv_content,
         media_type="text/csv",
@@ -644,7 +690,8 @@ async def export_sweep_json_endpoint(
 ) -> dict:
     """Generate structured JSON schema dictionary containing sweep data and metadata."""
     from suspensionlab.backend.services.kinematics_study_service import KinematicsStudyService
-    return KinematicsStudyService.export_json(req.sweep_data)
+    sweep_data = _resolve_sweep_data_for_export(req)
+    return KinematicsStudyService.export_json(sweep_data)
 
 
 @router.get("/setups", summary="List Available Persisted Setups and Benchmarks")

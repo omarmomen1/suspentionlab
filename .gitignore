@@ -48,3 +48,6 @@ scratch/
 .pytest_cache/
 .hypothesis/
 
+# Executables
+*.exe
+

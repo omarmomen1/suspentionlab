@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Inter } from "next/font/google";
 import Link from "next/link";
 import { Suspense } from "react";
 import NavItem from "../components/NavItem";
@@ -11,9 +10,6 @@ import CommandPalette from "../components/CommandPalette";
 import MobileNav from "../components/MobileNav";
 import PromptModalHost from "../components/sim/ModalHost";
 import NavigationProgressBar from "../components/NavigationProgressBar";
-
-const inter = Inter({ subsets: ["latin"] });
-
 import Navbar from "../components/Navbar";
 
 export const metadata: Metadata = {
@@ -27,7 +23,7 @@ import WorkspaceStatusBar from "../components/WorkspaceStatusBar";
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body suppressHydrationWarning className={`${inter.className} bg-black text-gray-100 antialiased selection:bg-ansys-yellow selection:text-black flex flex-col h-screen overflow-hidden`}>
+      <body suppressHydrationWarning className="font-sans bg-black text-gray-100 antialiased selection:bg-ansys-yellow selection:text-black flex flex-col h-screen overflow-hidden">
           <AuthProvider>
             <WorkspaceProvider>
               {/* WCAG 2.4.1 Bypass Blocks: Skip to main content link */}

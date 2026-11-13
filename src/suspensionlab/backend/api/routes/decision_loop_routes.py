@@ -63,8 +63,8 @@ class CreateLoopExperimentRequest(BaseModel):
     question_id: str = Field("Q-17", description="Linked question identifier")
     experiment_number: int = Field(52, description="Experiment sequence number")
     hypothesis: Optional[str] = None
-    changed_parameters: Optional[Dict[str, float]] = None
-    unchanged_parameters: Optional[Dict[str, float]] = None
+    changed_parameters: Optional[Dict[str, Any]] = None
+    unchanged_parameters: Optional[Dict[str, Any]] = None
     expected_effect: Optional[str] = None
     constraints: Optional[List[Dict[str, Any]]] = None
 
@@ -72,7 +72,7 @@ class CreateLoopExperimentRequest(BaseModel):
 class ExecuteLoopSimulationRequest(BaseModel):
     experiment_code: str = Field("EXP-52", description="Originating experiment code")
     simulation_number: int = Field(1844, description="Sequential simulation run number")
-    params: Optional[Dict[str, float]] = None
+    params: Optional[Dict[str, Any]] = None
 
 
 class CompareLoopSetupsRequest(BaseModel):

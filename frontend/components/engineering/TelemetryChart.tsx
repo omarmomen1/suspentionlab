@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import { Activity, Layers, Maximize2 } from "lucide-react";
+import SampleDemoTelemetryBadge from "./SampleDemoTelemetryBadge";
 
 interface TelemetryChartProps {
   title?: string;
@@ -26,9 +27,11 @@ export default function TelemetryChart({
 }: TelemetryChartProps) {
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
 
+  const isUsingDemoTrace = !(timestamps && timestamps.length > 0 && (measured || simulated));
+
   // Generate realistic deterministic physics traces if props are not supplied
   const data = useMemo(() => {
-    if (timestamps && timestamps.length > 0 && (measured || simulated)) {
+    if (!isUsingDemoTrace && timestamps) {
       return {
         t: timestamps,
         m: measured || [],
@@ -58,7 +61,7 @@ export default function TelemetryChart({
     }
 
     return { t: tArr, m: mArr, s: sArr };
-  }, [timestamps, measured, simulated]);
+  }, [isUsingDemoTrace, timestamps, measured, simulated]);
 
   // Compute bounding box
   const minVal = Math.min(...data.m, ...data.s, 0);
@@ -98,17 +101,20 @@ export default function TelemetryChart({
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div>
-          <div className="text-[10px] font-mono text-ansys-yellow uppercase tracking-wider font-bold flex items-center gap-1.5">
-            <Activity size={12} /> High-Resolution Trace Overlay
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="text-[10px] font-mono text-ansys-yellow uppercase tracking-wider font-bold flex items-center gap-1.5">
+              <Activity size={12} /> High-Resolution Trace Overlay
+            </div>
+            {isUsingDemoTrace && <SampleDemoTelemetryBadge size="xs" />}
           </div>
-          <h4 className="text-sm font-bold text-white tracking-tight">{title}</h4>
+          <h4 className="text-sm font-bold text-white tracking-tight mt-0.5">{title}</h4>
         </div>
 
         {/* Legend */}
         <div className="flex items-center gap-4 text-[11px] font-mono">
           <div className="flex items-center gap-1.5 text-cyan-400">
             <span className="w-2.5 h-1 bg-cyan-400 rounded-full" />
-            <span>MEASURED (MoTeC)</span>
+            <span>{isUsingDemoTrace ? "DEMO TRACE (SYNTHETIC)" : "MEASURED"}</span>
           </div>
           <div className="flex items-center gap-1.5 text-ansys-yellow">
             <span className="w-2.5 h-1 bg-ansys-yellow rounded-full" />

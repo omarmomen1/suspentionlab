@@ -30,6 +30,7 @@ import {
 import { useUndoRedo } from "../../hooks/useUndoRedo";
 import PDFExport from "../../components/PDFExport";
 import DataExport from "../../components/DataExport";
+import PlanGate from "../../components/PlanGate";
 import SimHistory, { saveSimulationToHistory } from "../../components/SimHistory";
 import TirUploader from "../../components/TirUploader";
 import TelemetryUploader from "../../components/TelemetryUploader";
@@ -105,11 +106,42 @@ function HandlingDashboard() {
     setTimeout(() => setToast(null), 3500);
   };
 
+  // Live front roll stiffness distribution derived from front/rear springs, track widths & ARBs
+  const kRollFront = 0.5 * params.K_spring_f * params.tw_f * params.tw_f + params.K_arb_f;
+  const kRollRear = 0.5 * params.K_spring_r * params.tw_r * params.tw_r + params.K_arb_r;
+  const computedRollDist = kRollFront + kRollRear > 0 ? kRollFront / (kRollFront + kRollRear) : params.roll_dist;
+
   // Run initial solver on mount
   useEffect(() => {
     runFullAnalysis();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Recompute handling balance & diagrams automatically (debounced) when chassis/ARB inputs change
+  const handlingMountedRef = useRef(false);
+  useEffect(() => {
+    if (!handlingMountedRef.current) {
+      handlingMountedRef.current = true;
+      return;
+    }
+    const timer = setTimeout(() => {
+      runFullAnalysis();
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    params.K_arb_f,
+    params.K_arb_r,
+    params.K_spring_f,
+    params.K_spring_r,
+    params.tw_f,
+    params.tw_r,
+    params.m,
+    params.h_cg,
+    params.v_init_kph,
+    params.maneuver_type,
+    params.tire_coeffs,
+  ]);
 
   const runFullAnalysis = async () => {
     setIsRunning(true);
@@ -119,7 +151,7 @@ function HandlingDashboard() {
         params: {
           m: params.m,
           h_cg: params.h_cg,
-          roll_dist: params.roll_dist,
+          roll_dist: computedRollDist,
           K_spring_f: params.K_spring_f,
           K_spring_r: params.K_spring_r,
           K_arb_f: params.K_arb_f,
@@ -142,7 +174,7 @@ function HandlingDashboard() {
         params: {
           m: params.m,
           h_cg: params.h_cg,
-          roll_dist: params.roll_dist,
+          roll_dist: computedRollDist,
           K_spring_f: params.K_spring_f,
           K_spring_r: params.K_spring_r,
           K_arb_f: params.K_arb_f,
@@ -163,9 +195,13 @@ function HandlingDashboard() {
         setup_a: {
           m: params.m,
           h_cg: params.h_cg,
-          roll_dist: params.roll_dist,
+          roll_dist: computedRollDist,
+          K_spring_f: params.K_spring_f,
+          K_spring_r: params.K_spring_r,
           K_arb_f: params.K_arb_f,
           K_arb_r: params.K_arb_r,
+          tw_f: params.tw_f,
+          tw_r: params.tw_r,
           tire_coeffs: params.tire_coeffs,
         },
         setup_b: {
@@ -182,7 +218,7 @@ function HandlingDashboard() {
       });
       setComparisonData(compRes);
 
-      saveSimulationToHistory("sl_sim_history_handling", params, diagRes.diagram);
+      saveSimulationToHistory("sl_sim_history_handling", { ...params, roll_dist: computedRollDist }, diagRes.diagram);
       showToast("Handling analysis solved successfully", "success");
     } catch (err: any) {
       showToast(err?.message || "Failed to solve handling dynamics", "error");
@@ -199,9 +235,13 @@ function HandlingDashboard() {
         base_params: {
           m: params.m,
           h_cg: params.h_cg,
-          roll_dist: params.roll_dist,
+          roll_dist: computedRollDist,
+          K_spring_f: params.K_spring_f,
+          K_spring_r: params.K_spring_r,
           K_arb_f: params.K_arb_f,
           K_arb_r: params.K_arb_r,
+          tw_f: params.tw_f,
+          tw_r: params.tw_r,
         },
         parameter_name: sweepParamName,
         min_val: minVal,
@@ -437,18 +477,42 @@ function HandlingDashboard() {
             </ParamSection>
 
             <ParamSection title="Roll Stiffness & ARB">
+              <div className="bg-[#0d0d0f] border border-[#252525] rounded-lg px-2.5 py-2 flex items-center justify-between">
+                <div>
+                  <div className="text-[11px] text-gray-300 font-medium">Front Roll Stiffness %</div>
+                  <div className="text-[9px] text-gray-500">Live from springs + ARBs</div>
+                </div>
+                <div className="text-right font-mono">
+                  <div className="text-xs font-bold text-ansys-yellow">
+                    {(computedRollDist * 100).toFixed(1)}%
+                  </div>
+                  <div className="text-[9px] text-gray-500">
+                    ratio {computedRollDist.toFixed(3)}
+                  </div>
+                </div>
+              </div>
               <ParameterInput
-                label="Front Roll Stiffness %"
-                val={params.roll_dist}
-                unit="ratio"
-                step={0.02}
-                onChange={(v) => setParams({ ...params, roll_dist: v })}
+                label="Front Spring Rate"
+                val={params.K_spring_f}
+                unit="N/m"
+                step={1000.0}
+                min={1000.0}
+                onChange={(v) => setParams({ ...params, K_spring_f: v })}
+              />
+              <ParameterInput
+                label="Rear Spring Rate"
+                val={params.K_spring_r}
+                unit="N/m"
+                step={1000.0}
+                min={1000.0}
+                onChange={(v) => setParams({ ...params, K_spring_r: v })}
               />
               <ParameterInput
                 label="Front ARB Stiffness"
                 val={params.K_arb_f}
                 unit="Nm/rad"
                 step={1000.0}
+                min={0}
                 onChange={(v) => setParams({ ...params, K_arb_f: v })}
               />
               <ParameterInput
@@ -456,6 +520,7 @@ function HandlingDashboard() {
                 val={params.K_arb_r}
                 unit="Nm/rad"
                 step={1000.0}
+                min={0}
                 onChange={(v) => setParams({ ...params, K_arb_r: v })}
               />
             </ParamSection>
@@ -1331,7 +1396,9 @@ function HandlingDashboard() {
 export default function Page() {
   return (
     <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-600 text-sm">Loading Handling Cockpit…</div>}>
-      <HandlingDashboard />
+      <PlanGate required="PRO" feature="Handling Dynamics & Bicycle Model">
+        <HandlingDashboard />
+      </PlanGate>
     </Suspense>
   );
 }

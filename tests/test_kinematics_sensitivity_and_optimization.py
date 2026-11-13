@@ -129,7 +129,7 @@ def test_engineering_question_camber_gain_without_toe():
     best = res["best_candidate"]
     assert best is not None, "Best candidate must be identified"
     assert best["constraint_status"] == "PASS", f"Best candidate must satisfy constraints: {best['violation_details']}"
-    assert best["delta_obj"] > 0, "Best candidate must improve the objective"
+    assert best["delta_obj"] < 0, "Best candidate must improve (more negative) bump camber gain"
     assert len(best["why_chosen"]) > 10, "Physical mechanism must be explained"
     assert "what_improved" in best and len(best["what_improved"]) > 0
 
@@ -150,7 +150,7 @@ def test_bounded_optimization_respects_limits_and_finds_pareto():
         allowed_axes=["Y", "Z"],
         hardpoint_bounds_mm=max_bound_mm,
         objectives=[
-            OptimizationObjective(metric="camber_gain_deg_per_100mm", direction="maximize", weight=1.0),
+            OptimizationObjective(metric="camber_gain_deg_per_100mm", direction="minimize", weight=1.0),
             OptimizationObjective(metric="toe_variation_deg", direction="minimize", weight=1.0),
         ],
         constraints=[

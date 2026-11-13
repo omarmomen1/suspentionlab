@@ -5,10 +5,11 @@ Shared Report DB model — stores simulation results for public sharing.
 """
 import uuid
 from datetime import datetime
-from sqlalchemy import Column, String, DateTime, JSON, Boolean, Integer, Index, Text, Float
+from sqlalchemy import Column, String, DateTime, JSON, Boolean, Integer, Index, Text, Float, Uuid
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 
 JSON_TYPE = JSON().with_variant(JSONB, 'postgresql')
+UUID_TYPE = Uuid(as_uuid=True).with_variant(PG_UUID(as_uuid=True), 'postgresql')
 from suspensionlab.backend.database.core import Base
 
 
@@ -21,7 +22,7 @@ class SharedReport(Base):
     )
 
     id = Column(
-        PG_UUID(as_uuid=True),
+        UUID_TYPE,
         primary_key=True,
         default=uuid.uuid4,
     )
@@ -32,10 +33,10 @@ class SharedReport(Base):
     result = Column(JSON_TYPE, nullable=False)
 
     # ── Provenance & Lineage (#24 & Enterprise Reporting) ──────────────────────
-    owner_id        = Column(PG_UUID(as_uuid=True), nullable=True, index=True)   # who shared it
-    team_id         = Column(PG_UUID(as_uuid=True), nullable=True, index=True)   # team isolation partition
-    organization_id = Column(PG_UUID(as_uuid=True), nullable=True, index=True)   # organization isolation partition
-    simulation_id   = Column(PG_UUID(as_uuid=True), nullable=True)   # jobs.id / simulation_run.id artifact reference
+    owner_id        = Column(UUID_TYPE, nullable=True, index=True)   # who shared it
+    team_id         = Column(UUID_TYPE, nullable=True, index=True)   # team isolation partition
+    organization_id = Column(UUID_TYPE, nullable=True, index=True)   # organization isolation partition
+    simulation_id   = Column(UUID_TYPE, nullable=True)   # jobs.id / simulation_run.id artifact reference
     doc_id          = Column(String(32), nullable=True)              # formatted DOC ID e.g. DOC-2026-SL-0001
     vehicle_ref     = Column(String(255), nullable=True)
     setup_ref       = Column(String(255), nullable=True)
@@ -58,7 +59,7 @@ class SharedReport(Base):
 
     # ── Approval Lifecycle (PROPOSED | APPROVED | REJECTED | EXPORTED) ────────
     status          = Column(String(16), nullable=False, default="PROPOSED")
-    approved_by_user_id = Column(PG_UUID(as_uuid=True), nullable=True)
+    approved_by_user_id = Column(UUID_TYPE, nullable=True)
     approved_by_email   = Column(String(255), nullable=True)
     approved_by_role    = Column(String(50), nullable=True)
     approved_at         = Column(DateTime(timezone=True), nullable=True)

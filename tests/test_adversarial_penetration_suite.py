@@ -19,9 +19,9 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
+import jwt
 import pytest
 from httpx import AsyncClient
-from jose import jwt
 from starlette.testclient import TestClient
 from starlette.websockets import WebSocketDisconnect
 
@@ -82,7 +82,7 @@ class TestAdversarialJWTAuthentication:
         """Token with alg: none is strictly rejected."""
         # Craft an unsigned token with alg: none
         claims = {"sub": str(uuid.uuid4()), "plan": "ENTERPRISE", "is_admin": True, "type": "access", "exp": time.time() + 3600}
-        # In python-jose or manual base64
+        # Manual base64 unsigned token with alg: none
         import base64
         header_b64 = base64.urlsafe_b64encode(json.dumps({"alg": "none", "typ": "JWT"}).encode()).decode().rstrip("=")
         payload_b64 = base64.urlsafe_b64encode(json.dumps(claims).encode()).decode().rstrip("=")

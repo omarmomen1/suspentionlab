@@ -131,6 +131,16 @@ class SimulationService:
         trace_carrier["correlation"] = correlation_meta
         payload["_correlation"] = correlation_meta
 
+        import os
+        redis_url = (os.getenv("REDIS_URL") or "").strip()
+        if not redis_url:
+            import logging
+            logging.getLogger(__name__).info("REDIS_URL not set; executing job %s in-process via bounded compute pool", job_id)
+            from suspensionlab.backend.core.compute_governance import bounded_run
+            loop = asyncio.get_running_loop()
+            loop.create_task(bounded_run(run_job, job_id, payload, trace_carrier))
+            return job_id
+
         from suspensionlab.backend.workers.orchestrator import submit_simulation_job
         try:
             await submit_simulation_job(

@@ -53,8 +53,16 @@ PRESET_SETUPS: Dict[str, Dict[str, Any]] = {
         "tire_radius_m": 0.330,
         "hardpoints": {
             **BENCHMARK_PRESETS["gt3_touring"]["hardpoints"],
-            "UWI_fwd": [-50.0, 80.0, 305.0],
-            "UWI_aft": [ 50.0, 80.0, 305.0],
+            "UWI_fwd": [
+                BENCHMARK_PRESETS["gt3_touring"]["hardpoints"]["UWI_fwd"][0],
+                BENCHMARK_PRESETS["gt3_touring"]["hardpoints"]["UWI_fwd"][1],
+                BENCHMARK_PRESETS["gt3_touring"]["hardpoints"]["UWI_fwd"][2] + 5.0,
+            ],
+            "UWI_aft": [
+                BENCHMARK_PRESETS["gt3_touring"]["hardpoints"]["UWI_aft"][0],
+                BENCHMARK_PRESETS["gt3_touring"]["hardpoints"]["UWI_aft"][1],
+                BENCHMARK_PRESETS["gt3_touring"]["hardpoints"]["UWI_aft"][2] + 5.0,
+            ],
         },
     },
     "formula_sae": {
@@ -75,8 +83,16 @@ PRESET_SETUPS: Dict[str, Dict[str, Any]] = {
         "tire_radius_m": 0.254,
         "hardpoints": {
             **BENCHMARK_PRESETS["formula_sae"]["hardpoints"],
-            "LWI_fwd": [-80.0, 100.0, 95.0],
-            "LWI_aft": [ 80.0, 100.0, 95.0],
+            "LWI_fwd": [
+                BENCHMARK_PRESETS["formula_sae"]["hardpoints"]["LWI_fwd"][0],
+                BENCHMARK_PRESETS["formula_sae"]["hardpoints"]["LWI_fwd"][1],
+                BENCHMARK_PRESETS["formula_sae"]["hardpoints"]["LWI_fwd"][2] - 15.0,
+            ],
+            "LWI_aft": [
+                BENCHMARK_PRESETS["formula_sae"]["hardpoints"]["LWI_aft"][0],
+                BENCHMARK_PRESETS["formula_sae"]["hardpoints"]["LWI_aft"][1],
+                BENCHMARK_PRESETS["formula_sae"]["hardpoints"]["LWI_aft"][2] - 15.0,
+            ],
         },
     },
     "lmp_prototype": {
@@ -146,6 +162,7 @@ class KinematicsStudyService:
         strict_mode: bool = False,
         setup_id: Optional[str] = None,
         vehicle_id: str = "corner_multibody",
+        tire_radius_m: float = 0.33,
     ) -> Dict[str, Any]:
         """Execute real kinematic sweep, compute derivatives, and persist result."""
         clean_hp = {k: [float(c) for c in v] for k, v in hardpoints.items()}
@@ -154,12 +171,13 @@ class KinematicsStudyService:
             z_min_mm=z_min_mm,
             z_max_mm=z_max_mm,
             n_steps=n_steps,
+            tire_radius=tire_radius_m,
             mode=backend_mode,
             strict_mode=strict_mode,
         )
         d = curves.to_dict()
         derivatives = compute_kinematic_derivatives(d)
-        val_report = validate_hardpoints_py("double_wishbone", clean_hp)
+        val_report = validate_hardpoints_py("double_wishbone", clean_hp, tire_radius_m=tire_radius_m)
 
         run_id = f"swp-{uuid.uuid4().hex[:12]}"
         geom_hash = compute_geometry_hash(clean_hp)

@@ -473,36 +473,58 @@ export default function TimelinePage() {
                     <Sliders className="w-4 h-4 text-cyan-400" />
                     <span>Physical Parameter Deltas</span>
                   </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left font-mono text-xs">
-                      <thead>
-                        <tr className="border-b border-neutral-800 text-[10px] uppercase text-neutral-400">
-                          <th className="py-2.5 px-3">Parameter</th>
-                          <th className="py-2.5 px-3">State in Event A</th>
-                          <th className="py-2.5 px-3">State in Event B</th>
-                          <th className="py-2.5 px-3">Absolute Delta (&Delta;)</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-neutral-800/60">
-                        {comparisonReport.parameter_deltas.map((pd, i) => (
-                          <tr key={i} className="hover:bg-neutral-800/30">
-                            <td className="py-3 px-3 font-sans font-medium text-white">{pd.parameter}</td>
-                            <td className="py-3 px-3 text-neutral-300">
-                              {pd.a} {pd.unit}
-                            </td>
-                            <td className="py-3 px-3 text-neutral-300">
-                              {pd.b} {pd.unit}
-                            </td>
-                            <td className="py-3 px-3">
-                              <span className={`font-bold ${pd.delta > 0 ? "text-cyan-400" : "text-amber-400"}`}>
-                                {pd.delta > 0 ? `+${pd.delta}` : pd.delta} {pd.unit}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                  {(() => {
+                    const rawDiffs: any[] =
+                      comparisonReport.parameter_deltas ||
+                      comparisonReport.parameter_diffs ||
+                      [];
+                    if (rawDiffs.length === 0) {
+                      return (
+                        <div className="text-xs font-mono text-neutral-400 py-3">
+                          No numeric setup parameter deltas recorded between these two events.
+                        </div>
+                      );
+                    }
+                    return (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left font-mono text-xs">
+                          <thead>
+                            <tr className="border-b border-neutral-800 text-[10px] uppercase text-neutral-400">
+                              <th className="py-2.5 px-3">Parameter</th>
+                              <th className="py-2.5 px-3">State in Event A</th>
+                              <th className="py-2.5 px-3">State in Event B</th>
+                              <th className="py-2.5 px-3">Absolute Delta (&Delta;)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-neutral-800/60">
+                            {rawDiffs.map((pd, i) => {
+                              const valA = pd.a ?? pd.event_a_value ?? 0;
+                              const valB = pd.b ?? pd.event_b_value ?? 0;
+                              const delta = pd.delta ?? pd.delta_abs ?? 0;
+                              const unit = pd.unit || "";
+                              return (
+                                <tr key={i} className="hover:bg-neutral-800/30">
+                                  <td className="py-3 px-3 font-sans font-medium text-white">{pd.parameter}</td>
+                                  <td className="py-3 px-3 text-neutral-300">
+                                    {valA} {unit}
+                                  </td>
+                                  <td className="py-3 px-3 text-neutral-300">
+                                    {valB} {unit}
+                                  </td>
+                                  <td className="py-3 px-3">
+                                    <span className={`font-bold ${delta > 0 ? "text-cyan-400" : "text-amber-400"}`}>
+                                      {delta > 0 ? `+${delta}` : delta} {unit}
+                                      {pd.delta_pct !== undefined ? ` (${pd.delta_pct > 0 ? "+" : ""}${pd.delta_pct}%)` : ""}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Engineering Effects Deltas */}
@@ -511,26 +533,50 @@ export default function TimelinePage() {
                     <Activity className="w-4 h-4 text-emerald-400" />
                     <span>Engineering Performance Consequences</span>
                   </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {comparisonReport.engineering_effect_deltas.map((ef, i) => (
-                      <div key={i} className="bg-neutral-950 border border-neutral-800 rounded-lg p-3.5 space-y-1">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="font-semibold text-white">{ef.metric}</span>
-                          <span
-                            className={`font-mono text-xs px-2 py-0.5 rounded font-bold ${
-                              ef.beneficial ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"
-                            }`}
-                          >
-                            {ef.delta > 0 ? `+${ef.delta}` : ef.delta} {ef.unit}
-                          </span>
+                  {Array.isArray(comparisonReport.engineering_effects) &&
+                  comparisonReport.engineering_effects.length > 0 ? (
+                    <div className="space-y-2">
+                      {comparisonReport.engineering_effects.map((eff, i) => (
+                        <div
+                          key={i}
+                          className="bg-neutral-950 border border-neutral-800 rounded-lg p-3 text-xs font-mono text-neutral-200 flex items-center gap-2"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                          <span>{eff}</span>
                         </div>
-                        <div className="text-[11px] font-mono text-neutral-400 flex justify-between">
-                          <span>A: {ef.a} {ef.unit}</span>
-                          <span>B: {ef.b} {ef.unit}</span>
+                      ))}
+                      {(comparisonReport.decision_consequences || []).map((cons, i) => (
+                        <div
+                          key={`cons-${i}`}
+                          className="bg-cyan-950/20 border border-cyan-900/40 rounded-lg p-3 text-xs font-mono text-cyan-200 flex items-center gap-2"
+                        >
+                          <ArrowRight className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                          <span>{cons}</span>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {(comparisonReport.engineering_effect_deltas || []).map((ef, i) => (
+                        <div key={i} className="bg-neutral-950 border border-neutral-800 rounded-lg p-3.5 space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="font-semibold text-white">{ef.metric}</span>
+                            <span
+                              className={`font-mono text-xs px-2 py-0.5 rounded font-bold ${
+                                ef.beneficial ? "bg-emerald-500/20 text-emerald-300" : "bg-amber-500/20 text-amber-300"
+                              }`}
+                            >
+                              {ef.delta > 0 ? `+${ef.delta}` : ef.delta} {ef.unit}
+                            </span>
+                          </div>
+                          <div className="text-[11px] font-mono text-neutral-400 flex justify-between">
+                            <span>A: {ef.a} {ef.unit}</span>
+                            <span>B: {ef.b} {ef.unit}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -646,11 +692,19 @@ export default function TimelinePage() {
                     </div>
                   </div>
 
-                  {/* Selected Option & Engineering Reason */}
+                    {/* Selected Option & Engineering Reason */}
                   <div className="space-y-3">
                     <div className="bg-emerald-950/20 border border-emerald-500/40 rounded-xl p-4 space-y-1.5">
                       <span className="text-xs font-mono uppercase text-emerald-400 font-bold">Selected Decision Option</span>
-                      <div className="text-base font-bold text-white">{selectedDecision.selected_option}</div>
+                      <div className="text-base font-bold text-white">
+                        {(() => {
+                          const opt: any = selectedDecision.selected_option;
+                          if (opt && typeof opt === "object") {
+                            return opt.name || opt.label || opt.title || opt.id || JSON.stringify(opt);
+                          }
+                          return String(opt ?? "N/A");
+                        })()}
+                      </div>
                       <p className="text-xs text-neutral-300 mt-1">{selectedDecision.engineering_reason}</p>
                     </div>
                   </div>

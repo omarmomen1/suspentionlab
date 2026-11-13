@@ -62,3 +62,58 @@ def test_multiresolution_lod_profiles():
     dict_repr = overview.to_dict()
     assert "timestamps" in dict_repr
     assert "values" in dict_repr
+
+
+@pytest.mark.asyncio
+async def test_decimate_route_requires_authentication():
+    """Unauthenticated requests to POST /api/v1/telemetry/decimate must be rejected with 401."""
+    from httpx import AsyncClient, ASGITransport
+    from suspensionlab.backend.api.main import app
+
+    payload = {
+        "timestamps": [0.0, 0.01, 0.02, 0.03, 0.04],
+        "values": [1.0, 2.0, 3.0, 4.0, 5.0],
+        "channel_name": "damper_velocity_fl",
+        "target_points": 100,
+    }
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        res = await client.post("/api/v1/telemetry/decimate", json=payload)
+        assert res.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_decimate_route_authenticated_success_and_max_array_length(authenticated_client):
+    """Authenticated requests succeed within bounds and reject oversized arrays with 422."""
+    from pydantic import ValidationError
+    from suspensionlab.backend.api.routes.telemetry_routes import DecimateRequest, MAX_DECIMATE_POINTS
+
+    # Direct schema validation for oversized timestamps / values
+    oversized = [0.0] * (MAX_DECIMATE_POINTS + 1)
+    valid = [0.0] * 10
+    with pytest.raises(ValidationError):
+        DecimateRequest(timestamps=oversized, values=valid)
+    with pytest.raises(ValidationError):
+        DecimateRequest(timestamps=valid, values=oversized)
+
+    # Valid authenticated HTTP call
+    ok_payload = {
+        "timestamps": [float(i) * 0.01 for i in range(50)],
+        "values": [0.1 * i for i in range(50)],
+        "channel_name": "damper_velocity_fl",
+        "target_points": 20,
+    }
+    res_ok = await authenticated_client.post("/api/v1/telemetry/decimate", json=ok_payload)
+    assert res_ok.status_code == 200
+    body = res_ok.json()
+    assert body["channel_name"] == "damper_velocity_fl"
+    assert body["original_points"] == 50
+
+    # Oversized array HTTP call -> 422 Validation Error
+    bad_payload = {
+        "timestamps": [0.0] * (MAX_DECIMATE_POINTS + 1),
+        "values": [0.0] * 10,
+        "channel_name": "damper_velocity_fl",
+        "target_points": 100,
+    }
+    res_bad = await authenticated_client.post("/api/v1/telemetry/decimate", json=bad_payload)
+    assert res_bad.status_code == 422

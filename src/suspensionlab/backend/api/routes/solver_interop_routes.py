@@ -46,7 +46,7 @@ from fastapi import (
     status,
 )
 from fastapi.responses import Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -207,11 +207,44 @@ class DiagnosticsResponseDTO(BaseModel):
     failure_reason: Optional[str] = None
 
 
+class SolverExecutionConfigSchema(BaseModel):
+    """Strict allowlisted solver execution configuration schema."""
+    model_config = ConfigDict(allow_inf_nan=False, extra="forbid")
+
+    duration: Optional[float] = Field(default=None, gt=0.0, le=3600.0)
+    stop_time: Optional[float] = Field(default=None, gt=0.0, le=3600.0)
+    t_end: Optional[float] = Field(default=None, gt=0.0, le=3600.0)
+    step: Optional[float] = Field(default=None, gt=0.0, le=1.0)
+    step_size: Optional[float] = Field(default=None, gt=0.0, le=1.0)
+    communication_step_size: Optional[float] = Field(default=None, gt=0.0, le=1.0)
+    bump_height: Optional[float] = Field(default=None, ge=-10.0, le=10.0)
+    bump_time: Optional[float] = Field(default=None, ge=0.0, le=3600.0)
+    road_input_type: Optional[str] = Field(default=None)
+    m_s: Optional[float] = Field(default=None, gt=0.0)
+    m_u: Optional[float] = Field(default=None, gt=0.0)
+    k_s: Optional[float] = Field(default=None, gt=0.0)
+    c: Optional[float] = Field(default=None, ge=0.0)
+    k_t: Optional[float] = Field(default=None, gt=0.0)
+    MR: Optional[float] = Field(default=None, gt=0.0)
+    benchmark_method: Optional[str] = Field(default=None)
+    contract_id: Optional[str] = Field(default=None)
+
+
+class ResourceLimitsSchema(BaseModel):
+    """Strict allowlisted solver resource limits schema."""
+    model_config = ConfigDict(allow_inf_nan=False, extra="forbid")
+
+    timeout_seconds: Optional[float] = Field(default=None, gt=0.0, le=300.0)
+    max_memory_mb: Optional[int] = Field(default=None, gt=0, le=16384)
+
+
 class ExecuteJobRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False, extra="forbid")
+
     solver_name: str = Field(..., description="Target solver runtime (e.g. 'FMI_COSIMULATION', 'EXTERNAL_CAE_SOLVER').")
     input_artifact_id: str = Field(..., description="UUID string of existing input artifact.")
-    execution_config: Optional[Dict[str, Any]] = Field(default=None, description="Solver execution configuration.")
-    resource_limits: Optional[Dict[str, Any]] = Field(default=None, description="Resource limits (e.g. timeout_seconds).")
+    execution_config: Optional[SolverExecutionConfigSchema] = Field(default=None, description="Solver execution configuration.")
+    resource_limits: Optional[ResourceLimitsSchema] = Field(default=None, description="Resource limits (e.g. timeout_seconds).")
     idempotency_key: Optional[str] = Field(default=None, description="Optional idempotency key.")
     wait_for_completion: bool = Field(default=True, description="Whether to execute immediately and return completed job.")
 
@@ -255,6 +288,8 @@ class JobResponseDTO(BaseModel):
 
 
 class JobPreflightRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False, extra="forbid")
+
     solver_name: str
     input_artifact_id: str
 
@@ -289,7 +324,7 @@ def _job_to_dto(job: SolverExecutionJob) -> JobResponseDTO:
         input_artifact_id=str(job.input_artifact_id) if job.input_artifact_id else None,
         input_artifact_hash=job.input_artifact_hash,
         output_artifact_ids=job.output_artifact_ids or [],
-        execution_config=job.execution_config or {},
+        execution_config=SolverExecutionService.sanitize_execution_config(job.execution_config),
         resource_limits=job.resource_limits or {},
         pid=job.pid,
         exit_code=job.exit_code,
@@ -333,12 +368,14 @@ class CreateCoSimContractRequest(BaseModel):
 
 
 class ExecuteCoSimJobRequest(BaseModel):
-    duration: float = Field(default=1.0, description="Simulation duration in seconds.")
-    t_end: Optional[float] = Field(default=None, description="Simulation duration in seconds.")
+    model_config = ConfigDict(allow_inf_nan=False, extra="forbid")
+
+    duration: float = Field(default=1.0, gt=0.0, le=3600.0, description="Simulation duration in seconds.")
+    t_end: Optional[float] = Field(default=None, gt=0.0, le=3600.0, description="Simulation duration in seconds.")
     worker_id: Optional[str] = Field(default=None, description="Worker identifier requesting execution.")
     wait_for_completion: Optional[bool] = Field(default=True, description="Synchronous execution flag.")
     idempotency_key: Optional[str] = Field(default=None, description="Idempotency key.")
-    resource_limits: Optional[Dict[str, Any]] = Field(default=None, description="Resource limits.")
+    resource_limits: Optional[ResourceLimitsSchema] = Field(default=None, description="Resource limits.")
 
 
 class WorkerHeartbeatRequest(BaseModel):
@@ -770,8 +807,16 @@ async def submit_execution_job(
             user=user,
             solver_name=req.solver_name,
             input_artifact_id=art_id,
-            execution_config=req.execution_config,
-            resource_limits=req.resource_limits,
+            execution_config=(
+                req.execution_config.model_dump(exclude_none=True)
+                if req.execution_config is not None
+                else None
+            ),
+            resource_limits=(
+                req.resource_limits.model_dump(exclude_none=True)
+                if req.resource_limits is not None
+                else None
+            ),
             idempotency_key=req.idempotency_key,
         )
 

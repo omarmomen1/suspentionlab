@@ -6,60 +6,211 @@
 @source "../lib/**/*.{js,ts,jsx,tsx}";
 
 @theme {
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --color-ansys-yellow: #f2a900;
-  --color-ansys-dark: #1e1e1e;
-  --color-ansys-surface: #252526;
-  --color-ansys-border: #333333;
+  --font-sans: var(--font-inter), 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+
+  /* ── Motorsport Carbon & Telemetry Core Tokens ───────────────────────────── */
+  --color-ansys-yellow: #F59E0B;
+  --color-ansys-yellow-hover: #D97706;
+  --color-ansys-gold: #F59E0B;
+  --color-ansys-amber: #F59E0B;
+  --color-ansys-amber-hover: #D97706;
+  --color-ansys-dark: #090B10;
+  --color-ansys-surface: #11151F;
+  --color-ansys-border: rgba(255, 255, 255, 0.08);
+  --color-ansys-ink: #090A0F;
+
+  --color-black: #090B10;
+
+  /* Primary Yellow / Amber Accent Remap */
+  --color-yellow-200: #FDE68A;
+  --color-yellow-300: #FCD34D;
+  --color-yellow-400: #F59E0B;
+  --color-yellow-500: #D97706;
+  --color-yellow-600: #B45309;
+  --color-yellow-700: #92400E;
+  --color-yellow-800: #6B3D0E;
+  --color-yellow-900: #45270B;
+  --color-yellow-950: #1C140A;
+
+  --color-amber-200: #FDE68A;
+  --color-amber-300: #FCD34D;
+  --color-amber-400: #F59E0B;
+  --color-amber-500: #F59E0B;
+  --color-amber-600: #D97706;
+  --color-amber-700: #9A5509;
+  --color-amber-800: #6B3D0E;
+  --color-amber-900: #45270B;
+  --color-amber-950: #1C140A;
+
+  /* Carbon & Matte Graphite Neutrals */
+  --color-slate-700: #283246;
+  --color-slate-800: #1B2232;
+  --color-slate-900: #11151F;
+  --color-slate-950: #090B10;
+
+  --color-zinc-700: #283142;
+  --color-zinc-800: #1B2232;
+  --color-zinc-900: #11151F;
+  --color-zinc-950: #090B10;
+
+  --color-gray-800: #1B2232;
+  --color-gray-900: #11151F;
+  --color-gray-950: #090B10;
+
+  /* Muted Industrial Purple / Violet / Indigo (softened from harsh neon) */
+  --color-purple-200: #D6D1EB;
+  --color-purple-300: #BCB4DE;
+  --color-purple-400: #9E92CA;
+  --color-purple-500: #7D70AA;
+  --color-purple-600: #665A90;
+  --color-purple-700: #514773;
+  --color-purple-800: #3C3557;
+  --color-purple-900: #28243B;
+  --color-purple-950: #171525;
+
+  --color-violet-300: #BCB4DE;
+  --color-violet-400: #9E92CA;
+  --color-violet-500: #7D70AA;
+  --color-violet-600: #665A90;
+  --color-violet-700: #514773;
+  --color-violet-800: #3C3557;
+  --color-violet-900: #28243B;
+  --color-violet-950: #171525;
+
+  --color-indigo-200: #CFD8EA;
+  --color-indigo-300: #B4C1DD;
+  --color-indigo-400: #8B9DC3;
+  --color-indigo-500: #687CA6;
+  --color-indigo-600: #53668C;
+  --color-indigo-700: #415170;
+  --color-indigo-800: #303D56;
+  --color-indigo-900: #20293D;
+  --color-indigo-950: #131826;
+
+  /* Muted Industrial Emerald / Green (softened from harsh neon) */
+  --color-emerald-200: #B5DFCE;
+  --color-emerald-300: #82C9AC;
+  --color-emerald-400: #4AB890;
+  --color-emerald-500: #279E74;
+  --color-emerald-600: #1F7E5D;
+  --color-emerald-700: #19644A;
+  --color-emerald-800: #154C39;
+  --color-emerald-900: #11362A;
+  --color-emerald-950: #0C201B;
+
+  --color-green-200: #B5DFCE;
+  --color-green-300: #82C9AC;
+  --color-green-400: #4AB890;
+  --color-green-500: #279E74;
+  --color-green-600: #1F7E5D;
+  --color-green-700: #19644A;
+  --color-green-800: #154C39;
+  --color-green-900: #11362A;
+  --color-green-950: #0C201B;
+
+  /* Muted Industrial Blue / Sky / Cyan / Teal */
+  --color-blue-200: #B6CEE6;
+  --color-blue-300: #8FB4DA;
+  --color-blue-400: #6196CB;
+  --color-blue-500: #467AB0;
+  --color-blue-600: #366190;
+  --color-blue-700: #2A4D73;
+  --color-blue-800: #203957;
+  --color-blue-900: #17283D;
+  --color-blue-950: #0F1926;
+
+  --color-sky-200: #B3D5E8;
+  --color-sky-300: #8DC0DB;
+  --color-sky-400: #5BA3C8;
+  --color-sky-500: #3E85AA;
+  --color-sky-600: #306B8B;
+  --color-sky-800: #1C4056;
+  --color-sky-900: #142D3D;
+  --color-sky-950: #0E1B24;
+
+  --color-cyan-200: #A5DCE6;
+  --color-cyan-300: #6ECAD9;
+  --color-cyan-400: #28BDD4;
+  --color-cyan-500: #06B6D4;
+  --color-cyan-600: #0891B2;
+  --color-cyan-800: #164E63;
+  --color-cyan-900: #123747;
+  --color-cyan-950: #0B1F29;
+
+  --color-teal-300: #7ECAC2;
+  --color-teal-400: #45B0A6;
+  --color-teal-500: #2A8F86;
+  --color-teal-800: #164946;
+  --color-teal-900: #113634;
+  --color-teal-950: #0D2020;
+
+  /* Harmonized Racing Coral / Red */
+  --color-rose-200: #F4B9C3;
+  --color-rose-300: #EE8C9D;
+  --color-rose-400: #F15B74;
+  --color-rose-500: #E23D59;
+  --color-rose-800: #6B2030;
+  --color-rose-900: #471622;
+  --color-rose-950: #220E15;
+
+  --color-red-300: #EEA0A0;
+  --color-red-400: #E56B6B;
+  --color-red-500: #CC4B4B;
+  --color-red-800: #682224;
+  --color-red-900: #45181B;
+  --color-red-950: #210F12;
 }
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 10%;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --background: 0 0% 9%;
-      --foreground: 0 0% 95%;
-    }
+    --font-inter: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    --font-jetbrains-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --background: #090B10;
+    --foreground: #E2E8F0;
+    --surface-base: #090B10;
+    --surface-plot: #0D1017;
+    --surface-card: #11151F;
+    --border-hairline: rgba(255, 255, 255, 0.08);
+    --accent-amber: #F59E0B;
+    --accent-amber-hover: #D97706;
+    --accent-ink: #090A0F;
   }
 
   body {
     background-color: var(--color-ansys-dark);
-    color: #e0e0e0;
+    color: #E2E8F0;
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 }
 
-/* Custom Scrollbar for professional feel */
+/* Custom Scrollbar for Motorsport Carbon feel */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-ansys-dark); 
+  background: var(--color-ansys-dark);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #555; 
+  background: #475569;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #777; 
+  background: #64748B;
 }
 
 /* .custom-scrollbar — used throughout the app on panels and plot areas.
    Without this class the elements fall back to browser defaults. */
 .custom-scrollbar {
   scrollbar-width: thin;
-  /* WCAG 1.4.11: raised from #444 for ≥3:1 non-text contrast on #111 panels */
-  scrollbar-color: #5a5a5a transparent;
+  /* WCAG 1.4.11: ≥3:1 non-text contrast on #090B10 / #11151F panels */
+  scrollbar-color: #5B6B82 transparent;
 }
 .custom-scrollbar::-webkit-scrollbar {
   width: 5px;
@@ -69,12 +220,12 @@
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  /* WCAG 1.4.11: thumb raised from #3a3a3a to #5a5a5a for ≥3:1 contrast on #111 */
-  background: #5a5a5a;
+  /* WCAG 1.4.11: ≥3:1 contrast on #090B10 / #11151F */
+  background: #5B6B82;
   border-radius: 9999px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #555;
+  background: #74869F;
 }
 
 @media print {
@@ -82,25 +233,23 @@
   nav, header, .no-print, .print-hide, button, .shrink-0 {
     display: none !important;
   }
-  
+
   /* Reset background and layout for clean printing */
   html, body {
     background: #ffffff !important;
     color: #111111 !important;
     font-size: 11pt !important;
   }
-  
+
   /* Remove borders and shadows for clean print */
   .border {
     border-color: #ddd !important;
   }
 }
 
-
-
 /* Accessibility: WCAG 2.4.7 & 2.4.11 Focus Visible & Focus Not Obscured */
 :focus-visible {
-  outline: 2px solid #f2a900 !important;
+  outline: 2px solid var(--color-ansys-yellow) !important;
   outline-offset: 2px !important;
 }
 
@@ -129,15 +278,309 @@
   }
 }
 
-/* Accessibility: WCAG 1.4.3 Contrast Remediation (≥4.5:1 normal text on dark backgrounds) */
+/* Accessibility: WCAG 1.4.3 Contrast Remediation (≥4.5:1 normal text on #090B10 / #11151F) */
 .text-gray-500, .text-slate-500, .text-zinc-500 {
-  color: #9ca3af;
+  color: #94A3B8;
 }
 .text-gray-600, .text-slate-600, .text-zinc-600 {
-  color: #a1a1aa;
+  color: #A8B3C5;
 }
 .text-gray-700, .text-slate-700, .text-zinc-700 {
-  color: #b0b0b8;
+  color: #BCC6D6;
 }
 
+/* ── Unified Carbon Surface, Border & Telemetry Amber Remaps ───────────────── */
+@layer utilities {
+  @media not print {
+    /* 1. Deep Carbon Base Canvas (#090B10) */
+    .bg-\[\#070709\],
+    .bg-\[\#07080a\],
+    .bg-\[\#07080c\],
+    .bg-\[\#080808\],
+    .bg-\[\#08080a\],
+    .bg-\[\#08090a\],
+    .bg-\[\#08090d\],
+    .bg-\[\#080a10\],
+    .bg-\[\#09090b\],
+    .bg-\[\#09090c\],
+    .bg-\[\#090a0d\],
+    .bg-\[\#090a0f\],
+    .bg-\[\#0a0a0a\],
+    .bg-\[\#0a0a0b\],
+    .bg-\[\#0a0a0c\],
+    .bg-\[\#0a0a0d\],
+    .bg-\[\#0a0a0f\],
+    .bg-\[\#0a0b0e\],
+    .bg-\[\#0b0b0d\],
+    .bg-\[\#0b0c12\],
+    .bg-\[\#0c0c0e\],
+    .bg-\[\#0c0c0f\],
+    .bg-\[\#0c0d0e\],
+    .bg-\[\#0c0d10\],
+    .bg-\[\#0c0d14\],
+    .bg-\[\#0c0e15\] {
+      background-color: #090B10;
+    }
 
+    .bg-\[rgba\(10\,10\,12\,0\.95\)\] {
+      background-color: rgba(9, 11, 16, 0.94);
+    }
+
+    /* 2. Carbon Plot & Recessed Instrument Wells (#0D1017) */
+    .bg-\[\#0d0d0d\],
+    .bg-\[\#0d0d0f\],
+    .bg-\[\#0d0d10\],
+    .bg-\[\#0d0e16\],
+    .bg-\[\#0e0e10\],
+    .bg-\[\#0e0e11\],
+    .bg-\[\#0e0e12\],
+    .bg-\[\#0e0e13\],
+    .bg-\[\#0e0f17\],
+    .bg-\[\#0e1017\],
+    .bg-\[\#0f0f11\],
+    .bg-\[\#0f0f12\],
+    .bg-\[\#0f0f14\],
+    .bg-\[\#0f1015\],
+    .bg-\[\#0f1118\],
+    .bg-\[\#0f111a\] {
+      background-color: #0D1017;
+    }
+
+    .bg-\[\#0d0d0f\]\/40 {
+      background-color: rgba(13, 16, 23, 0.4);
+    }
+
+    /* 3. Matte Graphite Elevated Cards, KPI Tiles, Sidebars & Tabs (#11151F) */
+    .bg-\[\#101014\],
+    .bg-\[\#10121a\],
+    .bg-\[\#111\],
+    .bg-\[\#111113\],
+    .bg-\[\#111114\],
+    .bg-\[\#111115\],
+    .bg-\[\#111116\],
+    .bg-\[\#11131a\],
+    .bg-\[\#11141e\],
+    .bg-\[\#121214\],
+    .bg-\[\#121215\],
+    .bg-\[\#12141c\],
+    .bg-\[\#12141d\],
+    .bg-\[\#12141e\],
+    .bg-\[\#131317\],
+    .bg-\[\#13151f\],
+    .bg-\[\#141416\],
+    .bg-\[\#141417\],
+    .bg-\[\#141418\],
+    .bg-\[\#141419\],
+    .bg-\[\#14141c\],
+    .bg-\[\#14151b\],
+    .bg-\[\#141620\],
+    .bg-\[\#141622\],
+    .bg-\[\#151518\],
+    .bg-\[\#151519\],
+    .bg-\[\#161618\],
+    .bg-\[\#161619\],
+    .bg-\[\#16161a\],
+    .bg-\[\#16161b\],
+    .bg-\[\#17171b\],
+    .bg-\[\#171924\],
+    .bg-\[\#18181c\],
+    .bg-\[\#18181d\],
+    .bg-\[\#18181e\],
+    .bg-\[\#181a22\],
+    .bg-\[\#181b28\] {
+      background-color: #11151F;
+    }
+
+    .bg-\[\#121215\]\/90 {
+      background-color: rgba(17, 21, 31, 0.92);
+    }
+
+    /* Interactive / Secondary Control Surfaces & Hover States */
+    .bg-\[\#1a1a1a\],
+    .bg-\[\#1a1a1c\],
+    .bg-\[\#1a1a20\],
+    .bg-\[\#1a1a22\],
+    .bg-\[\#1a1d2c\],
+    .bg-\[\#1c1c22\],
+    .bg-\[\#1e1e1e\],
+    .bg-\[\#1e1e20\],
+    .bg-\[\#1e1e22\],
+    .bg-\[\#1e1e26\],
+    .bg-\[\#1f1f23\],
+    .bg-\[\#1f1f24\],
+    .bg-\[\#20232f\],
+    .bg-\[\#222\],
+    .bg-\[\#22222a\],
+    .bg-\[\#252525\],
+    .bg-\[\#252527\],
+    .bg-\[\#252528\],
+    .bg-\[\#252530\],
+    .bg-\[\#2a2a2c\],
+    .bg-\[\#333\] {
+      background-color: #181E2B;
+    }
+
+    .hover\:bg-\[\#0d0d0d\]:hover,
+    .hover\:bg-\[\#1c1c22\]:hover,
+    .hover\:bg-\[\#1e1e20\]:hover,
+    .hover\:bg-\[\#252528\]:hover,
+    .hover\:bg-\[\#2a2a2c\]:hover,
+    .hover\:bg-\[\#333\]:hover {
+      background-color: #1E2636;
+    }
+
+    /* Chart grid 1px gap divider containers */
+    .bg-\[\#181818\] {
+      background-color: rgba(255, 255, 255, 0.08);
+    }
+
+    /* 4. Subtle Hairline Steel Card & Panel Borders (rgba(255, 255, 255, 0.08)) */
+    .border-\[\#111\],
+    .border-\[\#111113\],
+    .border-\[\#141416\],
+    .border-\[\#171924\],
+    .border-\[\#18181a\],
+    .border-\[\#18181c\],
+    .border-\[\#181a24\],
+    .border-\[\#1a1a1a\],
+    .border-\[\#1a1a1c\],
+    .border-\[\#1a1a20\],
+    .border-\[\#1b1b20\],
+    .border-\[\#1b1b22\],
+    .border-\[\#1b1e2a\],
+    .border-\[\#1c1c1f\],
+    .border-\[\#1c1c20\],
+    .border-\[\#1c1f2c\],
+    .border-\[\#1c1f2e\],
+    .border-\[\#1d202b\],
+    .border-\[\#1e1e1e\],
+    .border-\[\#1e1e20\],
+    .border-\[\#1e1e22\],
+    .border-\[\#1e1e24\],
+    .border-\[\#1e2029\],
+    .border-\[\#1e2230\],
+    .border-\[\#1f1f23\],
+    .border-\[\#1f1f26\],
+    .border-\[\#1f222e\],
+    .border-\[\#202025\],
+    .border-\[\#202026\],
+    .border-\[\#222\],
+    .border-\[\#222226\],
+    .border-\[\#222228\],
+    .border-\[\#222533\],
+    .border-\[\#222535\],
+    .border-\[\#222536\],
+    .border-\[\#222638\],
+    .border-\[\#232738\],
+    .border-\[\#242632\],
+    .border-\[\#252525\],
+    .border-\[\#252528\],
+    .border-\[\#25252c\],
+    .border-\[\#25252d\],
+    .border-\[\#252836\],
+    .border-\[\#26262a\],
+    .border-\[\#26262e\],
+    .border-\[\#262a3d\],
+    .border-\[\#27272a\],
+    .border-\[\#272730\],
+    .border-\[\#28282c\],
+    .border-\[\#282830\],
+    .border-\[\#2a2a2a\],
+    .border-\[\#2a2a2c\],
+    .border-\[\#2a2a2e\],
+    .border-\[\#2c2c36\],
+    .border-\[\#2c2f3d\],
+    .border-\[\#2d2d32\],
+    .border-\[\#2d2d38\],
+    .border-\[\#333\],
+    .border-\[\#333340\],
+    .border-\[\#353535\],
+    .border-zinc-800,
+    .border-slate-800 {
+      border-color: rgba(255, 255, 255, 0.08);
+    }
+
+    .hover\:border-\[\#3a3a3a\]:hover {
+      border-color: rgba(255, 255, 255, 0.16);
+    }
+
+    /* 5. Motorsport Telemetry Amber Accent (#F59E0B, hover #D97706, ink #090A0F) */
+    .bg-\[\#f2a900\] {
+      background-color: #F59E0B;
+    }
+    .bg-\[\#f2a900\]\/10 {
+      background-color: color-mix(in oklab, #F59E0B 10%, transparent);
+    }
+    .bg-\[\#f2a900\]\/15 {
+      background-color: color-mix(in oklab, #F59E0B 15%, transparent);
+    }
+    .text-\[\#f2a900\] {
+      color: #F59E0B;
+    }
+    .text-\[\#f2a900\]\/90 {
+      color: color-mix(in oklab, #F59E0B 90%, transparent);
+    }
+    .border-\[\#f2a900\] {
+      border-color: #F59E0B;
+    }
+    .border-\[\#f2a900\]\/25 {
+      border-color: color-mix(in oklab, #F59E0B 25%, transparent);
+    }
+    .border-\[\#f2a900\]\/30 {
+      border-color: color-mix(in oklab, #F59E0B 30%, transparent);
+    }
+    .border-\[\#f2a900\]\/40 {
+      border-color: color-mix(in oklab, #F59E0B 40%, transparent);
+    }
+    .hover\:bg-\[\#ffb914\]:hover {
+      background-color: #D97706;
+    }
+    .group:hover .group-hover\:fill-\[\#f2a900\] {
+      fill: #F59E0B;
+    }
+
+    /* Crisp dark-carbon ink (#090A0F) and unified #D97706 hover on primary Amber CTAs */
+    :is(.bg-ansys-yellow, .bg-ansys-gold, .bg-amber-500, .bg-amber-400, .bg-\[\#f2a900\]).text-black {
+      color: #090A0F;
+    }
+    :is(button, a, [role="button"], [role="tab"], input[type="submit"], .cursor-pointer):is(.bg-ansys-yellow, .bg-ansys-gold, .bg-amber-500, .bg-\[\#f2a900\]) {
+      color: #090A0F;
+    }
+    :is(button, a, [role="button"], [role="tab"], input[type="submit"], .cursor-pointer):is(.bg-ansys-yellow, .bg-ansys-gold, .bg-amber-500, .bg-\[\#f2a900\]):not(:disabled):hover {
+      background-color: #D97706;
+      color: #090A0F;
+      filter: none;
+    }
+
+    .selection\:bg-ansys-yellow::selection {
+      background-color: #F59E0B;
+      color: #090A0F;
+    }
+
+    /* Soften legacy hardcoded neon emerald/purple arbitrary overrides */
+    .text-\[\#00ff87\] {
+      color: var(--color-emerald-400);
+    }
+    .bg-\[\#00ff87\]\/5 {
+      background-color: color-mix(in oklab, var(--color-emerald-500) 6%, transparent);
+    }
+    .bg-\[\#00ff87\]\/20 {
+      background-color: color-mix(in oklab, var(--color-emerald-500) 16%, transparent);
+    }
+    .border-\[\#00ff87\]\/30 {
+      border-color: color-mix(in oklab, var(--color-emerald-500) 30%, transparent);
+    }
+    .bg-\[\#5e17eb\] {
+      background-color: var(--color-purple-700);
+    }
+    .hover\:bg-\[\#7c3aed\]:hover {
+      background-color: var(--color-purple-600);
+    }
+    .text-\[\#5e17eb\] {
+      color: var(--color-purple-400);
+    }
+    .focus\:border-\[\#5e17eb\]:focus {
+      border-color: var(--color-purple-500);
+    }
+  }
+}

@@ -17,8 +17,8 @@ import {
 import { useUndoRedo } from "../../hooks/useUndoRedo";
 import PDFExport from "../../components/PDFExport";
 import DataExport from "../../components/DataExport";
+import PlanGate from "../../components/PlanGate";
 import ComparePanel from "../../components/ComparePanel";
-import VehiclePresets from "../../components/VehiclePresets";
 import SimHistory, { saveSimulationToHistory } from "../../components/SimHistory";
 import { useAuth } from "../../contexts/AuthContext";
 
@@ -41,6 +41,107 @@ const TABS = [
 // ─── Plotly dark-theme base ──────────────────────────────────────────────────
 type Status = "good" | "warn" | "bad" | "neutral";
 type Toast  = { msg: string; type: "success" | "error" };
+
+interface FullCarPreset {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  params: {
+    m_s: number;
+    I_x: number;
+    I_y: number;
+    m_uf: number;
+    m_ur: number;
+    k_sf: number;
+    k_sr: number;
+    c_f: number;
+    c_r: number;
+    k_arb_f: number;
+    k_arb_r: number;
+    L: number;
+    weight_dist: number;
+    tw_f: number;
+    tw_r: number;
+    speed_kph: number;
+    p_amp: number;
+  };
+}
+
+const FULL_CAR_PRESETS: FullCarPreset[] = [
+  {
+    id: "sports_saloon",
+    name: "Sports Saloon (Default)",
+    category: "Road Car",
+    description: "Balanced 7-DOF sports sedan with moderate roll & pitch stiffness.",
+    params: {
+      m_s: 1200.0, I_x: 400.0, I_y: 1800.0, m_uf: 40.0, m_ur: 40.0,
+      k_sf: 30000.0, k_sr: 35000.0, c_f: 2500.0, c_r: 3000.0,
+      k_arb_f: 20000.0, k_arb_r: 10000.0, L: 2.6, weight_dist: 50.0,
+      tw_f: 1.6, tw_r: 1.6, speed_kph: 72.0, p_amp: 0.05,
+    },
+  },
+  {
+    id: "compact_hatch",
+    name: "Compact Hatchback",
+    category: "Road Car",
+    description: "FWD passenger hatchback with front-biased static mass and compliant ride.",
+    params: {
+      m_s: 1120.0, I_x: 340.0, I_y: 1650.0, m_uf: 32.0, m_ur: 30.0,
+      k_sf: 18000.0, k_sr: 20000.0, c_f: 1500.0, c_r: 1600.0,
+      k_arb_f: 12000.0, k_arb_r: 6000.0, L: 2.55, weight_dist: 60.0,
+      tw_f: 1.52, tw_r: 1.50, speed_kph: 72.0, p_amp: 0.03,
+    },
+  },
+  {
+    id: "gt3_race",
+    name: "GT3 Race Car",
+    category: "Racing",
+    description: "FIA GT3 chassis with stiff wheel rates, high roll resistance, and aero platform.",
+    params: {
+      m_s: 1180.0, I_x: 380.0, I_y: 1650.0, m_uf: 40.0, m_ur: 42.0,
+      k_sf: 75000.0, k_sr: 85000.0, c_f: 4800.0, c_r: 5200.0,
+      k_arb_f: 45000.0, k_arb_r: 24000.0, L: 2.70, weight_dist: 48.0,
+      tw_f: 1.66, tw_r: 1.64, speed_kph: 140.0, p_amp: 0.02,
+    },
+  },
+  {
+    id: "formula_student",
+    name: "Formula Student",
+    category: "Racing",
+    description: "Lightweight FSAE single-seater (240 kg sprung, low roll/pitch inertia).",
+    params: {
+      m_s: 240.0, I_x: 45.0, I_y: 110.0, m_uf: 14.0, m_ur: 15.0,
+      k_sf: 55000.0, k_sr: 60000.0, c_f: 1800.0, c_r: 1800.0,
+      k_arb_f: 18000.0, k_arb_r: 12000.0, L: 1.58, weight_dist: 47.0,
+      tw_f: 1.22, tw_r: 1.20, speed_kph: 80.0, p_amp: 0.015,
+    },
+  },
+  {
+    id: "full_size_suv",
+    name: "Full-Size SUV",
+    category: "Off-Road",
+    description: "Heavy high-inertia SUV tuned for deep stroke and obstacle absorption.",
+    params: {
+      m_s: 2150.0, I_x: 780.0, I_y: 3400.0, m_uf: 60.0, m_ur: 65.0,
+      k_sf: 26000.0, k_sr: 30000.0, c_f: 3600.0, c_r: 4000.0,
+      k_arb_f: 16000.0, k_arb_r: 10000.0, L: 2.95, weight_dist: 53.0,
+      tw_f: 1.68, tw_r: 1.68, speed_kph: 70.0, p_amp: 0.06,
+    },
+  },
+  {
+    id: "lmp_prototype",
+    name: "LMP Prototype",
+    category: "Racing",
+    description: "Endurance prototype with ultra-stiff heave/roll control.",
+    params: {
+      m_s: 880.0, I_x: 240.0, I_y: 1150.0, m_uf: 24.0, m_ur: 26.0,
+      k_sf: 125000.0, k_sr: 140000.0, c_f: 6500.0, c_r: 7200.0,
+      k_arb_f: 60000.0, k_arb_r: 35000.0, L: 2.95, weight_dist: 46.0,
+      tw_f: 1.65, tw_r: 1.62, speed_kph: 180.0, p_amp: 0.01,
+    },
+  },
+];
 
 interface FullCarResults {
   error?: boolean;
@@ -306,7 +407,29 @@ function FullCarDashboard() {
         <div className="w-60 shrink-0 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-y-auto custom-scrollbar">
           <div className="px-4 py-3 border-b border-[#1e1e1e] sticky top-0 bg-[#0d0d0f] z-10"><h2 className="text-xs font-semibold text-gray-300 flex items-center gap-2"><Settings2 size={13} className="text-ansys-yellow" /> Parameters</h2></div>
           <div className="p-4 space-y-5">
-            <VehiclePresets onSelect={(p) => setParams(prev => ({ ...prev, ...p.params, p_amp: p.road_profile.amplitude }))} />
+            <div className="space-y-1.5">
+              <label htmlFor="full-car-preset-select" className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+                7-DOF Full-Car Presets
+              </label>
+              <select
+                id="full-car-preset-select"
+                defaultValue="sports_saloon"
+                onChange={(e) => {
+                  const found = FULL_CAR_PRESETS.find((p) => p.id === e.target.value);
+                  if (found) {
+                    setParams({ ...found.params });
+                    showToast(`Loaded 7-DOF preset: ${found.name}`, "success");
+                  }
+                }}
+                className="w-full bg-[#0d0d0f] border border-[#252525] rounded-lg px-2.5 py-1.5 text-xs font-medium text-white focus:outline-none focus:border-ansys-yellow/60"
+              >
+                {FULL_CAR_PRESETS.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name} ({p.category})
+                  </option>
+                ))}
+              </select>
+            </div>
             <ParamSection title="Inertia">
               <ParameterInput label="Total Mass" val={params.m_s} unit="kg" min={1} onChange={(v) => setParams({ ...params, m_s: v })} />
               <ParameterInput label="Roll Inertia Ix" val={params.I_x} unit="kg·m²" min={1} onChange={(v) => setParams({ ...params, I_x: v })} />
@@ -425,38 +548,38 @@ function FullCarDashboard() {
                     <PlotBox>
                       <Plot
                         data={[
-                          { x: r.time, y: r.z_s?.map((v: number) => v * 1000), type: "scatter", mode: "lines", name: "CG Heave z_s", line: { color: "#f2a900", width: 2 } },
-                          { x: r.time, y: r.z_ufl?.map((v: number) => v * 1000), type: "scatter", mode: "lines", name: "FL Wheel", line: { color: "#00aeff", width: 1 } },
-                          { x: r.time, y: r.z_url?.map((v: number) => v * 1000), type: "scatter", mode: "lines", name: "RL Wheel", line: { color: "#ff2d55", width: 1 } },
+                          { x: r.time, y: r.z_s?.map((v: number) => v * 1000), type: "scatter", mode: "lines", name: "CG Heave z_s", line: { color: "#F59E0B", width: 2 } },
+                          { x: r.time, y: r.z_ufl?.map((v: number) => v * 1000), type: "scatter", mode: "lines", name: "FL Wheel", line: { color: "#06B6D4", width: 1 } },
+                          { x: r.time, y: r.z_url?.map((v: number) => v * 1000), type: "scatter", mode: "lines", name: "RL Wheel", line: { color: "#F43F5E", width: 1 } },
                         ]}
-                        layout={darkLayout({ title: { text: "Vertical Displacements", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Displacement (mm)", font: { color: "#444", size: 10 } } } })}
+                        layout={darkLayout({ title: { text: "Vertical Displacements", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#94A3B8", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Displacement (mm)", font: { color: "#94A3B8", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
                       />
                     </PlotBox>
                     <PlotBox>
                       <Plot
                         data={[ 
-                          { x: r.time, y: r.theta?.map((v: number) => v * 180 / Math.PI), type: "scatter", mode: "lines", name: "Pitch Angle θ", line: { color: "#00ff87", width: 2 } },
-                          { x: r.time, y: r.phi?.map((v: number) => v * 180 / Math.PI), type: "scatter", mode: "lines", name: "Roll Angle φ", line: { color: "#bf5af2", width: 2 } } 
+                          { x: r.time, y: r.theta?.map((v: number) => v * 180 / Math.PI), type: "scatter", mode: "lines", name: "Pitch Angle θ", line: { color: "#10B981", width: 2 } },
+                          { x: r.time, y: r.phi?.map((v: number) => v * 180 / Math.PI), type: "scatter", mode: "lines", name: "Roll Angle φ", line: { color: "#F43F5E", width: 2 } } 
                         ]}
-                        layout={darkLayout({ title: { text: "Attitude Angles", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Angle (°)", font: { color: "#444", size: 10 } } } })}
+                        layout={darkLayout({ title: { text: "Attitude Angles", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#94A3B8", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Angle (°)", font: { color: "#94A3B8", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
                       />
                     </PlotBox>
                     <PlotBox>
                       <Plot
-                        data={[ { x: r.time, y: r.ddz_s, type: "scatter", mode: "lines", name: "Heave Accel z̈_s", line: { color: "#f2a900", width: 2 }, fill: "tozeroy", fillcolor: "rgba(242,169,0,0.05)" } ]}
-                        layout={darkLayout({ title: { text: "Heave Acceleration", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Acceleration (m/s²)", font: { color: "#444", size: 10 } } } })}
+                        data={[ { x: r.time, y: r.ddz_s, type: "scatter", mode: "lines", name: "Heave Accel z̈_s", line: { color: "#F59E0B", width: 2 }, fill: "tozeroy", fillcolor: "rgba(245,158,11,0.06)" } ]}
+                        layout={darkLayout({ title: { text: "Heave Acceleration", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#94A3B8", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Acceleration (m/s²)", font: { color: "#94A3B8", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
                       />
                     </PlotBox>
                     <PlotBox>
                       <Plot
                         data={[
-                          { x: r.time, y: r.ddtheta, type: "scatter", mode: "lines", name: "Pitch Accel", line: { color: "#00ff87", width: 1.5 } },
-                          { x: r.time, y: r.ddphi, type: "scatter", mode: "lines", name: "Roll Accel", line: { color: "#bf5af2", width: 1.5 } }
+                          { x: r.time, y: r.ddtheta, type: "scatter", mode: "lines", name: "Pitch Accel", line: { color: "#10B981", width: 1.5 } },
+                          { x: r.time, y: r.ddphi, type: "scatter", mode: "lines", name: "Roll Accel", line: { color: "#F43F5E", width: 1.5 } }
                         ]}
-                        layout={darkLayout({ title: { text: "Angular Accelerations", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Accel (rad/s²)", font: { color: "#444", size: 10 } } } })}
+                        layout={darkLayout({ title: { text: "Angular Accelerations", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#94A3B8", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Accel (rad/s²)", font: { color: "#94A3B8", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
                       />
                     </PlotBox>
@@ -468,22 +591,22 @@ function FullCarDashboard() {
                   <div className="grid grid-cols-1 lg:grid-cols-2 auto-rows-[350px] gap-px bg-[#181818] overflow-y-auto custom-scrollbar h-full">
                     <PlotBox>
                       <Plot
-                        data={[ { x: r.phi?.map((v: number) => v * 180 / Math.PI), y: r.theta?.map((v: number) => v * 180 / Math.PI), type: "scatter", mode: "lines", name: "Coupling", line: { color: "#f2a900", width: 1.5 } } ]}
-                        layout={darkLayout({ title: { text: "Roll vs Pitch Space", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Roll φ (°)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Pitch θ (°)", font: { color: "#444", size: 10 } } } })}
+                        data={[ { x: r.phi?.map((v: number) => v * 180 / Math.PI), y: r.theta?.map((v: number) => v * 180 / Math.PI), type: "scatter", mode: "lines", name: "Coupling", line: { color: "#F59E0B", width: 1.5 } } ]}
+                        layout={darkLayout({ title: { text: "Roll vs Pitch Space", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Roll φ (°)", font: { color: "#94A3B8", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Pitch θ (°)", font: { color: "#94A3B8", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
                       />
                     </PlotBox>
                     <PlotBox>
                       <Plot
-                        data={[ { x: r.theta?.map((v: number) => v * 180 / Math.PI), y: r.dtheta?.map((v: number) => v * 180 / Math.PI), type: "scatter", mode: "lines", name: "Pitch Phase", line: { color: "#00ff87", width: 1.5 } } ]}
-                        layout={darkLayout({ title: { text: "Pitch Phase Portrait", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "θ (°)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "θ̇ (°/s)", font: { color: "#444", size: 10 } } } })}
+                        data={[ { x: r.theta?.map((v: number) => v * 180 / Math.PI), y: r.dtheta?.map((v: number) => v * 180 / Math.PI), type: "scatter", mode: "lines", name: "Pitch Phase", line: { color: "#10B981", width: 1.5 } } ]}
+                        layout={darkLayout({ title: { text: "Pitch Phase Portrait", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "θ (°)", font: { color: "#94A3B8", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "θ̇ (°/s)", font: { color: "#94A3B8", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
                       />
                     </PlotBox>
                     <PlotBox>
                       <Plot
-                        data={[ { x: r.phi?.map((v: number) => v * 180 / Math.PI), y: r.dphi?.map((v: number) => v * 180 / Math.PI), type: "scatter", mode: "lines", name: "Roll Phase", line: { color: "#bf5af2", width: 1.5 } } ]}
-                        layout={darkLayout({ title: { text: "Roll Phase Portrait", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "φ (°)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "φ̇ (°/s)", font: { color: "#444", size: 10 } } } })}
+                        data={[ { x: r.phi?.map((v: number) => v * 180 / Math.PI), y: r.dphi?.map((v: number) => v * 180 / Math.PI), type: "scatter", mode: "lines", name: "Roll Phase", line: { color: "#F43F5E", width: 1.5 } } ]}
+                        layout={darkLayout({ title: { text: "Roll Phase Portrait", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "φ (°)", font: { color: "#94A3B8", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "φ̇ (°/s)", font: { color: "#94A3B8", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
                       />
                     </PlotBox>
@@ -491,7 +614,7 @@ function FullCarDashboard() {
                       <div className="h-full p-5 flex flex-col justify-center gap-4">
                         <p className="text-[10px] font-bold tracking-widest text-gray-700 uppercase">Roll Characteristics</p>
                         <div className="space-y-3 font-mono text-xs">
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Roll Stiffness Dist</span><span className="text-[#00ff87]">{r.roll_stiffness_dist.toFixed(1)}% Front</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Roll Stiffness Dist</span><span className="text-[#10B981]">{r.roll_stiffness_dist.toFixed(1)}% Front</span></div>
                           <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Front Track</span><span className="text-white">{params.tw_f} m</span></div>
                           <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Rear Track</span><span className="text-white">{params.tw_r} m</span></div>
                         </div>
@@ -506,10 +629,10 @@ function FullCarDashboard() {
                     <PlotBox>
                       <Plot
                         data={[
-                          { x: r.time, y: r.lateral_load_transfer_f, type: "scatter", mode: "lines", name: "Front LLT", line: { color: "#00aeff", width: 2 } },
-                          { x: r.time, y: r.lateral_load_transfer_r, type: "scatter", mode: "lines", name: "Rear LLT", line: { color: "#ff2d55", width: 2 } }
+                          { x: r.time, y: r.lateral_load_transfer_f, type: "scatter", mode: "lines", name: "Front LLT", line: { color: "#06B6D4", width: 2 } },
+                          { x: r.time, y: r.lateral_load_transfer_r, type: "scatter", mode: "lines", name: "Rear LLT", line: { color: "#F43F5E", width: 2 } }
                         ]}
-                        layout={darkLayout({ title: { text: "Lateral Load Transfer (ΔFz)", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Load Transfer (N)", font: { color: "#444", size: 10 } } } })}
+                        layout={darkLayout({ title: { text: "Lateral Load Transfer (ΔFz)", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Time (s)", font: { color: "#94A3B8", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Load Transfer (N)", font: { color: "#94A3B8", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: false }}
                       />
                     </PlotBox>
@@ -517,8 +640,8 @@ function FullCarDashboard() {
                       <div className="h-full p-5 flex flex-col justify-center gap-4">
                         <p className="text-[10px] font-bold tracking-widest text-gray-700 uppercase">Load Transfer Summary</p>
                         <div className="space-y-3 font-mono text-xs">
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Max Front LLT</span><span className="text-[#00aeff]">{maxOf(r.lateral_load_transfer_f as number[]).toFixed(0)} N</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Max Rear LLT</span><span className="text-[#ff2d55]">{maxOf(r.lateral_load_transfer_r as number[]).toFixed(0)} N</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Max Front LLT</span><span className="text-[#06B6D4]">{maxOf(r.lateral_load_transfer_f as number[]).toFixed(0)} N</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Max Rear LLT</span><span className="text-[#F43F5E]">{maxOf(r.lateral_load_transfer_r as number[]).toFixed(0)} N</span></div>
                           <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Total Max LLT</span><span className="text-white">{(maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[])).toFixed(0)} N</span></div>
                         </div>
                       </div>
@@ -531,8 +654,8 @@ function FullCarDashboard() {
                   <div className="grid grid-cols-1 grid-rows-1 h-full gap-px bg-[#181818]">
                     <PlotBox>
                       <Plot
-                        data={[ { x: psdRoll.freqs, y: psdRoll.psd, type: "scatter", mode: "lines", name: "PSD Roll", fill: "tozeroy", fillcolor: "rgba(191,90,242,0.06)", line: { color: "#bf5af2", width: 2 } } ]}
-                        layout={darkLayout({ title: { text: "PSD — Roll Acceleration", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#444", size: 10 } }, type: "log", range: [Math.log10(0.1), Math.log10(50)] }, yaxis: { ...DARK_BASE.yaxis, title: { text: "PSD ((rad/s²)²/Hz)", font: { color: "#444", size: 10 } }, type: "log" } })}
+                        data={[ { x: psdRoll.freqs, y: psdRoll.psd, type: "scatter", mode: "lines", name: "PSD Roll", fill: "tozeroy", fillcolor: "rgba(244,63,94,0.08)", line: { color: "#F43F5E", width: 2 } } ]}
+                        layout={darkLayout({ title: { text: "PSD — Roll Acceleration", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#94A3B8", size: 10 } }, type: "log", range: [Math.log10(0.1), Math.log10(50)] }, yaxis: { ...DARK_BASE.yaxis, title: { text: "PSD ((rad/s²)²/Hz)", font: { color: "#94A3B8", size: 10 } }, type: "log" } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: false }}
                       />
                     </PlotBox>
@@ -550,7 +673,9 @@ function FullCarDashboard() {
 export default function Page() {
   return (
     <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-600 text-sm">Loading simulation environment…</div>}>
-      <FullCarDashboard />
+      <PlanGate required="PRO" feature="Full-Car (7-DOF) Multi-Body Solver">
+        <FullCarDashboard />
+      </PlanGate>
     </Suspense>
   );
 }

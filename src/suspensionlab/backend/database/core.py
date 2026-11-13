@@ -72,7 +72,9 @@ def get_worker_session_maker():
     if _worker_session_maker is None:
         worker_args = {"pool_pre_ping": True}
         if "sqlite" in DATABASE_URL:
+            from sqlalchemy.pool import NullPool
             worker_args["connect_args"] = {"check_same_thread": False, "timeout": 60}
+            worker_args["poolclass"] = NullPool
         else:
             worker_args.update({
                 "pool_size": 20, 

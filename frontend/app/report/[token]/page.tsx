@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import ReportClient from "./ReportClient";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const RAW_API_BASE = (process.env.BACKEND_URL || "http://127.0.0.1:8000/api/v1").replace(/\/+$/, "");
+const API_BASE = RAW_API_BASE.endsWith("/api/v1") ? RAW_API_BASE : `${RAW_API_BASE}/api/v1`;
 
 async function getReport(token: string) {
   try {

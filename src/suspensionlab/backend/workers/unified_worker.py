@@ -145,11 +145,16 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
     """Core async job lifecycle execution with distributed tracing stages and physics observability."""
     from suspensionlab.backend.database.core import get_worker_session_maker
     
-    redis_url = os.getenv("REDIS_URL")
-    if not redis_url:
-        logger.error(f"CRITICAL: REDIS_URL environment variable is missing. Worker aborting job {job_id}.")
-        return
-    r_conn = aioredis.from_url(redis_url)
+    redis_url = (os.getenv("REDIS_URL") or "").strip()
+    r_conn = None
+    if redis_url:
+        try:
+            r_conn = aioredis.from_url(redis_url)
+        except Exception as e:
+            logger.warning(f"Redis connection init failed for job {job_id}: {e}. Continuing without Redis.")
+            r_conn = None
+    else:
+        logger.info(f"REDIS_URL not set; executing job {job_id} in-process without Redis.")
     
     SessionLocal = get_worker_session_maker()
     async with SessionLocal() as db:
@@ -167,8 +172,8 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
             job_record.status = "RUNNING"
             await db.commit()
 
-            # Start the background heartbeat task
-            heartbeat_task = asyncio.create_task(_worker_heartbeat_async(job_id, r_conn))
+            # Start the background heartbeat task only when Redis is available
+            heartbeat_task = asyncio.create_task(_worker_heartbeat_async(job_id, r_conn)) if r_conn is not None else None
 
             res = None
             model_family = correlation.get("model_family", "durability" if job_type == "SIMULATE_DURABILITY" else "quarter_car")
@@ -272,6 +277,10 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
 
                         pdump = payload["params"].copy()
                         asymmetry = pdump.pop("road_asymmetry", 0.3)
+                        if "lateral_accel_mps2" in pdump and "lateral_accel_g" not in pdump:
+                            pdump["lateral_accel_g"] = float(pdump.pop("lateral_accel_mps2")) / 9.81
+                        else:
+                            pdump.pop("lateral_accel_mps2", None)
                         for k in ["damper_curve_v_f", "damper_curve_f_f", "damper_curve_v_r", "damper_curve_f_r"]:
                             pdump.pop(k, None)
                         p = FullCarParams(**pdump)
@@ -506,11 +515,12 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
                     )
 
             finally:
-                heartbeat_task.cancel()
-                try:
-                    await heartbeat_task
-                except asyncio.CancelledError:
-                    pass
+                if heartbeat_task is not None:
+                    heartbeat_task.cancel()
+                    try:
+                        await heartbeat_task
+                    except asyncio.CancelledError:
+                        pass
 
             job_record.status = final_status
             if final_status.startswith("FAILED"):
@@ -521,14 +531,15 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
             span.set_attribute("job.status", final_status)
             
             user_id = str(job_record.user_id) if job_record and job_record.user_id else None
-            try:
-                if not user_id:
-                    cached = await r_conn.get(f"job_status:{job_id}")
-                    user_id = json.loads(cached).get("user_id") if cached else None
-                res_data = {"job_id": job_id, "status": final_status, "user_id": user_id, "result": res, "error": job_record.error}
-                await r_conn.setex(f"job_status:{job_id}", 300, json.dumps(res_data))
-            except Exception:
-                pass
+            if r_conn is not None:
+                try:
+                    if not user_id:
+                        cached = await r_conn.get(f"job_status:{job_id}")
+                        user_id = json.loads(cached).get("user_id") if cached else None
+                    res_data = {"job_id": job_id, "status": final_status, "user_id": user_id, "result": res, "error": job_record.error}
+                    await r_conn.setex(f"job_status:{job_id}", 300, json.dumps(res_data))
+                except Exception:
+                    pass
                 
             WORKER_JOBS_TOTAL.labels(queue="default", status=final_status.lower()).inc()
             WORKER_JOB_DURATION.labels(queue="default").observe(time.time() - start_time)
@@ -544,7 +555,7 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
             return res
             
         except ValueError as val_err:
-            if 'heartbeat_task' in locals() and not heartbeat_task.done():
+            if 'heartbeat_task' in locals() and heartbeat_task is not None and not heartbeat_task.done():
                 heartbeat_task.cancel()
             
             record_solver_outcome(
@@ -565,13 +576,14 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
             span.set_attribute("job.status", "FAILED_INPUT")
             
             user_id = None
-            try:
-                cached = await r_conn.get(f"job_status:{job_id}")
-                user_id = json.loads(cached).get("user_id") if cached else None
-                res_data = {"job_id": job_id, "status": "FAILED_INPUT", "user_id": user_id, "result": None, "error": f"Input Validation Error: {str(val_err)}"}
-                await r_conn.setex(f"job_status:{job_id}", 300, json.dumps(res_data))
-            except Exception:
-                pass
+            if r_conn is not None:
+                try:
+                    cached = await r_conn.get(f"job_status:{job_id}")
+                    user_id = json.loads(cached).get("user_id") if cached else None
+                    res_data = {"job_id": job_id, "status": "FAILED_INPUT", "user_id": user_id, "result": None, "error": f"Input Validation Error: {str(val_err)}"}
+                    await r_conn.setex(f"job_status:{job_id}", 300, json.dumps(res_data))
+                except Exception:
+                    pass
                 
             WORKER_JOBS_TOTAL.labels(queue="default", status="failed_input").inc()
             WORKER_JOB_DURATION.labels(queue="default").observe(time.time() - start_time)
@@ -587,7 +599,7 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
             raise NonRetryableJobError("Input domain exception. Do not retry.") from val_err
 
         except (MathConvergenceError, ZeroDivisionError) as math_err:
-            if 'heartbeat_task' in locals() and not heartbeat_task.done():
+            if 'heartbeat_task' in locals() and heartbeat_task is not None and not heartbeat_task.done():
                 heartbeat_task.cancel()
             
             record_solver_outcome(
@@ -608,13 +620,14 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
             span.set_attribute("job.status", "FAILED_NUMERICAL")
             
             user_id = None
-            try:
-                cached = await r_conn.get(f"job_status:{job_id}")
-                user_id = json.loads(cached).get("user_id") if cached else None
-                res_data = {"job_id": job_id, "status": "FAILED_NUMERICAL", "user_id": user_id, "result": None, "error": f"Numerical Convergence Error: {str(math_err)}"}
-                await r_conn.setex(f"job_status:{job_id}", 300, json.dumps(res_data))
-            except Exception:
-                pass
+            if r_conn is not None:
+                try:
+                    cached = await r_conn.get(f"job_status:{job_id}")
+                    user_id = json.loads(cached).get("user_id") if cached else None
+                    res_data = {"job_id": job_id, "status": "FAILED_NUMERICAL", "user_id": user_id, "result": None, "error": f"Numerical Convergence Error: {str(math_err)}"}
+                    await r_conn.setex(f"job_status:{job_id}", 300, json.dumps(res_data))
+                except Exception:
+                    pass
                 
             WORKER_JOBS_TOTAL.labels(queue="default", status="failed_numerical").inc()
             WORKER_JOB_DURATION.labels(queue="default").observe(time.time() - start_time)
@@ -630,7 +643,7 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
             raise NonRetryableJobError("Math convergence exception. Do not retry.") from math_err
             
         except Exception as e:
-            if 'heartbeat_task' in locals() and not heartbeat_task.done():
+            if 'heartbeat_task' in locals() and heartbeat_task is not None and not heartbeat_task.done():
                 heartbeat_task.cancel()
             await db.rollback()
 
@@ -654,7 +667,11 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
             raise e
             
         finally:
-            await r_conn.aclose()
+            if r_conn is not None:
+                try:
+                    await r_conn.aclose()
+                except Exception:
+                    pass
 
 
 def run_job(job_id: str, payload: dict, trace_carrier: dict = None):

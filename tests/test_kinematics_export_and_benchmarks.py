@@ -112,10 +112,9 @@ def test_gt3_camber_benchmark_regression():
     camber_static = camber[idx_0]
     assert abs(camber_static) < 1.0, f"Baseline GT3 neutral camber was {camber_static}°"
 
-    # Bump camber recovery check
+    # Bump camber recovery check (top tilts inboard -> more negative camber in bump)
     camber_bump = camber[idx_bump]
-    # In solver coordinate frame, top tilts inward under bump (positive camber change)
-    assert camber_bump > camber_static, "Camber at bump must tilt more inward than at static"
+    assert camber_bump < camber_static, "Camber at bump must become more negative than at static"
     assert abs(camber_bump - camber_static) > 0.05, f"Expected noticeable camber change, got {camber_bump}°"
 
     # Bump steer check: toe change across ±40mm sweep is bounded within 5.0°

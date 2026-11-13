@@ -22,15 +22,218 @@ import {
   RunDecisionResponse,
 } from "../../lib/api_client";
 
+export interface ActiveSetupSnapshot {
+  k_spring_front: number;
+  k_spring_rear: number;
+  k_arb_front: number;
+  k_arb_rear: number;
+  ride_height_front: number;
+  ride_height_rear: number;
+}
+
+const DEFAULT_BASELINE_SETUP: ActiveSetupSnapshot = {
+  k_spring_front: 35_000,
+  k_spring_rear: 45_000,
+  k_arb_front: 15_000,
+  k_arb_rear: 10_000,
+  ride_height_front: 30,
+  ride_height_rear: 60,
+};
+
+function computeLocalSetupDiff(
+  runAName: string,
+  runBName: string,
+  base: ActiveSetupSnapshot,
+  cand: ActiveSetupSnapshot
+): {
+  diff: SetupDiffResponse;
+  whatChanged: WhatChangedResponse;
+  decision: RunDecisionResponse;
+} {
+  const specs: Array<{
+    key: keyof ActiveSetupSnapshot;
+    label: string;
+    unit: string;
+  }> = [
+    { key: "k_spring_front", label: "Front Spring Stiffness (k_s,f)", unit: "N/m" },
+    { key: "k_spring_rear", label: "Rear Spring Stiffness (k_s,r)", unit: "N/m" },
+    { key: "k_arb_front", label: "Front ARB Stiffness (k_arb,f)", unit: "N/m" },
+    { key: "k_arb_rear", label: "Rear ARB Stiffness (k_arb,r)", unit: "N/m" },
+    { key: "ride_height_front", label: "Front Ride Height (h_f)", unit: "mm" },
+    { key: "ride_height_rear", label: "Rear Ride Height (h_r)", unit: "mm" },
+  ];
+
+  const parameters = specs.map((s) => {
+    const bVal = base[s.key];
+    const cVal = cand[s.key];
+    const delta = cVal - bVal;
+    const deltaPct = Math.abs(bVal) > 1e-6 ? Number(((delta / bVal) * 100).toFixed(2)) : 0;
+    return {
+      parameter: s.label,
+      baseline: bVal,
+      candidate: cVal,
+      delta,
+      delta_pct: deltaPct,
+      unit: s.unit,
+    };
+  });
+
+  const baseRollF = 0.5 * (base.k_spring_front + base.k_arb_front) * 1.55 * 1.55;
+  const baseRollR = 0.5 * (base.k_spring_rear + base.k_arb_rear) * 1.52 * 1.52;
+  const candRollF = 0.5 * (cand.k_spring_front + cand.k_arb_front) * 1.55 * 1.55;
+  const candRollR = 0.5 * (cand.k_spring_rear + cand.k_arb_rear) * 1.52 * 1.52;
+
+  const baseFrontPct = (baseRollF / Math.max(1, baseRollF + baseRollR)) * 100;
+  const candFrontPct = (candRollF / Math.max(1, candRollF + candRollR)) * 100;
+  const deltaFrontPct = Number((candFrontPct - baseFrontPct).toFixed(2));
+
+  const deltaRhF = cand.ride_height_front - base.ride_height_front;
+  const deltaRhR = cand.ride_height_rear - base.ride_height_rear;
+  const rakeBase = base.ride_height_rear - base.ride_height_front;
+  const rakeCand = cand.ride_height_rear - cand.ride_height_front;
+  const deltaRake = rakeCand - rakeBase;
+  const totalRollBase = baseRollF + baseRollR;
+  const totalRollCand = candRollF + candRollR;
+  const deltaTotalRoll = Number((totalRollCand - totalRollBase).toFixed(0));
+
+  const changedSpecs = parameters.filter((p) => Math.abs(p.delta) > 1e-6);
+
+  const causal_chain: string[] =
+    changedSpecs.length === 0
+      ? [
+          "No active setup sliders differ from the baseline reference configuration yet.",
+          "Switch to Sensitivity Sliders or modify spring, ARB, or ride height values to evaluate live setup deltas.",
+        ]
+      : [
+          `Input Modifications: ${changedSpecs
+            .slice(0, 3)
+            .map((p) => `${p.parameter} ${p.delta > 0 ? "+" : ""}${p.delta} ${p.unit}`)
+            .join(", ")}.`,
+          `Elastic Roll Balance: Front roll stiffness distribution shifted ${baseFrontPct.toFixed(1)}% -> ${candFrontPct.toFixed(1)}% (${deltaFrontPct >= 0 ? "+" : ""}${deltaFrontPct}%).`,
+          `Aero Rake Platform: Rake changed from ${rakeBase.toFixed(0)} mm to ${rakeCand.toFixed(0)} mm (${deltaRake >= 0 ? "+" : ""}${deltaRake.toFixed(0)} mm).`,
+        ];
+
+  return {
+    diff: {
+      a: runAName,
+      b: runBName,
+      parameters,
+      predicted_consequences: {
+        "Front Roll Dist Delta": {
+          baseline: Number(baseFrontPct.toFixed(2)),
+          candidate: Number(candFrontPct.toFixed(2)),
+          delta: deltaFrontPct,
+          delta_pct: Number((deltaFrontPct / Math.max(1, baseFrontPct) * 100).toFixed(2)),
+          unit: "%",
+          beneficial: Math.abs(candFrontPct - 50) <= Math.abs(baseFrontPct - 50),
+        },
+        "Total Roll Stiffness Delta": {
+          baseline: Number(totalRollBase.toFixed(0)),
+          candidate: Number(totalRollCand.toFixed(0)),
+          delta: deltaTotalRoll,
+          delta_pct: Number(((deltaTotalRoll / Math.max(1, totalRollBase)) * 100).toFixed(2)),
+          unit: "Nm/rad",
+          beneficial: deltaTotalRoll >= 0,
+        },
+        "Front Ride Height Delta": {
+          baseline: base.ride_height_front,
+          candidate: cand.ride_height_front,
+          delta: deltaRhF,
+          delta_pct: Number(((deltaRhF / Math.max(1, base.ride_height_front)) * 100).toFixed(2)),
+          unit: "mm",
+          beneficial: cand.ride_height_front >= 15,
+        },
+        "Aero Rake Delta": {
+          baseline: rakeBase,
+          candidate: rakeCand,
+          delta: deltaRake,
+          delta_pct: Number(((deltaRake / Math.max(1, Math.abs(rakeBase))) * 100).toFixed(2)),
+          unit: "mm",
+          beneficial: deltaRake >= 0,
+        },
+      },
+    },
+    whatChanged: {
+      headline:
+        changedSpecs.length === 0
+          ? "Active Setup Matches Baseline Configuration"
+          : `Active Setup Delta: ${changedSpecs.length} Parameter${changedSpecs.length > 1 ? "s" : ""} Modified`,
+      summary:
+        changedSpecs.length === 0
+          ? "All suspension spring rates, ARB rates, and ride heights are aligned with the baseline setup."
+          : `Computed live from active setup state: front roll balance ${candFrontPct.toFixed(1)}% vs baseline ${baseFrontPct.toFixed(1)}%, rake ${rakeCand.toFixed(0)} mm.`,
+      confidence_score_pct: 100,
+      primary_mechanism:
+        Math.abs(deltaFrontPct) > Math.abs(deltaRake)
+          ? "Elastic roll stiffness redistribution across front and rear axles"
+          : "Aerodynamic rake and platform ride-height sensitivity",
+      parameter_deltas: changedSpecs.map((p) => ({
+        param: p.parameter,
+        from: p.baseline,
+        to: p.candidate,
+        delta_pct: p.delta_pct,
+      })),
+      predicted_effects: [
+        {
+          metric: "Front Roll Distribution",
+          delta: deltaFrontPct,
+          unit: "%",
+          verdict:
+            Math.abs(deltaFrontPct) <= 0.5
+              ? "NEUTRAL"
+              : Math.abs(candFrontPct - 50) <= Math.abs(baseFrontPct - 50)
+              ? "IMPROVED"
+              : "DEGRADED",
+        },
+      ],
+      causal_chain,
+    },
+    decision: {
+      verdict: cand.ride_height_front >= 15 && cand.ride_height_rear >= 25 ? "GOOD" : "WARNING",
+      headline:
+        changedSpecs.length === 0
+          ? "Baseline Parity Verified"
+          : cand.ride_height_front >= 15 && cand.ride_height_rear >= 25
+          ? "Active Setup Within Clearance Bounds"
+          : "Check Minimum Ride-Height Clearance",
+      why: "Evaluated directly from the active suspension setup parameters without stale cached runs.",
+      evidence: [
+        {
+          label: "Front Roll Balance",
+          value: `${candFrontPct.toFixed(1)}%`,
+          threshold: "44% - 56%",
+          status: candFrontPct >= 44 && candFrontPct <= 56 ? "PASS" : "WARN",
+        },
+        {
+          label: "Front Clearance",
+          value: `${cand.ride_height_front.toFixed(0)} mm`,
+          threshold: ">= 15 mm",
+          status: cand.ride_height_front >= 15 ? "PASS" : "FAIL",
+        },
+        {
+          label: "Rear Clearance",
+          value: `${cand.ride_height_rear.toFixed(0)} mm`,
+          threshold: ">= 25 mm",
+          status: cand.ride_height_rear >= 25 ? "PASS" : "FAIL",
+        },
+      ],
+    },
+  };
+}
+
 interface SetupDiffViewerProps {
   initialRunA?: string;
   initialRunB?: string;
+  activeSetup?: ActiveSetupSnapshot;
+  baselineSetup?: ActiveSetupSnapshot;
   onSelectRun?: (runId: string) => void;
 }
 
 export default function SetupDiffViewer({
-  initialRunA = "RUN-SPA-0027",
-  initialRunB = "RUN-SPA-0028",
+  initialRunA = "BASELINE-SETUP",
+  initialRunB = "ACTIVE-SETUP",
+  activeSetup,
+  baselineSetup = DEFAULT_BASELINE_SETUP,
   onSelectRun,
 }: SetupDiffViewerProps) {
   const [runA, setRunA] = useState(initialRunA);
@@ -41,9 +244,21 @@ export default function SetupDiffViewer({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const isLocalSetupMode =
+    (runA === "BASELINE-SETUP" || runA === initialRunA) &&
+    (runB === "ACTIVE-SETUP" || runB === initialRunB);
+
   const fetchDiffData = async () => {
-    setLoading(true);
     setError(null);
+    if (isLocalSetupMode) {
+      const local = computeLocalSetupDiff(runA, runB, baselineSetup, activeSetup ?? baselineSetup);
+      setDiff(local.diff);
+      setWhatChanged(local.whatChanged);
+      setDecision(local.decision);
+      return;
+    }
+
+    setLoading(true);
     try {
       const [d, wc, dec] = await Promise.all([
         SimulationApi.compareRuns(runA, runB).catch(() => null),
@@ -51,68 +266,10 @@ export default function SetupDiffViewer({
         SimulationApi.getRunDecision(runB).catch(() => null),
       ]);
 
-      if (d) {
-        setDiff(d);
-      } else {
-        // Engineering fallback conforming to SetupDiffResponse
-        setDiff({
-          a: runA,
-          b: runB,
-          parameters: [
-            { parameter: "Front Spring Stiffness (k_s,f)", baseline: 30000, candidate: 32000, delta: 2000, delta_pct: 6.67, unit: "N/m" },
-            { parameter: "Rear Spring Stiffness (k_s,r)", baseline: 34000, candidate: 38000, delta: 4000, delta_pct: 11.76, unit: "N/m" },
-            { parameter: "Front Damper Rebound (c_reb,f)", baseline: 2200, candidate: 2400, delta: 200, delta_pct: 9.09, unit: "Ns/m" },
-            { parameter: "Rear Damper Bump (c_bump,r)", baseline: 1600, candidate: 1800, delta: 200, delta_pct: 12.5, unit: "Ns/m" },
-            { parameter: "Front Ride Height (h_f)", baseline: 30, candidate: 28, delta: -2, delta_pct: -6.67, unit: "mm" },
-            { parameter: "Rear Ride Height (h_r)", baseline: 45, candidate: 42, delta: -3, delta_pct: -6.67, unit: "mm" },
-          ],
-          predicted_consequences: {
-            "Lap Time Delta": { baseline: 104.25, candidate: 104.163, delta: -0.087, delta_pct: -0.08, unit: "s", beneficial: true },
-            "Peak Lateral Acceleration": { baseline: 3.82, candidate: 3.89, delta: 0.07, delta_pct: 1.83, unit: "g", beneficial: true },
-            "Aero Platform Ride-Height Var": { baseline: 4.2, candidate: 3.1, delta: -1.1, delta_pct: -26.19, unit: "mm", beneficial: true },
-            "Contact Patch Dynamic Load Var": { baseline: 320, candidate: 298, delta: -22, delta_pct: -6.88, unit: "N", beneficial: true },
-          },
-        });
-      }
-
-      if (wc) {
-        setWhatChanged(wc);
-      } else {
-        setWhatChanged({
-          headline: "Rear Pitch Stabilization via Increased Heave Stiffness",
-          summary: "Stiffer rear heave spring (+4,000 N/m) reduced aerodynamic pitch deflection at high speed, stabilizing the underfloor diffuser in Sector 2.",
-          confidence_score_pct: 91,
-          primary_mechanism: "Diffuser aero seal maintained through Kemmel and Les Combes",
-          parameter_deltas: [
-            { param: "k_spring_rear", from: 34000, to: 38000, delta_pct: 11.76 },
-            { param: "ride_height_rear", from: 45, to: 42, delta_pct: -6.67 },
-          ],
-          predicted_effects: [
-            { metric: "Lap Time Delta", delta: -0.087, unit: "s", verdict: "IMPROVED" },
-            { metric: "Underfloor Aero Downforce", delta: 180, unit: "N", verdict: "IMPROVED" },
-          ],
-          causal_chain: [
-            "Input Trigger: Increased rear spring rate (+4,000 N/m) and reduced rake by 1mm.",
-            "Kinematic Response: Dynamic rear ride-height variance dropped from 4.2mm to 3.1mm at 280+ km/h.",
-            "Aero & Grip Consequence: Diffuser aero platform stabilized, delivering +1.8% front grip and -0.087s lap time reduction.",
-          ],
-        });
-      }
-
-      if (dec) {
-        setDecision(dec);
-      } else {
-        setDecision({
-          verdict: "GOOD",
-          headline: "Recommended for Track Evaluation",
-          why: "Candidate setup improves platform stability without tire degradation or bottoming.",
-          evidence: [
-            { label: "Lap Time Delta", value: "-0.087 s", threshold: "< 0.0 s", status: "PASS" },
-            { label: "Eau Rouge Bottoming Margin", value: "8.2 mm", threshold: "> 5.0 mm", status: "PASS" },
-            { label: "Tire Slip Margin", value: "18.4%", threshold: "> 10.0%", status: "PASS" },
-          ],
-        });
-      }
+      const localFallback = computeLocalSetupDiff(runA, runB, baselineSetup, activeSetup ?? baselineSetup);
+      setDiff(d ?? localFallback.diff);
+      setWhatChanged(wc ?? localFallback.whatChanged);
+      setDecision(dec ?? localFallback.decision);
     } catch (e: any) {
       setError(e?.message || "Failed to load setup diff data.");
     } finally {
@@ -121,8 +278,13 @@ export default function SetupDiffViewer({
   };
 
   useEffect(() => {
-    fetchDiffData();
-  }, [runA, runB]);
+    if (isLocalSetupMode) {
+      const local = computeLocalSetupDiff(runA, runB, baselineSetup, activeSetup ?? baselineSetup);
+      setDiff(local.diff);
+      setWhatChanged(local.whatChanged);
+      setDecision(local.decision);
+    }
+  }, [runA, runB, activeSetup, baselineSetup, isLocalSetupMode]);
 
   return (
     <div className="space-y-6 select-none font-sans text-white">

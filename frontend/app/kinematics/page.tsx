@@ -106,18 +106,18 @@ const BENCHMARK_CATALOG: Record<
     zRange: [-50, 50],
     tireRadiusM: 0.330,
     hardpoints: {
-      UWI_fwd: [-50.0, 80.0, 300.0],
-      UWI_aft: [50.0, 80.0, 300.0],
-      UWO: [0.0, 650.0, 295.0],
-      LWI_fwd: [-80.0, 80.0, 155.0],
-      LWI_aft: [80.0, 80.0, 155.0],
-      LWO: [0.0, 720.0, 145.0],
-      TRI: [0.0, 150.0, 220.0],
-      TRO: [-15.0, 710.0, 205.0],
-      WC: [0.0, 760.0, 220.0],
+      UWI_fwd: [-50.0, 80.0, 365.0],
+      UWI_aft: [50.0, 80.0, 365.0],
+      UWO: [-9.0, 625.0, 435.0],
+      LWI_fwd: [-80.0, 80.0, 215.0],
+      LWI_aft: [80.0, 80.0, 215.0],
+      LWO: [9.0, 675.0, 245.0],
+      TRI: [-15.0, 80.0, 267.5],
+      TRO: [-20.0, 647.5, 311.5],
+      WC: [0.0, 760.0, 330.0],
       CP: [0.0, 760.0, 0.0],
-      PRI: [-20.0, 300.0, 390.0],
-      PRO: [-15.0, 690.0, 250.0],
+      PRI: [-20.0, 380.0, 560.0],
+      PRO: [-15.0, 650.0, 275.0],
     },
   },
   gt3_camber_shim_5mm: {
@@ -128,62 +128,62 @@ const BENCHMARK_CATALOG: Record<
     zRange: [-50, 50],
     tireRadiusM: 0.330,
     hardpoints: {
-      UWI_fwd: [-50.0, 80.0, 300.0],
-      UWI_aft: [50.0, 80.0, 300.0],
-      UWO: [0.0, 650.0, 295.0],
-      LWI_fwd: [-80.0, 80.0, 155.0],
-      LWI_aft: [80.0, 80.0, 155.0],
-      LWO: [0.0, 725.0, 145.0],
-      TRI: [0.0, 150.0, 220.0],
-      TRO: [-15.0, 710.0, 205.0],
-      WC: [0.0, 760.0, 220.0],
+      UWI_fwd: [-50.0, 80.0, 365.0],
+      UWI_aft: [50.0, 80.0, 365.0],
+      UWO: [-9.0, 625.0, 435.0],
+      LWI_fwd: [-80.0, 80.0, 215.0],
+      LWI_aft: [80.0, 80.0, 215.0],
+      LWO: [9.0, 680.0, 245.0],
+      TRI: [-15.0, 80.0, 267.5],
+      TRO: [-20.0, 647.5, 311.5],
+      WC: [0.0, 760.0, 330.0],
       CP: [0.0, 760.0, 0.0],
-      PRI: [-20.0, 300.0, 390.0],
-      PRO: [-15.0, 690.0, 250.0],
+      PRI: [-20.0, 380.0, 560.0],
+      PRO: [-15.0, 650.0, 275.0],
     },
   },
   formula_sae: {
     id: "formula_sae",
     name: "Formula SAE Prototype",
     category: "Open Wheel Formula",
-    description: "Open-wheel formula car with aggressive camber recovery, low roll center, and direct pushrod actuation.",
+    description: "Open-wheel formula car with aggressive camber recovery, controlled roll center, and direct pushrod actuation.",
     zRange: [-30, 30],
     tireRadiusM: 0.254,
     hardpoints: {
-      UWI_fwd: [-50.0, 100.0, 240.0],
-      UWI_aft: [50.0, 100.0, 240.0],
-      UWO: [0.0, 520.0, 230.0],
-      LWI_fwd: [-80.0, 100.0, 110.0],
-      LWI_aft: [80.0, 100.0, 110.0],
-      LWO: [0.0, 560.0, 100.0],
-      TRI: [0.0, 120.0, 160.0],
-      TRO: [-15.0, 550.0, 150.0],
-      WC: [0.0, 600.0, 230.0],
+      UWI_fwd: [-50.0, 100.0, 295.0],
+      UWI_aft: [50.0, 100.0, 295.0],
+      UWO: [-7.5, 495.0, 340.0],
+      LWI_fwd: [-80.0, 100.0, 172.0],
+      LWI_aft: [80.0, 100.0, 172.0],
+      LWO: [7.5, 535.0, 185.0],
+      TRI: [-15.0, 100.0, 215.1],
+      TRO: [-20.0, 511.0, 239.2],
+      WC: [0.0, 600.0, 254.0],
       CP: [0.0, 600.0, 0.0],
-      PRI: [-20.0, 220.0, 320.0],
-      PRO: [-15.0, 530.0, 170.0],
+      PRI: [-20.0, 280.0, 445.0],
+      PRO: [-15.0, 515.0, 200.0],
     },
   },
   formula_sae_low_rc: {
     id: "formula_sae_low_rc",
     name: "Formula SAE (Low Roll Center / Raised Inboard UWI)",
     category: "Open Wheel Formula Variant",
-    description: "FSAE corner with raised upper wishbone inboard pivots (UWI Z+15mm), shifting roll center downward to soften front roll couple.",
+    description: "FSAE corner with raised upper wishbone inboard pivots (UWI Z+5mm), shifting roll center downward to soften front roll couple.",
     zRange: [-30, 30],
     tireRadiusM: 0.254,
     hardpoints: {
-      UWI_fwd: [-50.0, 100.0, 255.0],
-      UWI_aft: [50.0, 100.0, 255.0],
-      UWO: [0.0, 520.0, 230.0],
-      LWI_fwd: [-80.0, 100.0, 110.0],
-      LWI_aft: [80.0, 100.0, 110.0],
-      LWO: [0.0, 560.0, 100.0],
-      TRI: [0.0, 120.0, 160.0],
-      TRO: [-15.0, 550.0, 150.0],
-      WC: [0.0, 600.0, 230.0],
+      UWI_fwd: [-50.0, 100.0, 300.0],
+      UWI_aft: [50.0, 100.0, 300.0],
+      UWO: [-7.5, 495.0, 340.0],
+      LWI_fwd: [-80.0, 100.0, 172.0],
+      LWI_aft: [80.0, 100.0, 172.0],
+      LWO: [7.5, 535.0, 185.0],
+      TRI: [-15.0, 100.0, 216.8],
+      TRO: [-20.0, 511.0, 239.2],
+      WC: [0.0, 600.0, 254.0],
       CP: [0.0, 600.0, 0.0],
-      PRI: [-20.0, 220.0, 320.0],
-      PRO: [-15.0, 530.0, 170.0],
+      PRI: [-20.0, 280.0, 445.0],
+      PRO: [-15.0, 515.0, 200.0],
     },
   },
   lmp_prototype: {
@@ -194,18 +194,18 @@ const BENCHMARK_CATALOG: Record<
     zRange: [-35, 35],
     tireRadiusM: 0.340,
     hardpoints: {
-      UWI_fwd: [-60.0, 90.0, 270.0],
-      UWI_aft: [60.0, 90.0, 270.0],
-      UWO: [0.0, 720.0, 260.0],
-      LWI_fwd: [-90.0, 90.0, 120.0],
-      LWI_aft: [90.0, 90.0, 120.0],
-      LWO: [0.0, 780.0, 110.0],
-      TRI: [0.0, 140.0, 190.0],
-      TRO: [-15.0, 770.0, 175.0],
-      WC: [0.0, 820.0, 220.0],
+      UWI_fwd: [-60.0, 90.0, 370.0],
+      UWI_aft: [60.0, 90.0, 370.0],
+      UWO: [-9.0, 685.0, 435.0],
+      LWI_fwd: [-90.0, 90.0, 215.0],
+      LWI_aft: [90.0, 90.0, 215.0],
+      LWO: [9.0, 735.0, 240.0],
+      TRI: [-15.0, 90.0, 269.2],
+      TRO: [-20.0, 707.5, 308.2],
+      WC: [0.0, 820.0, 340.0],
       CP: [0.0, 820.0, 0.0],
-      PRI: [-25.0, 280.0, 370.0],
-      PRO: [-15.0, 740.0, 210.0],
+      PRI: [-25.0, 410.0, 550.0],
+      PRO: [-15.0, 710.0, 265.0],
     },
   },
 };
@@ -214,21 +214,21 @@ const BENCHMARK_CATALOG: Record<
 const THEME = {
   paper_bgcolor: "transparent",
   plot_bgcolor: "transparent",
-  font: { color: "#777", size: 11, family: "Inter, monospace" },
+  font: { color: "#94A3B8", size: 11, family: "Inter, monospace" },
   xaxis: {
-    color: "#555",
+    color: "#94A3B8",
     gridcolor: "#161820",
     zerolinecolor: "#2a2d3d",
-    tickfont: { color: "#666", size: 10 },
+    tickfont: { color: "#94A3B8", size: 10 },
   },
   yaxis: {
-    color: "#555",
+    color: "#94A3B8",
     gridcolor: "#161820",
     zerolinecolor: "#2a2d3d",
-    tickfont: { color: "#666", size: 10 },
+    tickfont: { color: "#94A3B8", size: 10 },
   },
   legend: {
-    font: { color: "#888", size: 10 },
+    font: { color: "#94A3B8", size: 10 },
     bgcolor: "rgba(0,0,0,0)",
     orientation: "h" as const,
     y: -0.22,
@@ -357,15 +357,15 @@ function plotLayout(
 }
 
 const COLORS = {
-  cyan: "#22d3ee",
-  violet: "#a78bfa",
-  amber: "#fbbf24",
-  emerald: "#34d399",
-  rose: "#fb7185",
-  blue: "#60a5fa",
-  orange: "#fb923c",
-  candidateAmber: "#f59e0b",
-  candidateViolet: "#c084fc",
+  cyan: "#06B6D4",
+  violet: "#F59E0B",
+  amber: "#F59E0B",
+  emerald: "#10B981",
+  rose: "#F43F5E",
+  blue: "#06B6D4",
+  orange: "#F59E0B",
+  candidateAmber: "#F59E0B",
+  candidateViolet: "#10B981",
 };
 
 // ─── KPI Card Component ───────────────────────────────────────────────────────
@@ -722,6 +722,20 @@ export default function KinematicsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPreset]);
 
+  // Auto-recompute sweep (debounced 250ms) when hardpoints or sweep bounds are edited
+  const didInitAutoSolveRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (!didInitAutoSolveRef.current) {
+      didInitAutoSolveRef.current = true;
+      return;
+    }
+    const timer = setTimeout(() => {
+      solve();
+    }, 250);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hp, zMin, zMax, nSteps]);
+
   // Automatically solve Setup B and run comparison when comparison mode is enabled
   useEffect(() => {
     if (isComparisonMode) {
@@ -880,8 +894,8 @@ export default function KinematicsPage() {
       {/* ── Top Header Navigation Bar ───────────────────────────────────────── */}
       <header className="border-b border-[#181a24] bg-[#0a0b10]/90 backdrop-blur-md px-5 py-3 sticky top-0 z-30 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-600 to-violet-600 flex items-center justify-center shadow-md shadow-cyan-900/30">
-            <Box className="w-4 h-4 text-white" />
+          <div className="w-8 h-8 rounded-lg bg-[#10141d] border border-cyan-500/40 flex items-center justify-center shadow-md shadow-black/40">
+            <Box className="w-4 h-4 text-cyan-400" />
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -935,7 +949,7 @@ export default function KinematicsPage() {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#10121a] hover:bg-[#181b28] text-gray-300 border border-[#222536] transition"
             title="Configure Target Design Corridors"
           >
-            <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+            <Sliders className="w-3.5 h-3.5 text-cyan-400" />
             <span>Target Bands</span>
           </button>
 
@@ -973,7 +987,7 @@ export default function KinematicsPage() {
           <button
             onClick={solve}
             disabled={loading}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-bold text-xs bg-gradient-to-r from-cyan-600 to-violet-600 hover:from-cyan-500 hover:to-violet-500 text-white shadow-lg shadow-cyan-950/40 disabled:opacity-50 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-bold text-xs bg-amber-500 hover:bg-amber-400 text-black border border-amber-400/50 shadow-lg shadow-black/40 disabled:opacity-50 transition-all cursor-pointer"
           >
             {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
             <span>{loading ? "Solving…" : "Recompute Sweep"}</span>
@@ -982,9 +996,9 @@ export default function KinematicsPage() {
       </header>
 
       {/* ── Main Workspace Grid ─────────────────────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row h-[calc(100vh-57px)] overflow-hidden">
+      <div className="flex flex-col lg:flex-row min-h-[calc(100vh-57px)]">
         {/* ── LEFT SIDEBAR: Hardpoint Controls & Travel Config ──────────────── */}
-        <aside className="w-full lg:w-80 flex-shrink-0 border-r border-[#171924] bg-[#090a0f] flex flex-col overflow-y-auto">
+        <aside className="w-full lg:w-80 flex-shrink-0 border-r border-[#171924] bg-[#090a0f] flex flex-col lg:max-h-[calc(100vh-57px)] lg:sticky lg:top-[57px] overflow-y-auto">
           <div className="p-3.5 border-b border-[#181a24] bg-[#0d0e16]">
             <h2 className="text-[11px] font-bold text-gray-300 uppercase tracking-wider flex items-center justify-between">
               <span>{isComparisonMode ? "Setup A Hardpoints (mm)" : "Corner Hardpoints (mm)"}</span>
@@ -1003,29 +1017,38 @@ export default function KinematicsPage() {
               </span>
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="text-[9px] text-gray-500">Droop (mm)</label>
+                  <label className="text-[9px] text-gray-400">Droop (mm)</label>
                   <input
                     type="number"
                     value={zMin}
-                    onChange={(e) => setZMin(parseFloat(e.target.value) || -50)}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value);
+                      setZMin(Number.isFinite(v) ? v : -50);
+                    }}
                     className="w-full mt-0.5 bg-[#08090d] border border-[#232738] rounded px-1.5 py-1 text-[11px] text-gray-200 font-mono text-center focus:border-cyan-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="text-[9px] text-gray-500">Bump (mm)</label>
+                  <label className="text-[9px] text-gray-400">Bump (mm)</label>
                   <input
                     type="number"
                     value={zMax}
-                    onChange={(e) => setZMax(parseFloat(e.target.value) || 50)}
+                    onChange={(e) => {
+                      const v = parseFloat(e.target.value);
+                      setZMax(Number.isFinite(v) ? v : 50);
+                    }}
                     className="w-full mt-0.5 bg-[#08090d] border border-[#232738] rounded px-1.5 py-1 text-[11px] text-gray-200 font-mono text-center focus:border-cyan-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="text-[9px] text-gray-500">Steps</label>
+                  <label className="text-[9px] text-gray-400">Steps</label>
                   <input
                     type="number"
                     value={nSteps}
-                    onChange={(e) => setNSteps(parseInt(e.target.value) || 33)}
+                    onChange={(e) => {
+                      const v = parseInt(e.target.value, 10);
+                      setNSteps(Number.isFinite(v) && v > 1 ? v : 33);
+                    }}
                     className="w-full mt-0.5 bg-[#08090d] border border-[#232738] rounded px-1.5 py-1 text-[11px] text-gray-200 font-mono text-center focus:border-cyan-500 focus:outline-none"
                   />
                 </div>
@@ -1181,7 +1204,7 @@ export default function KinematicsPage() {
               label="7. Caster"
               value={currentCaster}
               unit="°"
-              sub="Kingpin inclination"
+              sub="Steering axis caster angle"
               color={COLORS.amber}
             />
             <KPICard
@@ -1203,7 +1226,7 @@ export default function KinematicsPage() {
 
           {/* ── Real-Time Kinematic Derivative / Rate Metrics Bar ────────────── */}
           <div className="bg-[#0b0c12] border border-[#1d202b] rounded-xl px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2 text-indigo-400 font-semibold">
+            <div className="flex items-center gap-2 text-cyan-400 font-semibold">
               <TrendingUp className="w-4 h-4" />
               <span>Real Finite-Difference Kinematic Rates (at {currentTravel.toFixed(1)} mm):</span>
             </div>
@@ -1211,13 +1234,13 @@ export default function KinematicsPage() {
               <div>
                 <span className="text-gray-400">dγ/dz (Camber Gain): </span>
                 <span className="font-bold text-cyan-300">{currentCamberGain.toFixed(2)} °/100mm</span>
-                <span className="text-gray-500 text-[10px] ml-1">
+                <span className="text-gray-400 text-[10px] ml-1">
                   ({(currentCamberGain * 10.0).toFixed(1)} °/m)
                 </span>
               </div>
               <div>
                 <span className="text-gray-400">dToe/dz (Bump Steer): </span>
-                <span className="font-bold text-violet-300">{currentToeGain.toFixed(2)} °/100mm</span>
+                <span className="font-bold text-amber-300">{currentToeGain.toFixed(2)} °/100mm</span>
               </div>
               <div>
                 <span className="text-gray-400">dRC/dz (Migration Rate): </span>
@@ -1441,12 +1464,12 @@ export default function KinematicsPage() {
                       zMin,
                       zMax,
                       currentTravel,
-                      { title: { text: "Wheel Travel [mm]", font: { size: 11, color: "#666" } } },
-                      { title: { text: "Camber [°]", font: { size: 11, color: "#666" } } }
+                      { title: { text: "Wheel Travel [mm]", font: { size: 11, color: "#94A3B8" } } },
+                      { title: { text: "Camber [°]", font: { size: 11, color: "#94A3B8" } } }
                     ),
                     yaxis2: {
                       ...THEME.yaxis,
-                      title: { text: "Toe [°]", font: { size: 11, color: "#666" } },
+                      title: { text: "Toe [°]", font: { size: 11, color: "#94A3B8" } },
                       overlaying: "y",
                       side: "right",
                     },
@@ -1513,14 +1536,14 @@ export default function KinematicsPage() {
                       zMin,
                       zMax,
                       currentTravel,
-                      { title: { text: "Wheel Travel [mm]", font: { size: 11, color: "#666" } } },
-                      { title: { text: "Roll Center Height (Z) [mm]", font: { size: 11, color: "#666" } } },
+                      { title: { text: "Wheel Travel [mm]", font: { size: 11, color: "#94A3B8" } } },
+                      { title: { text: "Roll Center Height (Z) [mm]", font: { size: 11, color: "#94A3B8" } } },
                       undefined,
                       targetBands.roll_center_height_mm
                     ),
                     yaxis2: {
                       ...THEME.yaxis,
-                      title: { text: "RC Lateral Migration (Y) [mm]", font: { size: 11, color: "#666" } },
+                      title: { text: "RC Lateral Migration (Y) [mm]", font: { size: 11, color: "#94A3B8" } },
                       overlaying: "y",
                       side: "right",
                     },
@@ -1583,14 +1606,14 @@ export default function KinematicsPage() {
                       zMin,
                       zMax,
                       currentTravel,
-                      { title: { text: "Wheel Travel [mm]", font: { size: 11, color: "#666" } } },
-                      { title: { text: "Angular Rate [°/100mm]", font: { size: 11, color: "#666" } } },
+                      { title: { text: "Wheel Travel [mm]", font: { size: 11, color: "#94A3B8" } } },
+                      { title: { text: "Angular Rate [°/100mm]", font: { size: 11, color: "#94A3B8" } } },
                       undefined,
                       targetBands.camber_gain_deg_per_100mm
                     ),
                     yaxis2: {
                       ...THEME.yaxis,
-                      title: { text: "Linear Rate [mm/mm]", font: { size: 11, color: "#666" } },
+                      title: { text: "Linear Rate [mm/mm]", font: { size: 11, color: "#94A3B8" } },
                       overlaying: "y",
                       side: "right",
                     },
@@ -1636,8 +1659,8 @@ export default function KinematicsPage() {
                       zMin,
                       zMax,
                       currentTravel,
-                      { title: { text: "Wheel Travel [mm]", font: { size: 11, color: "#666" } } },
-                      { title: { text: "Motion Ratio [mm/mm]", font: { size: 11, color: "#666" } } },
+                      { title: { text: "Wheel Travel [mm]", font: { size: 11, color: "#94A3B8" } } },
+                      { title: { text: "Motion Ratio [mm/mm]", font: { size: 11, color: "#94A3B8" } } },
                       undefined,
                       targetBands.motion_ratio
                     ),
@@ -1691,8 +1714,8 @@ export default function KinematicsPage() {
                       zMin,
                       zMax,
                       currentTravel,
-                      { title: { text: "Wheel Travel [mm]", font: { size: 11, color: "#666" } } },
-                      { title: { text: "Δ [mm]", font: { size: 11, color: "#666" } } }
+                      { title: { text: "Wheel Travel [mm]", font: { size: 11, color: "#94A3B8" } } },
+                      { title: { text: "Δ [mm]", font: { size: 11, color: "#94A3B8" } } }
                     ),
                   }}
                   config={{ responsive: true, displaylogo: false }}
@@ -1741,12 +1764,12 @@ export default function KinematicsPage() {
                       zMin,
                       zMax,
                       currentTravel,
-                      { title: { text: "Wheel Travel [mm]", font: { size: 11, color: "#666" } } },
-                      { title: { text: "Angle [°]", font: { size: 11, color: "#666" } } }
+                      { title: { text: "Wheel Travel [mm]", font: { size: 11, color: "#94A3B8" } } },
+                      { title: { text: "Angle [°]", font: { size: 11, color: "#94A3B8" } } }
                     ),
                     yaxis2: {
                       ...THEME.yaxis,
-                      title: { text: "Scrub Radius [mm]", font: { size: 11, color: "#666" } },
+                      title: { text: "Scrub Radius [mm]", font: { size: 11, color: "#94A3B8" } },
                       overlaying: "y",
                       side: "right",
                     },
@@ -1834,6 +1857,7 @@ export default function KinematicsPage() {
         isOpen={isExportModalOpen}
         onClose={() => setIsExportModalOpen(false)}
         hardpoints={hp}
+        sweepData={result}
         setupName={BENCHMARK_CATALOG[selectedPreset]?.name || "Custom Setup"}
         zMin={zMin}
         zMax={zMax}

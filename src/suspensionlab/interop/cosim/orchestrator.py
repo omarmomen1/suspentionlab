@@ -153,28 +153,40 @@ class CoSimulationMasterOrchestrator:
                         raise FileNotFoundError(f"FMU file for participant '{m_id}' ({model_spec.name}) not found.")
 
                     fmu_path = pathlib.Path(fmu_file)
-                    if not fmu_path.exists():
+                    if not fmu_path.exists() or not fmu_path.is_file():
                         raise FileNotFoundError(f"FMU file '{fmu_path}' does not exist.")
 
-                    # Cryptographic allowlist check: untrusted FMUs must be rejected fail-closed
-                    with open(fmu_path, "rb") as f_obj:
-                        file_hash = hashlib.sha256(f_obj.read()).hexdigest()
+                    # Cryptographic allowlist check: read once into memory and stage privately to prevent TOCTOU
+                    fmu_bytes = fmu_path.read_bytes()
+                    file_hash = hashlib.sha256(fmu_bytes).hexdigest()
                     from suspensionlab.backend.services.solver_execution_service import VETTED_FMU_SHA256
                     if file_hash not in VETTED_FMU_SHA256:
                         raise PermissionError(
                             f"Untrusted FMU rejected: SHA-256 '{file_hash}' is not on the vetted allowlist."
                         )
 
-                    md = fmpy.read_model_description(str(fmu_path))
+                    staged_fmu_dir = pathlib.Path(tempfile.mkdtemp(prefix=f"fmu_stage_{m_id}_", dir=str(self.workspace_base)))
+                    temp_extract_dirs.append(staged_fmu_dir)
+                    staged_fmu_path = staged_fmu_dir / (fmu_path.name if fmu_path.suffix.lower() == ".fmu" else "model.fmu")
+                    staged_fmu_path.write_bytes(fmu_bytes)
+
+                    # Unconditionally verify SHA-256 of staged .fmu immediately before loading/extracting
+                    staged_hash = hashlib.sha256(staged_fmu_path.read_bytes()).hexdigest()
+                    if staged_hash not in VETTED_FMU_SHA256:
+                        raise PermissionError(
+                            f"Untrusted FMU rejected: SHA-256 '{staged_hash}' is not on the vetted allowlist."
+                        )
+
+                    md = fmpy.read_model_description(str(staged_fmu_path))
 
                     # Audit capabilities
-                    audit = FMICapabilityAuditor.audit_fmu(fmu_path)
+                    audit = FMICapabilityAuditor.audit_fmu(staged_fmu_path, vetted_hashes=VETTED_FMU_SHA256)
                     rollback_capabilities[m_id] = audit.rollback_supported
 
                     # Extract FMU to unique directory
                     unzip_dir = pathlib.Path(tempfile.mkdtemp(prefix=f"fmu_{m_id}_", dir=str(self.workspace_base)))
                     temp_extract_dirs.append(unzip_dir)
-                    fmpy.extract(str(fmu_path), unzipdir=str(unzip_dir))
+                    fmpy.extract(str(staged_fmu_path), unzipdir=str(unzip_dir))
 
                     # Map variable names to value references
                     refs: Dict[str, int] = {}

@@ -161,14 +161,19 @@ export default function KinematicsModelValidity({
             {/* Right Header Quick Actions / Metrics */}
             <div className="flex items-center gap-3 ml-auto">
               {/* Benchmarks Button */}
-              {benchmarks.length > 0 && onOpenBenchmarks && (
+              {onOpenBenchmarks && (
                 <button
+                  type="button"
                   data-testid="btn-open-benchmarks"
                   onClick={onOpenBenchmarks}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-500/40 text-cyan-300 text-xs font-mono transition-colors"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-500/40 text-cyan-300 text-xs font-mono transition-colors cursor-pointer"
                 >
                   <Award className="w-3.5 h-3.5 text-cyan-400" />
-                  <span>Benchmarks: {passedBenchmarksCount}/{benchmarks.length} Passed</span>
+                  <span>
+                    {benchmarks.length > 0
+                      ? `Benchmarks: ${passedBenchmarksCount}/${benchmarks.length} Passed`
+                      : "Benchmarks Audit"}
+                  </span>
                 </button>
               )}
 

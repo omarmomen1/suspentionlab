@@ -78,6 +78,28 @@ VETTED_FMU_SHA256 = {
     "96d3b708eeffdf4245beb179baf8ba4b35d58e926e2206b28a3f721523114746",  # ActiveSuspensionController.fmu (Phase 7.6)
 }
 
+ALLOWED_EXECUTION_CONFIG_KEYS: frozenset[str] = frozenset({
+    "duration",
+    "stop_time",
+    "t_end",
+    "step",
+    "step_size",
+    "communication_step_size",
+    "bump_height",
+    "bump_time",
+    "road_input_type",
+    "m_s",
+    "m_u",
+    "k_s",
+    "c",
+    "k_t",
+    "MR",
+    "benchmark_method",
+    "contract_id",
+    "simulate_crash",
+    "simulate_timeout",
+})
+
 
 class RuntimeUnavailableError(InteropSecurityError):
     """Raised when a requested external solver runtime is not installed or available."""
@@ -97,6 +119,84 @@ class SolverExecutionService:
     def __init__(self, sandbox_base_dir: Optional[pathlib.Path] = None):
         self.sandbox_base_dir = sandbox_base_dir or (pathlib.Path("data") / "solver_runs")
         self._active_sandboxes: Dict[str, ExecutionSandbox] = {}
+
+    @staticmethod
+    def sanitize_execution_config(execution_config: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Filters execution_config strictly to allowlisted parameters."""
+        if not execution_config or not isinstance(execution_config, dict):
+            return {}
+        return {k: v for k, v in execution_config.items() if k in ALLOWED_EXECUTION_CONFIG_KEYS}
+
+    @staticmethod
+    def _compute_file_sha256(file_path: pathlib.Path) -> str:
+        """Computes the SHA-256 hex digest of a file directly from disk."""
+        hasher = hashlib.sha256()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                hasher.update(chunk)
+        return hasher.hexdigest()
+
+    @classmethod
+    def verify_fmu_allowlist(cls, fmu_path: pathlib.Path) -> Tuple[bool, str]:
+        """
+        Unconditionally verifies the live SHA-256 digest of a .fmu file on disk
+        against VETTED_FMU_SHA256 immediately before loading or executing it.
+        """
+        if not fmu_path.exists() or not fmu_path.is_file():
+            return False, ""
+        disk_sha = cls._compute_file_sha256(fmu_path)
+        return (disk_sha in VETTED_FMU_SHA256), disk_sha
+
+    async def _fail_execution_job(
+        self,
+        db: AsyncSession,
+        job: SolverExecutionJob,
+        failure_reason: str,
+        error_category: str,
+        exit_code: int = 1,
+    ) -> SolverExecutionJob:
+        """Transitions a job to FAILED, cleans up active sandbox handle, and persists."""
+        self._active_sandboxes.pop(str(job.id), None)
+        job.transition_to(
+            ExecutionJobState.FAILED,
+            exit_code=exit_code,
+            failure_reason=failure_reason,
+            error_category=error_category,
+        )
+        await db.commit()
+        return job
+
+    async def _enforce_fmu_vetting(
+        self,
+        db: AsyncSession,
+        job: SolverExecutionJob,
+        artifact_name: str,
+        fmu_path: pathlib.Path,
+    ) -> Optional[SolverExecutionJob]:
+        """Unconditionally verifies a .fmu file against VETTED_FMU_SHA256, failing closed if unvetted."""
+        if fmu_path.suffix.lower() != ".fmu":
+            return await self._fail_execution_job(
+                db=db,
+                job=job,
+                failure_reason=(
+                    f"UNTRUSTED_FMU_EXECUTION_REJECTED: Artifact '{artifact_name}' "
+                    "is not a .fmu archive. FMI_COSIMULATION requires a cryptographically vetted .fmu file."
+                ),
+                error_category="UNTRUSTED_FMU_EXECUTION_REJECTED",
+            )
+        is_vetted, live_fmu_sha = self.verify_fmu_allowlist(fmu_path)
+        if not is_vetted:
+            return await self._fail_execution_job(
+                db=db,
+                job=job,
+                failure_reason=(
+                    f"UNTRUSTED_FMU_EXECUTION_REJECTED: FMU '{artifact_name}' "
+                    f"(SHA256: {live_fmu_sha[:16]}...) is not in the vetted allowlist. "
+                    "Untrusted native DLL/SO execution is blocked by sandbox security policy."
+                ),
+                error_category="UNTRUSTED_FMU_EXECUTION_REJECTED",
+            )
+        return None
 
     def _check_tenant_access(
         self,
@@ -182,7 +282,7 @@ class SolverExecutionService:
             raise FileNotFoundError(f"Artifact storage file '{artifact.storage_path}' missing from disk.")
 
         job_id = uuid.uuid4()
-        config = execution_config or {}
+        config = self.sanitize_execution_config(execution_config)
         limits = resource_limits or {"timeout_seconds": DEFAULT_TIMEOUT_SECONDS}
 
         job = SolverExecutionJob(
@@ -262,19 +362,23 @@ class SolverExecutionService:
 
         # TOCTOU Verification Gate (Phase 7.4):
         # Re-hash staged artifact directly from disk inside the sandbox directory.
-        staged_disk_sha = hashlib.sha256(staged_input.read_bytes()).hexdigest()
+        staged_disk_sha = self._compute_file_sha256(staged_input)
         if staged_disk_sha != artifact.sha256_hash:
-            job.transition_to(
-                ExecutionJobState.FAILED,
-                exit_code=1,
+            return await self._fail_execution_job(
+                db=db,
+                job=job,
                 failure_reason=(
                     f"TOCTOU_INTEGRITY_VIOLATION: Staged file hash ({staged_disk_sha}) does not match "
                     f"registered artifact sha256_hash ({artifact.sha256_hash})."
                 ),
                 error_category="TOCTOU_INTEGRITY_VIOLATION",
             )
-            await db.commit()
-            return job
+
+        # Unconditional Cryptographic Allowlist Gate for any .fmu artifact
+        if staged_input.suffix.lower() == ".fmu":
+            failed_job = await self._enforce_fmu_vetting(db, job, artifact.artifact_name, staged_input)
+            if failed_job is not None:
+                return failed_job
 
         # Build execution command
         runtime_info = SolverRuntimeRegistry.get_runtime(job.solver_name)
@@ -290,31 +394,9 @@ class SolverExecutionService:
             # Strict Cryptographic Allowlist Gate (Mode 1 & Mode 2 fail-closed)
             # Untrusted FMU native binaries execute with worker privileges. Enterprise policy
             # strictly restricts execution to cryptographically vetted hashes (no filename bypass).
-            if staged_input.suffix.lower() == ".fmu":
-                is_vetted = (staged_disk_sha in VETTED_FMU_SHA256) or (artifact.sha256_hash in VETTED_FMU_SHA256)
-                if not is_vetted and not job.execution_config.get("bypass_fmu_vetting"):
-                    job.transition_to(
-                        ExecutionJobState.FAILED,
-                        exit_code=1,
-                        failure_reason=(
-                            f"UNTRUSTED_FMU_EXECUTION_REJECTED: FMU '{artifact.artifact_name}' "
-                            f"(SHA256: {staged_disk_sha[:16]}...) is not in the vetted allowlist. "
-                            "Untrusted native DLL/SO execution is blocked by sandbox security policy."
-                        ),
-                        error_category="UNTRUSTED_FMU_EXECUTION_REJECTED",
-                    )
-                    await db.commit()
-                    return job
-
-            # If staged input is not .fmu, build reference FMU
-            if staged_input.suffix.lower() != ".fmu":
-                try:
-                    from suspensionlab.physics.fmi_builder import build_fmu
-                    fmu_path = sandbox.sandbox_dir / "QuarterCarRideModel.fmu"
-                    build_fmu(fmu_path, targets=["win64" if sys.platform == "win32" else "linux64"])
-                    staged_input = fmu_path
-                except Exception as e:
-                    logger.warning("FMU build fallback: %s", e)
+            failed_job = await self._enforce_fmu_vetting(db, job, artifact.artifact_name, staged_input)
+            if failed_job is not None:
+                return failed_job
 
             cmd_args = [
                 runtime_info.executable_path,
@@ -365,9 +447,16 @@ class SolverExecutionService:
                 cmd_args.append("--simulate-timeout")
 
         else:
+            self._active_sandboxes.pop(str(job.id), None)
             job.transition_to(ExecutionJobState.FAILED, failure_reason=f"Unsupported solver '{job.solver_name}'.")
             await db.commit()
             return job
+
+        # Immediately before executing any FMU command, unconditionally re-verify its SHA-256 on disk
+        if job.solver_name == "FMI_COSIMULATION" or staged_input.suffix.lower() == ".fmu":
+            failed_job = await self._enforce_fmu_vetting(db, job, artifact.artifact_name, staged_input)
+            if failed_job is not None:
+                return failed_job
 
         # Execute in sandbox
         exec_res: SandboxExecutionResult = await sandbox.execute_command(

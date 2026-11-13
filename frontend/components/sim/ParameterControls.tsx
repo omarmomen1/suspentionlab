@@ -50,7 +50,9 @@ export function ParameterInput({
     const parsed = overrideVal !== undefined ? overrideVal : parseFloat(localVal);
     if (!isNaN(parsed)) {
       const clamped = min !== undefined ? Math.max(min, parsed) : parsed;
-      onChange(clamped);
+      if (clamped !== val) {
+        onChange(clamped);
+      }
       setLocalVal(clamped.toString());
     } else {
       setLocalVal(val.toString());

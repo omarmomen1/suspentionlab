@@ -792,7 +792,7 @@ async def setup_sensitivity(
     K_theta = sus.pitch_stiffness(mp.wheelbase, a=mp.cog_dist_front, b=mp.b)
 
 
-    q_dyn = 0.5 * vehicle.aero.rho_air * vehicle.aero.frontal_area * speed_ms ** 2
+    q_dyn = 0.5 * vehicle.aero.rho_air * speed_ms ** 2
 
     return {
         "arb_balance":            arb_sens,

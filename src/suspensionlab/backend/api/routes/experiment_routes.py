@@ -27,7 +27,7 @@ router = APIRouter(prefix="/experiments", tags=["engineering-experiments"])
 class RunExperimentRequest(BaseModel):
     question: str = Field(..., description="Engineering question, e.g. 'What happens if I increase front roll stiffness by 10%?'")
     hypothesis: Optional[str] = Field(None, description="Physical hypothesis being evaluated")
-    parent_setup: Optional[Dict[str, float]] = Field(None, description="Baseline setup parameters")
+    parent_setup: Optional[Dict[str, Any]] = Field(None, description="Baseline setup parameters")
     parameter_changes: Optional[Any] = Field(None, description="List or dictionary of parameter changes")
     road_profile: Optional[Dict[str, Any]] = Field(None, description="Excitation profile definition")
     author: Optional[str] = Field(None, description="Signee dynamics engineer name")
@@ -36,13 +36,13 @@ class RunExperimentRequest(BaseModel):
 
 
 class CompareSetupsRequest(BaseModel):
-    setup_a: Dict[str, float] = Field(..., description="Setup A (Baseline) parameters")
-    setup_b: Dict[str, float] = Field(..., description="Setup B (Candidate) parameters")
+    setup_a: Dict[str, Any] = Field(..., description="Setup A (Baseline) parameters")
+    setup_b: Dict[str, Any] = Field(..., description="Setup B (Candidate) parameters")
     road_profile: Optional[Dict[str, Any]] = Field(None, description="Excitation profile definition")
 
 
 class BatchOptimizeRequest(BaseModel):
-    base_params: Optional[Dict[str, float]] = Field(None, description="Base setup parameters")
+    base_params: Optional[Dict[str, Any]] = Field(None, description="Base setup parameters")
     param_ranges: Optional[Dict[str, List[float]]] = Field(None, description="Parameter ranges for grid sweep e.g. {'k_s': [20000, 50000, 5]}")
     road_profile: Optional[Dict[str, Any]] = Field(None, description="Road excitation profile")
 

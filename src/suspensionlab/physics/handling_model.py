@@ -239,6 +239,35 @@ class HandlingParams:
         if self.wheel_radius <= 0.05:
             raise ValueError("Wheel dynamic radius 'wheel_radius' must be strictly > 0.05 m.")
 
+        # Dynamically couple front/rear spring + ARB roll stiffnesses into roll_dist
+        k_roll_f = 0.5 * self.K_spring_f * (self.tw_f ** 2) + self.K_arb_f
+        k_roll_r = 0.5 * self.K_spring_r * (self.tw_r ** 2) + self.K_arb_r
+        k_roll_tot = k_roll_f + k_roll_r
+        stiffness_modified = (
+            self.K_spring_f != 30000.0
+            or self.K_spring_r != 30000.0
+            or self.K_arb_f != 20000.0
+            or self.K_arb_r != 10000.0
+            or self.tw_f != 1.6
+            or self.tw_r != 1.6
+        )
+        if k_roll_tot > 0.0 and (abs(self.roll_dist - 0.55) < 1e-9 or stiffness_modified):
+            self.roll_dist = float(k_roll_f / k_roll_tot)
+        self._post_init_roll_dist = float(self.roll_dist)
+        self._post_init_k_roll = (float(k_roll_f), float(k_roll_r))
+
+
+def effective_roll_dist(p: HandlingParams) -> float:
+    """Compute effective front elastic roll stiffness fraction from springs + ARBs, respecting direct roll_dist sweeps."""
+    if hasattr(p, "_post_init_roll_dist") and abs(p.roll_dist - p._post_init_roll_dist) > 1e-9:
+        return float(p.roll_dist)
+    k_roll_f = 0.5 * p.K_spring_f * (p.tw_f ** 2) + p.K_arb_f
+    k_roll_r = 0.5 * p.K_spring_r * (p.tw_r ** 2) + p.K_arb_r
+    if hasattr(p, "_post_init_k_roll") and (float(k_roll_f), float(k_roll_r)) != p._post_init_k_roll:
+        tot = k_roll_f + k_roll_r
+        return float(k_roll_f / tot) if tot > 0.0 else float(p.roll_dist)
+    return float(p.roll_dist)
+
 def _handling_ode(
     t: float, 
     x: list[float], 
@@ -376,9 +405,10 @@ def _handling_ode(
     M_roll_total = p.m_s * a_y_eval * p.h_cg_s
     K_roll_f = 0.5 * p.K_spring_f * p.tw_f**2 + p.K_arb_f
     K_roll_r = 0.5 * p.K_spring_r * p.tw_r**2 + p.K_arb_r
+    r_dist = effective_roll_dist(p)
     
-    roll_f = (M_roll_total * p.roll_dist) / K_roll_f
-    roll_r = (M_roll_total * (1 - p.roll_dist)) / K_roll_r
+    roll_f = (M_roll_total * r_dist) / K_roll_f
+    roll_r = (M_roll_total * (1 - r_dist)) / K_roll_r
     
     z_fl = heave_f + roll_f * (p.tw_f / 2)
     z_fr = heave_f - roll_f * (p.tw_f / 2)
@@ -411,8 +441,8 @@ def _handling_ode(
     h_rc_cg = h_rc_f_dynamic + (h_rc_r_dynamic - h_rc_f_dynamic) * (p.a / L)
     M_roll = p.m_s * a_y_eval * (p.h_cg_s - h_rc_cg)
     
-    delta_Fz_lat_elast_f = (M_roll * p.roll_dist) / p.tw_f
-    delta_Fz_lat_elast_r = (M_roll * (1 - p.roll_dist)) / p.tw_r
+    delta_Fz_lat_elast_f = (M_roll * r_dist) / p.tw_f
+    delta_Fz_lat_elast_r = (M_roll * (1 - r_dist)) / p.tw_r
     
     delta_Fz_lat_f = delta_Fz_lat_uf + delta_Fz_lat_kin_f + delta_Fz_lat_elast_f
     delta_Fz_lat_r = delta_Fz_lat_ur + delta_Fz_lat_kin_r + delta_Fz_lat_elast_r
@@ -686,9 +716,10 @@ def compute_instantaneous_wheel_state(
     M_roll_total = p.m_s * a_y_eval * p.h_cg_s
     K_roll_f = 0.5 * p.K_spring_f * p.tw_f**2 + p.K_arb_f
     K_roll_r = 0.5 * p.K_spring_r * p.tw_r**2 + p.K_arb_r
+    r_dist = effective_roll_dist(p)
 
-    roll_f = (M_roll_total * p.roll_dist) / K_roll_f
-    roll_r = (M_roll_total * (1 - p.roll_dist)) / K_roll_r
+    roll_f = (M_roll_total * r_dist) / K_roll_f
+    roll_r = (M_roll_total * (1 - r_dist)) / K_roll_r
 
     z_fl = heave_f + roll_f * (p.tw_f / 2)
     z_fr = heave_f - roll_f * (p.tw_f / 2)
@@ -719,8 +750,8 @@ def compute_instantaneous_wheel_state(
     h_rc_cg = h_rc_f_dynamic + (h_rc_r_dynamic - h_rc_f_dynamic) * (p.a / L)
     M_roll = p.m_s * a_y_eval * (p.h_cg_s - h_rc_cg)
 
-    delta_Fz_lat_elast_f = (M_roll * p.roll_dist) / p.tw_f
-    delta_Fz_lat_elast_r = (M_roll * (1 - p.roll_dist)) / p.tw_r
+    delta_Fz_lat_elast_f = (M_roll * r_dist) / p.tw_f
+    delta_Fz_lat_elast_r = (M_roll * (1 - r_dist)) / p.tw_r
 
     delta_Fz_lat_f = delta_Fz_lat_uf + delta_Fz_lat_kin_f + delta_Fz_lat_elast_f
     delta_Fz_lat_r = delta_Fz_lat_ur + delta_Fz_lat_kin_r + delta_Fz_lat_elast_r

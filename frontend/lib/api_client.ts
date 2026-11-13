@@ -852,7 +852,9 @@ export class KinematicsApi {
   }
 
   static async exportCsv(payload: {
-    hardpoints: Record<string, number[]>;
+    sweep_data?: any;
+    hardpoints?: Record<string, number[]>;
+    format?: string;
     setup_name?: string;
     z_min_mm?: number;
     z_max_mm?: number;
@@ -863,11 +865,17 @@ export class KinematicsApi {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => `HTTP ${res.status}`);
+      throw new Error(`CSV export failed (${res.status}): ${msg}`);
+    }
     return res.blob();
   }
 
   static async exportJson(payload: {
-    hardpoints: Record<string, number[]>;
+    sweep_data?: any;
+    hardpoints?: Record<string, number[]>;
+    format?: string;
     setup_name?: string;
     z_min_mm?: number;
     z_max_mm?: number;
@@ -878,6 +886,10 @@ export class KinematicsApi {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => `HTTP ${res.status}`);
+      throw new Error(`JSON export failed (${res.status}): ${msg}`);
+    }
     return res.blob();
   }
 
@@ -1903,8 +1915,8 @@ export interface ExperimentRecordResponse {
 }
 
 export interface DeepComparisonResponse {
-  setup_a: Record<string, number>;
-  setup_b: Record<string, number>;
+  setup_a: Record<string, any>;
+  setup_b: Record<string, any>;
   what_changed: Array<{
     parameter: string;
     unit: string;
@@ -1987,8 +1999,8 @@ export class ExperimentApi {
   }
 
   static async compareSetups(payload: {
-    setup_a: Record<string, number>;
-    setup_b: Record<string, number>;
+    setup_a: Record<string, any>;
+    setup_b: Record<string, any>;
     road_profile?: Record<string, any>;
   }): Promise<DeepComparisonResponse> {
     return apiJson<DeepComparisonResponse>("/api/v1/experiments/compare", {
@@ -1998,7 +2010,7 @@ export class ExperimentApi {
   }
 
   static async batchOptimize(payload?: {
-    base_params?: Record<string, number>;
+    base_params?: Record<string, any>;
     param_ranges?: Record<string, number[]>;
     road_profile?: Record<string, any>;
   }): Promise<ParetoFrontierResponse> {
@@ -2212,6 +2224,15 @@ export interface EventComparisonReport {
     b: number;
     delta: number;
     unit: string;
+    delta_pct?: number;
+  }>;
+  parameter_diffs?: Array<{
+    parameter: string;
+    event_a_value: number;
+    event_b_value: number;
+    delta_abs: number;
+    delta_pct?: number;
+    unit?: string;
   }>;
   engineering_effect_deltas: Array<{
     metric: string;
@@ -2221,10 +2242,16 @@ export interface EventComparisonReport {
     beneficial: boolean;
     unit: string;
   }>;
+  engineering_effects?: string[];
   validation_deltas: {
     r2_delta: number;
     holdout_r2_delta: number;
     status_changed: boolean;
+  };
+  validation_effects?: {
+    event_a_status?: string;
+    event_b_status?: string;
+    confidence_change?: string;
   };
   decision_consequences: string[];
 }
@@ -2240,7 +2267,7 @@ export interface EngineeringDecisionData {
   status: "DRAFT" | "RECOMMENDED" | "VALIDATED" | "APPROVED" | "REJECTED";
   context_data: Record<string, any>;
   candidates_evaluated: Array<Record<string, any>>;
-  selected_option: string;
+  selected_option: string | { id?: string; name?: string; label?: string; title?: string; [key: string]: any };
   engineering_reason: string;
   tradeoffs_accepted: Array<Record<string, any>>;
   simulation_evidence: Record<string, any>;
@@ -2384,10 +2411,43 @@ export class TimelineDecisionApi {
     eventIdA: string,
     eventIdB: string
   ): Promise<EventComparisonReport> {
-    return apiJson<EventComparisonReport>("/api/v1/timeline/compare", {
+    const raw: any = await apiJson<any>("/api/v1/timeline/compare", {
       method: "POST",
-      body: JSON.stringify({ event_id_a: eventIdA, event_id_b: eventIdB }),
+      body: JSON.stringify({
+        event_a_id: eventIdA,
+        event_b_id: eventIdB,
+        event_id_a: eventIdA,
+        event_id_b: eventIdB,
+      }),
     });
+    return {
+      ...raw,
+      time_delta_seconds: raw.time_delta_seconds ?? 0,
+      parameter_deltas:
+        raw.parameter_deltas ??
+        (raw.parameter_diffs || []).map((pd: any) => ({
+          parameter: pd.parameter,
+          a: pd.a ?? pd.event_a_value ?? 0,
+          b: pd.b ?? pd.event_b_value ?? 0,
+          delta: pd.delta ?? pd.delta_abs ?? 0,
+          delta_pct: pd.delta_pct,
+          unit: pd.unit ?? "",
+        })),
+      engineering_effect_deltas:
+        raw.engineering_effect_deltas ??
+        (raw.engineering_effects || []).map((txt: any) =>
+          typeof txt === "string"
+            ? { metric: txt, a: 0, b: 0, delta: 0, beneficial: true, unit: "" }
+            : txt
+        ),
+      validation_deltas: raw.validation_deltas ?? {
+        r2_delta: 0,
+        holdout_r2_delta: 0,
+        status_changed:
+          raw.validation_effects?.event_a_status !== raw.validation_effects?.event_b_status,
+      },
+      decision_consequences: raw.decision_consequences ?? [],
+    };
   }
 
   static async createEvent(payload: Partial<TimelineEventData>): Promise<TimelineEventData> {

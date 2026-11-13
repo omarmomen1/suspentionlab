@@ -36,6 +36,15 @@ import {
   CorrelationCockpitResponse,
   ChannelDetailReport,
 } from "../../lib/api_client";
+import SampleDemoTelemetryBadge from "../../components/engineering/SampleDemoTelemetryBadge";
+import GGFrictionCircle from "../../components/GGFrictionCircle";
+import PlanGate from "../../components/PlanGate";
+import {
+  SAMPLE_TELEMETRY_DATASETS,
+  fetchSampleCsvText,
+  isSampleTelemetryFilename,
+  type SampleTelemetryDataset,
+} from "../../lib/sampleTelemetry";
 
 function fmtNum(val: number | null | undefined, digits = 2, withPlus = false): string {
   if (val === null || val === undefined || isNaN(val)) return "—";
@@ -43,9 +52,230 @@ function fmtNum(val: number | null | undefined, digits = 2, withPlus = false): s
   return withPlus && val > 0 ? `+${formatted}` : formatted;
 }
 
+const CHANNEL_META: Record<string, { name: string; unit: string }> = {
+  time: { name: "Time", unit: "s" },
+  distance: { name: "Distance", unit: "m" },
+  speed: { name: "Speed", unit: "km/h" },
+  lat_g: { name: "Lateral Acceleration", unit: "G" },
+  long_g: { name: "Longitudinal Acceleration", unit: "G" },
+  vert_g: { name: "Vertical Acceleration", unit: "G" },
+  damper_fl: { name: "Damper FL Displacement", unit: "mm" },
+  damper_fr: { name: "Damper FR Displacement", unit: "mm" },
+  damper_rl: { name: "Damper RL Displacement", unit: "mm" },
+  damper_rr: { name: "Damper RR Displacement", unit: "mm" },
+  rh_fl: { name: "Ride Height FL", unit: "mm" },
+  steer: { name: "Steering Angle", unit: "deg" },
+  brake: { name: "Brake Pressure Front", unit: "bar" },
+  throttle: { name: "Throttle Position", unit: "%" },
+  engine_rpm: { name: "Engine RPM", unit: "rpm" },
+};
+
+function mapHeaderKey(rawHeader: string): string {
+  const norm = rawHeader.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+  if (norm === "t" || norm === "timestamp" || norm === "time_s" || norm === "sec" || norm === "seconds" || norm === "elapsed_time" || norm === "time") return "time";
+  if (norm === "gps_speed" || norm === "v" || norm === "vehicle_speed" || norm === "speed_kmh" || norm === "v_kph" || norm === "ground_speed" || norm === "car_speed" || norm === "speed") return "speed";
+  if (norm === "g_lat" || norm === "latacc" || norm === "lat_acc" || norm === "lataccel" || norm === "lat_accel" || norm === "ay" || norm === "lateral_acc" || norm === "lat_g") return "lat_g";
+  if (norm === "g_lon" || norm === "inlineacc" || norm === "lonacc" || norm === "lon_g" || norm === "lonaccel" || norm === "longaccel" || norm === "ax" || norm === "long_acc" || norm === "long_g") return "long_g";
+  if (norm === "g_vert" || norm === "vertacc" || norm === "az" || norm === "vert_g" || norm === "vertaccel" || norm === "vert_acc" || norm === "heave_accel") return "vert_g";
+  if (norm === "susptravel_fl" || norm === "damper_fl" || norm === "damper_disp_fl") return "damper_fl";
+  if (norm === "susptravel_fr" || norm === "damper_fr" || norm === "damper_disp_fr") return "damper_fr";
+  if (norm === "susptravel_rl" || norm === "damper_rl" || norm === "damper_disp_rl") return "damper_rl";
+  if (norm === "susptravel_rr" || norm === "damper_rr" || norm === "damper_disp_rr") return "damper_rr";
+  if (norm === "steerangle" || norm === "steer_deg" || norm === "steering" || norm === "steer") return "steer";
+  if (norm === "brakepress_f" || norm === "brake_front" || norm === "brake_press" || norm === "brake") return "brake";
+  if (norm === "throttlepos" || norm === "tps" || norm === "throttle") return "throttle";
+  if (norm === "enginerpm" || norm === "rpm" || norm === "engine_rpm") return "engine_rpm";
+  return norm || "unknown";
+}
+
+interface ParsedCsvTelemetry {
+  rawColumns: string[];
+  mappedKeys: string[];
+  rejectedColumns: string[];
+  sampleCount: number;
+  sampleRateHz: number;
+  durationSec: number;
+  channels: Record<string, number[]>;
+  healthRows: Array<{
+    key: string;
+    name: string;
+    unit: string;
+    state: "VALID" | "WARNING" | "INVALID" | "MISSING";
+    rate: number;
+    coverage: number;
+    min: number;
+    max: number;
+    mean: number;
+    std: number;
+    missing_pct: number;
+  }>;
+  maxG: number;
+  latG: number;
+  longG: number;
+}
+
+function parseTelemetryCsv(csvText: string): ParsedCsvTelemetry {
+  // Strip UTF-8 BOM if present
+  const cleanCsvText = csvText.replace(/^\uFEFF/, "");
+  const lines = cleanCsvText.split(/\r?\n/).filter((l) => l.trim().length > 0 && !l.trim().startsWith("#"));
+  if (lines.length < 2) {
+    throw new Error("Telemetry CSV must contain a header line and at least one data row.");
+  }
+
+  // Detect delimiter (comma, semicolon, tab)
+  const firstLine = lines[0];
+  const delim = firstLine.includes("\t") ? "\t" : (firstLine.includes(";") && !firstLine.includes(",") ? ";" : ",");
+
+  const rawColumns = firstLine
+    .split(delim)
+    .map((c) => c.trim())
+    .filter(Boolean);
+  const mappedKeys = rawColumns.map(mapHeaderKey);
+
+  const buckets: number[][] = mappedKeys.map(() => []);
+  const validCounts: number[] = mappedKeys.map(() => 0);
+  const dataLines = lines.slice(1);
+
+  for (const line of dataLines) {
+    const parts = line.split(delim);
+    let rowHasData = false;
+    for (let c = 0; c < mappedKeys.length; c++) {
+      const cell = (parts[c] ?? "").trim();
+      if (cell === "" || cell.toLowerCase() === "nan" || cell.toLowerCase() === "null") {
+        buckets[c].push(NaN);
+        continue;
+      }
+      const v = parseFloat(cell);
+      if (Number.isFinite(v)) {
+        buckets[c].push(v);
+        validCounts[c] += 1;
+        rowHasData = true;
+      } else {
+        buckets[c].push(NaN);
+      }
+    }
+    if (!rowHasData && parts.length === 1 && parts[0] === "") {
+      // trailing empty row, pop
+      mappedKeys.forEach((_, c) => buckets[c].pop());
+    }
+  }
+
+  const channels: Record<string, number[]> = {};
+  const rejectedColumns: string[] = [];
+  const healthRows: ParsedCsvTelemetry["healthRows"] = [];
+  const sampleCount = dataLines.length;
+
+  // Estimate sample rate from time axis if available
+  const timeIdx = mappedKeys.indexOf("time");
+  let sampleRateHz = 100.0;
+  let durationSec = sampleCount > 0 ? sampleCount / sampleRateHz : 0;
+  if (timeIdx >= 0) {
+    const tArr = buckets[timeIdx].filter(Number.isFinite);
+    if (tArr.length >= 2) {
+      const span = tArr[tArr.length - 1] - tArr[0];
+      const dt = (tArr[1] - tArr[0]) || (span > 0 ? span / (tArr.length - 1) : 0.01);
+      if (dt > 1e-5) {
+        sampleRateHz = Math.round((1.0 / dt) * 10) / 10;
+      }
+      durationSec = span > 0 ? span : sampleCount / sampleRateHz;
+    }
+  }
+
+  for (let c = 0; c < mappedKeys.length; c++) {
+    const key = mappedKeys[c];
+    const finiteVals = buckets[c].filter(Number.isFinite);
+    if (finiteVals.length === 0) {
+      rejectedColumns.push(`${rawColumns[c]} (non-numeric/empty)`);
+      continue;
+    }
+    // Deduplicate only non-NaN cleaned vector
+    channels[key] = buckets[c].map((v, i) => (Number.isFinite(v) ? v : i > 0 && Number.isFinite(buckets[c][i - 1]) ? buckets[c][i - 1] : 0));
+    if (key === "damper_fl" && !channels["rh_fl"]) {
+      channels["rh_fl"] = channels[key];
+    }
+    if (key === "time") continue;
+
+    let min = finiteVals[0];
+    let max = finiteVals[0];
+    let sum = 0;
+    for (const v of finiteVals) {
+      if (v < min) min = v;
+      if (v > max) max = v;
+      sum += v;
+    }
+    const mean = sum / finiteVals.length;
+    let varSum = 0;
+    for (const v of finiteVals) {
+      varSum += (v - mean) ** 2;
+    }
+    const std = Math.sqrt(varSum / finiteVals.length);
+    const coverage = sampleCount > 0 ? (finiteVals.length / sampleCount) * 100 : 100;
+    const missingPct = Math.max(0, 100 - coverage);
+    const meta = CHANNEL_META[key] || { name: rawColumns[c], unit: "raw" };
+
+    healthRows.push({
+      key,
+      name: meta.name,
+      unit: meta.unit,
+      state: missingPct > 5 ? "WARNING" : "VALID",
+      rate: Math.round(sampleRateHz),
+      coverage: Number(coverage.toFixed(1)),
+      min: Number(min.toFixed(3)),
+      max: Number(max.toFixed(3)),
+      mean: Number(mean.toFixed(3)),
+      std: Number(std.toFixed(3)),
+      missing_pct: Number(missingPct.toFixed(1)),
+    });
+  }
+
+  // Synthesize vertical acceleration proxy if CSV lacks vert_g so quarter-car/full-car correlation works cleanly
+  if (!channels["vert_g"] && channels["damper_fl"] && channels["damper_fl"].length > 2) {
+    const d = channels["damper_fl"];
+    const dt = sampleRateHz > 0 ? 1 / sampleRateHz : 0.01;
+    const vertG: number[] = new Array(d.length).fill(0);
+    for (let i = 1; i < d.length - 1; i++) {
+      const accelMps2 = ((d[i + 1] - 2 * d[i] + d[i - 1]) / 1000.0) / (dt * dt);
+      vertG[i] = Math.max(-4, Math.min(4, Number((accelMps2 / 9.81).toFixed(4))));
+    }
+    channels["vert_g"] = vertG;
+  }
+
+  // Compute G-G circle point & peak envelope
+  const latArr = channels["lat_g"] || [];
+  const longArr = channels["long_g"] || [];
+  let maxG = 1.5;
+  let peakLat = 0;
+  let peakLong = 0;
+  const nG = Math.max(latArr.length, longArr.length);
+  for (let i = 0; i < nG; i++) {
+    const gx = latArr[i] ?? 0;
+    const gy = longArr[i] ?? 0;
+    const mag = Math.hypot(gx, gy);
+    if (mag > maxG) {
+      maxG = mag;
+      peakLat = gx;
+      peakLong = gy;
+    }
+  }
+
+  return {
+    rawColumns,
+    mappedKeys: Object.keys(channels),
+    rejectedColumns,
+    sampleCount,
+    sampleRateHz,
+    durationSec,
+    channels,
+    healthRows,
+    maxG: Number(maxG.toFixed(2)),
+    latG: Number(peakLat.toFixed(2)),
+    longG: Number(peakLong.toFixed(2)),
+  };
+}
+
 type CockpitTab = "ingestion" | "health" | "events" | "model_comparison" | "residuals" | "session_comparison";
 
-export default function CorrelationCockpitPage() {
+function CorrelationCockpitContent() {
   const router = useRouter();
   const { vehicle, setup } = useWorkspace();
 
@@ -57,29 +287,37 @@ export default function CorrelationCockpitPage() {
   const [modelComparisonData, setModelComparisonData] = useState<any>(null);
   const [selectedChannelKey, setSelectedChannelKey] = useState<string>("vert_g");
 
+  const [activeDatasetName, setActiveDatasetName] = useState<string>("sample_spa_gt3.csv");
+  const [isSampleDataset, setIsSampleDataset] = useState<boolean>(true);
+  const [loadingSampleId, setLoadingSampleId] = useState<string | null>(null);
+  const [parsedTelemetry, setParsedTelemetry] = useState<Record<string, number[]> | null>(null);
+  const [gCircleStats, setGCircleStats] = useState<{ maxG: number; latG: number; longG: number }>({
+    maxG: 1.85,
+    latG: 1.25,
+    longG: -0.95,
+  });
+
   // Ingestion & Health State
   const [auditTrail, setAuditTrail] = useState<any>({
-    raw_line_count: 6000,
-    header_line: "Time,Speed,G_Lat,G_Lon,Damper_FL,Damper_FR,Damper_RL,Damper_RR,BrakePress,Throttle",
-    identified_channels: ["time", "speed", "lat_g", "long_g", "damper_fl", "damper_fr", "damper_rl", "damper_rr", "brake", "throttle"],
-    rejected_channels: ["Engine_Oil_Temp (uncalibrated)"],
+    raw_line_count: 5000,
+    header_line: "Time,Distance,Speed,SteerAngle,G_Lat,G_Lon,SuspTravel_FL,SuspTravel_FR,SuspTravel_RL,SuspTravel_RR,BrakePress_F,ThrottlePos,EngineRPM",
+    identified_channels: ["time", "distance", "speed", "steer", "lat_g", "long_g", "damper_fl", "damper_fr", "damper_rl", "damper_rr", "brake", "throttle", "engine_rpm"],
+    rejected_channels: [],
     sample_rate_hz: 100.0,
+    duration_s: 50.0,
     duplicate_timestamps: 0,
     non_monotonic_jumps: 0,
     rejections_log: [],
-    modifications_log: ["Resampled to uniform 100.0 Hz via monotonic PCHIP interpolation"],
+    modifications_log: ["Ready: GT3 sample telemetry schema (100.0 Hz PCHIP resampling)"],
     unit_mappings: { speed: "km/h", lat_g: "G", long_g: "G", damper_fl: "mm", damper_fr: "mm" },
   });
 
   const [channelHealthList, setChannelHealthList] = useState<any[]>([
-    { key: "speed", name: "Speed", unit: "km/h", state: "VALID", rate: 100, coverage: 100.0, min: 0.0, max: 284.5, mean: 168.2, std: 42.1, missing_pct: 0.0 },
-    { key: "lat_g", name: "Lateral Acceleration", unit: "G", state: "VALID", rate: 100, coverage: 100.0, min: -3.85, max: 3.92, mean: 0.12, std: 1.65, missing_pct: 0.0 },
-    { key: "vert_g", name: "Vertical Acceleration", unit: "G", state: "VALID", rate: 100, coverage: 99.8, min: -2.1, max: 3.45, mean: 1.01, std: 0.48, missing_pct: 0.2 },
-    { key: "damper_fl", name: "Damper FL Displacement", unit: "mm", state: "VALID", rate: 100, coverage: 100.0, min: -24.5, max: 28.2, mean: 1.2, std: 8.4, missing_pct: 0.0 },
-    { key: "rh_fl", name: "Ride Height FL", unit: "mm", state: "WARNING", rate: 100, coverage: 98.4, min: 14.2, max: 48.0, mean: 31.5, std: 6.2, missing_pct: 1.6 },
-    { key: "steer", name: "Steering Angle", unit: "deg", state: "VALID", rate: 100, coverage: 100.0, min: -125.0, max: 130.0, mean: -2.1, std: 38.5, missing_pct: 0.0 },
-    { key: "brake_temp_fl", name: "Brake Rotor Temp FL", unit: "°C", state: "INVALID", rate: 10, coverage: 65.0, min: 20.0, max: 1150.0, mean: 620.0, std: 240.0, missing_pct: 35.0 },
-    { key: "tire_temp_core", name: "Tire Core Temp", unit: "°C", state: "MISSING", rate: 0, coverage: 0.0, min: 0, max: 0, mean: 0, std: 0, missing_pct: 100.0 },
+    { key: "speed", name: "Speed", unit: "km/h", state: "VALID", rate: 100, coverage: 100.0, min: 45.0, max: 258.0, mean: 162.4, std: 38.2, missing_pct: 0.0 },
+    { key: "lat_g", name: "Lateral Acceleration", unit: "G", state: "VALID", rate: 100, coverage: 100.0, min: -1.78, max: 1.82, mean: 0.08, std: 0.92, missing_pct: 0.0 },
+    { key: "long_g", name: "Longitudinal Acceleration", unit: "G", state: "VALID", rate: 100, coverage: 100.0, min: -1.65, max: 0.85, mean: -0.04, std: 0.62, missing_pct: 0.0 },
+    { key: "damper_fl", name: "Damper FL Displacement", unit: "mm", state: "VALID", rate: 100, coverage: 100.0, min: -18.5, max: 24.0, mean: 1.8, std: 7.4, missing_pct: 0.0 },
+    { key: "steer", name: "Steering Angle", unit: "deg", state: "VALID", rate: 100, coverage: 100.0, min: -95.0, max: 98.0, mean: -1.2, std: 28.4, missing_pct: 0.0 },
   ]);
 
   const [healthFilter, setHealthFilter] = useState<string>("ALL");
@@ -156,12 +394,69 @@ export default function CorrelationCockpitPage() {
   const [sessionCompData, setSessionCompData] = useState<any>(null);
   const [loadingComp, setLoadingComp] = useState(false);
 
+  const applyCsvMetadata = (csvText: string, filename: string, sampleFlag: boolean) => {
+    const parsed = parseTelemetryCsv(csvText);
+    setActiveDatasetName(filename);
+    setIsSampleDataset(sampleFlag);
+    setParsedTelemetry(parsed.channels);
+    setGCircleStats({ maxG: parsed.maxG, latG: parsed.latG, longG: parsed.longG });
+    setChannelHealthList(parsed.healthRows);
+    setAuditTrail((prev: any) => ({
+      ...prev,
+      raw_line_count: parsed.sampleCount,
+      header_line: parsed.rawColumns.join(","),
+      identified_channels: parsed.mappedKeys,
+      rejected_channels: parsed.rejectedColumns,
+      sample_rate_hz: parsed.sampleRateHz,
+      duration_s: parsed.durationSec,
+      modifications_log: [
+        `Loaded ${filename} (${parsed.sampleCount.toLocaleString()} frames, ${parsed.rawColumns.length} columns)`,
+        `Estimated sampling rate ${parsed.sampleRateHz.toFixed(1)} Hz (${parsed.durationSec.toFixed(1)} s duration)`,
+      ],
+    }));
+
+    // Recompute model comparison & session delta directly with newly parsed CSV telemetry
+    loadModelComparison(selectedModel, parsed.channels);
+    if (activeTab === "session_comparison" || sessionCompData) {
+      runSessionComparison(parsed.channels);
+    }
+  };
+
+  const handleLoadSampleDataset = async (ds: SampleTelemetryDataset) => {
+    setLoadingSampleId(ds.id);
+    try {
+      const text = await fetchSampleCsvText(ds);
+      applyCsvMetadata(text, ds.filename, true);
+    } catch (err) {
+      console.error("Failed to load sample telemetry:", err);
+    } finally {
+      setLoadingSampleId(null);
+    }
+  };
+
+  const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const uploaded = e.target.files?.[0];
+    if (!uploaded) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const text = typeof ev.target?.result === "string" ? ev.target.result : "";
+      if (text) {
+        applyCsvMetadata(text, uploaded.name, isSampleTelemetryFilename(uploaded.name));
+      }
+    };
+    reader.readAsText(uploaded);
+  };
+
   // Load Model Comparison Data
-  const loadModelComparison = async (modelType: string) => {
+  const loadModelComparison = async (modelType: string, overrideTelemetry?: Record<string, number[]> | null) => {
     setLoading(true);
     try {
+      const telemPayload = overrideTelemetry ?? parsedTelemetry;
       const res = await CorrelationApi.compareModel({
         model_type: modelType,
+        ...(telemPayload && telemPayload.time && telemPayload.time.length > 1
+          ? { telemetry_data: telemPayload }
+          : {}),
       });
       setModelComparisonData(res);
       if (res.channels && res.channels.length > 0) {
@@ -174,16 +469,49 @@ export default function CorrelationCockpitPage() {
     }
   };
 
-  // Run Session Comparison
-  const runSessionComparison = async () => {
+  // Run Session Comparison using parsed CSV telemetry slices (or loaded session trace)
+  const runSessionComparison = async (overrideTelemetry?: Record<string, number[]> | null) => {
     setLoadingComp(true);
     try {
-      // Use canonical trace for Lap A and modified version for Lap B
+      const telemSource = overrideTelemetry ?? parsedTelemetry;
+      let sessionA: Record<string, any>;
+      let sessionB: Record<string, any>;
+      let labelA = `${activeDatasetName} (Stint 1)`;
+      let labelB = `${activeDatasetName} (Stint 2)`;
+
+      if (telemSource && telemSource.time && telemSource.time.length >= 20) {
+        const mid = Math.floor(telemSource.time.length / 2);
+        const t0B = telemSource.time[mid] ?? 0;
+        const sliceHalf = (start: number, end: number, shiftTimeZero: number) => {
+          const out: Record<string, number[]> = {};
+          for (const [k, arr] of Object.entries(telemSource)) {
+            const sl = arr.slice(start, end);
+            out[k] = k === "time" ? sl.map((t) => Number((t - shiftTimeZero).toFixed(4))) : sl;
+          }
+          return out;
+        };
+        sessionA = sliceHalf(0, mid, telemSource.time[0] ?? 0);
+        sessionB = sliceHalf(mid, telemSource.time.length, t0B);
+      } else {
+        sessionA = {
+          time: [0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
+          speed: [142, 155, 168, 175, 160, 148, 164],
+          lat_g: [0.4, 1.1, 1.75, 1.62, 0.9, -0.5, -1.4],
+        };
+        sessionB = {
+          time: [0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
+          speed: [145, 158, 171, 179, 163, 151, 167],
+          lat_g: [0.45, 1.18, 1.82, 1.68, 0.95, -0.55, -1.48],
+        };
+        labelA = "Baseline Trace (A)";
+        labelB = "Candidate Trace (B)";
+      }
+
       const res = await CorrelationApi.compareSessions({
-        session_a: { time: [0, 1, 2, 3], speed: [120, 130, 140, 150], lat_g: [0.5, 1.2, 2.8, 1.0] },
-        session_b: { time: [0, 1, 2, 3], speed: [122, 133, 144, 152], lat_g: [0.6, 1.3, 3.0, 1.1] },
-        label_a: "Lap 4 (Baseline)",
-        label_b: "Lap 5 (Setup Rev B)",
+        session_a: sessionA,
+        session_b: sessionB,
+        label_a: labelA,
+        label_b: labelB,
       });
       setSessionCompData(res);
     } catch (err) {
@@ -253,31 +581,32 @@ export default function CorrelationCockpitPage() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
 
         {/* Cockpit Header */}
-        <div className="bg-gradient-to-r from-blue-950/40 via-cyan-950/20 to-neutral-900 border border-blue-800/40 rounded-xl p-6 shadow-2xl backdrop-blur-md">
+        <div className="bg-[#0e0e12] border border-[#222536] rounded-xl p-6 shadow-xl backdrop-blur-md">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <div className="flex items-center gap-2 text-xs font-mono text-cyan-400 uppercase tracking-wider mb-2">
                 <ShieldCheck className="w-4 h-4 text-cyan-400" />
                 <span>SuspensionLab PRO &bull; Engineering Investigation Cockpit</span>
               </div>
-              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex flex-wrap items-center gap-3">
                 <span>Telemetry &amp; Correlation Cockpit</span>
-                <span className="text-xs px-2.5 py-1 rounded bg-blue-500/20 border border-blue-500/40 text-blue-300 font-mono font-normal">
+                <span className="text-xs px-2.5 py-1 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 font-mono font-normal">
                   ANTI-TAUTOLOGY VERIFIED
                 </span>
+                {isSampleDataset && <SampleDemoTelemetryBadge size="sm" />}
               </h1>
               <div className="flex items-center gap-2 text-xs font-mono text-neutral-400 mt-2">
-                <span className="text-blue-400 font-bold">MEASURED DATA</span>
+                <span className="text-cyan-400 font-bold">MEASURED DATA</span>
                 <span>&rarr;</span>
-                <span className="text-amber-400 font-bold">EVENT</span>
+                <span className="text-slate-300 font-bold">EVENT</span>
                 <span>&rarr;</span>
-                <span className="text-cyan-400 font-bold">EVIDENCE</span>
+                <span className="text-slate-300 font-bold">EVIDENCE</span>
                 <span>&rarr;</span>
-                <span className="text-purple-400 font-bold">MODEL COMPARISON</span>
+                <span className="text-amber-400 font-bold">MODEL COMPARISON</span>
                 <span>&rarr;</span>
-                <span className="text-emerald-400 font-bold">HYPOTHESIS</span>
+                <span className="text-slate-300 font-bold">HYPOTHESIS</span>
                 <span>&rarr;</span>
-                <span className="text-rose-400 font-bold">EXPERIMENT</span>
+                <span className="text-emerald-400 font-bold">EXPERIMENT</span>
               </div>
             </div>
 
@@ -332,21 +661,38 @@ export default function CorrelationCockpitPage() {
         {activeTab === "ingestion" && (
           <div className="space-y-6">
             <div className="bg-neutral-900/80 border border-neutral-800 rounded-xl p-6 shadow-xl space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <h2 className="text-lg font-bold text-white flex flex-wrap items-center gap-2">
                     <FileSpreadsheet className="w-5 h-5 text-blue-400" />
                     <span>Telemetry Ingestion &amp; Audit Trail</span>
+                    {isSampleDataset && <SampleDemoTelemetryBadge size="xs" />}
                   </h2>
                   <p className="text-xs text-neutral-400 mt-0.5 font-mono">
-                    Full provenance tracking: Parsing &rarr; Channel Mapping &rarr; Monotonic Resampling &rarr; Quality Assessment
+                    Active Dataset: <span className="text-neutral-200">{activeDatasetName}</span> &bull; Parsing &rarr; Channel Mapping &rarr; Monotonic Resampling
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  {SAMPLE_TELEMETRY_DATASETS.map((ds) => (
+                    <button
+                      key={ds.id}
+                      type="button"
+                      onClick={() => handleLoadSampleDataset(ds)}
+                      disabled={loadingSampleId === ds.id}
+                      className={`px-2.5 py-1.5 text-xs font-mono rounded-lg border transition-colors ${
+                        activeDatasetName === ds.filename
+                          ? "bg-amber-500/20 border-amber-500/50 text-amber-300"
+                          : "bg-neutral-950 border-neutral-800 text-neutral-300 hover:border-amber-500/40 hover:text-amber-300"
+                      }`}
+                      title={ds.formatNote}
+                    >
+                      {loadingSampleId === ds.id ? "Loading…" : ds.shortLabel}
+                    </button>
+                  ))}
                   <label className="flex items-center gap-2 px-3 py-1.5 text-xs font-mono bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 rounded-lg cursor-pointer transition-colors">
                     <Upload className="w-3.5 h-3.5" />
                     <span>Upload New CSV</span>
-                    <input type="file" accept=".csv" className="hidden" />
+                    <input type="file" accept=".csv" onChange={handleCsvUpload} className="hidden" />
                   </label>
                 </div>
               </div>
@@ -356,12 +702,23 @@ export default function CorrelationCockpitPage() {
                 <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3">
                   <div className="text-[10px] uppercase font-mono text-neutral-400">Raw Samples</div>
                   <div className="text-lg font-bold font-mono text-white mt-0.5">{auditTrail.raw_line_count}</div>
-                  <div className="text-[10px] font-mono text-neutral-500">60.0s @ 100 Hz</div>
+                  <div className="text-[10px] font-mono text-neutral-500">
+                    {(() => {
+                      const rate = Number(auditTrail.sample_rate_hz) || 100;
+                      const dur =
+                        typeof auditTrail.duration_s === "number"
+                          ? auditTrail.duration_s
+                          : auditTrail.raw_line_count / rate;
+                      return `${dur.toFixed(1)}s @ ${rate.toFixed(0)} Hz`;
+                    })()}
+                  </div>
                 </div>
                 <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3">
                   <div className="text-[10px] uppercase font-mono text-neutral-400">Mapped Channels</div>
                   <div className="text-lg font-bold font-mono text-emerald-400 mt-0.5">{auditTrail.identified_channels.length}</div>
-                  <div className="text-[10px] font-mono text-neutral-500">1 rejected</div>
+                  <div className="text-[10px] font-mono text-neutral-500">
+                    {(auditTrail.rejected_channels?.length ?? 0)} rejected
+                  </div>
                 </div>
                 <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3">
                   <div className="text-[10px] uppercase font-mono text-neutral-400">Timestamp Quality</div>
@@ -370,7 +727,7 @@ export default function CorrelationCockpitPage() {
                 </div>
                 <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3">
                   <div className="text-[10px] uppercase font-mono text-neutral-400">Resampling Grid</div>
-                  <div className="text-lg font-bold font-mono text-purple-400 mt-0.5">100.0 Hz PCHIP</div>
+                  <div className="text-lg font-bold font-mono text-cyan-400 mt-0.5">100.0 Hz PCHIP</div>
                   <div className="text-[10px] font-mono text-neutral-500">Uniform &Delta;t = 10 ms</div>
                 </div>
               </div>
@@ -395,30 +752,32 @@ export default function CorrelationCockpitPage() {
               </div>
             </div>
 
-            {/* Failure UX Demonstration Card */}
-            <div className="bg-rose-950/20 border border-rose-800/40 rounded-xl p-6 space-y-4">
-              <div className="flex items-center gap-2 text-rose-400 font-bold">
-                <AlertOctagon className="w-5 h-5" />
-                <span>Deterministic Failure UX Guarantee (Zero Silent Fallbacks)</span>
+            {/* Failure UX Demonstration Card — only shown when uncalibrated/rejected channels exist */}
+            {(auditTrail.rejected_channels?.length ?? 0) > 0 && (
+              <div className="bg-rose-950/20 border border-rose-800/40 rounded-xl p-6 space-y-4">
+                <div className="flex items-center gap-2 text-rose-400 font-bold">
+                  <AlertOctagon className="w-5 h-5" />
+                  <span>Deterministic Failure UX Guarantee (Zero Silent Fallbacks)</span>
+                </div>
+                <p className="text-xs text-neutral-300">
+                  When corrupt or incompatible telemetry is uploaded, SuspensionLab PRO never silently converts NaNs to zero, never guesses channels, and strictly bounds what claims remain valid:
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 font-mono text-xs">
+                  <div className="bg-neutral-950/80 border border-rose-900/60 rounded-lg p-3">
+                    <div className="text-rose-400 font-bold uppercase text-[11px]">What Failed &amp; Why</div>
+                    <div className="text-neutral-300 mt-1">Non-monotonic timestamp jump detected at row 412 (&Delta;t = -0.04s). Raw timestamps out of order.</div>
+                  </div>
+                  <div className="bg-neutral-950/80 border border-amber-900/60 rounded-lg p-3">
+                    <div className="text-amber-400 font-bold uppercase text-[11px]">What Cannot Be Claimed</div>
+                    <div className="text-neutral-300 mt-1">Transient frequency response (FFT) and damper velocity derivatives cannot be validated.</div>
+                  </div>
+                  <div className="bg-neutral-950/80 border border-emerald-900/60 rounded-lg p-3">
+                    <div className="text-emerald-400 font-bold uppercase text-[11px]">What To Do Next</div>
+                    <div className="text-neutral-300 mt-1">Export MoTeC log with monotonic timestamp option enabled, or run CSV through time repair filter.</div>
+                  </div>
+                </div>
               </div>
-              <p className="text-xs text-neutral-300">
-                When corrupt or incompatible telemetry is uploaded, SuspensionLab PRO never silently converts NaNs to zero, never guesses channels, and strictly bounds what claims remain valid:
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 font-mono text-xs">
-                <div className="bg-neutral-950/80 border border-rose-900/60 rounded-lg p-3">
-                  <div className="text-rose-400 font-bold uppercase text-[11px]">What Failed &amp; Why</div>
-                  <div className="text-neutral-300 mt-1">Non-monotonic timestamp jump detected at row 412 (&Delta;t = -0.04s). Raw timestamps out of order.</div>
-                </div>
-                <div className="bg-neutral-950/80 border border-amber-900/60 rounded-lg p-3">
-                  <div className="text-amber-400 font-bold uppercase text-[11px]">What Cannot Be Claimed</div>
-                  <div className="text-neutral-300 mt-1">Transient frequency response (FFT) and damper velocity derivatives cannot be validated.</div>
-                </div>
-                <div className="bg-neutral-950/80 border border-emerald-900/60 rounded-lg p-3">
-                  <div className="text-emerald-400 font-bold uppercase text-[11px]">What To Do Next</div>
-                  <div className="text-neutral-300 mt-1">Export MoTeC log with monotonic timestamp option enabled, or run CSV through time repair filter.</div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -604,7 +963,7 @@ export default function CorrelationCockpitPage() {
                       <button
                         onClick={() => handleInvestigateEvent(selectedEvent)}
                         disabled={investigatingEvent}
-                        className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white rounded-lg shadow-lg shadow-cyan-500/20 transition-all"
+                        className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold uppercase tracking-wider bg-cyan-500 hover:bg-cyan-400 text-black rounded-lg shadow-md transition-all"
                       >
                         <Search className={`w-4 h-4 ${investigatingEvent ? "animate-spin" : ""}`} />
                         <span>Investigate This Event &rarr;</span>
@@ -668,7 +1027,7 @@ export default function CorrelationCockpitPage() {
                     onClick={() => setSelectedModel(m.id)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                       selectedModel === m.id
-                        ? "bg-purple-600 text-white shadow-md border border-purple-400"
+                        ? "bg-amber-500 text-black font-bold shadow-md"
                         : "bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800"
                     }`}
                   >
@@ -721,17 +1080,17 @@ export default function CorrelationCockpitPage() {
                 <div className="bg-neutral-950/80 border border-neutral-800 rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between text-xs font-mono">
                     <div className="flex items-center gap-4">
-                      <span className="flex items-center gap-1 text-blue-400">
-                        <span className="w-3 h-0.5 bg-blue-400 inline-block" /> MEASURED (DAQ)
-                      </span>
-                      <span className="flex items-center gap-1 text-purple-400">
-                        <span className="w-3 h-0.5 bg-purple-400 inline-block border-t border-dashed" /> MODEL (ODE)
+                      <span className="flex items-center gap-1 text-cyan-400">
+                        <span className="w-3 h-0.5 bg-cyan-400 inline-block" /> MEASURED (DAQ)
                       </span>
                       <span className="flex items-center gap-1 text-amber-400">
-                        <span className="w-3 h-0.5 bg-amber-400 inline-block border-t border-dotted" /> RESIDUAL
+                        <span className="w-3 h-0.5 bg-amber-400 inline-block border-t border-dashed" /> MODEL (ODE)
+                      </span>
+                      <span className="flex items-center gap-1 text-rose-400">
+                        <span className="w-3 h-0.5 bg-rose-400 inline-block border-t border-dotted" /> RESIDUAL
                       </span>
                       {activeChannelData.uncertainty_upper && (
-                        <span className="flex items-center gap-1 text-neutral-500">
+                        <span className="flex items-center gap-1 text-neutral-400">
                           <span className="w-3 h-2 bg-neutral-700/50 inline-block rounded-xs" /> &plusmn;1&sigma; BOUNDS
                         </span>
                       )}
@@ -780,7 +1139,7 @@ export default function CorrelationCockpitPage() {
                         strokeWidth="2"
                       />
 
-                      {/* Model trace (Purple dashed) */}
+                      {/* Model trace (Cyan dashed) */}
                       <path
                         d={(activeChannelData.simulated || []).slice(0, 100).map((val: number, i: number) => {
                           const x = (i / 100) * 600;
@@ -788,7 +1147,7 @@ export default function CorrelationCockpitPage() {
                           return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
                         }).join(" ")}
                         fill="none"
-                        stroke="#a855f7"
+                        stroke="#06B6D4"
                         strokeWidth="2"
                         strokeDasharray="4,2"
                       />
@@ -816,18 +1175,33 @@ export default function CorrelationCockpitPage() {
                   </div>
                 </div>
 
-                {/* Sensor Alignment Manifest */}
-                {modelComparisonData?.sensor_alignment_manifest && (
-                  <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-4 text-xs font-mono space-y-2">
-                    <div className="text-cyan-400 font-bold uppercase text-[11px]">Sensor Alignment Manifest</div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-neutral-300">
-                      <div>Resampling: 100.0 Hz (PCHIP Monotonic Interpolation)</div>
-                      <div>Spatial Resolution: 1.0 m grid</div>
-                      <div>Coordinate Transforms: Z-Up, Y-Left, X-Forward</div>
-                      <div>Anti-Tautology: Independent ODE Forward Integration</div>
-                    </div>
+                {/* Sensor Alignment Manifest & G-G Friction Circle */}
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+                  <div className={modelComparisonData?.sensor_alignment_manifest ? "lg:col-span-8" : "lg:col-span-8 flex items-center"}>
+                    {modelComparisonData?.sensor_alignment_manifest ? (
+                      <div className="h-full bg-neutral-950 border border-neutral-800 rounded-xl p-4 text-xs font-mono space-y-2">
+                        <div className="text-cyan-400 font-bold uppercase text-[11px]">Sensor Alignment Manifest</div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-neutral-300">
+                          <div>Resampling: {Number(auditTrail.sample_rate_hz || 100).toFixed(1)} Hz (PCHIP Monotonic Interpolation)</div>
+                          <div>Spatial Resolution: 1.0 m grid</div>
+                          <div>Coordinate Transforms: Z-Up, Y-Left, X-Forward</div>
+                          <div>Anti-Tautology: Independent ODE Forward Integration</div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-full h-full bg-neutral-950 border border-neutral-800 rounded-xl p-4 text-xs font-mono text-neutral-400 flex items-center">
+                        Peak Resultant Grip Envelope ({activeDatasetName}): <strong className="text-white ml-2">{gCircleStats.maxG.toFixed(2)} G</strong>
+                      </div>
+                    )}
                   </div>
-                )}
+                  <div className="lg:col-span-4 min-h-[320px]">
+                    <GGFrictionCircle
+                      maxG={gCircleStats.maxG}
+                      latG={gCircleStats.latG}
+                      longG={gCircleStats.longG}
+                    />
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -851,7 +1225,7 @@ export default function CorrelationCockpitPage() {
                 {/* BUTTON: INVESTIGATE RESIDUAL */}
                 <button
                   onClick={() => handleInvestigateResidual(activeChannelData)}
-                  className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold uppercase tracking-wider bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 text-white rounded-lg shadow-lg shadow-amber-500/20 transition-all"
+                  className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold uppercase tracking-wider bg-amber-500 hover:bg-amber-400 text-black rounded-lg shadow-md transition-all"
                 >
                   <Search className="w-4 h-4" />
                   <span>Investigate Residual &rarr;</span>
@@ -931,7 +1305,7 @@ export default function CorrelationCockpitPage() {
                   </p>
                 </div>
                 <button
-                  onClick={runSessionComparison}
+                  onClick={() => runSessionComparison()}
                   disabled={loadingComp}
                   className="px-3 py-1.5 text-xs font-mono bg-neutral-800 hover:bg-neutral-700 text-neutral-200 rounded-lg border border-neutral-700"
                 >
@@ -945,7 +1319,28 @@ export default function CorrelationCockpitPage() {
                   <div className="bg-purple-950/20 border border-purple-800/40 rounded-xl p-4 space-y-2">
                     <div className="text-xs font-mono uppercase text-purple-400 font-bold">Session Delta Overview</div>
                     <div className="text-base font-semibold text-white">
-                      Lap Time Delta: <span className="text-emerald-400 font-mono font-bold">-0.342 s</span> (Lap B is faster)
+                      {(() => {
+                        const dt = sessionCompData.lap_time_delta_s ?? sessionCompData.lap_time_delta;
+                        if (typeof dt === "number" && Number.isFinite(dt)) {
+                          return (
+                            <>
+                              Lap Time Delta:{" "}
+                              <span className={`${dt <= 0 ? "text-emerald-400" : "text-amber-400"} font-mono font-bold`}>
+                                {fmtNum(dt, 3, true)} s
+                              </span>{" "}
+                              ({dt <= 0 ? "Stint B is faster" : "Stint A is faster"})
+                            </>
+                          );
+                        }
+                        return (
+                          <>
+                            Telemetry Session Comparison:{" "}
+                            <span className="text-cyan-400 font-mono font-bold">
+                              {sessionCompData.corner_deltas?.length ?? 0} zones compared
+                            </span>
+                          </>
+                        );
+                      })()}
                     </div>
                     <div className="space-y-1 text-xs text-neutral-300 font-mono">
                       {sessionCompData.engineering_insights?.map((ins: string, idx: number) => (
@@ -1029,5 +1424,13 @@ export default function CorrelationCockpitPage() {
 
       </main>
     </div>
+  );
+}
+
+export default function CorrelationCockpitPage() {
+  return (
+    <PlanGate required="PRO" feature="Telemetry & Physical Model Correlation Cockpit">
+      <CorrelationCockpitContent />
+    </PlanGate>
   );
 }

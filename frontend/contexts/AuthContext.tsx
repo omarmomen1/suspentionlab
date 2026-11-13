@@ -1,5 +1,6 @@
 "use client";
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import { getUserPlanLevel, PLAN_LEVELS } from "../lib/planGate";
 
 export function resolveApiUrl(path: string): string {
   if (path.startsWith("http://") || path.startsWith("https://")) {
@@ -63,7 +64,7 @@ interface AuthContextValue {
   refreshSession: (force?: boolean) => Promise<AuthUser | null>;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 let refreshPromise: Promise<string | null> | null = null;
 let mePromise: Promise<AuthUser | null> | null = null;
@@ -75,6 +76,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user,    setUser]    = useState<AuthUser | null>(null);
   const [token,   setToken]   = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const tokenRef = useRef<string | null>(null);
+  tokenRef.current = token;
+  const didInitRef = useRef(false);
 
   const fetchMe = useCallback(async (force = false, overrideToken?: string): Promise<AuthUser | null> => {
     if (!force && cachedUser && Date.now() - lastFetchTime < CACHE_TTL_MS) {
@@ -87,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     mePromise = (async () => {
       try {
         const headers: Record<string, string> = {};
-        const activeToken = overrideToken || token;
+        const activeToken = overrideToken || tokenRef.current;
         if (activeToken) {
           headers["Authorization"] = `Bearer ${activeToken}`;
         }
@@ -106,6 +110,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           cachedUser = null;
           setToken(null);
           setUser(null);
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.removeItem("sl_token");
+              localStorage.removeItem("sl_refresh_token");
+              localStorage.removeItem("sl_user");
+            } catch {}
+          }
           return null;
         }
       } catch (err) {
@@ -117,10 +128,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     })();
 
     return mePromise;
-  }, [token]);
+  }, []);
 
-  // Restore session from localStorage or cookie on mount
+  // Restore session from localStorage or cookie on mount (once)
   useEffect(() => {
+    if (didInitRef.current) return;
+    didInitRef.current = true;
     let savedToken: string | null = null;
     if (typeof window !== "undefined") {
       try {
@@ -128,6 +141,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const savedUserStr = localStorage.getItem("sl_user");
         if (savedToken) {
           setToken(savedToken);
+          tokenRef.current = savedToken;
         }
         if (savedUserStr) {
           const parsed = JSON.parse(savedUserStr);
@@ -166,6 +180,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem("sl_token", data.token);
+        if (data.refresh_token) {
+          localStorage.setItem("sl_refresh_token", data.refresh_token);
+        }
         localStorage.setItem("sl_user", JSON.stringify(userObj));
       } catch {}
     }
@@ -191,6 +208,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") {
       try {
         localStorage.setItem("sl_token", data.token);
+        if (data.refresh_token) {
+          localStorage.setItem("sl_refresh_token", data.refresh_token);
+        }
       } catch {}
     }
     cachedUser = null;
@@ -210,6 +230,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (typeof window !== "undefined") {
       try {
         localStorage.removeItem("sl_token");
+        localStorage.removeItem("sl_refresh_token");
         localStorage.removeItem("sl_user");
       } catch {}
     }
@@ -250,16 +271,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const res = await fetch(fullUrl, { ...options, credentials: "include", headers });
     if (res.status === 401 && !isAuthRoute) {
+        const storedRefreshToken =
+          typeof window !== "undefined"
+            ? (localStorage.getItem("sl_refresh_token") || "").trim()
+            : "";
+
+        if (!storedRefreshToken) {
+            logout();
+            return res;
+        }
+
         if (!refreshPromise) {
             refreshPromise = fetch(resolveApiUrl("/auth/refresh"), {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 credentials: "include",
-                body: JSON.stringify({}),
+                body: JSON.stringify({ refresh_token: storedRefreshToken }),
             }).then(async refreshRes => {
                 if (refreshRes.ok) {
-                    const { token: newToken } = await refreshRes.json();
-                    return newToken as string;
+                    const data = await refreshRes.json();
+                    if (typeof window !== "undefined") {
+                      try {
+                        if (data.token) localStorage.setItem("sl_token", data.token);
+                        if (data.refresh_token) localStorage.setItem("sl_refresh_token", data.refresh_token);
+                      } catch {}
+                    }
+                    return (data.token as string) || null;
                 }
                 return null;
             }).catch(err => {
@@ -297,7 +334,6 @@ export function useAuth() {
 /** Returns true if the user has at least the required plan. */
 export function usePlanGate(required: "FREE" | "PRO" | "ENTERPRISE"): boolean {
   const { user } = useAuth();
-  const levels: Record<string, number> = { FREE: 0, PRO: 1, ENTERPRISE: 2, TRIAL: 1 };
-  const userLevel = levels[user?.plan ?? "FREE"] ?? 0;
-  return userLevel >= (levels[required] ?? 0);
+  const userLevel = getUserPlanLevel(user);
+  return userLevel >= (PLAN_LEVELS[required] ?? 0);
 }

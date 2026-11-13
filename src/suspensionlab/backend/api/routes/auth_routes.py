@@ -426,16 +426,17 @@ async def login(request: Request, req: LoginRequest, response: Response, db: Asy
         )
     )
     user_trial = trial_res.scalar_one_or_none()
-    is_trial_user = bool(user_trial) or (user.plan == PlanTier.TRIAL.value)
+    active_trial = user_trial if (user_trial and user_trial.status != "CONVERTED") else None
+    is_trial_user = bool(active_trial) or (user.plan == PlanTier.TRIAL.value)
     target_redirect = "/evaluation" if is_trial_user else "/quarter-car"
 
     t_status = None
     t_expires = None
-    if user_trial:
-        if user_trial.is_expired():
-            user_trial.status = "EXPIRED"
-        t_status = user_trial.status
-        t_expires = user_trial.expires_at.isoformat() if user_trial.expires_at else None
+    if active_trial:
+        if active_trial.is_expired():
+            active_trial.status = "EXPIRED"
+        t_status = active_trial.status
+        t_expires = active_trial.expires_at.isoformat() if active_trial.expires_at else None
 
     return AuthResponse(
         token=token,
@@ -501,15 +502,16 @@ async def get_me(request: Request, db: AsyncSession = Depends(get_db_dependency)
         )
     )
     user_trial = trial_res.scalar_one_or_none()
-    is_trial_user = bool(user_trial) or (user.plan == PlanTier.TRIAL.value)
+    active_trial = user_trial if (user_trial and user_trial.status != "CONVERTED") else None
+    is_trial_user = bool(active_trial) or (user.plan == PlanTier.TRIAL.value)
     target_redirect = "/evaluation" if is_trial_user else "/quarter-car"
     t_status = None
     t_expires = None
-    if user_trial:
-        if user_trial.is_expired():
-            user_trial.status = "EXPIRED"
-        t_status = user_trial.status
-        t_expires = user_trial.expires_at.isoformat() if user_trial.expires_at else None
+    if active_trial:
+        if active_trial.is_expired():
+            active_trial.status = "EXPIRED"
+        t_status = active_trial.status
+        t_expires = active_trial.expires_at.isoformat() if active_trial.expires_at else None
 
     return UserMeResponse(
         user_id=str(user.id),

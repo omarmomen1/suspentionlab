@@ -21,6 +21,7 @@ steering delta, brakes, differential, and aero maps) is modeled in the handling/
 """
 
 import os
+import math
 _FASTMATH = os.environ.get('SUSPENSIONLAB_FASTMATH', '1') == '1'
 
 import numpy as np
@@ -151,6 +152,7 @@ class FullCarParams:
     stribeck_sigma_r: float = 0.0
     k_torsion_nm_rad: float = 2_000_000.0  # Chassis torsional stiffness [Nm/rad]
     enable_contact_loss: bool = True  # Enable nonlinear tire liftoff clamping (Fz >= 0)
+    lateral_accel_g: float = 0.0      # Steady cornering lateral acceleration [g] for lateral load transfer
     
     def __post_init__(self):
         import math
@@ -467,32 +469,89 @@ def build_full_car_state_space(params: FullCarParams) -> Tuple[np.ndarray, np.nd
 def calculate_full_car_kpis(params: FullCarParams, res: dict) -> dict:
     A, _, _, _ = build_full_car_state_space(params)
     vals, vecs = np.linalg.eig(A)
-    
+
+    def _dominant_dof(vec_7: np.ndarray) -> int:
+        ms = np.abs(vec_7).copy()
+        ms[1] *= params.L / 2.0
+        ms[2] *= (params.tw_f + params.tw_r) / 4.0
+        return int(np.argmax(ms))
+
+    # 1. Extract oscillatory (underdamped) eigenmodes first
     idx = np.where(np.imag(vals) > 1e-3)[0]
-    vals = vals[idx]
-    vecs = vecs[:, idx]
-    
+    osc_vals = vals[idx]
+    osc_vecs = vecs[:, idx]
+
     modes = {"heave": 0.0, "pitch": 0.0, "roll": 0.0, "uf": 0.0, "ur": 0.0}
-    for i in range(len(vals)):
-        freq = float(np.imag(vals[i]) / (2 * np.pi))
-        mode_shape = np.abs(vecs[:7, i])
-        mode_shape[1] *= params.L / 2.0
-        mode_shape[2] *= (params.tw_f + params.tw_r) / 4.0
-        max_idx = int(np.argmax(mode_shape))
-        
-        if max_idx == 0: modes["heave"] = freq
-        elif max_idx == 1: modes["pitch"] = freq
-        elif max_idx == 2: modes["roll"] = freq
+    for i in range(len(osc_vals)):
+        freq = float(np.imag(osc_vals[i]) / (2 * np.pi))
+        max_idx = _dominant_dof(osc_vecs[:7, i])
+        if max_idx == 0: modes["heave"] = max(modes["heave"], freq)
+        elif max_idx == 1: modes["pitch"] = max(modes["pitch"], freq)
+        elif max_idx == 2: modes["roll"] = max(modes["roll"], freq)
         elif max_idx in [3, 4]: modes["uf"] = max(modes["uf"], freq)
         elif max_idx in [5, 6]: modes["ur"] = max(modes["ur"], freq)
-            
+
     modes_list = []
-    for i in range(len(vals)):
-        freq = float(np.imag(vals[i]) / (2 * np.pi))
-        damping_ratio = float(-np.real(vals[i]) / np.abs(vals[i])) if np.abs(vals[i]) > 0 else 0.0
-        mode_shape = vecs[:7, i].tolist()
+    for i in range(len(osc_vals)):
+        freq = float(np.imag(osc_vals[i]) / (2 * np.pi))
+        damping_ratio = float(-np.real(osc_vals[i]) / np.abs(osc_vals[i])) if np.abs(osc_vals[i]) > 0 else 0.0
+        mode_shape = osc_vecs[:7, i].tolist()
         if freq > 1e-3 and all(abs(freq - m["frequency"]) > 1e-2 for m in modes_list):
-            modes_list.append({"frequency": freq, "damping_ratio": damping_ratio, "mode_shape": [{"real": float(np.real(c)), "imag": float(np.imag(c))} for c in mode_shape]})
+            modes_list.append({
+                "frequency": freq,
+                "damping_ratio": damping_ratio,
+                "mode_shape": [{"real": float(np.real(c)), "imag": float(np.imag(c))} for c in mode_shape],
+            })
+
+    # 2. Extract undamped natural frequencies for any overdamped real eigenmodes (Im(lambda) == 0)
+    real_idx = np.where((np.abs(np.imag(vals)) <= 1e-3) & (np.real(vals) < -1e-6))[0]
+    real_by_dof: Dict[int, List[Tuple[float, np.ndarray]]] = {}
+    for r_i in real_idx:
+        d_idx = _dominant_dof(vecs[:7, r_i])
+        real_by_dof.setdefault(d_idx, []).append((float(np.abs(vals[r_i])), vecs[:7, r_i]))
+
+    # Compute exact undamped modal matrix eigenvalues from -A[7:, :7] = M^{-1} K as reference
+    u_eig_vals, u_eig_vecs = np.linalg.eig(-A[7:, :7])
+    undamped_by_dof: Dict[int, float] = {}
+    for k_i in range(len(u_eig_vals)):
+        lam_k = float(np.real(u_eig_vals[k_i]))
+        if lam_k > 0.0:
+            f_u = float(np.sqrt(lam_k) / (2.0 * np.pi))
+            d_idx = _dominant_dof(u_eig_vecs[:, k_i])
+            undamped_by_dof[d_idx] = max(undamped_by_dof.get(d_idx, 0.0), f_u)
+
+    def _overdamped_freq_and_zeta(d_idx: int) -> Tuple[float, float, Optional[np.ndarray]]:
+        poles = sorted(real_by_dof.get(d_idx, []), key=lambda t: t[0])
+        f_undamped = float(undamped_by_dof.get(d_idx, 0.0))
+        if f_undamped > 1e-4:
+            omega_u = f_undamped * 2.0 * math.pi
+            if len(poles) >= 2:
+                zeta = (poles[0][0] + poles[-1][0]) / (2.0 * omega_u)
+            else:
+                zeta = 1.0
+            m_vec = poles[0][1] if poles else None
+            return f_undamped, float(max(zeta, 1.0)), m_vec
+        if len(poles) >= 2:
+            l1, l2 = poles[0][0], poles[-1][0]
+            omega_n = math.sqrt(l1 * l2)
+            zeta = (l1 + l2) / (2.0 * omega_n) if omega_n > 0 else 1.0
+            return float(omega_n / (2.0 * np.pi)), float(zeta), poles[0][1]
+        if len(poles) == 1:
+            return float(poles[0][0] / (2.0 * np.pi)), 1.0, poles[0][1]
+        return 0.0, 1.0, None
+
+    dof_mode_map = [(0, "heave"), (1, "pitch"), (2, "roll"), (3, "uf"), (4, "uf"), (5, "ur"), (6, "ur")]
+    for d_idx, mode_key in dof_mode_map:
+        if modes[mode_key] <= 1e-6:
+            f_od, z_od, m_vec = _overdamped_freq_and_zeta(d_idx)
+            if f_od > 1e-4:
+                modes[mode_key] = max(modes[mode_key], f_od)
+                if m_vec is not None and all(abs(f_od - m["frequency"]) > 1e-2 for m in modes_list):
+                    modes_list.append({
+                        "frequency": f_od,
+                        "damping_ratio": z_od,
+                        "mode_shape": [{"real": float(np.real(c)), "imag": float(np.imag(c))} for c in m_vec.tolist()],
+                    })
             
     res["eigenmodes"] = modes_list
     res["f_n_heave"] = modes["heave"]
@@ -600,8 +659,21 @@ def run_full_car_analysis(params: FullCarParams, profile: FourCornerRoadProfile)
     F_t_rl = np.maximum(0.0, params.k_tr * (profile.z_rrl[::step] - yout_d[:, 5]))
     F_t_rr = np.maximum(0.0, params.k_tr * (profile.z_rrr[::step] - yout_d[:, 6]))
     
-    res_arrays["lateral_load_transfer_f"] = (F_t_fl - F_t_fr) / 2.0
-    res_arrays["lateral_load_transfer_r"] = (F_t_rl - F_t_rr) / 2.0
+    k_wf = params.k_sf * (params.MR_f**2)
+    k_wr = params.k_sr * (params.MR_r**2)
+    K_roll_f = 0.5 * k_wf * params.tw_f**2 + params.k_arb_f * params.tw_f**2
+    K_roll_r = 0.5 * k_wr * params.tw_r**2 + params.k_arb_r * params.tw_r**2
+    roll_dist_frac = float(K_roll_f / (K_roll_f + K_roll_r)) if (K_roll_f + K_roll_r) > 0 else 0.5
+
+    # Include steady cornering lateral acceleration load transfer when lateral_accel_g is provided
+    a_y_mps2 = float(getattr(params, "lateral_accel_g", 0.0)) * 9.81
+    h_cg_m = float(getattr(params, "cg_height_mm", 350.0)) / 1000.0
+    m_total = params.m_s + 2.0 * params.m_uf + 2.0 * params.m_ur
+    dFz_corner_f = roll_dist_frac * (m_total * a_y_mps2 * h_cg_m) / max(params.tw_f, 1e-4)
+    dFz_corner_r = (1.0 - roll_dist_frac) * (m_total * a_y_mps2 * h_cg_m) / max(params.tw_r, 1e-4)
+
+    res_arrays["lateral_load_transfer_f"] = (F_t_fl - F_t_fr) / 2.0 + dFz_corner_f
+    res_arrays["lateral_load_transfer_r"] = (F_t_rl - F_t_rr) / 2.0 + dFz_corner_r
     
     for k, v in res_arrays.items():
         if isinstance(v, np.ndarray):
@@ -609,11 +681,7 @@ def run_full_car_analysis(params: FullCarParams, profile: FourCornerRoadProfile)
 
     res = {k: v.tolist() if isinstance(v, np.ndarray) else v for k, v in res_arrays.items()}
     
-    k_wf = params.k_sf * (params.MR_f**2)
-    k_wr = params.k_sr * (params.MR_r**2)
-    K_roll_f = 0.5 * k_wf * params.tw_f**2 + params.k_arb_f * params.tw_f**2
-    K_roll_r = 0.5 * k_wr * params.tw_r**2 + params.k_arb_r * params.tw_r**2
-    res["roll_stiffness_dist"] = float(K_roll_f / (K_roll_f + K_roll_r)) * 100.0 if (K_roll_f + K_roll_r) > 0 else 50.0
+    res["roll_stiffness_dist"] = roll_dist_frac * 100.0 if (K_roll_f + K_roll_r) > 0 else 50.0
 
     # 4-wheel contact state determination
     def _wheel_contact_states(f_arr):

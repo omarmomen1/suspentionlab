@@ -1,6 +1,7 @@
 "use client";
 import { useState, useCallback } from "react";
 import { Loader2, FileCode2 } from "lucide-react";
+import PlanGate from "./PlanGate";
 
 interface DataExportProps {
   results: Record<string, unknown> | null;
@@ -92,17 +93,19 @@ export default function DataExport({ results, fileName = "suspensionlab_export",
   }, [results, fileName]);
 
   return (
-    <div className="inline-flex flex-col items-start gap-1">
-      <button onClick={handleExport} disabled={exporting || !results}
-        className={`flex items-center gap-1.5 px-3 py-1.5 bg-[#141416] border border-[#252525]
-          hover:bg-[#1e1e20] rounded-lg text-xs font-medium transition-colors disabled:opacity-40 ${className}`}>
-        {exporting
-          ? <><Loader2 size={13} className="animate-spin" /> Generating .m…</>
-          : <><FileCode2 size={13} /> Export MATLAB</>}
-      </button>
-      {exportError && (
-        <span className="text-[10px] text-rose-400 font-mono">{exportError}</span>
-      )}
-    </div>
+    <PlanGate required="PRO" compact feature="Export MATLAB">
+      <div className="inline-flex flex-col items-start gap-1">
+        <button onClick={handleExport} disabled={exporting || !results}
+          className={`flex items-center gap-1.5 px-3 py-1.5 bg-[#141416] border border-[#252525]
+            hover:bg-[#1e1e20] rounded-lg text-xs font-medium transition-colors disabled:opacity-40 ${className}`}>
+          {exporting
+            ? <><Loader2 size={13} className="animate-spin" /> Generating .m…</>
+            : <><FileCode2 size={13} /> Export MATLAB</>}
+        </button>
+        {exportError && (
+          <span className="text-[10px] text-rose-400 font-mono">{exportError}</span>
+        )}
+      </div>
+    </PlanGate>
   );
 }

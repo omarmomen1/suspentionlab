@@ -63,13 +63,13 @@ def test_real_suspension_camber_gain_directionality():
     camber_gain = np.array(derivs["camber_gain_deg_per_100mm"])
     assert len(camber_gain) == 21
 
-    # In bump (z > 0), camber increases with travel in the solver's coordinate frame (top tilts inward)
-    # Typical racecar double wishbone camber gain magnitude is between 0.2 and 1.6 deg/100mm
+    # In bump (z > 0), leaning the top of the wheel inboard produces negative camber gain (d(camber)/dz < 0).
+    # Typical racecar double wishbone camber gain magnitude is between 0.2 and 1.6 deg/100mm.
     idx_bump = np.where(np.array(d["wheel_travel_mm"]) > 5.0)[0]
     assert len(idx_bump) > 0
     bump_gain = camber_gain[idx_bump]
-    assert np.all(bump_gain > 0.0), f"Bump camber gain must be positive in solver coordinates, got {bump_gain}"
-    assert np.all(bump_gain < 2.5), f"Bump camber gain unrealistically steep: {bump_gain}"
+    assert np.all(bump_gain < 0.0), f"Bump camber gain must be negative (top tilts inboard), got {bump_gain}"
+    assert np.all(bump_gain > -2.5), f"Bump camber gain unrealistically steep: {bump_gain}"
 
 
 def test_monotonic_travel_ordering():

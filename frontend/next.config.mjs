@@ -7,6 +7,11 @@ const nextConfig = {
         destination: "/auth/login",
         permanent: false,
       },
+      {
+        source: "/alternative-to-msc-adams",
+        destination: "/",
+        permanent: false,
+      },
     ];
   },
 

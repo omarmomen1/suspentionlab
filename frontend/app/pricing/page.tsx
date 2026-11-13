@@ -2,7 +2,7 @@
 
 import React from "react";
 import Link from "next/link";
-import { Check, Zap, Shield, Building2, ArrowRight } from "lucide-react";
+import { Check, Zap, Shield, Building2, ArrowRight, ExternalLink } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
 const PLANS = [
@@ -11,11 +11,11 @@ const PLANS = [
     planKey: "FREE",
     price: "Free",
     billing: "forever",
-    description: "For individual engineers exploring vehicle dynamics.",
+    description: "3D Kinematics & Quarter-Car Preview.",
     color: "border-[#252525]",
     badge: null,
     features: [
-      "Quarter Car (2-DOF) simulator",
+      "3D Kinematics & Quarter-Car Preview",
       "5 saved configurations",
       "Transmissibility & Bode plots",
       "ISO 2631-1 comfort analysis",
@@ -27,50 +27,46 @@ const PLANS = [
     icon: Zap,
   },
   {
-    name: "Pro",
+    name: "Pro Engineer",
     planKey: "PRO",
-    price: "$49",
-    billing: "per month",
-    description: "For suspension engineers who need the full toolkit.",
+    price: "$29",
+    billing: "/ month",
+    description: "Full-Car, Damper LUTs, Telemetry Correlation, Setup Optimizer & PDF Reports.",
     color: "border-ansys-yellow shadow-[0_0_40px_rgba(242,169,0,0.08)]",
     badge: "Most Popular",
     features: [
       "Everything in Starter",
-      "Half Car (4-DOF) & Full Car (7-DOF)",
-      "AI Auto-Tune optimizer",
-      "Handling dynamics & kinematics",
-      "Active suspension comparison",
-      "Unlimited saved configurations",
-      "NVH & Acoustics module",
-      "PDF export & reporting",
+      "Full-Car (7-DOF) & Half-Car (4-DOF)",
+      "Damper LUTs & nonlinear curves",
+      "Telemetry Correlation",
+      "Setup Optimizer & AI Auto-Tune",
+      "PDF Reports & unlimited configs",
       "Priority email support",
     ],
-    cta: "Upgrade to Pro",
+    cta: "Activate License Key →",
     ctaHref: "/settings#billing",
     ctaStyle: "bg-ansys-yellow text-black font-bold hover:brightness-110 shadow-[0_0_20px_rgba(242,169,0,0.25)]",
     icon: Shield,
   },
   {
-    name: "Enterprise",
+    name: "Race Team / FSAE Pass",
     planKey: "ENTERPRISE",
-    price: "Custom",
-    billing: "contact us",
-    description: "For OEM teams that need scale, compliance, and integrations.",
+    price: "$199",
+    billing: "/ year",
+    description: "Up to 10 team seats, Engineering Memory, Shared Reports & FMI Co-Sim.",
     color: "border-[#252525]",
     badge: null,
     features: [
-      "Everything in Pro",
-      "SSO / SAML authentication",
-      "Dedicated cloud deployment",
-      "REST API access",
-      "Custom road profile import",
-      "Audit logs & compliance",
-      "SLA-backed uptime",
-      "Dedicated customer success",
-      "Volume seat licensing",
+      "Everything in Pro Engineer",
+      "Up to 10 team seats",
+      "Engineering Memory",
+      "Shared Reports",
+      "FMI Co-Sim (FMU / Simulink / ADAMS)",
+      "Audit logs & REST API access",
+      "Direct team invoicing & SLA support",
     ],
-    cta: "Contact Sales",
-    ctaHref: "mailto:support@suspensionlab.pro",
+    cta: "Activate Team Pass",
+    ctaHref: "/settings#billing",
     ctaStyle: "bg-[#1e1e20] border border-[#333] text-white hover:bg-[#2a2a2c]",
     icon: Building2,
   },
@@ -79,25 +75,27 @@ const PLANS = [
 const FAQS = [
   {
     q: "Can I switch plans later?",
-    a: "Yes — upgrade or downgrade anytime. When you upgrade, you get instant access to all features. When you downgrade, your saved configs are preserved but locked until you re-upgrade.",
+    a: "Yes — upgrade anytime using a Gumroad license key or a direct team key. When you upgrade, you get instant access to all unlocked studio modules.",
   },
   {
-    q: "What physics models are included in each plan?",
-    a: "Starter includes the 2-DOF quarter car model. Pro adds 4-DOF half car, 7-DOF full car, handling dynamics, active suspension, and the kinematics module. All models use the same RK45 ODE solver.",
+    q: "What physics models are included in each tier?",
+    a: "Starter includes 3D Kinematics & Quarter-Car Preview. Pro Engineer ($29/month) unlocks Full-Car (7-DOF), Damper LUTs, Telemetry Correlation, Setup Optimizer, and PDF Reports. Race Team / FSAE Pass ($199/year) adds up to 10 seats, Engineering Memory, Shared Reports, and FMI Co-Sim.",
   },
   {
-    q: "Is there an annual discount?",
-    a: "Yes — paying annually saves 20% compared to monthly. Toggle billing to annual on the checkout page.",
+    q: "How do I activate my license after purchasing?",
+    a: "After checkout on Gumroad (or direct team invoicing), copy your license key and paste it in Settings → Billing (/settings#billing) for instant activation.",
   },
   {
-    q: "Do you offer academic or startup discounts?",
-    a: "Yes. Students and researchers get 50% off Pro with a verified .edu email. Early-stage startups (< 2 years old, < 10 employees) get 30% off. Contact us to apply.",
+    q: "Do you offer direct invoicing for Formula Student / FSAE or OEM teams?",
+    a: "Yes. Teams can purchase the Race Team / FSAE Pass directly or request a direct invoice and SLPRO team license key by contacting our engineering team.",
   },
 ];
 
 export default function PricingPage() {
   const { user } = useAuth();
   const currentPlanKey = (user?.plan || "FREE").toUpperCase();
+  const gumroadProUrl = process.env.NEXT_PUBLIC_GUMROAD_PRO_URL?.trim() || "";
+  const gumroadTeamUrl = process.env.NEXT_PUBLIC_GUMROAD_TEAM_URL?.trim() || "";
 
   return (
     <div className="min-h-full bg-black pt-[44px]">
@@ -110,7 +108,7 @@ export default function PricingPage() {
             Simple, transparent engineering tiers
           </h1>
           <p className="text-gray-500 text-lg max-w-xl mx-auto">
-            Every tier includes the core physics engine. Upgrade for multi-body DOF solvers, AI optimizers, and enterprise team governance.
+            Every tier includes the core physics engine. Upgrade for full-car dynamics, damper LUTs, telemetry correlation, and team collaboration.
           </p>
         </div>
 
@@ -130,18 +128,18 @@ export default function PricingPage() {
               ctaHref = "/quarter-car";
               ctaStyle = "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-bold hover:bg-emerald-500/30";
             } else if (isEnterpriseUser) {
-              ctaText = "Included in Enterprise";
+              ctaText = "Included in Team Pass";
               ctaHref = "/quarter-car";
               ctaStyle = "bg-white/10 text-white border border-white/20 hover:bg-white/20";
-            } else if (!user) {
-              if (plan.planKey === "FREE") {
-                ctaText = "Get Started Free";
-                ctaHref = "/auth/register";
-              } else if (plan.planKey === "PRO") {
-                ctaText = "Get Started with Pro";
-                ctaHref = "/auth/register";
-              }
+            } else if (!user && plan.planKey === "FREE") {
+              ctaText = "Get Started Free";
+              ctaHref = "/auth/register";
             }
+
+            const showProGumroad =
+              !isCurrentPlan && !isEnterpriseUser && plan.planKey === "PRO" && Boolean(gumroadProUrl);
+            const showTeamGumroad =
+              !isCurrentPlan && plan.planKey === "ENTERPRISE" && Boolean(gumroadTeamUrl);
 
             return (
               <div
@@ -185,12 +183,48 @@ export default function PricingPage() {
                   ))}
                 </ul>
 
-                <Link
-                  href={ctaHref}
-                  className={`w-full py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2 ${ctaStyle}`}
-                >
-                  {ctaText} <ArrowRight size={14} />
-                </Link>
+                {showProGumroad ? (
+                  <div className="space-y-2.5">
+                    <a
+                      href={gumroadProUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`w-full py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2 ${plan.ctaStyle}`}
+                    >
+                      Buy on Gumroad ($29) <ExternalLink size={14} />
+                    </a>
+                    <Link
+                      href="/settings#billing"
+                      className="w-full py-2.5 rounded-xl text-xs font-semibold text-gray-300 bg-[#161618] border border-[#2a2a2e] hover:text-white hover:border-[#3c3c42] transition-all flex items-center justify-center gap-1.5"
+                    >
+                      Activate License Key →
+                    </Link>
+                  </div>
+                ) : showTeamGumroad ? (
+                  <div className="space-y-2.5">
+                    <a
+                      href={gumroadTeamUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`w-full py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2 ${plan.ctaStyle}`}
+                    >
+                      Buy Team Pass ($199/yr) <ExternalLink size={14} />
+                    </a>
+                    <Link
+                      href="/settings#billing"
+                      className="w-full py-2.5 rounded-xl text-xs font-semibold text-gray-300 bg-[#161618] border border-[#2a2a2e] hover:text-white hover:border-[#3c3c42] transition-all flex items-center justify-center gap-1.5"
+                    >
+                      Activate License Key →
+                    </Link>
+                  </div>
+                ) : (
+                  <Link
+                    href={ctaHref}
+                    className={`w-full py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2 ${ctaStyle}`}
+                  >
+                    {ctaText} <ArrowRight size={14} />
+                  </Link>
+                )}
               </div>
             );
           })}
@@ -227,7 +261,7 @@ export default function PricingPage() {
             <a href="/legal/terms" className="text-gray-500 hover:text-white underline transition-colors">Terms of Service</a>
             {" "}and{" "}
             <a href="/legal/privacy" className="text-gray-500 hover:text-white underline transition-colors">Privacy Policy</a>.
-            Billing is handled securely by Lemon Squeezy.
+            Instant license key delivery via Gumroad or direct team invoicing.
           </p>
         </div>
 

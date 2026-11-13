@@ -17,6 +17,13 @@ import {
   DigitalTwinApi,
   DigitalTwinOperationalState,
 } from "../../lib/api_client";
+import SampleDemoTelemetryBadge from "../../components/engineering/SampleDemoTelemetryBadge";
+import {
+  SAMPLE_TELEMETRY_DATASETS,
+  fetchSampleCsvText,
+  isSampleTelemetryFilename,
+  type SampleTelemetryDataset,
+} from "../../lib/sampleTelemetry";
 
 interface ParsedError {
   message: string;
@@ -72,11 +79,13 @@ export default function DigitalTwinPage() {
 
   // Analysis State
   const [file, setFile] = useState<File | null>(null);
+  const [isSampleDemo, setIsSampleDemo] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isAnalysing, setIsAnalysing] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<any>(null);
   const [error, setError] = useState<ParsedError | null>(null);
+  const isSampleFile = isSampleDemo || isSampleTelemetryFilename(file?.name);
 
   // Live Telemetry Production WebSocket Hook (Replaces Math.random())
   const {
@@ -103,12 +112,16 @@ export default function DigitalTwinPage() {
     e.preventDefault();
     setIsDragging(false);
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      setFile(e.dataTransfer.files[0]);
+      const dropped = e.dataTransfer.files[0];
+      setFile(dropped);
+      setIsSampleDemo(isSampleTelemetryFilename(dropped.name));
     }
   };
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setFile(e.target.files[0]);
+      const selected = e.target.files[0];
+      setFile(selected);
+      setIsSampleDemo(isSampleTelemetryFilename(selected.name));
     }
   };
 
@@ -127,15 +140,16 @@ export default function DigitalTwinPage() {
     }
   };
 
-  const handleLoadDemoSession = async () => {
+  const handleLoadDemoSession = async (
+    dataset: SampleTelemetryDataset = SAMPLE_TELEMETRY_DATASETS[0]
+  ) => {
     try {
       setIsAnalysing(true);
       setError(null);
-      const res = await fetch("/samples/motec_spa_session.csv");
-      if (!res.ok) throw new Error("Failed to load sample dataset");
-      const blob = await res.blob();
-      const sampleFile = new File([blob], "motec_spa_session.csv", { type: "text/csv" });
+      const csvText = await fetchSampleCsvText(dataset);
+      const sampleFile = new File([csvText], dataset.filename, { type: "text/csv" });
       setFile(sampleFile);
+      setIsSampleDemo(true);
 
       const formData = new FormData();
       formData.append("file", sampleFile);
@@ -513,6 +527,12 @@ export default function DigitalTwinPage() {
           </div>
         )}
 
+        {activeTab === "sync" && (
+          <div className="space-y-6 animate-in fade-in duration-300">
+            <TelemetrySyncView />
+          </div>
+        )}
+
         {activeTab === "analysis" && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Upload Zone */}
@@ -537,9 +557,12 @@ export default function DigitalTwinPage() {
                   <Upload className="w-8 h-8 text-slate-400" />
                 </div>
                 <div>
-                  <p className="text-lg font-medium text-slate-200">
-                    {file ? file.name : "Drag and drop telemetry CSV"}
-                  </p>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <p className="text-lg font-medium text-slate-200">
+                      {file ? file.name : "Drag and drop telemetry CSV"}
+                    </p>
+                    {file && isSampleFile && <SampleDemoTelemetryBadge size="sm" />}
+                  </div>
                   <p className="text-sm text-slate-500 mt-1">
                     Supports AiM, MoTeC, Pi System, and generic headers
                   </p>
@@ -588,20 +611,29 @@ export default function DigitalTwinPage() {
 
             {/* Actions */}
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={handleLoadDemoSession}
-                  disabled={isAnalysing}
-                  className="px-3.5 py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-semibold flex items-center gap-1.5 transition">
-                  <Zap size={14} /> Load Demo MoTeC Session (Spa 2026)
-                </button>
-                <a
-                  href="/samples/motec_spa_session.csv"
-                  download="motec_spa_session.csv"
-                  className="px-3.5 py-2 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition">
-                  <FileSpreadsheet size={14} /> Download Sample CSV
-                </a>
+              <div className="flex flex-wrap items-center gap-2">
+                <SampleDemoTelemetryBadge size="sm" />
+                {SAMPLE_TELEMETRY_DATASETS.map((ds) => (
+                  <div key={ds.id} className="inline-flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleLoadDemoSession(ds)}
+                      disabled={isAnalysing}
+                      className="px-3 py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-semibold flex items-center gap-1.5 transition"
+                      title={ds.formatNote}
+                    >
+                      <Zap size={14} /> Load {ds.label}
+                    </button>
+                    <a
+                      href={ds.path}
+                      download={ds.filename}
+                      className="px-2.5 py-2 rounded-lg bg-slate-800/60 hover:bg-slate-800 border border-slate-700 text-slate-300 hover:text-white text-xs font-semibold flex items-center gap-1.5 transition"
+                      title={`Download ${ds.filename}`}
+                    >
+                      <FileSpreadsheet size={14} /> {ds.filename}
+                    </a>
+                  </div>
+                ))}
               </div>
               <button
                 onClick={handleAnalyse}
@@ -635,6 +667,17 @@ export default function DigitalTwinPage() {
             {/* Results */}
             {analysisResult && (
               <div className="space-y-6">
+                {isSampleFile && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2.5 rounded-xl bg-amber-950/20 border border-amber-500/30">
+                    <div className="flex items-center gap-2 text-xs text-amber-200">
+                      <SampleDemoTelemetryBadge size="sm" />
+                      <span className="font-mono">{file?.name}</span>
+                    </div>
+                    <span className="text-[11px] text-slate-400">
+                      Synthetic demo telemetry fixture — upload a real track log CSV to analyze car data.
+                    </span>
+                  </div>
+                )}
                 {/* QA Summary */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="bg-slate-900/40 border border-slate-800/80 p-4 rounded-xl">
@@ -849,13 +892,16 @@ export default function DigitalTwinPage() {
                       SLTP v1 Binary
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {isReplaying
-                      ? "Replaying MoTeC Spa 100 Hz dataset through Ingestion Gateway"
-                      : isStreaming
-                      ? "Ingesting live DAQ stream with Pacejka Digital Twin calibration"
-                      : "Ready to stream high-frequency telemetry"}
-                  </p>
+                  <div className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-2">
+                    <span>
+                      {isReplaying
+                        ? "Replaying sample 100 Hz GT3 dataset through Ingestion Gateway"
+                        : isStreaming
+                        ? "Ingesting live DAQ stream with Pacejka Digital Twin calibration"
+                        : "Ready to stream high-frequency telemetry"}
+                    </span>
+                    {isReplaying && <SampleDemoTelemetryBadge size="xs" />}
+                  </div>
                 </div>
               </div>
 

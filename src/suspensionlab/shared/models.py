@@ -260,6 +260,7 @@ class FullCarParamsSchema(BaseModel):
     cg_height_mm: float = Field(default=350.0, gt=50.0, le=2000.0, description="CG height [mm]")
     brake_bias_front: float = Field(default=0.60, ge=0.0, le=1.0, description="Front brake bias fraction")
     drive_bias_rear: float = Field(default=1.00, ge=0.0, le=1.0, description="Rear drive bias fraction (1.0 = full RWD)")
+    lateral_accel_g: float = Field(default=0.0, ge=-5.0, le=5.0, description="Cornering lateral acceleration [g]")
     model_config = ConfigDict(allow_inf_nan=False)
     damper_curve_v_f: Optional[List[float]] = None
     damper_curve_f_f: Optional[List[float]] = None

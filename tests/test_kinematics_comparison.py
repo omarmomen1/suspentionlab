@@ -60,7 +60,7 @@ def test_modified_pickup_causal_attribution():
 
     # 2. Metric comparisons check
     camber_cmp = res["metric_comparisons"]["camber_deg"]
-    assert camber_cmp["max_difference"] > 0.0
+    assert abs(camber_cmp["max_difference"]) > 0.0
     assert camber_cmp["rms_difference"] > 0.0
 
     # 3. Categorized causal findings check

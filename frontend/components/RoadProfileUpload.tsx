@@ -18,26 +18,65 @@ interface RoadProfileUploadProps {
 }
 
 function parseCSV(text: string): { time: number[]; displacement: number[] } {
-  const lines = text
-    .split("\n")
+  // Strip UTF-8 BOM if present
+  const cleanText = text.replace(/^\uFEFF/, "");
+  const lines = cleanText
+    .split(/\r?\n/)
     .map((l) => l.trim())
-    .filter((l) => l && !l.startsWith("#") && !l.match(/^[a-z]/i)); // skip header rows
+    .filter((l) => l.length > 0 && !l.startsWith("#"));
 
+  if (lines.length === 0) {
+    throw new Error("Uploaded file is empty.");
+  }
+
+  // Detect header row and column aliases
+  const timeAliases = ["time", "t", "time_s", "timestamp", "sec", "seconds", "elapsed_time", "t_s"];
+  const dispAliases = [
+    "displacement", "disp", "z_r", "z_road", "road_z", "elevation",
+    "profile", "height", "elevation_m", "displacement_m", "z_profile", "road_displacement"
+  ];
+
+  let headerIndex = -1;
+  let timeCol = 0;
+  let dispCol = 1;
+
+  for (let i = 0; i < Math.min(lines.length, 5); i++) {
+    const rawCols = lines[i].split(/[\t,;]+/).map((c) => c.trim().toLowerCase().replace(/[^a-z0-9_]+/g, ""));
+    const tIdx = rawCols.findIndex((c) => timeAliases.includes(c) || c.startsWith("time"));
+    const dIdx = rawCols.findIndex((c) => dispAliases.includes(c) || c.includes("disp") || c.includes("elev") || c.includes("height"));
+
+    if (tIdx !== -1 && dIdx !== -1 && tIdx !== dIdx) {
+      headerIndex = i;
+      timeCol = tIdx;
+      dispCol = dIdx;
+      break;
+    }
+  }
+
+  const dataLines = headerIndex !== -1 ? lines.slice(headerIndex + 1) : lines;
   const time: number[] = [];
   const displacement: number[] = [];
 
-  for (const line of lines) {
-    const cols = line.split(/[\t,;\s]+/);
-    if (cols.length < 2) continue;
-    if (cols[0] === "" || cols[1] === "") continue;
-    const t = parseFloat(cols[0]);
-    const d = parseFloat(cols[1]);
-    if (!isNaN(t) && !isNaN(d)) {
+  for (const line of dataLines) {
+    const cols = line.split(/[\t,;]+/);
+    if (cols.length <= Math.max(timeCol, dispCol)) continue;
+    const tStr = cols[timeCol]?.trim() ?? "";
+    const dStr = cols[dispCol]?.trim() ?? "";
+    if (tStr === "" || dStr === "") continue;
+
+    const t = parseFloat(tStr);
+    const d = parseFloat(dStr);
+    if (Number.isFinite(t) && Number.isFinite(d)) {
       time.push(t);
       displacement.push(d);
     }
   }
-  if (time.length < 10) throw new Error("File must have at least 10 data rows (time, displacement).");
+
+  if (time.length < 10) {
+    throw new Error(
+      "Unable to map required columns. Please ensure CSV contains 'time' (s) and 'displacement' (m) columns (or at least 10 valid numeric rows)."
+    );
+  }
   return { time, displacement };
 }
 

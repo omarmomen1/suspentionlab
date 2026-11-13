@@ -1,6 +1,8 @@
 export { default as EvidenceBadge } from "./EvidenceBadge";
 export type { EngineeringStateType } from "./EvidenceBadge";
 
+export { default as SampleDemoTelemetryBadge } from "./SampleDemoTelemetryBadge";
+
 export { default as ValidationBadge } from "./ValidationBadge";
 export type { ValidationTier } from "./ValidationBadge";
 

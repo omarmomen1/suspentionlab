@@ -17,6 +17,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { TelemetryApi, DecimatedTraceResponse, TelemetryEventOverlay } from "../../lib/api_client";
+import SampleDemoTelemetryBadge from "../engineering/SampleDemoTelemetryBadge";
 
 export type CornerPhase = "STRAIGHT" | "BRAKING" | "CORNER_ENTRY" | "APEX" | "CORNER_EXIT";
 
@@ -215,9 +216,12 @@ export default function TelemetrySyncView() {
           {/* Active Corner Phase */}
           <div>
             <div className="text-[10px] font-mono text-gray-400 uppercase">Corner Phase</div>
-            <span className={`px-2.5 py-0.5 rounded-full border text-xs font-mono font-bold inline-block ${currentCornerPhase.color}`}>
-              {currentCornerPhase.label}
-            </span>
+            <div className="flex flex-wrap items-center gap-2 mt-0.5">
+              <span className={`px-2.5 py-0.5 rounded-full border text-xs font-mono font-bold inline-block ${currentCornerPhase.color}`}>
+                {currentCornerPhase.label}
+              </span>
+              <SampleDemoTelemetryBadge size="xs" />
+            </div>
           </div>
         </div>
 

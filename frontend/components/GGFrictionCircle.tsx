@@ -14,6 +14,7 @@ interface GGFrictionCircleProps {
 export default function GGFrictionCircle({ maxG, latG, longG }: GGFrictionCircleProps) {
   const currentTotalG = Math.sqrt(latG * latG + longG * longG);
   const exploitationPct = maxG > 0 ? ((currentTotalG / maxG) * 100).toFixed(0) : "0";
+  const axisBound = Math.max(3, Math.ceil(Math.max(maxG || 1.5, Math.abs(latG), Math.abs(longG)) * 1.15 * 10) / 10);
 
   // We use Plotly shapes to draw the theoretical max G circle
   const circleShape: any = {
@@ -52,14 +53,14 @@ export default function GGFrictionCircle({ maxG, latG, longG }: GGFrictionCircle
           plot_bgcolor: "transparent",
           xaxis: { 
             title: { text: "Lat G", font: { color: "#9ca3af" } },
-            range: [-3, 3], 
+            range: [-axisBound, axisBound], 
             gridcolor: "rgba(255,255,255,0.1)", 
             zerolinecolor: "rgba(255,255,255,0.3)",
             tickfont: { color: "#9ca3af" }
           },
           yaxis: { 
             title: { text: "Long G", font: { color: "#9ca3af" } },
-            range: [-3, 3], 
+            range: [-axisBound, axisBound], 
             gridcolor: "rgba(255,255,255,0.1)", 
             zerolinecolor: "rgba(255,255,255,0.3)",
             tickfont: { color: "#9ca3af" }

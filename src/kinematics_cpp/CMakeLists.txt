@@ -76,9 +76,10 @@ else()
     target_include_directories(kinematics_core PRIVATE ${EIGEN3_INCLUDE_DIR})
 endif()
 
-# MinGW runtime linkage: statically link libgcc, libstdc++, and winpthread
+# MinGW runtime linkage: statically link libgcc, libstdc++, and winpthread (no external DLLs)
 if (MINGW)
-    target_link_options(kinematics_core PRIVATE -static -static-libgcc -static-libstdc++ -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic)
+    target_link_options(kinematics_core PRIVATE -static -static-libgcc -static-libstdc++)
+    target_link_libraries(kinematics_core PRIVATE -Wl,-Bstatic -lstdc++ -lwinpthread)
 endif()
 
 # Output directly to suspensionlab/physics directory and root src for seamless Python loading

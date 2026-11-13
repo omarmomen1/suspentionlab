@@ -109,6 +109,10 @@ class Settings(BaseSettings):
     rate_limit_auth: str = "120/minute"
 
     gumroad_product_permalink: str = "suspensionlab-pro"
+    gumroad_product_id: Optional[str] = None
+    gumroad_team_product_id: Optional[str] = None
+    jwt_secret_key: Optional[str] = None
+    jwt_keys: Optional[str] = None
     
     database_url: str = "sqlite+aiosqlite:///./data/suspensionlab.db"
     app_base_url: str = "http://localhost:3000"

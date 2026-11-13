@@ -22,7 +22,7 @@ router = APIRouter(prefix="/reports", tags=["Reporting"])
 
 
 class CreateReportRequest(BaseModel):
-    simulation_run_id: str
+    simulation_run_id: str = "latest"
     title: str = ""
     notes: str = ""
 
@@ -603,7 +603,11 @@ async def hydrate_report_endpoint(
     uid = str(user.user_id)
     tid = str(user.team_id) if getattr(user, "team_id", None) else None
     try:
-        data = await report_service.hydrate_engineering_report(db, run_id_or_label, uid, tid)
+        target_id = run_id_or_label
+        if (run_id_or_label or "").strip().lower() == "latest":
+            latest_run = await report_service.resolve_latest_or_baseline_run(db, uid, tid)
+            target_id = str(latest_run.id)
+        data = await report_service.hydrate_engineering_report(db, target_id, uid, tid)
         return data
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -630,9 +634,13 @@ async def create_from_run_endpoint(
     oid = str(user.organization_id) if getattr(user, "organization_id", None) else None
 
     try:
+        target_id = req.simulation_run_id
+        if (req.simulation_run_id or "").strip().lower() in ("", "latest", "default", "baseline"):
+            latest_run = await report_service.resolve_latest_or_baseline_run(db, uid, tid)
+            target_id = str(latest_run.id)
         rep = await report_service.create_or_get_persisted_report(
             db=db,
-            run_id_or_label=req.simulation_run_id,
+            run_id_or_label=target_id,
             user_id=uid,
             user_email=uemail,
             user_role=urole,
@@ -641,7 +649,7 @@ async def create_from_run_endpoint(
             title=req.title,
             notes=req.notes,
         )
-        hydrated = await report_service.hydrate_engineering_report(db, req.simulation_run_id, uid, tid)
+        hydrated = await report_service.hydrate_engineering_report(db, str(rep.simulation_id), uid, tid)
         return {
             "id": str(rep.id),
             "token": rep.token,

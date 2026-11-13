@@ -128,6 +128,7 @@ _UNIVERSAL_ONTOLOGY_MAP: List[Tuple[str, str, str, float, float]] = [
     ("time", "time", "s", 1.0, 0.0),
     ("timestamp", "time", "s", 1.0, 0.0),
     ("sec", "time", "s", 1.0, 0.0),
+    ("time_s", "time", "s", 1.0, 0.0),
     ("t_abs", "time", "s", 1.0, 0.0),
     ("distance", "distance", "m", 1.0, 0.0),
     ("dist", "distance", "m", 1.0, 0.0),
@@ -136,10 +137,12 @@ _UNIVERSAL_ONTOLOGY_MAP: List[Tuple[str, str, str, float, float]] = [
 
     # Speed
     ("ground speed", "speed", "m/s", 1.0, 0.0),
+    ("ground_speed", "speed", "m/s", 1.0, 0.0),
     ("gps speed", "speed", "m/s", 1.0, 0.0),
     ("gps_speed", "speed", "m/s", 1.0, 0.0),
     ("speed_kmh", "speed", "km/h", 1.0 / 3.6, 0.0),
     ("speed km/h", "speed", "km/h", 1.0 / 3.6, 0.0),
+    ("v_kph", "speed", "km/h", 1.0 / 3.6, 0.0),
     ("speed", "speed", "m/s", 1.0, 0.0),
     ("v_x", "speed", "m/s", 1.0, 0.0),
     ("vx_car", "speed", "m/s", 1.0, 0.0),
@@ -177,6 +180,8 @@ _UNIVERSAL_ONTOLOGY_MAP: List[Tuple[str, str, str, float, float]] = [
     ("g_lon", "long_g", "G", 1.0, 0.0),
     ("lateral acc", "lat_g", "G", 1.0, 0.0),
     ("lateral g", "lat_g", "G", 1.0, 0.0),
+    ("lataccel", "lat_g", "G", 1.0, 0.0),
+    ("latacc", "lat_g", "G", 1.0, 0.0),
     ("lat_acc", "lat_g", "G", 1.0, 0.0),
     ("lat_g", "lat_g", "G", 1.0, 0.0),
     ("latg", "lat_g", "G", 1.0, 0.0),
@@ -191,6 +196,9 @@ _UNIVERSAL_ONTOLOGY_MAP: List[Tuple[str, str, str, float, float]] = [
     ("longitudinal acc", "long_g", "G", 1.0, 0.0),
     ("longitudinal g", "long_g", "G", 1.0, 0.0),
     ("longitudinal", "long_g", "G", 1.0, 0.0),
+    ("longaccel", "long_g", "G", 1.0, 0.0),
+    ("lonaccel", "long_g", "G", 1.0, 0.0),
+    ("lonacc", "long_g", "G", 1.0, 0.0),
     ("long_acc", "long_g", "G", 1.0, 0.0),
     ("long_g", "long_g", "G", 1.0, 0.0),
     ("longg", "long_g", "G", 1.0, 0.0),
@@ -203,6 +211,7 @@ _UNIVERSAL_ONTOLOGY_MAP: List[Tuple[str, str, str, float, float]] = [
 
     # Vertical Accel / Heave
     ("vertical acc", "vert_g", "G", 1.0, 0.0),
+    ("vertaccel", "vert_g", "G", 1.0, 0.0),
     ("vert g", "vert_g", "G", 1.0, 0.0),
     ("vert_acc", "vert_g", "G", 1.0, 0.0),
     ("vert_g", "vert_g", "G", 1.0, 0.0),

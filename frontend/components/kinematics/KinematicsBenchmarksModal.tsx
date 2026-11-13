@@ -39,7 +39,7 @@ export default function KinematicsBenchmarksModal({
   const failedCount = benchmarks.filter((b) => b.status === "FAIL").length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-[#0e1017] border border-[#262a3d] rounded-2xl w-full max-w-3xl overflow-hidden shadow-2xl flex flex-col">
         {/* Header */}
         <div className="px-6 py-4 bg-[#12141e] border-b border-[#222638] flex items-center justify-between">
@@ -80,6 +80,11 @@ export default function KinematicsBenchmarksModal({
 
         {/* Content Table / Cards */}
         <div className="p-6 space-y-3 max-h-[70vh] overflow-y-auto">
+          {benchmarks.length === 0 && (
+            <div className="p-6 rounded-xl border border-dashed border-[#262a3d] text-center text-xs font-mono text-gray-400">
+              No benchmark comparison entries yet. Click Recompute Sweep to run solver compliance checks against canonical vehicle dynamics benchmarks.
+            </div>
+          )}
           {benchmarks.map((item) => {
             const isPass = item.status === "PASS";
             const isWarn = item.status === "WARN";
@@ -116,7 +121,7 @@ export default function KinematicsBenchmarksModal({
                           : "bg-rose-950/80 text-rose-300 border-rose-500/50"
                       }`}
                     >
-                      {item.status} ({item.error_pct.toFixed(1)}% err)
+                      {item.status} ({(item.error_pct ?? 0).toFixed(1)}% err)
                     </span>
                   </div>
                 </div>
@@ -138,7 +143,7 @@ export default function KinematicsBenchmarksModal({
                   <div className="bg-black/30 p-2 rounded border border-white/5">
                     <span className="text-[10px] text-gray-400 block uppercase">Relative Error</span>
                     <span className={`font-bold ${isPass ? "text-emerald-400" : isWarn ? "text-amber-400" : "text-rose-400"}`}>
-                      {item.error_pct.toFixed(1)}%
+                      {(item.error_pct ?? 0).toFixed(1)}%
                     </span>
                   </div>
                 </div>

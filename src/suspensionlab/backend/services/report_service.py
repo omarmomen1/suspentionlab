@@ -219,6 +219,147 @@ def calculate_gg_envelope(
     }
 
 
+async def create_baseline_quarter_car_run(
+    db: AsyncSession,
+    user_id: Optional[str] = None,
+    team_id: Optional[str] = None,
+) -> SimulationRun:
+    """Compute and persist a real baseline quarter-car SimulationRun when no prior runs exist."""
+    from dataclasses import asdict, is_dataclass
+    from suspensionlab.physics.quarter_car import RoadProfile, SolverMode, run_quarter_car_analysis
+    from suspensionlab.backend.services.run_artifacts import (
+        KINEMATICS_VERSION,
+        PHYSICS_VERSIONS,
+        SOFTWARE_VERSION,
+        SOLVER_VERSION,
+        _run_seq_lock,
+    )
+
+    p = QuarterCarParams(m_s=320.0, m_u=45.0, k_s=35000.0, c=2200.0, k_t=220000.0, MR=0.85)
+    prof = RoadProfile(profile_type="iso8608", iso_class="B", speed_mps=25.0, duration=2.0)
+    qc_res = run_quarter_car_analysis(p, prof, f_min=0.5, f_max=25.0, n_freq=60, solver_mode=SolverMode.FAST)
+
+    raw_res = asdict(qc_res) if is_dataclass(qc_res) else dict(getattr(qc_res, "__dict__", {}))
+    clean_res = {}
+    for k, v in raw_res.items():
+        if isinstance(v, np.ndarray):
+            clean_res[k] = v.tolist()
+        elif isinstance(v, (np.floating, np.integer)):
+            clean_res[k] = v.item()
+        elif isinstance(v, (bool, int, float, str, list, dict)) or v is None:
+            clean_res[k] = v
+        else:
+            clean_res[k] = str(v)
+
+    params_dict = {
+        "m_s": p.m_s,
+        "m_u": p.m_u,
+        "k_s": p.k_s,
+        "c": p.c,
+        "k_t": p.k_t,
+        "MR": p.MR,
+    }
+    profile_dict = {
+        "profile_type": prof.profile_type,
+        "iso_class": prof.iso_class,
+        "speed_mps": prof.speed_mps,
+        "duration": prof.duration,
+    }
+
+    uid = uuid.UUID(str(user_id)) if user_id else uuid.UUID(int=0)
+    tid = uuid.UUID(str(team_id)) if team_id else None
+
+    async with _run_seq_lock:
+        seq_res = await db.execute(select(func.coalesce(func.max(SimulationRun.seq), 0)))
+        seq = int(seq_res.scalar_one()) + 1
+        run = SimulationRun(
+            id=uuid.uuid4(),
+            seq=seq,
+            label=f"RUN-{seq:06d}",
+            job_id=None,
+            user_id=uid,
+            team_id=tid,
+            created_at=datetime.datetime.now(datetime.timezone.utc),
+            simulation_type="quarter_car",
+            title="Baseline Quarter-Car Reference Run",
+            vehicle_ref="VEH-DEFAULT",
+            setup_ref="BASELINE-QC",
+            tire_ref="TIRE-DEFAULT",
+            track_ref="ISO8608-B",
+            telemetry_ref="NONE",
+            params=params_dict,
+            profile=profile_dict,
+            result=clean_res,
+            model_validity={"status": "UNVALIDATED", "score": None},
+            tire_snapshot={"k_t": p.k_t, "c_t": p.c_t},
+            track_geometry_hash=canonical_hash(profile_dict),
+            software_version=SOFTWARE_VERSION,
+            physics_version=PHYSICS_VERSIONS.get("quarter_car", "quarter-car-v2"),
+            kinematics_version=KINEMATICS_VERSION,
+            solver_version=SOLVER_VERSION,
+            params_hash=canonical_hash(params_dict),
+            result_hash=canonical_hash(clean_res),
+            input_hash=canonical_hash(profile_dict),
+        )
+        db.add(run)
+        await db.commit()
+        await db.refresh(run)
+        return run
+
+
+async def resolve_latest_or_baseline_run(
+    db: AsyncSession,
+    user_id: Optional[str] = None,
+    team_id: Optional[str] = None,
+) -> SimulationRun:
+    """Resolve the caller tenant's latest SimulationRun / completed JobRecord, or create a baseline run if empty."""
+    tenant_conditions = []
+    if user_id:
+        try:
+            tenant_conditions.append(SimulationRun.user_id == uuid.UUID(str(user_id)))
+        except ValueError:
+            pass
+    if team_id:
+        try:
+            tenant_conditions.append(SimulationRun.team_id == uuid.UUID(str(team_id)))
+        except ValueError:
+            pass
+
+    latest_q = select(SimulationRun).order_by(desc(SimulationRun.created_at), desc(SimulationRun.seq)).limit(1)
+    if tenant_conditions:
+        latest_q = latest_q.where(or_(*tenant_conditions))
+    latest_run = (await db.execute(latest_q)).scalar_one_or_none()
+    if latest_run is not None:
+        return latest_run
+
+    jq_latest = (
+        select(JobRecord)
+        .where(JobRecord.status.in_(["COMPLETED", "COMPLETED_VALID", "COMPLETED_WITH_WARNINGS"]))
+        .order_by(desc(JobRecord.started_at))
+        .limit(1)
+    )
+    j_conds = []
+    if user_id:
+        try:
+            j_conds.append(JobRecord.user_id == uuid.UUID(str(user_id)))
+        except ValueError:
+            pass
+    if team_id:
+        try:
+            j_conds.append(JobRecord.team_id == uuid.UUID(str(team_id)))
+        except ValueError:
+            pass
+    if j_conds:
+        jq_latest = jq_latest.where(or_(*j_conds))
+    latest_job = (await db.execute(jq_latest)).scalar_one_or_none()
+    if latest_job is not None:
+        from suspensionlab.backend.services.run_artifacts import create_run_from_job
+        payload = await create_run_from_job(db, str(latest_job.id), str(latest_job.user_id), team_id=team_id)
+        return await get_simulation_run(db, payload["label"], user_id, team_id)
+
+    return await create_baseline_quarter_car_run(db, user_id=user_id, team_id=team_id)
+
+
 async def get_simulation_run(
     db: AsyncSession,
     run_id_or_label: str,
@@ -230,6 +371,20 @@ async def get_simulation_run(
         raise LookupError("Simulation run identifier cannot be empty.")
 
     clean_id = run_id_or_label.strip()
+    if clean_id.lower() in ("latest", "default", "benchmark"):
+        raise LookupError(f"Simulation run '{clean_id}' requires an explicit run ID or label.")
+
+    tenant_conditions = []
+    if user_id:
+        try:
+            tenant_conditions.append(SimulationRun.user_id == uuid.UUID(str(user_id)))
+        except ValueError:
+            pass
+    if team_id:
+        try:
+            tenant_conditions.append(SimulationRun.team_id == uuid.UUID(str(team_id)))
+        except ValueError:
+            pass
 
     q = select(SimulationRun).limit(1)
     if clean_id.upper().startswith("RUN-"):
@@ -241,24 +396,8 @@ async def get_simulation_run(
         except ValueError:
             q = q.where(SimulationRun.label == clean_id)
 
-    if user_id:
-        conditions = []
-        try:
-            conditions.append(SimulationRun.user_id == uuid.UUID(str(user_id)))
-        except ValueError:
-            pass
-        if team_id:
-            try:
-                conditions.append(SimulationRun.team_id == uuid.UUID(str(team_id)))
-            except ValueError:
-                pass
-        if conditions:
-            q = q.where(or_(*conditions))
-    elif team_id:
-        try:
-            q = q.where(SimulationRun.team_id == uuid.UUID(str(team_id)))
-        except ValueError:
-            pass
+    if tenant_conditions:
+        q = q.where(or_(*tenant_conditions))
 
     res = await db.execute(q)
     run = res.scalar_one_or_none()
@@ -779,7 +918,40 @@ async def create_or_get_persisted_report(
     notes: str = "",
 ) -> SharedReport:
     """Create or load a persistent SharedReport record from a SimulationRun, strictly scoped to tenant."""
-    hydrated = await hydrate_engineering_report(db, run_id_or_label, user_id, team_id)
+    try:
+        hydrated = await hydrate_engineering_report(db, run_id_or_label, user_id, team_id)
+    except LookupError:
+        # Preserve strict 404 when targeting a run that belongs to another tenant
+        cid = (run_id_or_label or "").strip()
+        if cid:
+            other_conds = [SimulationRun.label == cid, func.upper(SimulationRun.label) == cid.upper()]
+            try:
+                other_conds.append(SimulationRun.id == uuid.UUID(cid))
+            except ValueError:
+                pass
+            exists_other = (await db.execute(select(SimulationRun.id).where(or_(*other_conds)).limit(1))).scalar_one_or_none()
+            if exists_other is not None:
+                raise
+        # Check whether DB simply has zero runs for this tenant (empty DB onboarding) vs invalid/missing ID
+        tenant_q = select(SimulationRun.id).limit(1)
+        t_conds = []
+        if user_id:
+            try:
+                t_conds.append(SimulationRun.user_id == uuid.UUID(str(user_id)))
+            except ValueError:
+                pass
+        if team_id:
+            try:
+                t_conds.append(SimulationRun.team_id == uuid.UUID(str(team_id)))
+            except ValueError:
+                pass
+        if t_conds:
+            tenant_q = tenant_q.where(or_(*t_conds))
+        has_any_run = (await db.execute(tenant_q)).scalar_one_or_none() is not None
+        if has_any_run:
+            raise
+        baseline = await resolve_latest_or_baseline_run(db, user_id=user_id, team_id=team_id)
+        hydrated = await hydrate_engineering_report(db, str(baseline.id), user_id, team_id)
     sim_uuid = uuid.UUID(hydrated["simulation_run_id"])
 
     # Check if a report row already exists for this simulation run within tenant

@@ -26,7 +26,7 @@ class CaeImportRequest(BaseModel):
     source_tool: str = Field(..., description="e.g. 'MSC Adams', 'MATLAB / Simulink', 'IPG CarMaker'")
     version: str = Field(..., description="e.g. 'Adams 2024.1', 'R2024b'")
     solver: str = Field(..., description="e.g. 'WSTIFF', 'ode45'")
-    parameters: Dict[str, float] = Field(..., description="Vehicle setup parameters (m_s, k_s, c, MR)")
+    parameters: Dict[str, Any] = Field(..., description="Vehicle setup parameters (m_s, k_s, c, MR)")
     raw_trace_csv: str = Field(..., description="CSV trace with time, ddz_s (or vert_g), travel, tire_load")
     execution_environment: Optional[str] = Field("External Windows x86_64 CAE Host", description="Execution host")
     inputs_meta: Optional[Dict[str, Any]] = None
@@ -34,7 +34,7 @@ class CaeImportRequest(BaseModel):
 
 class CaeCompareRequest(BaseModel):
     import_payload: CaeImportRequest
-    override_native_params: Optional[Dict[str, float]] = None
+    override_native_params: Optional[Dict[str, Any]] = None
 
 
 class CaeExportRequest(BaseModel):

@@ -6,6 +6,8 @@ Supports two auth methods:
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
+
 from fastapi import Header, HTTPException, Request, Depends, status
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +19,7 @@ from suspensionlab.backend.security.jwt_utils import decode_access_token
 from suspensionlab.shared.models import PlanTier
 
 # Plan tiers ordered by privilege level
-PLAN_LEVELS = {PlanTier.FREE: 0, PlanTier.PRO: 1, PlanTier.ENTERPRISE: 2, PlanTier.TRIAL: 2}
+PLAN_LEVELS = {PlanTier.FREE: 0, PlanTier.PRO: 1, PlanTier.ENTERPRISE: 2, PlanTier.TRIAL: 1}
 
 
 from typing import Any
@@ -31,11 +33,47 @@ from suspensionlab.backend.security.permissions import (
 
 def _is_user_trial(trial: Any, user_plan: str | None, organization: Any) -> bool:
     """Safely evaluate whether user or their organization is on trial, always returning strict bool."""
+    active_or_expired_trial = trial is not None and getattr(trial, "status", None) != "CONVERTED"
     return bool(
-        (trial is not None)
+        active_or_expired_trial
         or (user_plan == PlanTier.TRIAL.value)
         or bool(organization and getattr(organization, "plan", None) == PlanTier.TRIAL.value)
     )
+
+
+def _normalize_plan_key(plan: Any) -> str:
+    if isinstance(plan, PlanTier):
+        return plan.value.upper()
+    return str(plan or PlanTier.FREE.value).upper()
+
+
+def _format_trial_expiry(trial: Any) -> str | None:
+    expires_at = getattr(trial, "expires_at", None)
+    if expires_at is None:
+        return None
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return expires_at.isoformat()
+
+
+def _is_trial_context_expired(user: "UserContext") -> bool:
+    if (user.trial_status or "").upper() == "EXPIRED":
+        return True
+    exp_raw = getattr(user, "trial_expires_at", None)
+    if exp_raw:
+        try:
+            exp_dt = (
+                exp_raw
+                if isinstance(exp_raw, datetime)
+                else datetime.fromisoformat(str(exp_raw).replace("Z", "+00:00"))
+            )
+            if exp_dt.tzinfo is None:
+                exp_dt = exp_dt.replace(tzinfo=timezone.utc)
+            if exp_dt <= datetime.now(timezone.utc):
+                return True
+        except (ValueError, TypeError):
+            return True
+    return False
 
 
 class UserContext(BaseModel):
@@ -51,6 +89,7 @@ class UserContext(BaseModel):
     is_admin: bool = False
     is_trial: bool = False
     trial_status: str | None = None      # ACTIVE | EXPIRED
+    trial_expires_at: str | None = None
     permissions: list[str] = Field(default_factory=list)
 
     def model_post_init(self, __context: Any) -> None:
@@ -243,10 +282,12 @@ async def verify_api_key(
             trial = trial_check.scalar_one_or_none()
             is_trial = _is_user_trial(trial, user.plan, user.organization)
             trial_status = None
-            if trial:
+            trial_expires_at = None
+            if trial and getattr(trial, "status", None) != "CONVERTED":
                 if trial.is_expired():
                     trial.status = "EXPIRED"
                 trial_status = trial.status
+                trial_expires_at = _format_trial_expiry(trial)
 
             return UserContext(
                 user_id=str(user.id),
@@ -261,6 +302,7 @@ async def verify_api_key(
                 is_admin=False if is_trial else bool(user.is_admin),
                 is_trial=is_trial,
                 trial_status=trial_status,
+                trial_expires_at=trial_expires_at,
                 permissions=sorted(list(perms)),
             )
 
@@ -340,10 +382,12 @@ async def verify_api_key(
                         trial = trial_check.scalar_one_or_none()
                         is_trial = _is_user_trial(trial, user.plan, user.organization)
                         trial_status = None
-                        if trial:
+                        trial_expires_at = None
+                        if trial and getattr(trial, "status", None) != "CONVERTED":
                             if trial.is_expired():
                                 trial.status = "EXPIRED"
                             trial_status = trial.status
+                            trial_expires_at = _format_trial_expiry(trial)
 
                         return UserContext(
                             user_id=str(user.id),
@@ -358,6 +402,7 @@ async def verify_api_key(
                             is_admin=False if is_trial else bool(user.is_admin),
                             is_trial=is_trial,
                             trial_status=trial_status,
+                            trial_expires_at=trial_expires_at,
                             permissions=sorted(list(perms)),
                         )
         # API key provided but invalid
@@ -391,15 +436,28 @@ def require_plan(minimum_plan: str):
     Usage:  Depends(require_plan(PlanTier.PRO))
     """
     async def _check(user: UserContext = Depends(verify_api_key)):
-        if user.is_trial:
-            return user
-        user_level = PLAN_LEVELS.get(user.plan, 0)
-        required   = PLAN_LEVELS.get(minimum_plan, 0)
+        plan_key = _normalize_plan_key(user.plan)
+        is_trial_user = bool(user.is_trial or plan_key == PlanTier.TRIAL.value)
+        trial_expired = is_trial_user and _is_trial_context_expired(user)
+
+        if is_trial_user:
+            user_level = 0 if trial_expired else max(PLAN_LEVELS.get(plan_key, 0), PLAN_LEVELS[PlanTier.TRIAL])
+        else:
+            user_level = PLAN_LEVELS.get(plan_key, 0)
+
+        required_key = _normalize_plan_key(minimum_plan)
+        required = PLAN_LEVELS.get(required_key, 0)
         if user_level < required:
+            detail = (
+                f"Your trial has expired. This feature requires the {required_key} plan. "
+                f"Upgrade at /pricing to unlock it."
+                if trial_expired
+                else f"This feature requires the {required_key} plan. "
+                     f"Upgrade at /pricing to unlock it."
+            )
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"This feature requires the {minimum_plan} plan. "
-                       f"Upgrade at /pricing to unlock it.",
+                detail=detail,
             )
         return user
     return _check

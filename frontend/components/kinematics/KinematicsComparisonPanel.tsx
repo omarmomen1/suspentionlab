@@ -150,40 +150,44 @@ export default function KinematicsComparisonPanel({
       {/* ── Sub-Navigation Tabs ── */}
       <div className="flex items-center gap-2 border-b border-slate-800 pb-2 text-xs">
         <button
+          type="button"
           onClick={() => setActiveTab("causal")}
           className={`px-3 py-1.5 rounded-md font-medium transition ${
             activeTab === "causal"
-              ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40"
+              ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
               : "text-slate-400 hover:text-slate-200"
           }`}
         >
           Why is B Different? ({(comparison?.causal_attribution || (comparison as any)?.causal_findings || []).length})
         </button>
         <button
+          type="button"
           onClick={() => setActiveTab("metrics")}
           className={`px-3 py-1.5 rounded-md font-medium transition ${
             activeTab === "metrics"
-              ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40"
+              ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
               : "text-slate-400 hover:text-slate-200"
           }`}
         >
           Metric Deltas ({Object.keys(comparison?.metric_comparisons || {}).length})
         </button>
         <button
+          type="button"
           onClick={() => setActiveTab("hardpoints")}
           className={`px-3 py-1.5 rounded-md font-medium transition ${
             activeTab === "hardpoints"
-              ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40"
+              ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
               : "text-slate-400 hover:text-slate-200"
           }`}
         >
           Hardpoint Deltas ({Object.keys(comparison?.hardpoint_deltas || {}).length})
         </button>
         <button
+          type="button"
           onClick={() => setActiveTab("provenance")}
           className={`px-3 py-1.5 rounded-md font-medium transition ${
             activeTab === "provenance"
-              ? "bg-indigo-600/30 text-indigo-300 border border-indigo-500/40"
+              ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
               : "text-slate-400 hover:text-slate-200"
           }`}
         >
@@ -192,9 +196,13 @@ export default function KinematicsComparisonPanel({
       </div>
 
       {/* ── Tab Content ── */}
-      {!comparison ? (
-        <div className="text-center py-8 text-slate-500 text-xs">
-          Select Setup A and B, then click <strong className="text-indigo-400">Compare Setups</strong> to run independent solver sweeps.
+      {loading && !comparison ? (
+        <div className="text-center py-8 text-cyan-400 text-xs font-mono">
+          Solving Setup A vs Setup B kinematic comparison...
+        </div>
+      ) : !comparison ? (
+        <div className="text-center py-8 text-slate-400 text-xs">
+          Select Setup A and B, then click <strong className="text-cyan-400">Compare Setups</strong> to run independent solver sweeps.
         </div>
       ) : (
         <div className="flex flex-col gap-4">
@@ -301,9 +309,9 @@ export default function KinematicsComparisonPanel({
 
           {/* TAB 2: Metric Deltas Table */}
           {activeTab === "metrics" && (
-            <div className="overflow-x-auto rounded-lg border border-slate-800">
+            <div data-testid="metric-deltas-table" className="overflow-x-auto rounded-lg border border-slate-800">
               <table className="w-full text-xs text-left border-collapse">
-                <thead className="bg-slate-800/90 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+                <thead className="bg-slate-800/90 text-slate-300 font-semibold uppercase tracking-wider text-[10px]">
                   <tr>
                     <th className="p-2.5">Kinematic Quantity</th>
                     <th className="p-2.5 text-right">Setup A (Static)</th>
@@ -314,38 +322,66 @@ export default function KinematicsComparisonPanel({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800 font-mono text-[11px]">
-                  {Object.values(comparison.metric_comparisons).map((m, idx) => {
-                    const deltaStatic = m.delta_static;
-                    const deltaColor =
-                      Math.abs(deltaStatic) < 1e-4
-                        ? "text-slate-400"
-                        : deltaStatic > 0
-                        ? "text-emerald-400"
-                        : "text-amber-400";
+                  {(() => {
+                    const rows = Array.isArray(comparison.metric_comparisons)
+                      ? comparison.metric_comparisons
+                      : Object.values(comparison.metric_comparisons || {});
+                    if (rows.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={6} className="p-4 text-center text-slate-400 font-sans">
+                            No metric delta rows returned. Click Compare Setups to recompute Setup A vs Setup B.
+                          </td>
+                        </tr>
+                      );
+                    }
+                    return rows.map((m, idx) => {
+                      const mAny = m as any;
+                      const staticA = Number(m.setup_a?.static_val ?? mAny.val_a_static ?? 0);
+                      const staticB = Number(m.setup_b?.static_val ?? mAny.val_b_static ?? 0);
+                      const deltaStatic = Number(m.delta_static ?? mAny.static_difference ?? (staticB - staticA));
+                      const deltaBump = Number(m.delta_bump ?? mAny.bump_difference ?? 0);
+                      const rmsDiff = Number(m.rms_difference ?? 0);
+                      const labelText = m.name || mAny.label || mAny.metric || mAny.channel || `Metric ${idx + 1}`;
+                      const deltaColor =
+                        Math.abs(deltaStatic) < 1e-4
+                          ? "text-slate-400"
+                          : deltaStatic > 0
+                          ? "text-emerald-400"
+                          : "text-amber-400";
 
-                    return (
-                      <tr key={idx} className="hover:bg-slate-800/40 transition">
-                        <td className="p-2.5 font-sans font-medium text-slate-200">
-                          {m.name} <span className="text-slate-500 font-normal">({m.unit})</span>
-                        </td>
-                        <td className="p-2.5 text-right text-slate-300">
-                          {m.setup_a.static_val.toFixed(2)}
-                        </td>
-                        <td className="p-2.5 text-right text-slate-300">
-                          {m.setup_b.static_val.toFixed(2)}
-                        </td>
-                        <td className={`p-2.5 text-right font-bold ${deltaColor}`}>
-                          {deltaStatic >= 0 ? `+${deltaStatic.toFixed(2)}` : deltaStatic.toFixed(2)}
-                        </td>
-                        <td className="p-2.5 text-right text-slate-300">
-                          {m.delta_bump >= 0 ? `+${m.delta_bump.toFixed(2)}` : m.delta_bump.toFixed(2)}
-                        </td>
-                        <td className="p-2.5 text-right text-slate-400">
-                          {m.rms_difference.toFixed(3)}
-                        </td>
-                      </tr>
-                    );
-                  })}
+                      return (
+                        <tr key={idx} className="hover:bg-slate-800/40 transition">
+                          <td className="p-2.5 font-sans font-medium text-slate-200">
+                            {labelText} <span className="text-slate-400 font-normal">({m.unit ?? ""})</span>
+                          </td>
+                          <td className="p-2.5 text-right text-slate-300">
+                            {Number.isFinite(staticA) ? staticA.toFixed(2) : "—"}
+                          </td>
+                          <td className="p-2.5 text-right text-slate-300">
+                            {Number.isFinite(staticB) ? staticB.toFixed(2) : "—"}
+                          </td>
+                          <td className={`p-2.5 text-right font-bold ${deltaColor}`}>
+                            {Number.isFinite(deltaStatic)
+                              ? deltaStatic >= 0
+                                ? `+${deltaStatic.toFixed(2)}`
+                                : deltaStatic.toFixed(2)
+                              : "—"}
+                          </td>
+                          <td className="p-2.5 text-right text-slate-300">
+                            {Number.isFinite(deltaBump)
+                              ? deltaBump >= 0
+                                ? `+${deltaBump.toFixed(2)}`
+                                : deltaBump.toFixed(2)
+                              : "—"}
+                          </td>
+                          <td className="p-2.5 text-right text-slate-400">
+                            {Number.isFinite(rmsDiff) ? rmsDiff.toFixed(3) : "—"}
+                          </td>
+                        </tr>
+                      );
+                    });
+                  })()}
                 </tbody>
               </table>
             </div>

@@ -54,6 +54,15 @@ let apiRefreshPromise: Promise<string | null> | null = null;
 
 async function tryRefreshToken(): Promise<string | null> {
   if (typeof window === "undefined") return null;
+  let storedRefreshToken = "";
+  try {
+    storedRefreshToken = (localStorage.getItem("sl_refresh_token") || sessionStorage.getItem("sl_refresh_token") || "").trim();
+  } catch {
+    return null;
+  }
+  if (!storedRefreshToken) {
+    return null;
+  }
   if (apiRefreshPromise) return apiRefreshPromise;
 
   apiRefreshPromise = (async () => {
@@ -63,17 +72,23 @@ async function tryRefreshToken(): Promise<string | null> {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({}),
+        body: JSON.stringify({ refresh_token: storedRefreshToken }),
       });
       if (res.ok) {
         const data = await res.json();
         if (data.token) {
           try {
             localStorage.setItem("sl_token", data.token);
+            if (data.refresh_token) {
+              localStorage.setItem("sl_refresh_token", data.refresh_token);
+            }
           } catch {}
           return data.token as string;
         }
       }
+      try {
+        localStorage.removeItem("sl_refresh_token");
+      } catch {}
       return null;
     } catch {
       return null;

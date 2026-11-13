@@ -200,7 +200,7 @@ const DEFAULT_TIRE: TireState = {
 
 const DEFAULT_TELEMETRY: TelemetryWorkspaceState = {
   sessionId: "sess-live",
-  datasetName: "motec_spa_session.csv",
+  datasetName: "sample_spa_gt3.csv",
   sampleRateHz: 100,
   isStreaming: false,
   isReplaying: false,

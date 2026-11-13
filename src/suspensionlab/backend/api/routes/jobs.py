@@ -53,8 +53,8 @@ async def get_job_status(
                     return parsed
             
             # If COMPLETED/FAILED, we fall through to DB to get authoritative timestamps
-    except redis.exceptions.ConnectionError:
-        pass # Fallback to DB if Redis is unreachable
+    except Exception:
+        pass # Fallback to DB if Redis is unavailable or unreachable
 
     # 2. Fallback to Database
     from sqlalchemy import or_

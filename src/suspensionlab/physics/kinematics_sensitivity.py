@@ -523,7 +523,7 @@ PRESET_QUESTIONS = {
         id="camber_gain_without_toe",
         title="Increase negative camber gain in bump while minimizing bump steer",
         objective_metric="camber_gain_deg_per_100mm",
-        direction="maximize",  # in our solver frame, inward tilt is positive rate
+        direction="minimize",  # negative d(camber)/dz in bump -> more negative means stronger gain
         constraints={
             "toe_variation_deg": (0.0, 5.0),
             "roll_center_height_static_mm": (-150.0, 150.0),
@@ -538,7 +538,7 @@ PRESET_QUESTIONS = {
         direction="minimize",
         constraints={
             "scrub_radius_static_mm": (10.0, 60.0),
-            "camber_gain_deg_per_100mm": (0.1, 1.5),
+            "camber_gain_deg_per_100mm": (-3.0, -0.05),
         },
         candidate_hardpoints=["LWI_fwd", "LWI_aft", "LWO", "UWI_fwd", "UWI_aft"],
         description="Shift front roll center downward to soften front roll couple while preserving steering feedback feel.",
@@ -549,7 +549,7 @@ PRESET_QUESTIONS = {
         objective_metric="toe_variation_deg",
         direction="minimize",
         constraints={
-            "camber_gain_deg_per_100mm": (0.1, 1.5),
+            "camber_gain_deg_per_100mm": (-3.0, -0.05),
             "roll_center_height_static_mm": (-150.0, 150.0),
         },
         candidate_hardpoints=["TRI", "TRO"],
@@ -688,10 +688,10 @@ def evaluate_engineering_question(
                         else:
                             worse.append(f"Increased bump steer variation by +{d_m:.2f}{u}")
                     elif m_k == "camber_gain_deg_per_100mm":
-                        if d_m > 0:
-                            improved.append(f"Increased bump camber gain by +{d_m:.2f} {u}")
+                        if d_m < 0:
+                            improved.append(f"Increased negative bump camber gain by {d_m:.2f} {u}")
                         else:
-                            worse.append(f"Decreased bump camber gain by {d_m:.2f} {u}")
+                            worse.append(f"Reduced negative bump camber gain by +{d_m:.2f} {u}")
                     elif m_k == "track_change_max_mm":
                         if d_m < 0:
                             improved.append(f"Reduced track scrub by {abs(d_m):.2f} mm")
@@ -830,7 +830,7 @@ def optimize_hardpoints(
     base_metrics = evaluate_sweep_metrics(clean_hp, z_min_mm=z_min_mm, z_max_mm=z_max_mm, n_steps=n_steps)
 
     objs = objectives or [
-        OptimizationObjective(metric="camber_gain_deg_per_100mm", direction="maximize", weight=1.0),
+        OptimizationObjective(metric="camber_gain_deg_per_100mm", direction="minimize", weight=1.0),
         OptimizationObjective(metric="toe_variation_deg", direction="minimize", weight=1.0),
     ]
     consts = constraints or [
@@ -923,12 +923,15 @@ def optimize_hardpoints(
                     is_feasible = False
                     violations.append(f"{METRIC_LABELS.get(c.metric, c.metric)} ({v:.2f}) > limit {c.max_val}")
 
+        cand_id = f"cand-{cand_id_counter:03d}"
         cand_entry = {
-            "id": f"cand-{cand_id_counter:03d}",
+            "id": cand_id,
+            "candidate_id": cand_id,
             "changes_summary": ", ".join(change_summary) if change_summary else "Baseline (0 mm change)",
             "hardpoints": test_hp,
             "geometry_hash": compute_geometry_hash(test_hp),
             "metrics": metrics,
+            "objective_values": dict(metrics),
             "is_feasible": is_feasible,
             "violations": violations,
             "is_pareto": False,
@@ -960,6 +963,7 @@ def optimize_hardpoints(
         "pareto_count": len(pareto_candidates),
         "best_compromise_candidate": best_candidate,
         "pareto_candidates": pareto_candidates,
+        "pareto_frontier": pareto_candidates,
         "all_candidates": evaluated_candidates,
     }
 
@@ -1075,7 +1079,12 @@ def _build_candidate_explanation(
         lbl = METRIC_LABELS.get(m_k, m_k)
 
         # Improvement logic
-        if m_k in ("camber_gain_deg_per_100mm", "motion_ratio_static"):
+        if m_k == "camber_gain_deg_per_100mm":
+            if diff < 0:
+                improved.append(f"{lbl}: {diff:.2f} {u}")
+            else:
+                worse.append(f"{lbl}: +{diff:.2f} {u}")
+        elif m_k == "motion_ratio_static":
             if diff > 0:
                 improved.append(f"{lbl}: +{diff:.2f} {u}")
             else:

@@ -246,3 +246,47 @@ async def test_experiment_tenant_isolation(client: AsyncClient, mock_user):
     assert "Access denied" in resp2.json()["detail"]
 
     app.dependency_overrides.pop(verify_api_key, None)
+
+
+@pytest.mark.asyncio
+async def test_compare_setups_with_provenance_metadata(authenticated_client: AsyncClient):
+    """Verify that comparing setups containing _provenance, string names, and metadata succeeds with 200 (no 422)."""
+    payload = {
+        "setup_a": {
+            "name": "Setup A — Baseline",
+            "k_s": 35000.0,
+            "c": 2200.0,
+            "m_s": 320.0,
+            "k_t": 220000.0,
+            "k_arb_f": 16000.0,
+            "_provenance": {
+                "clone_from": "faf9aa9c-a759-464b-8ac5-5f4d6d8c83a1",
+                "optimization_id": "opt-9812",
+                "user": "engineer@team.com",
+            },
+        },
+        "setup_b": {
+            "name": "Setup B — Candidate",
+            "k_s": 42000.0,
+            "c": 2600.0,
+            "m_s": 320.0,
+            "k_t": 220000.0,
+            "k_arb_f": 18500.0,
+            "_provenance": {
+                "clone_from": "compare_setup_b",
+            },
+        },
+    }
+
+    resp = await authenticated_client.post("/api/v1/experiments/compare", json=payload)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert "verdict" in data
+    assert "what_changed" in data
+    assert "what_improved" in data
+    assert "what_got_worse" in data
+    # Confirm numeric parameters were correctly extracted
+    params_changed = [c["parameter"] for c in data["what_changed"]]
+    assert "k_s" in params_changed
+    assert "c" in params_changed
+

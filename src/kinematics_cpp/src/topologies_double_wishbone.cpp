@@ -225,8 +225,8 @@ std::map<std::string, double> DoubleWishbone::calculate_kinematics(
     // Wheel spin axis in world coordinates (local Y axis)
     Eigen::Vector3d spin = A.col(1);
 
-    // 1. Camber angle (+ = top of wheel tilts outboard)
-    res["camber"] = std::atan2(spin(2), spin(1)) * 180.0 / M_PI;
+    // 1. Camber angle (- = top of wheel tilts inboard; + = outboard)
+    res["camber"] = std::atan2(-spin(2), spin(1)) * 180.0 / M_PI;
 
     // 2. Toe angle (+ = toe-out)
     res["toe"] = std::atan2(spin(0), spin(1)) * 180.0 / M_PI;
@@ -244,7 +244,7 @@ std::map<std::string, double> DoubleWishbone::calculate_kinematics(
     res["caster"] = std::atan2(-kp(0), kp(2)) * 180.0 / M_PI;
 
     // 4. Kingpin Inclination (KPI) in Y-Z plane (+ = top inboard)
-    res["kpi"] = std::atan2(kp(1), kp(2)) * 180.0 / M_PI;
+    res["kpi"] = std::atan2(-kp(1), kp(2)) * 180.0 / M_PI;
 
     // Contact patch location in world coordinates (Z = 0 at design ground)
     double r_tire_mm = tire_radius * 1000.0;

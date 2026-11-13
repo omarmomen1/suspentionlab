@@ -174,7 +174,13 @@ async def set_session_tenant_context(
     org_id = organization_id or (tenant_context.organization_id if tenant_context else "") or ""
     t_id = team_id or (tenant_context.team_id if tenant_context else "") or ""
     u_id = user_id or (tenant_context.user_id if tenant_context else "") or ""
-    admin_flag = "true" if (is_super_admin or (tenant_context and tenant_context.role in ("owner", "super_admin", "org_admin"))) else "false"
+    role = (tenant_context.role or "").lower().strip() if tenant_context else ""
+    is_org_scoped_role = role in ("owner", "org_owner", "org_admin")
+    admin_flag = (
+        "true"
+        if (role == "system_super_admin" or (is_super_admin and not is_org_scoped_role))
+        else "false"
+    )
 
     bind = session.bind
     dialect_name = bind.dialect.name if bind else ""

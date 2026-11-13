@@ -12,8 +12,9 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const PLAN_BADGES: Record<string, { label: string; color: string }> = {
   FREE:       { label: "Free",       color: "text-gray-400 bg-[#1e1e1e]"          },
-  PRO:        { label: "Pro",        color: "text-ansys-yellow bg-ansys-yellow/10" },
-  ENTERPRISE: { label: "Enterprise", color: "text-purple-400 bg-purple-900/20"     },
+  TRIAL:      { label: "7-Day Trial", color: "text-amber-300 bg-amber-500/10"      },
+  PRO:        { label: "Pro Engineer", color: "text-ansys-yellow bg-ansys-yellow/10" },
+  ENTERPRISE: { label: "Team Pass",  color: "text-purple-400 bg-purple-900/20"     },
 };
 
 import { type LucideIcon } from "lucide-react";
@@ -38,8 +39,9 @@ function SectionCard({ title, icon: Icon, children }: {
 interface ApiKey { id: string; name: string; key_prefix: string; created_at: string; last_used: string | null; }
 
 export default function SettingsPage() {
-  const { user, logout, authHeader, fetchWithAuth } = useAuth();
+  const { user, logout, fetchWithAuth, refreshSession } = useAuth();
   const [activeTab, setActiveTab]    = useState<"account" | "billing" | "api-keys" | "webhooks" | "team" | "security" | "enterprise">("account");
+  const gumroadProUrl = process.env.NEXT_PUBLIC_GUMROAD_PRO_URL?.trim() || "https://gumroad.com/l/suspensionlab-pro";
   const [apiKeys,   setApiKeys]      = useState<ApiKey[]>([]);
   const [newKeyName, setNewKeyName]  = useState("");
   const [newKeyValue, setNewKeyValue] = useState<string | null>(null);
@@ -59,6 +61,27 @@ export default function SettingsPage() {
   const badge   = PLAN_BADGES[plan] ?? { label: "Unknown", color: "text-gray-500 bg-[#1e1e1e]" };
   const canKeys = plan !== "FREE";
   const isEnterprise = plan === "ENTERPRISE" || user?.user_id === "admin-001";
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const syncTabFromHash = () => {
+      const hash = window.location.hash.replace(/^#/, "");
+      if (
+        hash === "account" ||
+        hash === "billing" ||
+        hash === "api-keys" ||
+        hash === "webhooks" ||
+        hash === "team" ||
+        hash === "security" ||
+        hash === "enterprise"
+      ) {
+        setActiveTab(hash);
+      }
+    };
+    syncTabFromHash();
+    window.addEventListener("hashchange", syncTabFromHash);
+    return () => window.removeEventListener("hashchange", syncTabFromHash);
+  }, []);
 
   // Fetch API keys when tab opens
   useEffect(() => {
@@ -139,15 +162,34 @@ export default function SettingsPage() {
     setActivatingLicense(true);
     setLicenseMessage(null);
     try {
-      const r = await fetch(`${API_BASE}/api/v1/billing/verify-license`, {
+      let r = await fetchWithAuth("/api/v1/billing/verify-license", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ license_key: gumroadKey.trim() }),
       });
+      if (r.status === 404) {
+        r = await fetchWithAuth("/billing/verify-license", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ license_key: gumroadKey.trim() }),
+        });
+      }
       const data = await r.json();
       if (r.ok) {
-        setLicenseMessage({ type: "success", text: "PRO unlocked successfully! Refreshing..." });
-        setTimeout(() => window.location.reload(), 2000);
+        const activatedPlan = data.plan || "PRO";
+        if (typeof window !== "undefined") {
+          try {
+            const rawUser = localStorage.getItem("sl_user");
+            if (rawUser) {
+              const u = JSON.parse(rawUser);
+              u.plan = activatedPlan;
+              localStorage.setItem("sl_user", JSON.stringify(u));
+            }
+          } catch {}
+        }
+        await refreshSession(true);
+        setLicenseMessage({ type: "success", text: `${activatedPlan} unlocked successfully! Refreshing...` });
+        setTimeout(() => window.location.reload(), 1500);
       } else {
         setLicenseMessage({ type: "error", text: data.detail || "Invalid license key." });
       }
@@ -241,9 +283,13 @@ export default function SettingsPage() {
                       <p className="text-sm text-gray-400">
                         {plan === "FREE"
                           ? "You are on the free plan. Upgrade to unlock all models and AI Auto-Tune."
+                          : plan === "TRIAL"
+                          ? user?.trial_status === "EXPIRED"
+                            ? "Your 7-day evaluation trial has expired. Activate a license key to restore Pro access."
+                            : "You are on a 7-day evaluation trial. Activate a license key anytime to convert to Pro or Team Pass."
                           : plan === "PRO"
-                          ? "You have full access to all Pro features."
-                          : "Enterprise plan — full access + team features."}
+                          ? "You have full access to all Pro Engineer features."
+                          : "Race Team / FSAE Pass — full access + team features."}
                       </p>
                     </div>
                     {plan !== "ENTERPRISE" && (
@@ -254,18 +300,29 @@ export default function SettingsPage() {
                       </Link>
                     )}
                   </div>
-                  {plan === "FREE" && (
+                  {plan !== "ENTERPRISE" && (
                     <div className="mt-4 pt-4 border-t border-[#1e1e1e]">
-                      <p className="text-sm font-semibold text-white mb-2">Activate PRO</p>
+                      <p className="text-sm font-semibold text-white mb-2">Activate License Key</p>
                       <p className="text-xs text-gray-500 mb-4">
-                        Purchased a license on Gumroad? Enter your license key here to unlock PRO features instantly.
+                        Purchased a license on Gumroad or received a direct team key (SLPRO-...)? Enter your license key here to unlock features instantly.
                       </p>
+                      <div className="mb-3">
+                        <a
+                          href={gumroadProUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-ansys-yellow/10 border border-ansys-yellow/30 text-xs font-bold text-ansys-yellow hover:bg-ansys-yellow/20 transition-all"
+                        >
+                          Don’t have a license key yet? Get Pro on Gumroad →
+                          <ExternalLink size={12} />
+                        </a>
+                      </div>
                       <div className="flex gap-2">
                         <input
                           type="text"
                           value={gumroadKey}
                           onChange={(e) => setGumroadKey(e.target.value)}
-                          placeholder="e.g. XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX"
+                          placeholder="e.g. XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX or SLPRO-PRO-..."
                           className="flex-1 bg-[#0d0d0f] border border-[#252525] rounded-xl px-3 py-2 text-sm text-white placeholder:text-gray-700 focus:outline-none focus:border-ansys-yellow/60 transition-all font-mono"
                         />
                         <button
@@ -282,13 +339,6 @@ export default function SettingsPage() {
                           {licenseMessage.text}
                         </p>
                       )}
-                      
-                      <div className="mt-4">
-                        <a href="https://gumroad.com/l/suspensionlab-pro" target="_blank" rel="noreferrer"
-                          className="text-xs text-ansys-yellow hover:underline">
-                          Don&apos;t have a license? Buy on Gumroad &rarr;
-                        </a>
-                      </div>
                     </div>
                   )}
                 </SectionCard>

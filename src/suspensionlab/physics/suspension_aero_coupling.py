@@ -746,8 +746,8 @@ class CoupledVehicleModel:
                     if abs(mean_rh - peak_front_rh) < 10.0 or mean_rh < peak_front_rh:
                         porpoising_detected = True
 
-            q_dyn = 0.5 * getattr(self.aero, "rho_air", 1.225) * getattr(self.aero, "frontal_area", 1.6) * v ** 2
-            df_total = cl_val * q_dyn
+            q_dyn = 0.5 * getattr(self.aero, "rho_air", 1.225) * v ** 2
+            df_total = cl_val * q_dyn * getattr(self.aero, "frontal_area", 1.6)
             df_front = df_total * cop_val
             df_rear  = df_total * (1.0 - cop_val)
 
@@ -914,7 +914,8 @@ class CoupledVehicleModel:
 
         # Perturbed
         k_arb_f_new = sus_base.k_arb_front + delta_arb_front
-        K_phi_f_new = (sus_base.k_spring_front + k_arb_f_new) * tf ** 2 / 2.0
+        k_wf = sus_base.k_spring_front * (sus_base.motion_ratio_front ** 2)
+        K_phi_f_new = 0.5 * k_wf * (tf ** 2) + k_arb_f_new * (tf ** 2)
         K_phi_new   = K_phi_f_new + K_phi_r_base
         lat_frac_f_new  = K_phi_f_new / max(K_phi_new, 1.0)
         dFz_lat_f_new   = lat_frac_f_new * m * ay * h / tf
@@ -948,10 +949,10 @@ class CoupledVehicleModel:
         -------
         dict with aero change and load distribution change.
         """
-        q_dyn = 0.5 * self.aero.rho_air * self.aero.frontal_area * v ** 2
+        q_dyn = 0.5 * self.aero.rho_air * v ** 2
         dCL_drh = self.aero.cl_rh_sens  # ΔCL/mm
 
-        delta_df = dCL_drh * delta_rh_mm * q_dyn  # N change in total downforce
+        delta_df = dCL_drh * delta_rh_mm * q_dyn * self.aero.frontal_area  # N change in total downforce
         delta_df_front = delta_df * self.aero.cop_fraction
         delta_df_rear  = delta_df * (1.0 - self.aero.cop_fraction)
 

@@ -27,7 +27,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import type { QCarParams } from "../../lib/qcarParams";
-import type { ValidityReport } from "../ModelValidity";
+import { resolveValidityTier, type ValidityReport } from "../ModelValidity";
 
 export interface EngineeringDecisionCardProps {
   currentParams: QCarParams;
@@ -64,13 +64,18 @@ export default function EngineeringDecisionCard({
     }
   }
 
-  // 2. WHY? (PHYSICAL CAUSAL MECHANISM)
-  const omega_n = Math.sqrt(currentParams.k_s / Math.max(1, currentParams.m_s));
-  const f_n = omega_n / (2 * Math.PI);
-  const c_crit = 2 * Math.sqrt(currentParams.k_s * currentParams.m_s);
-  const zeta = currentParams.c / Math.max(1, c_crit);
+  // 2. WHY? (PHYSICAL CAUSAL MECHANISM) — synced with Motion Ratio MR and live solver outputs
+  const mr = currentParams.MR ?? 1.0;
+  const k_wheel = currentParams.k_s * mr * mr;
+  const c_wheel = currentParams.c * mr * mr;
+  const omega_n = Math.sqrt(k_wheel / Math.max(1, currentParams.m_s));
+  const f_n_analytical = omega_n / (2 * Math.PI);
+  const f_n = results.f_n_s ?? results.kpis?.fn_hz ?? f_n_analytical;
+  const c_crit = 2 * Math.sqrt(k_wheel * Math.max(1, currentParams.m_s));
+  const zeta_analytical = c_wheel / Math.max(1e-6, c_crit);
+  const zeta = results.zeta_s ?? results.kpis?.zeta ?? zeta_analytical;
 
-  let physicalMechanism = `Body natural frequency is ${f_n.toFixed(2)} Hz with damping ratio ζ = ${zeta.toFixed(2)}. `;
+  let physicalMechanism = `Body natural frequency is ${f_n.toFixed(2)} Hz with damping ratio ζ = ${zeta.toFixed(3)}. `;
   if (zeta < 0.2) {
     physicalMechanism += "Low damping causes persistent body oscillations and resonance amplification.";
   } else if (zeta > 0.6) {
@@ -80,9 +85,19 @@ export default function EngineeringDecisionCard({
   }
 
   // 3. IS IT BETTER?
-  const accelRms = results.kpis?.accel_rms ?? (results.ddz_s ? Math.sqrt(results.ddz_s.reduce((acc: number, v: number) => acc + v * v, 0) / results.ddz_s.length) : null);
-  const travelMaxMm = results.kpis?.travel_max_mm ?? (results.susp_travel ? Math.max(...results.susp_travel.map(Math.abs)) * 1000 : null);
-  const tireRms = results.kpis?.tire_load_rms ?? (results.tire_defl ? Math.sqrt(results.tire_defl.reduce((acc: number, v: number) => acc + v * v, 0) / results.tire_defl.length) * 1000 : null);
+  const accelRms =
+    results.rms_body_accel_wk ??
+    results.rms_body_accel ??
+    results.kpis?.accel_rms ??
+    (results.ddz_s ? Math.sqrt(results.ddz_s.reduce((acc: number, v: number) => acc + v * v, 0) / results.ddz_s.length) : null);
+  const travelMaxMm =
+    results.peak_susp_travel != null
+      ? Number(results.peak_susp_travel) * 1000
+      : (results.kpis?.travel_max_mm ?? (results.susp_travel ? Math.max(...results.susp_travel.map(Math.abs)) * 1000 : null));
+  const tireRms = results.rms_tire_load ?? results.kpis?.tire_load_rms ?? (results.tire_defl ? Math.sqrt(results.tire_defl.reduce((acc: number, v: number) => acc + v * v, 0) / results.tire_defl.length) * 1000 : null);
+
+  const validityTier = validity ? resolveValidityTier(validity) : "VALIDATED";
+  const isOutOfDomain = validityTier === "OUT-OF-DOMAIN";
 
   let verdict = "NEUTRAL / BASELINE";
   let verdictColor = "text-ansys-yellow border-ansys-yellow/40 bg-ansys-yellow/10";
@@ -90,36 +105,52 @@ export default function EngineeringDecisionCard({
 
   if (accelRms !== null) {
     if (accelRms < 0.315) {
-      verdict = "EXCELLENT (ISO COMFORT)";
-      verdictColor = "text-emerald-400 border-emerald-500/40 bg-emerald-950/40";
+      verdict = isOutOfDomain ? "OUT-OF-DOMAIN" : "EXCELLENT (ISO COMFORT)";
+      verdictColor = isOutOfDomain
+        ? "text-rose-400 border-rose-500/40 bg-rose-950/40"
+        : "text-emerald-400 border-emerald-500/40 bg-emerald-950/40";
       verdictDesc = `Comfort vibration is below ISO 2631-1 comfortable limit (RMS: ${accelRms.toFixed(3)} m/s²).`;
     } else if (accelRms < 0.63) {
-      verdict = "GOOD (MODERATE COMFORT)";
-      verdictColor = "text-cyan-400 border-cyan-500/40 bg-cyan-950/40";
+      verdict = isOutOfDomain ? "OUT-OF-DOMAIN" : "GOOD (MODERATE COMFORT)";
+      verdictColor = isOutOfDomain
+        ? "text-rose-400 border-rose-500/40 bg-rose-950/40"
+        : "text-cyan-400 border-cyan-500/40 bg-cyan-950/40";
       verdictDesc = `Vibration level is moderate (RMS: ${accelRms.toFixed(3)} m/s²).`;
     } else {
-      verdict = "WARNING (HARSH)";
+      verdict = isOutOfDomain ? "OUT-OF-DOMAIN · HARSH" : "WARNING (HARSH)";
       verdictColor = "text-rose-400 border-rose-500/40 bg-rose-950/40";
       verdictDesc = `Vibration level exceeds uncomfortable threshold (RMS: ${accelRms.toFixed(3)} m/s²).`;
     }
   }
 
   // 4. CAN I TRUST IT? (RULE 12 PROVENANCE)
-  const solverName = results.solver || "scipy.integrate.solve_ivp (RK45)";
+  const solverName = results.solver || "scipy.integrate.solve_ivp (BDF)";
   const backendModel = results.backend || "QuarterCar 2-DOF Lumped Parameter Core";
-  const modelVersion = "v2.4.0-prod";
+  const modelVersion = validity?.provenance?.solver_version || "v2.4.0-prod";
   const buildHash = "git-2026.09.pro";
 
   // 5. WHAT SHOULD I DO?
   let recommendation = "";
-  if (zeta < 0.25) {
-    recommendation = `Increase damping c to at least ${(c_crit * 0.3).toFixed(0)} Ns/m to suppress underdamped resonance and improve settle time.`;
+  const hasActionableWarning =
+    isOutOfDomain ||
+    zeta < 0.25 ||
+    zeta > 0.65 ||
+    f_n > 1.8 ||
+    (travelMaxMm != null && travelMaxMm > 70) ||
+    (accelRms !== null && accelRms >= 0.63);
+
+  if (isOutOfDomain) {
+    recommendation = `Parameters fall outside validated calibration bounds (${validity?.score ?? 0}% confidence). Correct out-of-domain limits or suspension bottoming before making race setup decisions.`;
+  } else if (zeta < 0.25) {
+    recommendation = `Increase damping c to at least ${Math.round((c_crit * 0.3) / Math.max(mr * mr, 1e-6))} Ns/m to suppress underdamped resonance and improve settle time.`;
   } else if (zeta > 0.65) {
-    recommendation = `Decrease damping c toward ${(c_crit * 0.4).toFixed(0)} Ns/m to soften high-frequency harshness and lower ISO acceleration RMS.`;
+    recommendation = `Decrease damping c toward ${Math.round((c_crit * 0.4) / Math.max(mr * mr, 1e-6))} Ns/m to soften high-frequency harshness and lower ISO acceleration RMS.`;
   } else if (f_n > 1.8) {
-    recommendation = `Spring rate is stiff (f_n = ${f_n.toFixed(2)} Hz). For passenger comfort, lower spring rate to target f_n between 1.1 - 1.4 Hz.`;
-  } else if (travelMaxMm && travelMaxMm > 70) {
+    recommendation = `Spring rate is stiff (f_n = ${f_n.toFixed(2)} Hz). For passenger comfort, lower spring rate to target f_n between 1.1 – 1.4 Hz.`;
+  } else if (travelMaxMm != null && travelMaxMm > 70) {
     recommendation = `Maximum suspension travel is high (${travelMaxMm.toFixed(1)} mm). Increase bump stop stiffness or raise spring rate to prevent bottoming out.`;
+  } else if (accelRms !== null && accelRms >= 0.63) {
+    recommendation = `Chassis vibration is harsh (Wk RMS ${accelRms.toFixed(3)} m/s²). Soften spring rate or adjust rebound damping to bring ISO ride comfort back into envelope.`;
   } else {
     recommendation = "System is operating within optimal Pareto ride-comfort & road-holding window. Setup is safe for vehicle sign-off.";
   }
@@ -235,9 +266,19 @@ export default function EngineeringDecisionCard({
                 <ChevronDown size={11} className={`transition-transform ${showProvenance ? "rotate-180" : ""}`} />
               </button>
             </div>
-            <p className="text-emerald-300 text-[11px]">
-              ✓ High-fidelity physics solver verified within physical boundary constraints.
-            </p>
+            {isOutOfDomain ? (
+              <p className="text-rose-300 text-[11px]">
+                ⚠ OUT-OF-DOMAIN ({validity?.score ?? 0}%): Parameters exceed validated domain bounds. Treat predictions as uncalibrated.
+              </p>
+            ) : validityTier !== "VALIDATED" ? (
+              <p className="text-amber-300 text-[11px]">
+                ! {validityTier} ({validity?.score ?? 0}%): Directionally valid; verify boundary checks before track sign-off.
+              </p>
+            ) : (
+              <p className="text-emerald-300 text-[11px]">
+                ✓ High-fidelity physics solver verified within physical boundary constraints ({validity?.score ?? 100}%).
+              </p>
+            )}
             {showProvenance && (
               <div className="mt-2 p-2 rounded bg-black/50 border border-white/[0.06] text-[10px] font-mono space-y-0.5 text-gray-400">
                 <div>Model: <span className="text-gray-200">{backendModel} ({modelVersion})</span></div>
@@ -249,11 +290,17 @@ export default function EngineeringDecisionCard({
           </div>
 
           {/* Q5: What should I do? */}
-          <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/30 space-y-1.5 md:col-span-2 lg:col-span-2">
-            <span className="text-[10px] uppercase font-bold text-emerald-400 flex items-center gap-1">
-              <CheckCircle2 size={12} /> 5. What Should I Do? (Actionable Recommendation)
+          <div className={`p-3 rounded-xl space-y-1.5 md:col-span-2 lg:col-span-2 ${
+            hasActionableWarning
+              ? "bg-amber-950/20 border border-amber-500/30"
+              : "bg-emerald-950/20 border border-emerald-500/30"
+          }`}>
+            <span className={`text-[10px] uppercase font-bold flex items-center gap-1 ${
+              hasActionableWarning ? "text-amber-400" : "text-emerald-400"
+            }`}>
+              {hasActionableWarning ? <AlertTriangle size={12} /> : <CheckCircle2 size={12} />} 5. What Should I Do? (Actionable Recommendation)
             </span>
-            <p className="text-emerald-100 text-[11px] leading-relaxed font-semibold">
+            <p className={`${hasActionableWarning ? "text-amber-100" : "text-emerald-100"} text-[11px] leading-relaxed font-semibold`}>
               {recommendation}
             </p>
           </div>

@@ -213,7 +213,7 @@ std::map<std::string, double> MacPherson::calculate_kinematics(
     std::map<std::string, double> res;
     
     Eigen::Vector3d spin = A.col(1); // Local Y axis
-    res["camber"] = std::atan2(spin(2), spin(1)) * 180.0 / M_PI;
+    res["camber"] = std::atan2(-spin(2), spin(1)) * 180.0 / M_PI;
     res["toe"]    = std::atan2(spin(0), spin(1)) * 180.0 / M_PI;
 
     // Contact patch
@@ -232,7 +232,7 @@ std::map<std::string, double> MacPherson::calculate_kinematics(
     }
 
     res["caster"] = std::atan2(-kingpin(0), kingpin(2)) * 180.0 / M_PI;
-    res["kpi"]    = std::atan2(kingpin(1), kingpin(2)) * 180.0 / M_PI;
+    res["kpi"]    = std::atan2(-kingpin(1), kingpin(2)) * 180.0 / M_PI;
 
     // Scrub radius and mechanical trail
     if (std::abs(kingpin(2)) > 1e-6) {

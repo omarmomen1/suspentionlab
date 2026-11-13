@@ -1,10 +1,11 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import PlanGate from "./PlanGate";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-export default function TeamSettings() {
+function TeamSettingsContent() {
   const { fetchWithAuth, user } = useAuth();
   const [team, setTeam] = useState<any>(null);
   const [analytics, setAnalytics] = useState<any>(null);
@@ -256,5 +257,13 @@ export default function TeamSettings() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function TeamSettings() {
+  return (
+    <PlanGate required="ENTERPRISE" feature="Race Team Workspace & Up to 10 Seats">
+      <TeamSettingsContent />
+    </PlanGate>
   );
 }

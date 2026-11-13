@@ -489,14 +489,14 @@ def _extract_py(
     r = np.array([x_WC, y_WC, z_WC], dtype=np.float64)
 
     spin = R[:, 1]
-    camber_deg = math.degrees(math.atan2(spin[2], spin[1]))
+    camber_deg = math.degrees(math.atan2(-spin[2], spin[1]))
     toe_deg    = math.degrees(math.atan2(spin[0], spin[1]))
 
     uwo = r + R @ hp["d_UWO"]
     lwo = r + R @ hp["d_LWO"]
     tro = r + R @ hp["d_TRO"]
     kp  = (uwo - lwo) / (np.linalg.norm(uwo - lwo) + 1e-12)
-    kpi_deg    = math.degrees(math.atan2(kp[1], kp[2]))
+    kpi_deg    = math.degrees(math.atan2(-kp[1], kp[2]))
     caster_deg = math.degrees(math.atan2(-kp[0], kp[2]))
 
     track_change     = y_WC - hp["WC0"][1]
@@ -1804,6 +1804,7 @@ def solve_kinematics(
                 roll_center_height_mm = res.roll_center_height_mm[i],
                 motion_ratio          = res.motion_ratio[i],
                 scrub_radius_mm       = res.scrub_radius_mm[i],
+                converged             = res.converged[i] if (hasattr(res, "converged") and len(res.converged) > i) else True,
                 anti_dive_pct         = res.anti_dive_pct[i] if (res.anti_dive_pct is not None and len(res.anti_dive_pct) > i) else 0.0,
                 anti_squat_pct        = res.anti_squat_pct[i] if (res.anti_squat_pct is not None and len(res.anti_squat_pct) > i) else 0.0,
                 anti_lift_pct         = res.anti_lift_pct[i] if (res.anti_lift_pct is not None and len(res.anti_lift_pct) > i) else 0.0,
@@ -1816,6 +1817,9 @@ def solve_kinematics(
                 roll_center_lateral_mm = 0.0,
                 geometry              = geom,
             ))
+        curves.model_validity = getattr(res, "model_validity", None)
+        curves.benchmarks = getattr(res, "benchmarks", [])
+        curves.reproducibility = getattr(res, "reproducibility", None)
         return curves
     else:
         if strict_mode and mode == "cpp" and not _HAVE_CPP:

@@ -240,6 +240,8 @@ def parse_telemetry_csv(content: str) -> dict:
       - '_channel_info': dict[str, ChannelInfo]
       - '_audit_trail': dict (IngestionAuditTrail serialized)
     """
+    # Strip UTF-8 BOM if present
+    content = content.lstrip("\ufeff")
     lines = content.splitlines()
     if not lines or all(not l.strip() for l in lines):
         raise ValueError("Telemetry CSV content cannot be empty.")

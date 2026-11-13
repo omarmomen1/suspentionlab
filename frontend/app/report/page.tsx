@@ -17,9 +17,9 @@ import { useWorkspace } from "../../contexts/WorkspaceContext";
 const DARK_PLOT_BASE = {
   paper_bgcolor: "transparent",
   plot_bgcolor: "transparent",
-  font: { color: "#777", size: 10, family: "Inter, monospace" },
-  xaxis: { color: "#555", gridcolor: "#161618", zerolinecolor: "#2a2a2a" },
-  yaxis: { color: "#555", gridcolor: "#161618", zerolinecolor: "#2a2a2a" },
+  font: { color: "#94A3B8", size: 10, family: "Inter, monospace" },
+  xaxis: { color: "#94A3B8", gridcolor: "#161618", zerolinecolor: "#2a2a2a", tickfont: { color: "#94A3B8" } },
+  yaxis: { color: "#94A3B8", gridcolor: "#161618", zerolinecolor: "#2a2a2a", tickfont: { color: "#94A3B8" } },
   margin: { l: 45, r: 15, t: 25, b: 35 },
   autosize: true,
 };
@@ -55,9 +55,11 @@ function ReportContent() {
   const [sharing, setSharing] = useState(false);
 
   const reportRef = useRef<HTMLDivElement>(null);
+  const benchmarkFallbackAttemptedRef = useRef<boolean>(false);
 
   useEffect(() => {
     async function init() {
+      benchmarkFallbackAttemptedRef.current = false;
       setLoading(true);
       setError(null);
       try {
@@ -85,7 +87,7 @@ function ReportContent() {
     init();
   }, [queryRunId]);
 
-  async function loadReportForRun(runIdOrLabel: string) {
+  async function loadReportForRun(runIdOrLabel: string, allowFallback: boolean = true) {
     setLoading(true);
     setError(null);
     try {
@@ -128,22 +130,33 @@ function ReportContent() {
         }
       }
     } catch (err: any) {
-      console.warn("Failed to load run report, falling back to benchmark simulation:", err);
-      try {
-        await triggerBenchmarkSimulation();
-      } catch (fallbackErr: any) {
-        setError(fallbackErr.message || `Failed to hydrate report for ${runIdOrLabel}`);
+      console.warn("Failed to load run report:", err);
+      if (allowFallback && !benchmarkFallbackAttemptedRef.current && runIdOrLabel !== "latest") {
+        try {
+          await triggerBenchmarkSimulation();
+          return;
+        } catch (fallbackErr: any) {
+          setError(fallbackErr.message || `Failed to hydrate report for ${runIdOrLabel}`);
+          return;
+        }
       }
+      setError(err?.message || `Failed to hydrate report for ${runIdOrLabel}`);
     } finally {
       setLoading(false);
     }
   }
 
   async function triggerBenchmarkSimulation() {
+    if (benchmarkFallbackAttemptedRef.current) {
+      setError("Failed to hydrate latest benchmark report.");
+      setLoading(false);
+      return;
+    }
+    benchmarkFallbackAttemptedRef.current = true;
     setLoading(true);
     setError(null);
     try {
-      await loadReportForRun("latest");
+      await loadReportForRun("latest", false);
     } catch (err: any) {
       console.error("Benchmark run failed:", err);
       setError("Failed to execute benchmark simulation. " + (err.message || ""));
@@ -432,7 +445,7 @@ function ReportContent() {
               </div>
               <div className="bg-[#0f0f12] print:bg-white border border-[#1e1e24] print:border-gray-300 rounded-2xl p-4">
                 <p className="text-[10px] font-bold text-gray-500 print:text-gray-600 uppercase tracking-wider">Telemetry Correlation</p>
-                <p className="text-2xl font-black text-purple-400 print:text-purple-700 font-mono mt-1">
+                <p className="text-2xl font-black text-cyan-400 print:text-cyan-700 font-mono mt-1">
                   {metrics["Telemetry Correlation"] || `${report.correlation_pct?.toFixed(1)} %`}
                 </p>
                 <p className="text-[11px] text-gray-400 print:text-gray-600 mt-1">Residual MAE: 1.41 mm</p>
@@ -478,7 +491,7 @@ function ReportContent() {
                       ]}
                       layout={{
                         ...DARK_PLOT_BASE,
-                        title: { text: "Simulated Time-Domain Transient (Distance/Time vs Displacement)", font: { color: "#666", size: 11 } },
+                        title: { text: "Simulated Time-Domain Transient (Distance/Time vs Displacement)", font: { color: "#94A3B8", size: 11 } },
                         legend: { orientation: "h", y: 1.15, font: { color: "#888", size: 9 } }
                       } as any}
                       config={{ displayModeBar: false, responsive: true }}
@@ -557,9 +570,9 @@ function ReportContent() {
                       ]}
                       layout={{
                         ...DARK_PLOT_BASE,
-                        title: { text: "Lateral G vs Longitudinal G", font: { color: "#666", size: 11 } },
-                        xaxis: { ...DARK_PLOT_BASE.xaxis, title: { text: "Lateral G", font: { color: "#666" } } },
-                        yaxis: { ...DARK_PLOT_BASE.yaxis, title: { text: "Longitudinal G", font: { color: "#666" } } },
+                        title: { text: "Lateral G vs Longitudinal G", font: { color: "#94A3B8", size: 11 } },
+                        xaxis: { ...DARK_PLOT_BASE.xaxis, title: { text: "Lateral G", font: { color: "#94A3B8" } } },
+                        yaxis: { ...DARK_PLOT_BASE.yaxis, title: { text: "Longitudinal G", font: { color: "#94A3B8" } } },
                       } as any}
                       config={{ displayModeBar: false, responsive: true }}
                       style={{ width: "100%", height: "100%" }}
@@ -580,7 +593,7 @@ function ReportContent() {
                           y: plotData.aerodynamics.downforce_n,
                           name: "Total Downforce [N]",
                           type: "scatter", mode: "lines",
-                          line: { color: "#a78bfa", width: 2 }
+                          line: { color: "#06B6D4", width: 2 }
                         },
                         {
                           x: plotData.aerodynamics.speed_kmh,
@@ -592,9 +605,9 @@ function ReportContent() {
                       ]}
                       layout={{
                         ...DARK_PLOT_BASE,
-                        title: { text: "Aero Forces F = 0.5 * rho * A * C * v^2", font: { color: "#666", size: 11 } },
-                        xaxis: { ...DARK_PLOT_BASE.xaxis, title: { text: "Speed [km/h]", font: { color: "#666" } } },
-                        yaxis: { ...DARK_PLOT_BASE.yaxis, title: { text: "Force [N]", font: { color: "#666" } } },
+                        title: { text: "Aero Forces F = 0.5 * rho * A * C * v^2", font: { color: "#94A3B8", size: 11 } },
+                        xaxis: { ...DARK_PLOT_BASE.xaxis, title: { text: "Speed [km/h]", font: { color: "#94A3B8" } } },
+                        yaxis: { ...DARK_PLOT_BASE.yaxis, title: { text: "Force [N]", font: { color: "#94A3B8" } } },
                       } as any}
                       config={{ displayModeBar: false, responsive: true }}
                       style={{ width: "100%", height: "100%" }}
@@ -638,9 +651,9 @@ function ReportContent() {
                     ]}
                     layout={{
                       ...DARK_PLOT_BASE,
-                      title: { text: "Wheel Center Travel [mm] vs Angle [deg]", font: { color: "#666", size: 11 } },
-                      xaxis: { ...DARK_PLOT_BASE.xaxis, title: { text: "Wheel Heave Travel [mm]", font: { color: "#666" } } },
-                      yaxis: { ...DARK_PLOT_BASE.yaxis, title: { text: "Angle [deg]", font: { color: "#666" } } },
+                      title: { text: "Wheel Center Travel [mm] vs Angle [deg]", font: { color: "#94A3B8", size: 11 } },
+                      xaxis: { ...DARK_PLOT_BASE.xaxis, title: { text: "Wheel Heave Travel [mm]", font: { color: "#94A3B8" } } },
+                      yaxis: { ...DARK_PLOT_BASE.yaxis, title: { text: "Angle [deg]", font: { color: "#94A3B8" } } },
                     } as any}
                     config={{ displayModeBar: false, responsive: true }}
                     style={{ width: "100%", height: "100%" }}
@@ -680,7 +693,7 @@ function ReportContent() {
                 </div>
                 <div className="p-4 bg-black/40 print:bg-gray-100 rounded-xl border border-[#1f1f26] print:border-gray-200">
                   <p className="text-[10px] text-gray-500 print:text-gray-600 font-bold uppercase">Heave Natural Frequency</p>
-                  <p className="text-xl font-bold font-mono text-purple-400 print:text-purple-700 mt-1">
+                  <p className="text-xl font-bold font-mono text-cyan-400 print:text-cyan-700 mt-1">
                     {metrics["Heave Natural Frequency"] || "—"}
                   </p>
                   <p className="text-[10px] text-gray-400 print:text-gray-600 mt-0.5">

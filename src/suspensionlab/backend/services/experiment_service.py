@@ -99,7 +99,7 @@ def compute_reproducibility_hash(params: Dict[str, Any], metrics: Dict[str, Any]
     return hashlib.sha256(dumped.encode("utf-8")).hexdigest()
 
 
-def evaluate_simulation_kpis(params: Dict[str, float], road_profile: Optional[Dict[str, Any]] = None) -> Dict[str, float]:
+def evaluate_simulation_kpis(params: Dict[str, Any], road_profile: Optional[Dict[str, Any]] = None) -> Dict[str, float]:
     """Executes canonical quarter-car physics simulation and returns standardized KPIs."""
     p = QuarterCarParams(
         m_s=float(params.get("m_s", 320.0)),
@@ -326,7 +326,7 @@ def build_engineering_causality_chain(
     return chain
 
 
-def check_engineering_constraints(cand_params: Dict[str, float], cand_metrics: Dict[str, float]) -> Tuple[bool, List[Dict[str, Any]]]:
+def check_engineering_constraints(cand_params: Dict[str, Any], cand_metrics: Dict[str, float]) -> Tuple[bool, List[Dict[str, Any]]]:
     """Evaluates physical and operational engineering constraints."""
     constraints = []
     all_passed = True
@@ -384,8 +384,8 @@ class ExperimentService:
         team_id: Optional[str] = None,
         question: str = "",
         hypothesis: Optional[str] = None,
-        parent_setup: Optional[Dict[str, float]] = None,
-        parameter_changes: Optional[List[Dict[str, Any]] | Dict[str, float]] = None,
+        parent_setup: Optional[Dict[str, Any]] = None,
+        parameter_changes: Optional[List[Dict[str, Any]] | Dict[str, Any]] = None,
         road_profile: Optional[Dict[str, Any]] = None,
         author: Optional[str] = None,
         clone_from: Optional[str] = None,
@@ -664,8 +664,8 @@ class ExperimentService:
 
     @staticmethod
     def compare_setups(
-        setup_a: Dict[str, float],
-        setup_b: Dict[str, float],
+        setup_a: Dict[str, Any],
+        setup_b: Dict[str, Any],
         road_profile: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """
@@ -747,7 +747,7 @@ class ExperimentService:
 
     @staticmethod
     def batch_optimize_pareto(
-        base_params: Dict[str, float],
+        base_params: Dict[str, Any],
         param_ranges: Optional[Dict[str, List[float]]] = None,
         road_profile: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
@@ -773,7 +773,7 @@ class ExperimentService:
             profile_type="sine",
             amplitude=0.03,
             frequency=2.0,
-            duration=3.0,
+            duration=1.0,
             speed_mps=float(rp.get("speed_mps", rp.get("v_ms", 30.0))),
         )
 
@@ -826,6 +826,12 @@ class ExperimentService:
             })
 
         best = frontier_dict.get("best_compromise")
+        if isinstance(best, dict):
+            best.setdefault("is_pareto_optimal", bool(best.get("pareto_rank", 0) == 0 and best.get("feasible", True)))
+            if "candidate_id" not in best:
+                best_params = best.get("params", {})
+                matched_cid = next((c["candidate_id"] for c in candidates if c.get("params") == best_params), "CAND-01")
+                best["candidate_id"] = matched_cid
         best_explanation = (
             f"Best compromise setup located at k_s={best['params'].get('k_s', 0):.0f} N/m, c={best['params'].get('c', 0):.0f} Ns/m. "
             "Closest Euclidean distance to the theoretical Utopia point (0,0) with 0 constraint violations. "

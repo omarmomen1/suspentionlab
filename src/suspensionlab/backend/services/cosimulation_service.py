@@ -508,8 +508,15 @@ class CoSimulationService:
         fmu_map = {}
         for m in participants:
             if m.model_type == "FMI_2_0_COSIM":
-                p_cand = pathlib.Path(f"{m.name}.fmu")
-                if p_cand.exists():
+                safe_name = pathlib.Path(m.name).name
+                has_traversal = (
+                    safe_name != m.name
+                    or ".." in m.name
+                    or "/" in m.name
+                    or "\\" in m.name
+                )
+                p_cand = pathlib.Path(f"{safe_name}.fmu") if not has_traversal else None
+                if p_cand is not None and p_cand.exists():
                     fmu_map[m.model_id] = str(p_cand)
                 else:
                     fmu_map[m.model_id] = "QuarterCarRideModel.fmu"

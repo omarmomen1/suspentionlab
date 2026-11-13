@@ -21,10 +21,11 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, DateTime, JSON, Integer, Float, ForeignKey, Index, Text
+from sqlalchemy import Column, String, DateTime, JSON, Integer, Float, ForeignKey, Index, Text, Uuid
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB
 
 JSON_TYPE = JSON().with_variant(JSONB, "postgresql")
+UUID_TYPE = Uuid(as_uuid=True).with_variant(PG_UUID(as_uuid=True), "postgresql")
 from suspensionlab.backend.database.core import Base
 
 
@@ -41,12 +42,12 @@ class SimulationRun(Base):
         Index("ix_simruns_label", "label", unique=True),
     )
 
-    id         = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id         = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
     seq        = Column(Integer, nullable=False, unique=True)   # global monotonic sequence
     label      = Column(String(24), nullable=False)             # "RUN-000183"
-    job_id     = Column(PG_UUID(as_uuid=True), nullable=True)   # originating job (nullable for imported runs)
-    user_id    = Column(PG_UUID(as_uuid=True), nullable=False)
-    team_id    = Column(PG_UUID(as_uuid=True), nullable=True)
+    job_id     = Column(UUID_TYPE, nullable=True)   # originating job (nullable for imported runs)
+    user_id    = Column(UUID_TYPE, nullable=False)
+    team_id    = Column(UUID_TYPE, nullable=True)
 
     # ── What was simulated ────────────────────────────────────────────────
     simulation_type = Column(String(50), nullable=False)        # quarter_car | full_car | lap_sim…

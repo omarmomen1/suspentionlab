@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -88,22 +88,35 @@ async def list_timeline(
     return {"total": len(events), "events": events}
 
 
-@router.get("/timeline/compare")
+@router.api_route("/timeline/compare", methods=["GET", "POST"])
 async def compare_timeline_events_endpoint(
-    event_a_id: str = Query(..., description="First event UUID"),
-    event_b_id: str = Query(..., description="Second event UUID"),
+    request: Request,
+    event_a_id: Optional[str] = Query(None, description="First event UUID"),
+    event_b_id: Optional[str] = Query(None, description="Second event UUID"),
     user: UserContext = Depends(require_permission(Permission.VEHICLE_READ)),
     db: AsyncSession = Depends(get_db_dependency),
 ):
     """
     'What Changed?' comparison engine between two timeline events (Section 12).
-    Compares parameter deltas, engineering effects, validation effects, and decision consequences.
+    Accepts GET query params or POST JSON body with {event_a_id, event_b_id} or {event_id_a, event_id_b}.
     """
+    eid_a = event_a_id
+    eid_b = event_b_id
+    if request.method == "POST":
+        try:
+            body = await request.json()
+            if isinstance(body, dict):
+                eid_a = eid_a or body.get("event_a_id") or body.get("event_id_a")
+                eid_b = eid_b or body.get("event_b_id") or body.get("event_id_b")
+        except Exception:
+            pass
+    if not eid_a or not eid_b:
+        raise HTTPException(status_code=422, detail="Both event_a_id and event_b_id are required.")
     try:
         report = await TimelineDecisionService.compare_timeline_events(
             db=db,
-            event_a_id=event_a_id,
-            event_b_id=event_b_id,
+            event_a_id=eid_a,
+            event_b_id=eid_b,
             user_id=user.user_id,
             team_id=getattr(user, "team_id", None),
         )
@@ -127,7 +140,9 @@ async def create_timeline_event_endpoint(
         team_id=getattr(user, "team_id", None),
         event_type=req.event_type,
         title=req.title,
+        description=req.description,
         author=user.name or user.email or req.author or "Dynamics Engineer",
+        vehicle_ref=req.vehicle_ref,
         setup_ref=req.setup_ref,
         model_version=req.model_version,
         before_state=req.before_state,

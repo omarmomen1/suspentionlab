@@ -10,7 +10,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Any, Tuple
 
-from jose import JWTError, jwt
+import jwt
+from jwt.exceptions import PyJWTError
 import bcrypt
 from passlib.context import CryptContext
 
@@ -101,19 +102,19 @@ def create_refresh_token(data: dict[str, Any], expires_delta: timedelta | None =
 def _decode_token_with_rotation(token: str) -> dict[str, Any] | None:
     """Decodes token dynamically handling the `kid` header for rotation."""
     try:
-        unverified_headers = jwt.get_unverified_headers(token)
+        unverified_headers = jwt.get_unverified_header(token)
         kid = unverified_headers.get("kid", "v1")
         
         keys = get_jwt_keys()
         # SECURITY: Reject tokens with unknown kid outright — do NOT fall back to
         # the active key, as that would allow a forged token with an arbitrary kid
         # header to potentially match the active key's signature.
-        if kid not in keys:
+        if not isinstance(kid, str) or kid not in keys:
             return None
         secret_key = keys[kid]
         
         return jwt.decode(token, secret_key, algorithms=[ALGORITHM])
-    except JWTError:
+    except PyJWTError:
         return None
 
 def decode_access_token(token: str) -> dict[str, Any] | None:

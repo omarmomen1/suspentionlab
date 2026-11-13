@@ -24,6 +24,7 @@ import {
   Info,
 } from "lucide-react";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
+import PlanGate from "../../components/PlanGate";
 import {
   ExperimentApi,
   DeepComparisonResponse,
@@ -85,7 +86,7 @@ function CompareContent() {
   const { setActiveExperimentId } = useWorkspace();
 
   // Setup states
-  const [setupA, setSetupA] = useState<Record<string, number>>({
+  const [setupA, setSetupA] = useState<Record<string, any>>({
     k_s: 35000,
     c: 2200,
     m_s: 320,
@@ -93,7 +94,7 @@ function CompareContent() {
     k_arb_f: 16000,
   });
 
-  const [setupB, setSetupB] = useState<Record<string, number>>({
+  const [setupB, setSetupB] = useState<Record<string, any>>({
     k_s: 42000,
     c: 2600,
     m_s: 320,
@@ -112,7 +113,7 @@ function CompareContent() {
   const [testQueued, setTestQueued] = useState<boolean>(false);
 
   // Load comparison on mount or preset switch
-  const runDeepCompare = async (aParams = setupA, bParams = setupB) => {
+  const runDeepCompare = async (aParams: Record<string, any> = setupA, bParams: Record<string, any> = setupB) => {
     setIsLoading(true);
     setError(null);
     setTestQueued(false);
@@ -834,7 +835,9 @@ function CompareContent() {
 export default function ComparePage() {
   return (
     <Suspense fallback={<div className="min-h-screen bg-[#070709] text-white p-8">Loading comparative intelligence...</div>}>
-      <CompareContent />
+      <PlanGate required="PRO" feature="Setup Compare (A vs B)">
+        <CompareContent />
+      </PlanGate>
     </Suspense>
   );
 }

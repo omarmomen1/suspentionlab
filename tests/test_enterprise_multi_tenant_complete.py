@@ -163,6 +163,70 @@ async def test_database_session_tenant_context_execution():
         assert db.info.get("tenant_context") is not None
         assert db.info["tenant_context"]["organization_id"] == "org-test-1"
         assert db.info["tenant_context"]["team_id"] == "team-test-1"
+        assert db.info["tenant_context"]["is_super_admin"] is False
+
+
+@pytest.mark.asyncio
+async def test_rls_super_admin_flag_restricted_to_system_super_admin():
+    """org_owner, owner, org_admin, and super_admin must NEVER set app.is_super_admin='true'; only system_super_admin may."""
+    from unittest.mock import AsyncMock, MagicMock
+
+    async with SessionLocal() as db:
+        for non_system_role in ("org_owner", "owner", "org_admin", "ORG_ADMIN", "ORG_OWNER", "super_admin", "engineer"):
+            ctx = TenantContext(
+                user_id="usr-test-1",
+                organization_id="org-test-1",
+                team_id="team-test-1",
+                role=non_system_role,
+            )
+            await set_session_tenant_context(db, tenant_context=ctx)
+            assert db.info["tenant_context"]["is_super_admin"] is False, (
+                f"Role {non_system_role!r} must not grant is_super_admin"
+            )
+
+        # Even if is_super_admin=True is passed, org_owner/org_admin must never elevate
+        for org_role in ("org_owner", "owner", "org_admin"):
+            ctx = TenantContext(
+                user_id="usr-test-1",
+                organization_id="org-test-1",
+                team_id="team-test-1",
+                role=org_role,
+            )
+            await set_session_tenant_context(db, tenant_context=ctx, is_super_admin=True)
+            assert db.info["tenant_context"]["is_super_admin"] is False
+
+        # Dedicated system_super_admin role grants app.is_super_admin='true'
+        sys_ctx = TenantContext(
+            user_id="usr-sys-1",
+            organization_id="org-sys",
+            team_id="team-sys",
+            role="system_super_admin",
+        )
+        await set_session_tenant_context(db, tenant_context=sys_ctx)
+        assert db.info["tenant_context"]["is_super_admin"] is True
+
+    # Also verify exact SQL SET LOCAL statements emitted for PostgreSQL dialect
+    for role_name, expected_sql_flag in [
+        ("org_owner", "false"),
+        ("org_admin", "false"),
+        ("owner", "false"),
+        ("super_admin", "false"),
+        ("system_super_admin", "true"),
+    ]:
+        pg_session = MagicMock()
+        pg_session.bind = MagicMock()
+        pg_session.bind.dialect = MagicMock()
+        pg_session.bind.dialect.name = "postgresql"
+        pg_session.execute = AsyncMock()
+        ctx = TenantContext(
+            user_id="usr-pg",
+            organization_id="org-pg",
+            team_id="team-pg",
+            role=role_name,
+        )
+        await set_session_tenant_context(pg_session, tenant_context=ctx)
+        executed_sql = [str(call.args[0]) for call in pg_session.execute.call_args_list]
+        assert f"SET LOCAL app.is_super_admin = '{expected_sql_flag}';" in executed_sql
 
 
 def test_granular_rbac_capability_matrix_completeness():
