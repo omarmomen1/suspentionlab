@@ -26,7 +26,13 @@ export default function ErrorBoundary({
       <p className="text-slate-400 mb-2">
         An unexpected error occurred. Our team has been notified.
       </p>
-      {error.digest && (
+      {error?.message && (
+        <div className="max-w-xl my-3 px-3 py-2 rounded-lg bg-zinc-900/90 border border-red-500/30 text-red-300 font-mono text-xs text-left overflow-x-auto shadow-inner">
+          <span className="text-red-400 font-bold block mb-0.5">Diagnostic Error:</span>
+          <span className="break-words select-all">{error.message}</span>
+        </div>
+      )}
+      {error?.digest && (
         <p className="text-xs font-mono text-slate-500 mb-4">
           Error reference: {error.digest}
         </p>

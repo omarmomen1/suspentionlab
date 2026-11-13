@@ -133,13 +133,24 @@ class SimulationService:
 
         import os
         redis_url = (os.getenv("REDIS_URL") or "").strip()
-        if not redis_url:
+        is_serverless = (
+            os.getenv("ENVIRONMENT") == "PROD"
+            or os.getenv("VERCEL") == "1"
+            or not redis_url
+        )
+
+        if is_serverless:
             import logging
-            logging.getLogger(__name__).info("REDIS_URL not set; executing job %s in-process via bounded compute pool", job_id)
-            from suspensionlab.backend.core.compute_governance import bounded_run
-            loop = asyncio.get_running_loop()
-            loop.create_task(bounded_run(run_job, job_id, payload, trace_carrier))
-            return job_id
+            logging.getLogger(__name__).info(
+                "Serverless runtime detected (ENVIRONMENT=PROD or REDIS_URL unset); executing job %s synchronously", job_id
+            )
+            from suspensionlab.backend.workers.unified_worker import _run_job_async
+            try:
+                res = await _run_job_async(job_id, payload, ctx=None, span=current_span, start_time=time.time(), correlation=correlation_meta)
+                return job_id
+            except Exception as e:
+                logging.getLogger(__name__).exception("Synchronous execution failed for job %s: %s", job_id, e)
+                return job_id
 
         from suspensionlab.backend.workers.orchestrator import submit_simulation_job
         try:
@@ -162,3 +173,158 @@ class SimulationService:
             loop.create_task(bounded_run(run_job, job_id, payload, trace_carrier))
             
         return job_id
+
+    @classmethod
+    async def execute_or_enqueue(
+        cls,
+        user_id: str,
+        plan: str,
+        job_type: str,
+        payload: dict,
+        db,
+        team_id: str | None = None,
+        organization_id: str | None = None,
+    ) -> dict:
+        """
+        Executes ODE solver synchronously on Vercel Serverless (ENVIRONMENT=PROD or REDIS_URL unset)
+        and persists the completed SimulationJob directly to PostgreSQL, returning the result inline.
+        On distributed architectures with active Redis, enqueues to the worker queue.
+        """
+        import os
+        from suspensionlab.backend.core.compute_governance import assert_user_concurrency
+        await assert_user_concurrency(db, user_id, plan)
+        record_customer_job(plan)
+
+        if not organization_id:
+            try:
+                user_res = await db.execute(select(User.organization_id).where(User.id == uuid.UUID(str(user_id))))
+                org_val = user_res.scalar()
+                if org_val:
+                    organization_id = str(org_val)
+            except Exception:
+                pass
+
+        from suspensionlab.backend.services.trial_service import TrialService
+        trial = await TrialService.assert_trial_access(
+            db,
+            user={"user_id": user_id, "organization_id": organization_id, "plan": plan},
+            action="simulate",
+            delta=1,
+        )
+        if trial:
+            await TrialService.record_trial_usage(
+                db,
+                user={"user_id": user_id, "organization_id": organization_id, "plan": plan},
+                action="simulate",
+                delta=1,
+            )
+
+        job_id = str(uuid.uuid4())
+
+        new_job = JobRecord(
+            id=uuid.UUID(job_id),
+            user_id=uuid.UUID(str(user_id)),
+            team_id=uuid.UUID(str(team_id)) if team_id else None,
+            job_type=job_type,
+            status="PENDING",
+            params=payload.get("params", {}),
+            profile=payload.get("profile", {}),
+        )
+        db.add(new_job)
+        await db.commit()
+
+        model_family_map = {
+            "OPTIMIZE_QUARTER": "quarter_car",
+            "SIMULATE_QUARTER": "quarter_car",
+            "SWEEP_QUARTER": "quarter_car",
+            "MONTE_CARLO_QUARTER": "quarter_car",
+            "SIMULATE_HALF": "half_car",
+            "SIMULATE_FULL": "full_car",
+            "SIMULATE_ACTIVE": "active_quarter_car",
+            "SIMULATE_HANDLING": "handling",
+            "SIMULATE_DURABILITY": "durability",
+        }
+        model_family = model_family_map.get(job_type, "quarter_car")
+
+        current_span = trace.get_current_span()
+        span_ctx = current_span.get_span_context() if current_span else None
+        trace_id = format(span_ctx.trace_id, "032x") if (span_ctx and span_ctx.is_valid) else str(uuid.uuid4().hex)
+        req_id = request_id_ctx.get()
+
+        correlation_meta = {
+            "request_id": req_id,
+            "trace_id": trace_id,
+            "job_id": job_id,
+            "user_id": str(user_id),
+            "organization_id": str(organization_id or "-"),
+            "team_id": str(team_id or "-"),
+            "model_family": model_family,
+            "enqueued_at": time.time(),
+        }
+
+        trace_carrier = {}
+        inject(trace_carrier)
+        trace_carrier["correlation"] = correlation_meta
+        payload["_correlation"] = correlation_meta
+
+        redis_url = (os.getenv("REDIS_URL") or "").strip()
+        is_serverless = (
+            os.getenv("ENVIRONMENT") == "PROD"
+            or os.getenv("VERCEL") == "1"
+            or not redis_url
+        )
+
+        if is_serverless:
+            import logging
+            logging.getLogger(__name__).info(
+                "Executing simulation job %s synchronously in serverless context", job_id
+            )
+            from suspensionlab.backend.workers.unified_worker import _run_job_async
+            try:
+                result = await _run_job_async(
+                    job_id=job_id,
+                    payload=payload,
+                    ctx=None,
+                    span=current_span,
+                    start_time=time.time(),
+                    correlation=correlation_meta,
+                )
+                return {
+                    "job_id": job_id,
+                    "status": "COMPLETED",
+                    "result": result,
+                    "error": None,
+                }
+            except Exception as e:
+                logging.getLogger(__name__).exception("Synchronous execution failed for job %s: %s", job_id, e)
+                return {
+                    "job_id": job_id,
+                    "status": "FAILED",
+                    "result": None,
+                    "error": str(e),
+                }
+
+        from suspensionlab.backend.workers.orchestrator import submit_simulation_job
+        try:
+            await submit_simulation_job(
+                run_job,
+                job_id=job_id,
+                payload=payload,
+                trace_carrier=trace_carrier,
+                plan=plan,
+                dedicated=(plan == "ENTERPRISE"),
+                result_ttl=86400,
+                failure_ttl=86400,
+                retry=Retry(max=3, interval=[10, 30, 60]),
+            )
+        except Exception as e:
+            from suspensionlab.backend.core.compute_governance import bounded_run
+            loop = asyncio.get_running_loop()
+            loop.create_task(bounded_run(run_job, job_id, payload, trace_carrier))
+
+        return {
+            "job_id": job_id,
+            "status": "PENDING",
+            "result": None,
+            "error": None,
+        }

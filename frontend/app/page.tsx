@@ -28,6 +28,7 @@ const TOOL_ICONS: Record<StudioIconKey, LucideIcon> = {
   correlation: GitCompare,
   optimizer: Sliders,
   memory: History,
+  ai: Sparkles,
 };
 
 const TOOL_TIER_BADGES: Record<string, { label: string; style: string }> = {
@@ -54,6 +55,10 @@ const TOOL_TIER_BADGES: Record<string, { label: string; style: string }> = {
   "memory-reports": {
     label: "TEAM PASS",
     style: "bg-purple-500/15 border-purple-500/40 text-purple-300",
+  },
+  "ai-engineer": {
+    label: "AI SUITE",
+    style: "bg-indigo-500/15 border-indigo-500/40 text-indigo-300",
   },
 };
 

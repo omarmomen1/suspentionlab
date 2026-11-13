@@ -16,7 +16,8 @@ export type StudioIconKey =
   | "full_car"
   | "correlation"
   | "optimizer"
-  | "memory";
+  | "memory"
+  | "ai";
 
 export interface StudioToolGroup {
   id: string;
@@ -171,6 +172,20 @@ export const STUDIO_TOOLS: StudioToolGroup[] = [
         href: "/report",
         label: "Engineering Reports",
         desc: "Executive simulation & compliance report export",
+      },
+    ],
+  },
+  {
+    id: "ai-engineer",
+    label: "AI Race Engineer",
+    href: "/ai-engineer",
+    icon: "ai",
+    dropdownAlign: "right",
+    routes: [
+      {
+        href: "/ai-engineer",
+        label: "AI Race Engineer",
+        desc: "Physics-grounded setup diagnosis, Copilot reasoning & sign-off",
       },
     ],
   },

@@ -501,3 +501,5 @@ class MonteCarloResultSchema(BaseModel):
 class JobResponse(BaseModel):
     job_id: str
     status: str
+    result: Optional[dict[str, Any]] = None
+    error: Optional[str] = None

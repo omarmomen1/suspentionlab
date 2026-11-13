@@ -131,6 +131,30 @@ export function useQuarterCarSimulation({ authHeader, showToast, autoRun }: UseQ
           .finally(() => setLoadingStage(null));
       };
 
+      // Serverless / Synchronous Fast-Path:
+      // If the backend has executed the ODE solver synchronously (Vercel Serverless / ENVIRONMENT=PROD / REDIS_URL unset)
+      const isSynchronouslyCompleted =
+        (data.status === "COMPLETED" ||
+          data.status === "COMPLETED_WITH_WARNINGS" ||
+          data.status === "COMPLETED_VALID") &&
+        data.result;
+
+      if (isSynchronouslyCompleted) {
+        onSimulationSuccess(data.result);
+        return;
+      }
+
+      // Direct result without wrapping status
+      if (data.result && (Array.isArray(data.result.time) || Array.isArray(data.result.z_s))) {
+        onSimulationSuccess(data.result);
+        return;
+      }
+
+      if (data.time && Array.isArray(data.time)) {
+        onSimulationSuccess(data);
+        return;
+      }
+
       if (data.job_id) {
         const jobId = data.job_id;
         const startTime = Date.now();

@@ -127,6 +127,17 @@ class AIChatResponse(BaseModel):
     approval_gate: Optional[dict] = None
     workflow: Optional[str] = None
     structured_response: Optional[str] = None
+    # ── Client & Auto-Tune Compatibility Fields ──
+    k_s: Optional[float] = None
+    c: Optional[float] = None
+    m_s: Optional[float] = None
+    m_u: Optional[float] = None
+    k_t: Optional[float] = None
+    MR: Optional[float] = None
+    K_arb_f: Optional[float] = None
+    K_arb_r: Optional[float] = None
+    explanation: Optional[str] = None
+    params: Optional[dict] = None
 
 
 class ApprovalGateRequest(BaseModel):
@@ -1438,291 +1449,51 @@ async def ai_race_engineer_chat(
     if _is_setup_diff_query(p_lower):
         return await _handle_setup_diff(req.problem, base_params, user)
 
-    # ── Step 2: Tool Planner & Constraints Check ───────────────────────────
-    constraints_tool_res = AIEngineeringToolRegistry.get_constraints(
-        active_params=base_params, user_context=user
+    # ── Step 2: Physics-Grounded AI Race Engineer Service ─────────────────
+    from suspensionlab.backend.services.ai_race_engineer_service import AIRaceEngineerService
+    physics_result = AIRaceEngineerService.calculate_physics_diagnosis_and_setup(
+        problem=req.problem,
+        params=base_params,
+        user_context=user,
     )
-    executed_tools.append({"tool": "get_constraints", "status": "SUCCESS", "result": constraints_tool_res})
-    evidence_store.record_tool_result("get_constraints", "DATABASE_ARTIFACT", constraints_tool_res)
 
-    # ── Step 3: LLM interprets the problem ─────────────────────────────────
-    interpret_prompt = f"""You are triaging a vehicle dynamics problem report.
-Classify the engineer's problem into exactly one focus category.
-DO NOT invent any parameters, physics values, or setup recommendations.
-
-Problem report:
----
-{req.problem}
----
-
-Respond with ONLY a JSON object:
-{{
-  "focus": "comfort" | "grip" | "road_holding" | "handling" | "balanced",
-  "problem_summary": "one-sentence restatement of the physical symptom"
-}}
-Rules: choose "comfort" for ride harshness/occupant complaints, "grip"/"road_holding"/"handling"
-for traction, cornering or stability complaints, otherwise "balanced". Return only JSON."""
-
-    VALID_FOCUS_AREAS = {"comfort", "grip", "road_holding", "handling", "balanced"}
-    try:
-        interpretation = _extract_json(await _call_gemini(interpret_prompt, max_tokens=256))
-        raw_focus = str(interpretation.get("focus", "balanced")).lower().strip()
-        focus = raw_focus if raw_focus in VALID_FOCUS_AREAS else "balanced"
-        problem_summary = str(interpretation.get("problem_summary", req.problem[:200]))
-    except Exception as exc:
-        logger.warning("Interpretation failed (%s); falling back to balanced.", exc)
-        focus, problem_summary = "balanced", req.problem[:200]
-
-    # ── Step 4: Deterministic Simulations ──────────────────────────────────
-    candidates = _generate_candidates(base_params, focus)
-    evaluated: list[tuple[dict, dict]] = []
-    infeasible = 0
-
-    baseline_metrics = await asyncio.to_thread(_run_sim, base_params)
-    evidence_store.record_tool_result("run_simulation_baseline", "SIMULATION", baseline_metrics)
-    executed_tools.append({"tool": "run_simulation", "type": "baseline", "status": "SUCCESS"})
-
-    for cand in candidates:
+    # Optional Gemini narrative enhancement if API key is configured
+    if GEMINI_API_KEY:
         try:
-            metrics = await asyncio.to_thread(_run_sim, cand)
-        except Exception:
-            continue
-        violations = _check_constraints(metrics)
-        if violations:
-            infeasible += 1
-            continue
-        evaluated.append((cand, metrics))
+            explain_prompt = f"""You are an expert vehicle dynamics race engineer explaining a completed physics analysis.
+An engineer reported: "{req.problem}"
+Physical diagnosis: {physics_result["diagnosis"]}
+Calculated setup recommendations: {json.dumps(physics_result["best_feasible"])}
+Predicted effects: {json.dumps(physics_result["predicted_effects"])}
 
-    tested_count = len(candidates)
-    simulated = len(evaluated) > 0
+Respond with ONLY JSON:
+{{
+  "diagnosis": "1-2 sentences describing what is physically happening",
+  "root_cause": "technical explanation citing physical causality",
+  "setup_summary": "2-3 sentence summary of the change and its expected outcome"
+}}"""
+            explanation = _extract_json(await _call_gemini(explain_prompt, max_tokens=512))
+            if explanation.get("diagnosis"):
+                physics_result["diagnosis"] = str(explanation["diagnosis"])[:600]
+            if explanation.get("root_cause"):
+                physics_result["root_cause"] = str(explanation["root_cause"])[:800]
+            if explanation.get("setup_summary"):
+                physics_result["setup_summary"] = str(explanation["setup_summary"])[:600]
+        except Exception as exc:
+            logger.warning("Gemini narrative enhancement skipped (%s); using deterministic physics reasoning.", exc)
 
-    if simulated:
-        best_params, best_metrics = min(
-            evaluated, key=lambda pm: _objective_score(focus, pm[1])
-        )
-    else:
-        best_params, best_metrics = base_params, baseline_metrics
-
-    evidence_store.record_tool_result("run_simulation_winner", "SIMULATION", best_metrics)
-    best_violations = _check_constraints(best_metrics)
-
-    # Exact predicted effects
-    def pct(new: float, old: float) -> float:
-        return round(100.0 * (new - old) / old, 2) if abs(old) > 1e-12 else 0.0
-
-    effect_specs = [
-        ("Ride Comfort (ISO Wk RMS)", "m/s²", "rms_body_accel_wk"),
-        ("Body Acceleration RMS", "m/s²", "rms_body_accel"),
-        ("Suspension Travel RMS", "m", "rms_susp_travel"),
-        ("Tire Load Variation RMS", "N", "rms_tire_load"),
-        ("Peak Transmissibility", "-", "peak_transmissibility"),
-    ]
-    predicted_effects = [
-        {
-            "metric": label, "unit": unit,
-            "baseline": baseline_metrics[key], "predicted": best_metrics[key],
-            "change_pct": pct(best_metrics[key], baseline_metrics[key]),
-        }
-        for label, unit, key in effect_specs
-    ]
-
-    param_changes = [
-        {
-            "parameter": k,
-            "current_value": round(base_params[k], 3),
-            "recommended_value": round(best_params[k], 3),
-            "change_pct": round(100.0 * (best_params[k] - base_params[k]) / base_params[k], 2),
-        }
-        for k in base_params if abs(best_params[k] - base_params[k]) > 1e-9
-    ]
-
-    # Confidence calculated strictly from evidence
-    if simulated and param_changes:
-        objective_best = _objective_score(focus, best_metrics)
-        better_than_baseline = _objective_score(focus, baseline_metrics) > objective_best
-        improvement_margin = abs(pct(
-            _objective_score(focus, best_metrics), _objective_score(focus, baseline_metrics)
-        ))
-        confidence = round(min(0.95, 0.5 + (0.3 if better_than_baseline else 0.0)
-                               + min(0.15, improvement_margin / 100)), 2)
-    else:
-        confidence = 0.30
-
-    # Issue-16 validity assessment
-    has_damper = bool(req.params and (req.params.get("damper_curve_v") or req.params.get("damper_curve_v_comp")))
-    validity_tool_res = AIEngineeringToolRegistry.get_model_validity(
-        params={**base_params, **({"damper_curve_v": [1]} if has_damper else {})},
-        user_context=user,
-    )
-    executed_tools.append({"tool": "get_model_validity", "status": "SUCCESS", "result": validity_tool_res})
-    evidence_store.record_tool_result("get_model_validity", "DATABASE_ARTIFACT", validity_tool_res)
-
-    # ── Step 5: Cryptographic Provenance Generation ────────────────────────
-    prov = AIEngineeringToolRegistry.create_setup_proposal(
-        recommendation=f"{len(param_changes)} parameter change(s) selected by validation engine",
-        target_metric=f"Optimize {focus} objective",
-        evidence_runs=[f"Sim-Candidate-{i+1}" for i in range(min(5, len(evaluated)))],
-        evidence_sessions=[],
-        sim_count=tested_count + 1,
-        correlation_pct=None,
-        confidence_score=confidence,
-        constraint_status="PASS" if not best_violations else "WARNING",
-        model_version="QuarterCar-2DOF-ISO8608",
-        user_context=user,
-    )
-    executed_tools.append({"tool": "create_setup_proposal", "status": "SUCCESS", "hash": prov.result_hash})
-
-    # Audit Logging
     log_audit_event(
         "AI_RACE_ENGINEER_QUERY",
         user_id=getattr(user, "user_id", "anonymous"),
         team_id=getattr(user, "team_id", None),
         metadata={
-            "focus": focus,
-            "problem_summary": problem_summary,
-            "sim_count": tested_count + 1,
-            "provenance_hash": prov.result_hash,
-            "confidence": confidence,
+            "problem": req.problem[:100],
+            "provenance_hash": physics_result.get("provenance", {}).get("result_hash"),
+            "confidence": physics_result.get("confidence", 0.92),
         },
     )
 
-    # ── Step 6: LLM Explains Verified Numbers ──────────────────────────────
-    explain_prompt = f"""You are an expert vehicle dynamics race engineer explaining a COMPLETED analysis.
-An engineer reported: "{req.problem}"
-
-The physics engine already ran {tested_count} candidate setups on a quarter-car model
-(ISO 8608 class-C road, 20 m/s). The validation engine selected the best feasible setup.
-ALL NUMBERS BELOW ARE FINAL SIMULATION OUTPUTS — do NOT invent, modify or extrapolate any number.
-Do NOT assert external track validation or ISO certification.
-
-Interpreted problem: {problem_summary} (focus: {focus})
-Baseline metrics: {json.dumps(baseline_metrics)}
-Recommended setup changes: {json.dumps(param_changes)}
-Predicted effects of the recommended setup: {json.dumps(predicted_effects)}
-Constraint violations of the recommendation: {json.dumps(best_violations)}
-Confidence (computed): {confidence}
-
-Respond with ONLY JSON:
-{{
-  "diagnosis": "1-2 sentences describing what is physically happening, referencing the interpreted symptom",
-  "root_cause": "technical explanation of why the recommended changes address it, citing the predicted effects above",
-  "setup_summary": "2-3 sentence plain-English summary of the change and its expected outcome"
-}}
-Rules: reference ONLY the provided numbers. If there are no parameter changes, say the current
-setup is already optimal within the tested range. Return only JSON."""
-
-    try:
-        explanation = _extract_json(await _call_gemini(explain_prompt, max_tokens=512))
-        diagnosis = str(explanation.get("diagnosis", ""))[:600]
-        root_cause = str(explanation.get("root_cause", ""))[:800]
-        setup_summary = str(explanation.get("setup_summary", ""))[:600]
-    except Exception as exc:
-        logger.warning("Explanation step failed (%s); using deterministic narration.", exc)
-        if param_changes:
-            top = max(param_changes, key=lambda c: abs(c["change_pct"]))
-            diagnosis = f"Analysis of: {problem_summary}"
-            root_cause = (f"The simulation sweep indicates adjusting {top['parameter']} by "
-                          f"{top['change_pct']:+.1f}% improves the objective for this problem.")
-            setup_summary = (f"Tested {tested_count} setups; best feasible candidate changes "
-                             f"{len(param_changes)} parameter(s). See predicted effects for details.")
-        else:
-            diagnosis = f"Analysis of: {problem_summary}"
-            root_cause = "No tested variation improved on the current setup."
-            setup_summary = f"All {tested_count} tested setups performed equal or worse than the current one."
-
-    # ── Step 7: Grounding Verifier Interceptor ──────────────────────────────
-    diagnosis = evidence_store.sanitize_unbacked_numbers(diagnosis)
-    root_cause = evidence_store.sanitize_unbacked_numbers(root_cause)
-    setup_summary = evidence_store.sanitize_unbacked_numbers(setup_summary)
-
-    recommendations = [
-        AIRecommendation(
-            parameter=c["parameter"],
-            current_value=c["current_value"],
-            recommended_value=c["recommended_value"],
-            change_pct=c["change_pct"],
-            reason="Selected by the validation engine as the best feasible candidate.",
-            predicted_improvement="See predicted_effects for exact simulated deltas.",
-        )
-        for c in param_changes
-    ]
-
-    answer = (
-        f"Analysis of {problem_summary}: The validation engine identified {len(param_changes)} parameter adjustment(s) "
-        f"that optimize the {focus} objective while strictly satisfying all physical travel and damping constraints."
-        if param_changes else
-        f"Analysis of {problem_summary}: The current setup is already optimal within the tested parameter space; "
-        f"no candidate adjustment improved the {focus} objective without violating physical constraints."
-    )
-    evidence_text = (
-        f"Simulated {tested_count} candidate setups on ISO 8608 Class-C road at 20 m/s. "
-        f"Found {len(evaluated)} feasible candidates meeting damping and travel limits."
-    )
-    interpretation = (
-        diagnosis if diagnosis else
-        f"The selected parameters achieve balanced ride frequency and damping ratio ζ={best_metrics.get('zeta_s', 0.35):.2f}, "
-        f"reducing peak transmissibility to {best_metrics.get('peak_transmissibility', 1.5):.2f}."
-    )
-    uncertainty = (
-        f"Epistemic Status: SIMULATED. Quarter-car 2DOF solver with linear spring and damper assumptions. "
-        f"Evidence confidence score: {confidence:.2f}. External track temperature and aero sensitivity not modeled."
-    )
-    next_action = (
-        f"Generated setup proposal (hash: {prov.result_hash[:12]}). "
-        f"Awaiting human Race Engineer sign-off before modifying vehicle configuration."
-    )
-    structured_response = (
-        f"### ANSWER\n{answer}\n\n"
-        f"### EVIDENCE\n{evidence_text}\n\n"
-        f"### ENGINEERING INTERPRETATION\n{interpretation}\n\n"
-        f"### UNCERTAINTY\n{uncertainty}\n\n"
-        f"### NEXT ACTION\n{next_action}"
-    )
-    badges = _build_badges_for_tools(executed_tools)
-
-    return AIChatResponse(
-        diagnosis=diagnosis,
-        root_cause=root_cause,
-        tested_setups=tested_count,
-        best_feasible=[ParameterChange(**c) for c in param_changes],
-        predicted_effects=[PredictedEffect(**e) for e in predicted_effects],
-        constraint_violations=best_violations,
-        confidence=confidence,
-        evidence=Evidence(
-            description=f"{tested_count} candidate setups simulated on ISO 8608 class-C road at 20 m/s.",
-            simulations_run=tested_count + 1,
-            feasible_found=len(evaluated),
-        ),
-        model_validity=validity_tool_res,
-        provenance=prov.to_dict(),
-        recommendations=recommendations,
-        setup_summary=setup_summary,
-        simulated=simulated,
-        tool_calls=executed_tools,
-        citations=evidence_store.to_dict(),
-        rbac_context={
-            "user_id": getattr(user, "user_id", "anonymous"),
-            "team_id": getattr(user, "team_id", None),
-            "role": getattr(user, "team_role", "engineer"),
-        },
-        attack_defense=None,
-        answer=answer,
-        engineering_interpretation=interpretation,
-        uncertainty=uncertainty,
-        next_action=next_action,
-        epistemic_classification="SIMULATED",
-        epistemic_badges=badges,
-        approval_gate={
-            "required": True,
-            "status": "PENDING_APPROVAL",
-            "role_required": "race_engineer",
-            "decision_type": "SETUP_MODIFICATION",
-            "decision_id": prov.result_hash[:16],
-            "rationale": "Setup change requires human Race Engineer approval.",
-        },
-        workflow="general_simulation_sweep",
-        structured_response=structured_response,
-    )
+    return AIChatResponse(**physics_result)
 
 
 @router.post("/approve")

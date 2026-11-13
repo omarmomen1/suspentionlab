@@ -15,15 +15,17 @@ logger = logging.getLogger(__name__)
 class JobResponse(BaseModel):
     job_id: str
     status: str
+    result: dict | None = None
+    error: str | None = None
 
-@router.post("/simulate", response_model=JobResponse, status_code=status.HTTP_202_ACCEPTED)
+@router.post("/simulate", response_model=JobResponse, status_code=status.HTTP_200_OK)
 async def simulate(
     payload: SimulateRequest,
     user: UserContext = Depends(require_permission(Permission.SIMULATION_RUN)),
     db: AsyncSession = Depends(get_db_dependency)
 ):
     try:
-        job_id = await SimulationService.enqueue_simulation(
+        job_res = await SimulationService.execute_or_enqueue(
             user_id=user.user_id,
             plan=user.plan,
             job_type="SIMULATE_QUARTER",
@@ -31,7 +33,12 @@ async def simulate(
             db=db,
             team_id=getattr(user, "team_id", None),
         )
-        return JobResponse(job_id=job_id, status="PENDING")
+        return JobResponse(
+            job_id=job_res["job_id"],
+            status=job_res.get("status", "COMPLETED"),
+            result=job_res.get("result"),
+            error=job_res.get("error"),
+        )
     except HTTPException:
         raise
     except Exception as e:

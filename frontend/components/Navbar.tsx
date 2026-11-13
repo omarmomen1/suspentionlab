@@ -41,6 +41,7 @@ const STUDIO_ICONS: Record<StudioIconKey, LucideIcon> = {
   correlation: GitCompare,
   optimizer: Sliders,
   memory: FileText,
+  ai: Sparkles,
 };
 
 function StudioToolLabel({ id, fallback }: { id: string; fallback: string }) {
@@ -85,6 +86,12 @@ function StudioToolLabel({ id, fallback }: { id: string; fallback: string }) {
           <span className="sr-only min-[1440px]:not-sr-only">Engineering </span>
           <span className="sr-only xl:not-sr-only">Memory &amp; </span>
           Reports
+        </>
+      );
+    case "ai-engineer":
+      return (
+        <>
+          AI Race<span className="sr-only min-[1440px]:not-sr-only"> Engineer</span>
         </>
       );
     default:

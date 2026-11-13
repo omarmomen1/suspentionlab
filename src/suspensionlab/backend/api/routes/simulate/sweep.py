@@ -61,7 +61,7 @@ def perform_sweep_sync(payload_dict: dict) -> dict:
         "min_x": float(X[min_idx]), "min_y": float(Y[min_idx]), "min_z": float(Z[min_idx])
     }
 
-@router.post("/simulate/sweep", response_model=JobResponse, status_code=202)
+@router.post("/simulate/sweep", response_model=JobResponse, status_code=200)
 async def simulate_sweep(
     payload: SweepRequest,
     user: Any = Depends(require_permission(Permission.SIMULATION_RUN)),
@@ -72,7 +72,7 @@ async def simulate_sweep(
 
     from suspensionlab.backend.services.simulation_service import SimulationService
     try:
-        job_id = await SimulationService.enqueue_simulation(
+        job_res = await SimulationService.execute_or_enqueue(
             user_id=user.user_id,
             plan=user.plan,
             job_type="SWEEP_QUARTER",
@@ -80,6 +80,11 @@ async def simulate_sweep(
             db=db,
             team_id=getattr(user, "team_id", None)
         )
-        return JobResponse(job_id=job_id, status="PENDING")
+        return JobResponse(
+            job_id=job_res["job_id"],
+            status=job_res.get("status", "COMPLETED"),
+            result=job_res.get("result"),
+            error=job_res.get("error"),
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail="Internal simulation error.")

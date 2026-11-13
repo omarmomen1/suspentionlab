@@ -221,26 +221,43 @@ function QuarterCarDashboard() {
       const data = await res.json();
       if (res.ok) {
         const recMap: Record<string, number> = {};
-        (data.best_feasible || data.recommendations || []).forEach((item: any) => {
-          if (item.parameter && typeof item.recommended_value === "number") {
-            recMap[item.parameter] = item.recommended_value;
-          }
-        });
+        if (Array.isArray(data.best_feasible)) {
+          data.best_feasible.forEach((item: any) => {
+            if (item?.parameter && typeof item.recommended_value === "number") {
+              recMap[item.parameter] = item.recommended_value;
+            }
+          });
+        }
+        if (Array.isArray(data.recommendations)) {
+          data.recommendations.forEach((item: any) => {
+            if (item?.parameter && typeof item.recommended_value === "number") {
+              recMap[item.parameter] = item.recommended_value;
+            }
+          });
+        }
+        if (data.params && typeof data.params === "object") {
+          Object.entries(data.params).forEach(([k, v]) => {
+            if (typeof v === "number") recMap[k] = v;
+          });
+        }
+
         setParams((prev) => ({ 
           ...prev, 
-          m_s: data.m_s, 
-          m_u: data.m_u, 
-          k_s: data.k_s, 
-          c: data.c, 
-          k_t: data.k_t, 
-          MR: data.MR 
+          m_s: recMap["m_s"] ?? (typeof data.m_s === "number" ? data.m_s : prev.m_s),
+          m_u: recMap["m_u"] ?? (typeof data.m_u === "number" ? data.m_u : prev.m_u),
+          k_s: recMap["k_s"] ?? (typeof data.k_s === "number" ? data.k_s : prev.k_s),
+          c:   recMap["c"]   ?? (typeof data.c === "number" ? data.c : prev.c),
+          k_t: recMap["k_t"] ?? (typeof data.k_t === "number" ? data.k_t : prev.k_t),
+          MR:  recMap["MR"]  ?? (typeof data.MR === "number" ? data.MR : prev.MR),
         }));
-        showToast(`AI Tuned: ${data.explanation}`, "success");
+
+        const explanationText = data.explanation || data.answer || data.setup_summary || "Setup optimized based on vehicle physics.";
+        showToast(`AI Tuned: ${String(explanationText).slice(0, 90)}`, "success");
         setIsMagicModalOpen(false);
         setMagicGoal("");
         setTimeout(() => document.getElementById("btn-run")?.click(), 800);
       } else {
-        showToast(data.detail || "Auto-tune failed", "error");
+        showToast(data.detail || data.message || "Auto-tune failed", "error");
       }
     } catch { showToast("Failed to reach generative optimizer", "error"); }
     finally { setIsTuning(false); }
@@ -250,6 +267,7 @@ function QuarterCarDashboard() {
   const psdData = useMemo(() => {
     if (!results || results.error) return null;
     if (!results.psd_freqs || !results.psd_values) return null;
+    if (!Array.isArray(results.psd_freqs) || !Array.isArray(results.psd_values)) return null;
     return {
       freqs: results.psd_freqs as number[],
       psd: results.psd_values as number[]
@@ -264,15 +282,18 @@ function QuarterCarDashboard() {
     const zu = results.z_u as number[];
     const vs = results.dz_s as number[];
     const vu = results.dz_u as number[];
-    if (!zs || !zu || !vs || !vu) return null;
-    const kw = p.k_s * p.MR * p.MR;
-    const cw = p.c   * p.MR * p.MR;
-    const F_spring = zs.map((z, i) => kw * (z - zu[i]));
-    const F_damper = vs.map((v, i) => cw * (v - vu[i]));
-    const F_total  = F_spring.map((fs, i) => fs + F_damper[i]);
-    const relVel   = vs.map((v, i) => v - vu[i]);
+    if (!Array.isArray(zs) || !Array.isArray(zu) || !Array.isArray(vs) || !Array.isArray(vu)) return null;
+    const ksVal = typeof p?.k_s === "number" ? p.k_s : 35000;
+    const mrVal = typeof p?.MR === "number" ? p.MR : 1.0;
+    const cVal  = typeof p?.c === "number" ? p.c : 1500;
+    const kw = ksVal * mrVal * mrVal;
+    const cw = cVal   * mrVal * mrVal;
+    const F_spring = zs.map((z, i) => kw * (z - (zu[i] ?? 0)));
+    const F_damper = vs.map((v, i) => cw * (v - (vu[i] ?? 0)));
+    const F_total  = F_spring.map((fs, i) => fs + (F_damper[i] ?? 0));
+    const relVel   = vs.map((v, i) => v - (vu[i] ?? 0));
     return { F_spring, F_damper, F_total, relVel };
-  }, [results, simParams]); // NOT dependent on live `params`
+  }, [results, simParams, params]); // NOT dependent on live `params`
 
   const hasResults = results && !results.error;
 

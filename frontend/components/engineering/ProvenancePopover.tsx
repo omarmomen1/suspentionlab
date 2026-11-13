@@ -87,13 +87,13 @@ export default function ProvenancePopover({
         ) : (
           <div className="space-y-5 text-xs font-mono">
             {/* Causal Chain Timeline */}
-            {data!.chain && data!.chain.length > 0 && (
+            {Array.isArray(data?.chain) && data.chain.length > 0 && (
               <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.08]">
                 <div className="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-3 font-sans">
                   Physical Causal Chain
                 </div>
                 <div className="space-y-2">
-                  {data!.chain.map((step, idx) => (
+                  {data.chain.map((step, idx) => (
                     <React.Fragment key={idx}>
                       <div className="p-2.5 rounded-lg bg-black/40 border border-white/5 flex items-center justify-between">
                         <div>
@@ -104,7 +104,7 @@ export default function ProvenancePopover({
                           Step {idx + 1}
                         </span>
                       </div>
-                      {idx < data!.chain!.length - 1 && (
+                      {idx < (data.chain?.length ?? 0) - 1 && (
                         <div className="flex justify-center py-0.5 text-gray-600">
                           <ArrowDown size={14} />
                         </div>
@@ -183,13 +183,13 @@ export default function ProvenancePopover({
             )}
 
             {/* Limitations */}
-            {data!.limitations && data!.limitations.length > 0 && (
+            {Array.isArray(data?.limitations) && data.limitations.length > 0 && (
               <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06]">
                 <div className="text-gray-500 text-[10px] uppercase font-bold mb-1.5 flex items-center gap-1">
                   <AlertTriangle size={12} className="text-amber-400" /> KNOWN LIMITATIONS
                 </div>
                 <ul className="list-disc list-inside space-y-1 text-[11px] text-gray-300">
-                  {data!.limitations.map((lim, i) => (
+                  {data.limitations.map((lim, i) => (
                     <li key={i}>{lim}</li>
                   ))}
                 </ul>
