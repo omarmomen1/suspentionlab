@@ -28,8 +28,15 @@ import numpy as np
 from dataclasses import dataclass, field
 from typing import List, Tuple, Dict, Any, Optional
 from scipy.integrate import ode, solve_ivp
-from numba import njit, cfunc, types, carray
-from scipy import LowLevelCallable
+try:
+    from numba import njit
+except ImportError:
+    def njit(*args, **kwargs):
+        def decorator(f):
+            return f
+        if len(args) == 1 and callable(args[0]):
+            return args[0]
+        return decorator
 
 from suspensionlab.shared.models import FullCarParamsSchema, FullCarResultSchema
 from suspensionlab.physics.contracts import (

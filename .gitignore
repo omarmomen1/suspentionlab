@@ -47,6 +47,12 @@ build/
 scratch/
 .pytest_cache/
 .hypothesis/
+deploy_hf/
+backend_vercel/
+.neon
+.neon/
+.env.production.secret
+.env*.local
 
 # Executables
 *.exe

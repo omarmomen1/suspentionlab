@@ -13,7 +13,7 @@ with smooth low-speed regularization and non-reversing brake friction mechanics.
 """
 
 from dataclasses import dataclass
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 import numpy as np
 
 from suspensionlab.physics.validity import (

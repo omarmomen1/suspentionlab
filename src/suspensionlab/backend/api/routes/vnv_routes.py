@@ -10,6 +10,8 @@ ENTERPRISE-only: this is customer-facing proof of solver correctness.
 """
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
 

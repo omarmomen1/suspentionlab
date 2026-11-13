@@ -97,7 +97,10 @@ class CoSimulationService:
     """
 
     def __init__(self, storage_dir: Optional[pathlib.Path] = None):
-        self.storage_dir = storage_dir or pathlib.Path("data/cosim_artifacts")
+        import os, tempfile
+        _is_prod_or_vercel = os.environ.get("ENVIRONMENT") == "PROD" or os.environ.get("VERCEL") == "1"
+        default_dir = (pathlib.Path(tempfile.gettempdir()) / "data" / "cosim_artifacts") if _is_prod_or_vercel else pathlib.Path("data/cosim_artifacts")
+        self.storage_dir = storage_dir or default_dir
         self.storage_dir.mkdir(parents=True, exist_ok=True)
 
     @staticmethod

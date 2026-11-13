@@ -67,7 +67,12 @@ from suspensionlab.interop.security import (
 
 logger = logging.getLogger(__name__)
 
-ARTIFACT_STORAGE_ROOT = (pathlib.Path("data") / "interop_artifacts").resolve()
+import tempfile
+_is_prod_or_vercel = os.environ.get("ENVIRONMENT") == "PROD" or os.environ.get("VERCEL") == "1"
+if _is_prod_or_vercel:
+    ARTIFACT_STORAGE_ROOT = pathlib.Path(tempfile.gettempdir()) / "data" / "interop_artifacts"
+else:
+    ARTIFACT_STORAGE_ROOT = (pathlib.Path("data") / "interop_artifacts").resolve()
 
 
 def _ensure_storage_dir() -> pathlib.Path:

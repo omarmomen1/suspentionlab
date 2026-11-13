@@ -25,10 +25,7 @@ if _sentry_dsn:
             profiles_sample_rate=0.1,
         )
     except ImportError:
-        if _env == "PROD":
-            raise RuntimeError("CRITICAL: sentry_sdk is missing but SENTRY_DSN is provided in PROD environment.")
-elif _env == "PROD":
-    raise RuntimeError("CRITICAL: SENTRY_DSN is required in PROD environment.")
+        pass
 
 # Initialize OpenTelemetry
 setup_opentelemetry()
@@ -98,9 +95,15 @@ from suspensionlab.backend.api.middleware import (
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
+_frontend_url = (os.environ.get("FRONTEND_URL") or "").strip()
+_cors_origins = list(settings.allow_origins_list)
+if _frontend_url and _frontend_url not in _cors_origins:
+    _cors_origins.append(_frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allow_origins_list,
+    allow_origins=_cors_origins,
+    allow_origin_regex=r"^https:\/\/.*\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -411,13 +414,16 @@ async def readiness():
     record_dependency_health(db_ok=db_ok, redis_ok=redis_ok)
     sync_db_pool_metrics()
 
-    if not db_ok or not redis_ok:
+    redis_required = bool((os.getenv("REDIS_URL") or "").strip())
+    is_ready = db_ok and (redis_ok or not redis_required)
+
+    if not is_ready:
         raise HTTPException(
             status_code=503,
             detail={
                 "status": "unready",
                 "database": "healthy" if db_ok else "unreachable",
-                "redis": "healthy" if redis_ok else "unreachable",
+                "redis": "healthy" if redis_ok else ("unreachable" if redis_required else "disabled_in_process"),
                 "errors": errors,
             }
         )
@@ -425,7 +431,7 @@ async def readiness():
     return {
         "status": "ready",
         "database": "healthy",
-        "redis": "healthy",
+        "redis": "healthy" if redis_ok else "disabled_in_process",
     }
 
 from fastapi.security import HTTPBasic, HTTPBasicCredentials

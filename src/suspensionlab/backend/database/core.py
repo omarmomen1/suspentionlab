@@ -11,6 +11,14 @@ elif DATABASE_URL.startswith("postgresql://") and "+asyncpg" not in DATABASE_URL
 elif DATABASE_URL.startswith("postgres://") and "+asyncpg" not in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://")
 
+if "+asyncpg" in DATABASE_URL and "sslmode=" in DATABASE_URL:
+    DATABASE_URL = (
+        DATABASE_URL.replace("sslmode=require", "ssl=require")
+        .replace("sslmode=verify-full", "ssl=require")
+        .replace("sslmode=verify-ca", "ssl=require")
+        .replace("sslmode=prefer", "ssl=prefer")
+    )
+
 engine_args = {
     "pool_pre_ping": True,
 }

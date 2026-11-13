@@ -9,6 +9,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 from suspensionlab.backend.database.core import Base
 # Import all database models so target_metadata is complete
+import suspensionlab.backend.database.models  # noqa: F401
 from suspensionlab.backend.database.models.user import User  # noqa: F401
 from suspensionlab.backend.database.models.team import Team  # noqa: F401
 from suspensionlab.backend.database.models.job import JobRecord  # noqa: F401
@@ -36,13 +37,15 @@ def get_url() -> str:
         url = url.replace("postgresql://", "postgresql+asyncpg://")
     elif url.startswith("postgres://") and "+asyncpg" not in url:
         url = url.replace("postgres://", "postgresql+asyncpg://")
+    if "+asyncpg" in url and "sslmode=" in url:
+        url = url.replace("sslmode=", "ssl=")
     return url
 
 def do_run_migrations(connection):
     context.configure(
         connection=connection, 
         target_metadata=target_metadata,
-        render_as_batch=True
+        render_as_batch=(connection.dialect.name == "sqlite"),
     )
     with context.begin_transaction():
         context.run_migrations()

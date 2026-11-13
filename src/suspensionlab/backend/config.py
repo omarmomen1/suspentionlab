@@ -179,6 +179,8 @@ class Settings(BaseSettings):
             url = url.replace("postgres://", "postgresql+asyncpg://", 1)
         elif url.startswith("postgresql://"):
             url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if "+asyncpg" in url and "sslmode=" in url:
+            url = url.replace("sslmode=", "ssl=")
         return url
 
 settings = Settings()

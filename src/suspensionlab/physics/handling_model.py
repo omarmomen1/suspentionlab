@@ -20,7 +20,7 @@ import math
 import numpy as np
 from scipy.integrate import solve_ivp
 from dataclasses import dataclass, field
-from typing import Callable, Optional
+from typing import Any, Callable, Optional, Dict, List, Tuple, Union
 from scipy.interpolate import interp1d
 from suspensionlab.physics.exceptions import SolverNonConvergenceError, MathConvergenceError
 from suspensionlab.physics.magic_formula import calc_tire_forces, TireCoeffs

@@ -70,7 +70,15 @@ _FASTMATH = os.environ.get('SUSPENSIONLAB_FASTMATH', '1') == '1'
 import math
 import numpy as np
 from dataclasses import dataclass, field
-from numba import njit
+try:
+    from numba import njit
+except ImportError:
+    def njit(*args, **kwargs):
+        def decorator(f):
+            return f
+        if len(args) == 1 and callable(args[0]):
+            return args[0]
+        return decorator
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from suspensionlab.physics.tire_model import (

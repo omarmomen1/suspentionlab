@@ -117,7 +117,10 @@ class SolverExecutionService:
     """
 
     def __init__(self, sandbox_base_dir: Optional[pathlib.Path] = None):
-        self.sandbox_base_dir = sandbox_base_dir or (pathlib.Path("data") / "solver_runs")
+        import tempfile
+        _is_prod_or_vercel = os.environ.get("ENVIRONMENT") == "PROD" or os.environ.get("VERCEL") == "1"
+        default_sandbox = (pathlib.Path(tempfile.gettempdir()) / "data" / "solver_runs") if _is_prod_or_vercel else (pathlib.Path("data") / "solver_runs")
+        self.sandbox_base_dir = sandbox_base_dir or default_sandbox
         self._active_sandboxes: Dict[str, ExecutionSandbox] = {}
 
     @staticmethod

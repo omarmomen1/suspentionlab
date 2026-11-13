@@ -54,7 +54,7 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Dict, List, Literal, Optional, Tuple, Union
 from enum import Enum
 
 import numpy as np

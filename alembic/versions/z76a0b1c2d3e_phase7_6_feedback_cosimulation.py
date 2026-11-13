@@ -1,7 +1,7 @@
 """phase7_6_feedback_cosimulation
 
-Revision ID: z9a0b1c2d3e4
-Revises: y8z9a0b1c2d3
+Revision ID: z76a0b1c2d3e
+Revises: z9a0b1c2d3e4
 Create Date: 2026-10-25 07:00:00.000000
 
 Phase 7.6: Genuine Feedback Co-Simulation, Physical Interface Expansion & Numerical Verification:
@@ -20,8 +20,8 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'z9a0b1c2d3e4'
-down_revision: Union[str, None] = 'y8z9a0b1c2d3'
+revision: str = 'z76a0b1c2d3e'
+down_revision: Union[str, None] = 'z9a0b1c2d3e4'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
