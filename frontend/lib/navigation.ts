@@ -6,8 +6,9 @@
 export interface NavDropdownItem {
   href: string;
   label: string;
-  desc: string;
+  desc?: string;
   aliases?: string[];
+  badge?: string;
 }
 
 export type StudioIconKey =
@@ -115,6 +116,12 @@ export const STUDIO_TOOLS: StudioToolGroup[] = [
         label: "Handling Dynamics",
         desc: "Bicycle model, slip angles & transient yaw response",
       },
+      {
+        href: "/lap-sim",
+        label: "Lap Simulator",
+        desc: "Quasi-static track solver, bottleneck mapping & delta analysis",
+        badge: "PRO",
+      },
     ],
   },
   {
@@ -186,6 +193,20 @@ export const STUDIO_TOOLS: StudioToolGroup[] = [
         href: "/ai-engineer",
         label: "AI Race Engineer",
         desc: "Physics-grounded setup diagnosis, Copilot reasoning & sign-off",
+      },
+    ],
+  },
+  {
+    id: "lap-sim",
+    label: "Lap Time & Track Sim",
+    href: "/lap-sim",
+    icon: "full_car",
+    dropdownAlign: "right",
+    routes: [
+      {
+        href: "/lap-sim",
+        label: "Lap Time & Track Sim",
+        desc: "Quasi-static track solver, bottleneck mapping & delta analysis",
       },
     ],
   },

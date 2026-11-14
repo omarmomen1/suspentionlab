@@ -25,6 +25,9 @@ _TIR_KEY_MAP = {
     "FNOMIN":  "Fz0",
     "PNOMIN":  "p0_bar",
     "NOMPRES": "p0_bar",
+    "LMUX":    "lambda_mux",
+    "LMUY":    "lambda_muy",
+    "LKY":     "lambda_ky",
 
     # ── Lateral pure slip ─────────────────────────────────────────────
     "PCY1":    "pCy1",
@@ -123,6 +126,8 @@ def parse_tir_file(content: str) -> TireCoeffs:
                 try:
                     val_float = float(val_part)
                     setattr(coeffs, attr_name, val_float)
+                    if key_part == "FNOMIN":
+                        coeffs.f_nomin = val_float
                     found_keys.add(key_part)
                 except ValueError:
                     logger.warning(

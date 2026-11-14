@@ -47,6 +47,14 @@ from suspensionlab.physics.contracts import (
 )
 
 
+def arb_rate_to_roll_stiffness(k_arb_wheel_n_per_m: float, track_width_m: float) -> float:
+    """Convert wheel-rate ARB stiffness [N/m] to roll stiffness K_phi [N*m/rad].
+    
+    K_phi = 0.5 * k_arb_wheel * (track_width ** 2)
+    """
+    return 0.5 * float(k_arb_wheel_n_per_m) * (float(track_width_m) ** 2)
+
+
 @dataclass
 class RoadProfile:
     """Complete 3D Road Profile with derivative and wheel-specific kinematics."""
@@ -298,6 +306,7 @@ def _compute_full_car_forces_fast(x: np.ndarray, u: np.ndarray, p: np.ndarray, d
     dz_srl = dz_s + b * dtheta + (tw_r / 2) * dphi
     dz_srr = dz_s + b * dtheta - (tw_r / 2) * dphi
 
+    # Relative displacement: extension (z_s - z_u) and compression jounce (z_u - z_s)
     z_rel_w_fl = z_sfl - z_ufl; v_rel_w_fl = dz_sfl - dz_ufl
     z_rel_w_fr = z_sfr - z_ufr; v_rel_w_fr = dz_sfr - dz_ufr
     z_rel_w_rl = z_srl - z_url; v_rel_w_rl = dz_srl - dz_url
@@ -307,6 +316,12 @@ def _compute_full_car_forces_fast(x: np.ndarray, u: np.ndarray, p: np.ndarray, d
     z_rel_s_fr = z_rel_w_fr * MR_f; v_rel_s_fr = v_rel_w_fr * MR_f
     z_rel_s_rl = z_rel_w_rl * MR_r; v_rel_s_rl = v_rel_w_rl * MR_r
     z_rel_s_rr = z_rel_w_rr * MR_r; v_rel_s_rr = v_rel_w_rr * MR_r
+
+    # Jounce compression deflection at spring: z_defl = z_u - z_s = -z_rel
+    z_defl_s_fl = -z_rel_s_fl
+    z_defl_s_fr = -z_rel_s_fr
+    z_defl_s_rl = -z_rel_s_rl
+    z_defl_s_rr = -z_rel_s_rr
     
     # Suspension Forces
     F_d_fl = _get_damper_fast(v_rel_s_fl, c_f, fr_f, fs_f, fc_f, vs_f, sig_f)
@@ -319,10 +334,11 @@ def _compute_full_car_forces_fast(x: np.ndarray, u: np.ndarray, p: np.ndarray, d
     F_s_rl = k_sr * (z_rel_s_rl - z_0_r)
     F_s_rr = k_sr * (z_rel_s_rr - z_0_r)
     
-    F_b_fl = _get_bump_fast(z_rel_s_fl, bs_cf, bs_ef, bs_rf, bs_exp_f)
-    F_b_fr = _get_bump_fast(z_rel_s_fr, bs_cf, bs_ef, bs_rf, bs_exp_f)
-    F_b_rl = _get_bump_fast(z_rel_s_rl, bs_cr, bs_er, bs_rr, bs_exp_r)
-    F_b_rr = _get_bump_fast(z_rel_s_rr, bs_cr, bs_er, bs_rr, bs_exp_r)
+    # Bump stop force: positive in compression jounce, negative in rebound
+    F_b_fl = _get_bump_fast(z_defl_s_fl, bs_cf, bs_ef, bs_rf, bs_exp_f)
+    F_b_fr = _get_bump_fast(z_defl_s_fr, bs_cf, bs_ef, bs_rf, bs_exp_f)
+    F_b_rl = _get_bump_fast(z_defl_s_rl, bs_cr, bs_er, bs_rr, bs_exp_r)
+    F_b_rr = _get_bump_fast(z_defl_s_rr, bs_cr, bs_er, bs_rr, bs_exp_r)
     
     # ARB forces (at the wheel)
     F_arb_fl = k_arb_f * (z_rel_w_fl - z_rel_w_fr)
@@ -330,11 +346,12 @@ def _compute_full_car_forces_fast(x: np.ndarray, u: np.ndarray, p: np.ndarray, d
     F_arb_rl = k_arb_r * (z_rel_w_rl - z_rel_w_rr)
     F_arb_rr = k_arb_r * (z_rel_w_rr - z_rel_w_rl)
     
-    # Total suspension force at the wheel (scale by MR)
-    F_susp_fl = (F_s_fl + F_d_fl + F_b_fl) * MR_f + F_arb_fl
-    F_susp_fr = (F_s_fr + F_d_fr + F_b_fr) * MR_f + F_arb_fr
-    F_susp_rl = (F_s_rl + F_d_rl + F_b_rl) * MR_r + F_arb_rl
-    F_susp_rr = (F_s_rr + F_d_rr + F_b_rr) * MR_r + F_arb_rr
+    # Total suspension force acting DOWNWARD on chassis (+) and UPWARD on wheel (+)
+    # In compression, F_b > 0 pushes chassis UP, hence - F_b.
+    F_susp_fl = (F_s_fl + F_d_fl - F_b_fl) * MR_f + F_arb_fl
+    F_susp_fr = (F_s_fr + F_d_fr - F_b_fr) * MR_f + F_arb_fr
+    F_susp_rl = (F_s_rl + F_d_rl - F_b_rl) * MR_r + F_arb_rl
+    F_susp_rr = (F_s_rr + F_d_rr - F_b_rr) * MR_r + F_arb_rr
     
     # Tire Forces
     F_t_fl = _get_tire_force(k_tf, z_ufl, z_rfl, c_tf, dz_ufl, 0.0)
@@ -661,10 +678,28 @@ def run_full_car_analysis(params: FullCarParams, profile: FourCornerRoadProfile)
         "ddphi": x_dot_d[:, 9],
     }
     
-    F_t_fl = np.maximum(0.0, params.k_tf * (profile.z_rfl[::step] - yout_d[:, 3]))
-    F_t_fr = np.maximum(0.0, params.k_tf * (profile.z_rfr[::step] - yout_d[:, 4]))
-    F_t_rl = np.maximum(0.0, params.k_tr * (profile.z_rrl[::step] - yout_d[:, 5]))
-    F_t_rr = np.maximum(0.0, params.k_tr * (profile.z_rrr[::step] - yout_d[:, 6]))
+    L_total = params.a + params.b
+    static_f = (params.m_s * (params.b / (2.0 * L_total)) + params.m_uf) * 9.81 if L_total > 1e-4 else (0.25 * params.m_s + params.m_uf) * 9.81
+    static_r = (params.m_s * (params.a / (2.0 * L_total)) + params.m_ur) * 9.81 if L_total > 1e-4 else (0.25 * params.m_s + params.m_ur) * 9.81
+
+    # Total normal load: static + dynamic clamped at zero (unilateral contact)
+    F_z_total_fl = np.maximum(0.0, static_f + params.k_tf * (profile.z_rfl[::step] - yout_d[:, 3]))
+    F_z_total_fr = np.maximum(0.0, static_f + params.k_tf * (profile.z_rfr[::step] - yout_d[:, 4]))
+    F_z_total_rl = np.maximum(0.0, static_r + params.k_tr * (profile.z_rrl[::step] - yout_d[:, 5]))
+    F_z_total_rr = np.maximum(0.0, static_r + params.k_tr * (profile.z_rrr[::step] - yout_d[:, 6]))
+
+    # Dynamic perturbation force
+    F_t_fl = F_z_total_fl - static_f
+    F_t_fr = F_z_total_fr - static_f
+    F_t_rl = F_z_total_rl - static_r
+    F_t_rr = F_z_total_rr - static_r
+
+    tire_liftoff_detected = bool(
+        np.any(F_z_total_fl <= 1e-3) or
+        np.any(F_z_total_fr <= 1e-3) or
+        np.any(F_z_total_rl <= 1e-3) or
+        np.any(F_z_total_rr <= 1e-3)
+    )
     
     k_wf = params.k_sf * (params.MR_f**2)
     k_wr = params.k_sr * (params.MR_r**2)
@@ -694,11 +729,12 @@ def run_full_car_analysis(params: FullCarParams, profile: FourCornerRoadProfile)
     def _wheel_contact_states(f_arr):
         return ["LIFTOFF" if f <= 1e-3 else "CONTACT" for f in f_arr]
 
-    res["contact_states_fl"] = _wheel_contact_states(F_t_fl)
-    res["contact_states_fr"] = _wheel_contact_states(F_t_fr)
-    res["contact_states_rl"] = _wheel_contact_states(F_t_rl)
-    res["contact_states_rr"] = _wheel_contact_states(F_t_rr)
-    res["minimum_Fz"] = float(min(np.min(F_t_fl), np.min(F_t_fr), np.min(F_t_rl), np.min(F_t_rr)))
+    res["contact_states_fl"] = _wheel_contact_states(F_z_total_fl)
+    res["contact_states_fr"] = _wheel_contact_states(F_z_total_fr)
+    res["contact_states_rl"] = _wheel_contact_states(F_z_total_rl)
+    res["contact_states_rr"] = _wheel_contact_states(F_z_total_rr)
+    res["minimum_Fz"] = float(min(np.min(F_z_total_fl), np.min(F_z_total_fr), np.min(F_z_total_rl), np.min(F_z_total_rr)))
+    res["tire_liftoff_detected"] = tire_liftoff_detected
 
     diag = PhysicsDiagnostics(
         force_residual_max_n=float(np.max(np.abs(res_arrays["ddz_s"] * params.m_s))),

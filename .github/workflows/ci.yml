@@ -2,9 +2,9 @@ name: CI — Lint, Test, Build, Scan, Deploy
 
 on:
   push:
-    branches: [main, staging]
+    branches: [main, master, staging, phase-7-6]
   pull_request:
-    branches: [main, staging]
+    branches: [main, master, staging, phase-7-6]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

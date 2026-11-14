@@ -6,7 +6,7 @@ An enterprise-grade, professional vehicle dynamics platform. This tool simulates
 
 * **Physics Engine:** Core dynamic models including 2-DOF Quarter Car, 4-DOF Half Car, and 7-DOF Full Car utilizing SciPy's `solve_ivp` (RK45) for time-domain integration.
 * **Kinematics & Handling:** Pacejka Magic Formula tire models with real-time 3D React Three Fiber visualizations.
-* **NVH Analytics:** Structural transmissibility and A-Weighting impedance matrix solvers.
+* **NVH Analytics:** Structural transmissibility, ISO 2631-1:1997 $W_k$ vertical whole-body vibration weighting, and impedance matrix solvers.
 * **Modern Stack:** React/Next.js frontend with an ultra-fast FastAPI backend and SQLite persistence.
 
 ## Repository Structure

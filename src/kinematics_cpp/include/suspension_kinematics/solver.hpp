@@ -49,6 +49,10 @@ public:
         double residual_norm = 0.0;
         double condition_number = 1.0;
         int line_search_steps = 0;
+
+        Result() = default;
+        Result(Eigen::VectorXd s, SolverResult st, int it, double rn, double cn, int ls)
+            : state(std::move(s)), status(st), iterations(it), residual_norm(rn), condition_number(cn), line_search_steps(ls) {}
     };
 
     struct Options {

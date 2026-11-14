@@ -456,78 +456,42 @@ def run_full_car_7dof_analytical_benchmark() -> Dict[str, Any]:
 
 def run_iso_2631_wk_frequency_response_benchmark() -> Dict[str, Any]:
     """
-    Validates our ISO 2631-1:1997 W_k digital filter against the official published
-    1/3-octave attenuation table from 0.5 Hz to 80 Hz and reports the exact dB / % deviation.
+    Validates SuspensionLab's _apply_wk_weighting against the official published
+    ISO 2631-1:1997 Table 1 1/3-octave attenuation table from 0.5 Hz to 80 Hz and reports the exact dB / % deviation.
     """
     print("\n" + "="*70)
     print("2.1 ISO 2631-1:1997 W_k FILTER FREQUENCY RESPONSE BENCHMARK")
     print("="*70)
 
-    # Standard ISO 2631-1:1997 Annex B continuous transfer function poles and zeros
-    f1, f2 = 0.4, 100.0
-    f3, f4 = 12.5, 12.5
-    f5, f6 = 2.37, 3.35
-    Q5, Q6 = 0.91, 0.91
-
-    w1, w2 = 2 * np.pi * f1, 2 * np.pi * f2
-    w3, w4 = 2 * np.pi * f3, 2 * np.pi * f4
-    w5, w6 = 2 * np.pi * f5, 2 * np.pi * f6
-
-    z_h = [0, 0]
-    p_h = [-w1/np.sqrt(2) + 1j*w1/np.sqrt(2), -w1/np.sqrt(2) - 1j*w1/np.sqrt(2)]
-    k_h = 1.0
-
-    z_l = []
-    p_l = [-w2/np.sqrt(2) + 1j*w2/np.sqrt(2), -w2/np.sqrt(2) - 1j*w2/np.sqrt(2)]
-    k_l = w2**2
-
-    z_t = [-w3]
-    p_t = [-w4]
-    k_t = w4 / w3
-
-    disc5 = complex((w5/Q5)**2 - 4*w5**2)
-    r5 = np.sqrt(disc5)
-    z_s = [(-w5/Q5 + r5)/2, (-w5/Q5 - r5)/2]
-
-    disc6 = complex((w6/Q6)**2 - 4*w6**2)
-    r6 = np.sqrt(disc6)
-    p_s = [(-w6/Q6 + r6)/2, (-w6/Q6 - r6)/2]
-    k_s = 1.0  # Monic polynomial form per ISO 2631-1:1997 Table B.1
-
-    z = np.concatenate([z_h, z_l, z_t, z_s])
-    p = np.concatenate([p_h, p_l, p_t, p_s])
-    k = k_h * k_l * k_t * k_s
-
-    fs = 500.0
-    zd, pd, kd = signal.bilinear_zpk(z, p, k, fs)
-    sos = signal.zpk2sos(zd, pd, kd)
-
-    # Official ISO 2631-1:1997 Table 1 nominal 1/3-octave frequencies and factors
+    # Official ISO 2631-1:1997 Table 1 nominal 1/3-octave frequencies and factors (W_k vertical whole-body)
     iso_official_table = [
-        (0.50, 0.472, -6.52),
-        (0.63, 0.528, -5.55),
-        (0.80, 0.588, -4.61),
-        (1.00, 0.651, -3.73),
-        (1.25, 0.721, -2.84),
-        (1.60, 0.803, -1.91),
-        (2.00, 0.895, -0.96),
-        (2.50, 0.963, -0.33),
-        (3.15, 0.989, -0.10),
-        (4.00, 0.992, -0.07),
-        (5.00, 0.995, -0.04),
-        (6.30, 0.996, -0.03),
-        (8.00, 0.989, -0.10),
-        (10.0, 0.942, -0.52),
-        (12.5, 0.733, -2.70),
-        (16.0, 0.537, -5.40),
-        (20.0, 0.408, -7.79),
-        (25.0, 0.315, -10.03),
-        (31.5, 0.246, -12.18),
-        (40.0, 0.192, -14.33),
-        (50.0, 0.149, -16.54),
-        (63.0, 0.114, -18.86),
-        (80.0, 0.0811, -21.82),
+        (0.50, 0.4180, -7.58),
+        (0.63, 0.4590, -6.76),
+        (0.80, 0.4770, -6.43),
+        (1.00, 0.4820, -6.34),
+        (1.25, 0.4840, -6.30),
+        (1.60, 0.4940, -6.12),
+        (2.00, 0.5310, -5.50),
+        (2.50, 0.6310, -4.00),
+        (3.15, 0.8040, -1.89),
+        (4.00, 0.9670, -0.29),
+        (5.00, 1.0390, +0.33),
+        (6.30, 1.0540, +0.46),
+        (8.00, 1.0360, +0.31),
+        (10.0, 0.9880, -0.10),
+        (12.5, 0.9020, -0.90),
+        (16.0, 0.7680, -2.29),
+        (20.0, 0.6360, -3.93),
+        (25.0, 0.5130, -5.80),
+        (31.5, 0.4050, -7.85),
+        (40.0, 0.3140, -10.06),
+        (50.0, 0.2460, -12.18),
+        (63.0, 0.1860, -14.61),
+        (80.0, 0.1320, -17.59),
     ]
+
+    fs = 250.0  # 250 Hz sample rate (typical vehicle telemetry / simulation sampling)
+    dt = 1.0 / fs
 
     table_results = []
     max_db_dev = 0.0
@@ -537,9 +501,14 @@ def run_iso_2631_wk_frequency_response_benchmark() -> Dict[str, Any]:
     print("-" * 75)
 
     for fc, iso_factor, iso_db in iso_official_table:
-        # Evaluate digital filter frequency response
-        _, h = signal.sosfreqz(sos, worN=[2 * np.pi * fc], fs=fs)
-        app_factor = float(np.abs(h[0]))
+        T = max(10.0, 30.0 / fc)
+        n_pts = int(round(T * fs))
+        t = np.arange(n_pts) * dt
+        sine_wave = np.sin(2.0 * np.pi * fc * t)
+
+        # Pass through application's actual _apply_wk_weighting
+        filtered = _apply_wk_weighting(sine_wave, dt=dt, fs=fs)
+        app_factor = float(np.sqrt(np.mean(filtered**2)) / np.sqrt(np.mean(sine_wave**2)))
         app_db = float(20.0 * np.log10(app_factor))
         delta_db = app_db - iso_db
         pct_err = abs(app_factor - iso_factor) / iso_factor * 100.0
@@ -561,7 +530,7 @@ def run_iso_2631_wk_frequency_response_benchmark() -> Dict[str, Any]:
         print(f"{fc:<10.2f} | {iso_factor:<10.4f} | {app_factor:<10.4f} | {iso_db:<8.2f} | {app_db:<8.2f} | {delta_db:<+8.2f} | {pct_err:<10.2f}%")
 
     print(f"\nMax dB Deviation across 0.5–80 Hz : {max_db_dev:+.3f} dB")
-    print(f"Max % Deviation across 0.5–80 Hz  : {max_pct_dev:.2f}% (Bilinear warping at high frequencies)")
+    print(f"Max % Deviation across 0.5–80 Hz  : {max_pct_dev:.2f}%")
 
     return {
         "table": table_results,
@@ -1083,7 +1052,7 @@ def generate_markdown_report(
     for row in res_iso["table"]:
         md.append(f"| {row['frequency_hz']:.2f} | {row['iso_factor']:.4f} | {row['app_factor']:.4f} | {row['iso_db']:.2f} | {row['app_db']:.2f} | {row['delta_db']:+.2f} | {row['pct_error']:.2f}% |")
     md.append(f"\n- **Maximum Attenuation Deviation**: `{res_iso['max_db_deviation']:+.3f} dB`")
-    md.append(f"- **Maximum % Deviation**: `{res_iso['max_pct_deviation']:.2f}%` (arising naturally from bilinear frequency warping near Nyquist / 80 Hz).\n")
+    md.append(f"- **Maximum % Deviation**: `{res_iso['max_pct_deviation']:.2f}%` (exact continuous s-domain evaluation via zero-padded RFFT/IRFFT, eliminating bilinear warping).\n")
 
     md.append("### 2.2 Published Textbook Benchmark Cases (Milliken RCVD & Gillespie)")
     m = res_textbook["milliken_rcvd"]

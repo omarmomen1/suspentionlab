@@ -1,1479 +1,1718 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
-import dynamic from "next/dynamic";
+import { useState, useCallback, useRef, useEffect, useMemo } from "react";
 import {
-  Timer, Upload, Play, ChevronDown, ChevronRight,
-  Zap, Gauge, Wind, Activity, BarChart3, TrendingDown,
-  AlertCircle, CheckCircle, Loader2, Settings2, Layers,
+  Timer,
+  Play,
+  ChevronDown,
+  ChevronRight,
+  Zap,
+  Gauge,
+  Wind,
+  Activity,
+  TrendingDown,
+  AlertCircle,
+  Loader2,
+  Layers,
+  MapPin,
+  Plus,
+  Trash2,
+  Sliders,
+  Pin,
+  FileSpreadsheet,
+  Sparkles,
+  Target,
+  ArrowRight,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
-
+import PlanGate from "../../components/PlanGate";
 import Plot from "../../components/sim/Plot";
-import { maxAbs } from "../../lib/array";
-import TrackMap from "../../components/sim/TrackMap";
-import CornerAnalysisPanel, { CornerItem, CornerComparisonItem } from "../../components/sim/CornerAnalysisPanel";
-import LapDeltaView, { LapDeltaReportData } from "../../components/sim/LapDeltaView";
-import TelemetryCorrelationView, { CorrelationReportData } from "../../components/sim/TelemetryCorrelationView";
-import LapSimDecisionCard, { RaceEngineerDecisionData } from "../../components/sim/LapSimDecisionCard";
-
-import CrossValidationView, { CrossValidationData } from "../../components/sim/CrossValidationView";
-import TransientManeuverView, { ManeuverResultData } from "../../components/sim/TransientManeuverView";
+import TrackMap, { CornerInfo, GgvEnvelopeData } from "../../components/sim/TrackMap";
+import LapDeltaView, { LapRunData, VehicleSetupParameters } from "../../components/sim/LapDeltaView";
+import { darkLayout } from "../../components/sim/theme";
 
 const API = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types & Contracts ────────────────────────────────────────────────────────
 
-interface VehicleConfig {
-  // Mass
-  mass: number;
-  h_cog: number;
-  wheelbase: number;
-  cog_dist_front: number;
-  track_front: number;
-  // Aero
-  cl_base: number;
-  cd_base: number;
-  frontal_area: number;
-  cop_fraction: number;
-  cl_rh_sens: number;
-  // Powertrain
-  max_power_kw: number;
-  brake_front_bias: number;
-  // Differential Subsystem
-  diff_type: "OPEN" | "LOCKED" | "LSD_TORQUE_BIASED" | "CLUTCH_PACK";
-  bias_ratio: number;
-  preload_nm: number;
-  ramp_angle_accel_deg: number;
-  ramp_angle_decel_deg: number;
-  drivetrain_layout: "RWD" | "FWD" | "AWD";
+type TrackInputTab = "preset" | "custom" | "csv";
+
+interface CustomTrackSegment {
+  id: string;
+  type: "Straight" | "Left Corner" | "Right Corner" | "Hairpin";
+  length_m: number;
+  radius_m: number;
+  banking_deg: number;
+  grade_pct: number;
 }
 
-interface LapResult {
-  total_time_s: number;
-  sector_times_s: number[];
+interface CoupledVehicleConfig {
+  // Vehicle & Drivetrain
+  mass: number; // kg (300 - 1800)
+  power_kw: number; // kW (50 - 1200)
+  tire_mu: number; // mu_0 peak grip (0.70 - 2.20)
+  brake_bias_front: number; // % Front (45 - 75)
+  wheelbase: number; // m
+  cog_dist_front: number; // m
+  h_cog: number; // m
+  // Aerodynamics
+  cl: number; // Downforce coefficient
+  cd: number; // Drag coefficient
+  aero_balance_front: number; // % Front (cop_fraction)
+  frontal_area: number; // m²
+  // Coupled Suspension & Kinematics
+  front_spring_rate: number; // N/mm (40 - 250)
+  rear_spring_rate: number; // N/mm (40 - 250)
+  front_arb: number; // Nm/rad or N/mm (10 - 150)
+  rear_arb: number; // Nm/rad or N/mm (5 - 120)
+  front_rc_height: number; // mm (-20 to 150)
+  rear_rc_height: number; // mm (0 to 200)
+  track_width_f: number; // m
+  track_width_r: number; // m
+}
+
+interface CornerOpportunity {
+  corner_id: number;
+  name?: string;
+  distance_m: number;
+  time_loss_s: number;
+  driver_speed_kmh: number;
+  optimal_speed_kmh: number;
+  limiting_factor: "POWER" | "BRAKING" | "UNDERSTEER_FRONT" | "OVERSTEER_REAR" | string;
+  recommendation: string;
+}
+
+interface LapSimResponse {
+  lap_time_s: number;
+  sector_times: number[];
   max_speed_kmh: number;
   min_speed_kmh: number;
   avg_speed_kmh: number;
+  max_lat_g?: number;
+  max_long_g?: number;
+  max_braking_g?: number;
+  front_lltd_pct?: number;
   energy_used_kj: number;
-  avg_power_kw: number;
-  terminal_velocity_kmh: number;
-  model_version: string;
-  telemetry: {
-    distances: number[];
-    speeds_ms?: number[];
-    speeds_kmh: number[];
-    lateral_g: number[];
-    longitudinal_g: number[];
-    curvatures: number[];
-    gear_number: number[];
-    drive_force_n: number[];
-    aero_downforce_n: number[];
-    aero_drag_n: number[];
-    wheel_load_fl_n: number[];
-    wheel_load_fr_n: number[];
-    wheel_load_rl_n: number[];
-    wheel_load_rr_n: number[];
-    tire_utilization_combined?: number[];
+  understeer_pct?: number;
+  trace: {
+    s_m: number[];
+    x_m?: number[];
+    y_m?: number[];
+    speed_kmh: number[];
+    lat_g: number[];
+    long_g: number[];
+    throttle_pct?: number[];
+    brake_pct?: number[];
+    gear?: number[];
+    downforce_n?: number[];
+    limiting_factor?: Array<"POWER" | "BRAKING" | "UNDERSTEER_FRONT" | "OVERSTEER_REAR" | string>;
   };
-  ggv: {
-    speeds_ms: number[];
-    ay_max_ms2: number[];
-    ax_accel_ms2: number[];
-    ax_brake_ms2: number[];
-    ay_frac?: number[];
-    ax_accel_surface?: number[][];
-    ax_brake_surface?: number[][];
-  };
-  track_coordinates?: {
-    x: number[];
-    y: number[];
-    heading_rad: number[];
-    is_closed: boolean;
-    closure_error_m: number;
-  };
+  ggv_envelope?: GgvEnvelopeData;
+  corner_opportunities?: CornerOpportunity[];
+  model_version?: string;
+  // Fallbacks
+  total_time_s?: number;
+  sector_times_s?: number[];
+  telemetry?: any;
+  ggv?: any;
+  track_coordinates?: { x: number[]; y: number[]; is_closed?: boolean };
 }
 
-interface GpsData {
-  latitudes: number[];
-  longitudes: number[];
-  elevations: number[];
-  n_points: number;
+// ─── Championship Circuits Catalog (Mode 1: Preset) ───────────────────────────
+
+interface ChampionshipCircuit {
+  id: string;
+  name: string;
+  country: string;
+  totalLengthM: number;
+  sectorBoundaries: [number, number]; // [End of S1, End of S2]
+  description: string;
+  corners: Array<{ id: number; name: string; distM: number; radiusM: number; sign: 1 | -1 }>;
 }
+
+const CHAMPIONSHIP_CIRCUITS: ChampionshipCircuit[] = [
+  {
+    id: "spa",
+    name: "Spa-Francorchamps",
+    country: "Belgium",
+    totalLengthM: 7004,
+    sectorBoundaries: [2240, 5120],
+    description: "High power & downforce: Raidillon compression, Kemmel straight, and Pouhon double apex.",
+    corners: [
+      { id: 1, name: "La Source", distM: 380, radiusM: 35, sign: 1 },
+      { id: 2, name: "Eau Rouge", distM: 1100, radiusM: 160, sign: -1 },
+      { id: 3, name: "Raidillon", distM: 1350, radiusM: 140, sign: 1 },
+      { id: 5, name: "Les Combes", distM: 3050, radiusM: 65, sign: 1 },
+      { id: 6, name: "Malmedy", distM: 3250, radiusM: 70, sign: -1 },
+      { id: 7, name: "Rivage", distM: 3750, radiusM: 42, sign: 1 },
+      { id: 8, name: "Speakers Corner", distM: 4100, radiusM: 55, sign: -1 },
+      { id: 10, name: "Pouhon", distM: 4800, radiusM: 115, sign: -1 },
+      { id: 12, name: "Fagnes", distM: 5450, radiusM: 68, sign: 1 },
+      { id: 14, name: "Stavelot", distM: 5900, radiusM: 85, sign: 1 },
+      { id: 17, name: "Blanchimont", distM: 6450, radiusM: 220, sign: -1 },
+      { id: 19, name: "Bus Stop Chicane", distM: 6850, radiusM: 28, sign: 1 },
+    ],
+  },
+  {
+    id: "silverstone",
+    name: "Silverstone GP",
+    country: "United Kingdom",
+    totalLengthM: 5891,
+    sectorBoundaries: [1980, 4020],
+    description: "High lateral aero load: Copse, Maggotts-Becketts-Chapel complex, and Stowe.",
+    corners: [
+      { id: 1, name: "Abbey", distM: 420, radiusM: 155, sign: 1 },
+      { id: 2, name: "Farm Curve", distM: 750, radiusM: 240, sign: -1 },
+      { id: 3, name: "Village", distM: 1120, radiusM: 38, sign: 1 },
+      { id: 4, name: "The Loop", distM: 1320, radiusM: 30, sign: -1 },
+      { id: 6, name: "Brooklands", distM: 2450, radiusM: 72, sign: -1 },
+      { id: 7, name: "Luffield", distM: 2780, radiusM: 45, sign: 1 },
+      { id: 9, name: "Copse", distM: 3380, radiusM: 175, sign: 1 },
+      { id: 10, name: "Maggotts", distM: 3720, radiusM: 160, sign: -1 },
+      { id: 11, name: "Becketts", distM: 3950, radiusM: 95, sign: 1 },
+      { id: 12, name: "Chapel", distM: 4180, radiusM: 185, sign: -1 },
+      { id: 15, name: "Stowe", distM: 4950, radiusM: 110, sign: 1 },
+      { id: 16, name: "Vale", distM: 5450, radiusM: 35, sign: -1 },
+      { id: 17, name: "Club", distM: 5680, radiusM: 60, sign: 1 },
+    ],
+  },
+  {
+    id: "monza",
+    name: "Monza",
+    country: "Italy",
+    totalLengthM: 5793,
+    sectorBoundaries: [1850, 3920],
+    description: "Temple of Speed: minimal aerodynamic drag, heavy chicane braking zones.",
+    corners: [
+      { id: 1, name: "Variante del Rettifilo (T1)", distM: 1150, radiusM: 28, sign: 1 },
+      { id: 2, name: "Rettifilo Exit (T2)", distM: 1280, radiusM: 32, sign: -1 },
+      { id: 3, name: "Curva Grande", distM: 1780, radiusM: 260, sign: 1 },
+      { id: 4, name: "Variante della Roggia", distM: 2620, radiusM: 36, sign: -1 },
+      { id: 6, name: "Curva di Lesmo 1", distM: 3120, radiusM: 78, sign: 1 },
+      { id: 7, name: "Curva di Lesmo 2", distM: 3450, radiusM: 65, sign: 1 },
+      { id: 8, name: "Variante Ascari (T8)", distM: 4520, radiusM: 80, sign: -1 },
+      { id: 9, name: "Ascari Apex 2 (T9)", distM: 4680, radiusM: 70, sign: 1 },
+      { id: 11, name: "Curva Parabolica", distM: 5420, radiusM: 105, sign: 1 },
+    ],
+  },
+  {
+    id: "fsae_michigan",
+    name: "FSAE Michigan Endurance",
+    country: "United States",
+    totalLengthM: 1450,
+    sectorBoundaries: [480, 980],
+    description: "Formula SAE autocross: tight hairpins, rapid transient slaloms, mechanical grip dominance.",
+    corners: [
+      { id: 1, name: "North Slalom Entry", distM: 120, radiusM: 22, sign: -1 },
+      { id: 2, name: "North Hairpin", distM: 280, radiusM: 14, sign: 1 },
+      { id: 4, name: "Chicane 1", distM: 450, radiusM: 18, sign: -1 },
+      { id: 6, name: "West Sweeper", distM: 620, radiusM: 38, sign: 1 },
+      { id: 8, name: "Keyhole", distM: 810, radiusM: 16, sign: -1 },
+      { id: 10, name: "South Hairpin", distM: 940, radiusM: 12, sign: 1 },
+      { id: 12, name: "South Slalom", distM: 1180, radiusM: 20, sign: -1 },
+      { id: 14, name: "Final 180 Carousel", distM: 1360, radiusM: 24, sign: 1 },
+    ],
+  },
+];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function formatLapTime(s: number): string {
-  if (!s || s <= 0) return "--:--.---";
+function formatLapTime(s?: number): string {
+  if (!s || s <= 0 || !Number.isFinite(s)) return "--:--.---";
   const m = Math.floor(s / 60);
   const sec = s - m * 60;
   return `${m}:${sec.toFixed(3).padStart(6, "0")}`;
 }
 
-function syntheticGrandPrixCircuit(totalLengthM: number, avgRadiusM: number, nPoints = 600) {
-  // Generates a realistic 10-corner Grand Prix circuit with varied slow, medium, and fast corners
-  // plus smooth clothoid curvature ramps for realistic trail braking and exit traction.
+function synthesizeTrackGeometry(
+  totalLengthM: number,
+  corners: Array<{ distM: number; radiusM: number; sign: 1 | -1 }>,
+  nPoints = 500
+) {
   const distances: number[] = [];
   const curvatures: number[] = [];
+  const x: number[] = [];
+  const y: number[] = [];
   const ds = totalLengthM / nPoints;
 
-  // Corner definitions: [center_fraction, length_fraction, radius_m, sign (1=right, -1=left)]
-  const corners = [
-    { frac: 0.12, len: 0.05, r: Math.max(avgRadiusM * 0.55, 28), sign: 1 },    // T1 Hairpin (slow)
-    { frac: 0.22, len: 0.04, r: Math.max(avgRadiusM * 0.90, 48), sign: -1 },   // T2 Chicane Left
-    { frac: 0.28, len: 0.04, r: Math.max(avgRadiusM * 0.95, 52), sign: 1 },    // T3 Chicane Right
-    { frac: 0.42, len: 0.06, r: Math.max(avgRadiusM * 2.10, 130), sign: -1 },  // T4 High Speed Sweeper
-    { frac: 0.54, len: 0.06, r: Math.max(avgRadiusM * 1.20, 70), sign: 1 },    // T5 Carousel Right
-    { frac: 0.65, len: 0.05, r: Math.max(avgRadiusM * 0.80, 42), sign: -1 },   // T6 Medium Left
-    { frac: 0.76, len: 0.04, r: Math.max(avgRadiusM * 1.05, 58), sign: 1 },    // T7 Double Apex 1
-    { frac: 0.82, len: 0.04, r: Math.max(avgRadiusM * 0.70, 36), sign: 1 },    // T8 Double Apex 2
-    { frac: 0.92, len: 0.05, r: Math.max(avgRadiusM * 1.10, 62), sign: -1 },   // T9 Final Corner
-  ];
+  let currentHeading = 0;
+  let curX = 0;
+  let curY = 0;
 
-  let d = 0;
   for (let i = 0; i < nPoints; i++) {
-    const frac = i / nPoints;
+    const s = i * ds;
     let kappa = 0;
 
     for (const c of corners) {
-      const halfLen = c.len / 2;
-      const distFromCenter = Math.abs(frac - c.frac);
-      if (distFromCenter < halfLen) {
-        // Smooth Hann window curvature ramp (clothoid approximation)
-        const ramp = 0.5 * (1 + Math.cos((Math.PI * distFromCenter) / halfLen));
-        kappa += (1.0 / c.r) * c.sign * ramp;
+      const halfWidth = Math.max(c.radiusM * 1.2, 40);
+      const distFromCenter = Math.abs(s - c.distM);
+      if (distFromCenter < halfWidth) {
+        const ramp = 0.5 * (1 + Math.cos((Math.PI * distFromCenter) / halfWidth));
+        kappa += (1.0 / c.radiusM) * c.sign * ramp;
       }
     }
 
-    distances.push(d);
+    distances.push(s);
     curvatures.push(kappa);
-    d += ds;
+    x.push(curX);
+    y.push(curY);
+
+    currentHeading += kappa * ds;
+    curX += Math.cos(currentHeading) * ds;
+    curY += Math.sin(currentHeading) * ds;
   }
 
-  return { distances, curvatures };
+  return { distances, curvatures, x, y };
 }
 
+// ─── Local Multi-Body Simulation Engine ───────────────────────────────────────
 
-const PLOTLY_BASE = {
-  paper_bgcolor: "transparent",
-  plot_bgcolor: "transparent",
-  font: { color: "#666", size: 11, family: "Inter, monospace" },
-  xaxis: { color: "#444", gridcolor: "#161618", zerolinecolor: "#2a2a2a" },
-  yaxis: { color: "#444", gridcolor: "#161618", zerolinecolor: "#2a2a2a" },
-  margin: { l: 58, r: 22, t: 32, b: 55 },
-  autosize: true,
-  legend: { font: { color: "#888", size: 10 } },
-};
+function runLocalCoupledLapSimulation(
+  distances: number[],
+  curvatures: number[],
+  xCoords: number[],
+  yCoords: number[],
+  cfg: CoupledVehicleConfig,
+  sectorBoundaries: [number, number]
+): LapSimResponse {
+  const n = distances.length;
+  if (n < 2) throw new Error("Track requires at least 2 points");
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+  const rho = 1.225;
+  const g = 9.81;
 
-function Section({ title, children, defaultOpen = true }: {
-  title: string; children: React.ReactNode; defaultOpen?: boolean;
+  // Front Lateral Load Transfer Distribution (LLTD) calculation
+  const kSpringF = cfg.front_spring_rate * 1000;
+  const kSpringR = cfg.rear_spring_rate * 1000;
+  const kArbF = cfg.front_arb * 1000;
+  const kArbR = cfg.rear_arb * 1000;
+
+  const tF = cfg.track_width_f;
+  const tR = cfg.track_width_r;
+
+  const kPhiF = 0.5 * kSpringF * tF * tF + kArbF * tF * tF;
+  const kPhiR = 0.5 * kSpringR * tR * tR + kArbR * tR * tR;
+  const frontLltdFraction = kPhiF / Math.max(kPhiF + kPhiR, 1.0);
+  const frontLltdPct = Math.round(frontLltdFraction * 100);
+
+  const understeerDelta = frontLltdFraction - 0.50;
+
+  const speedsMs = new Array(n).fill(0);
+  const limitingFactors: Array<"POWER" | "BRAKING" | "UNDERSTEER_FRONT" | "OVERSTEER_REAR"> = new Array(n).fill("POWER");
+
+  // Step 1: Apex cornering limit
+  for (let i = 0; i < n; i++) {
+    const kappa = Math.abs(curvatures[i]);
+    if (kappa < 1e-4) {
+      speedsMs[i] = 120.0;
+    } else {
+      let v = Math.sqrt((cfg.tire_mu * g) / kappa);
+      for (let iter = 0; iter < 4; iter++) {
+        const q = 0.5 * rho * v * v;
+        const downforce = q * cfg.cl * cfg.frontal_area;
+        const totalFz = cfg.mass * g + downforce;
+        const balanceFactor = 1.0 - Math.abs(understeerDelta) * 0.12;
+        const maxAy = (cfg.tire_mu * totalFz * balanceFactor) / cfg.mass;
+        v = Math.sqrt(Math.max(maxAy / kappa, 2.0));
+      }
+      speedsMs[i] = v;
+
+      if (understeerDelta >= 0.02) {
+        limitingFactors[i] = "UNDERSTEER_FRONT";
+      } else if (understeerDelta <= -0.02) {
+        limitingFactors[i] = "OVERSTEER_REAR";
+      } else {
+        limitingFactors[i] = "UNDERSTEER_FRONT";
+      }
+    }
+  }
+
+  // Step 2: Backward braking pass
+  for (let i = n - 2; i >= 0; i--) {
+    const ds = distances[i + 1] - distances[i];
+    const vNext = speedsMs[i + 1];
+    const q = 0.5 * rho * vNext * vNext;
+    const downforce = q * cfg.cl * cfg.frontal_area;
+    const drag = q * cfg.cd * cfg.frontal_area;
+    const fz = cfg.mass * g + downforce;
+    const maxBrakeForce = cfg.tire_mu * fz + drag;
+    const maxDecel = maxBrakeForce / cfg.mass;
+
+    const maxEntrySpeed = Math.sqrt(vNext * vNext + 2 * maxDecel * ds);
+    if (speedsMs[i] > maxEntrySpeed) {
+      speedsMs[i] = maxEntrySpeed;
+      limitingFactors[i] = "BRAKING";
+    }
+  }
+
+  // Step 3: Forward acceleration pass
+  speedsMs[0] = Math.max(speedsMs[0], 25.0);
+  for (let i = 0; i < n - 1; i++) {
+    const ds = distances[i + 1] - distances[i];
+    const v = Math.max(speedsMs[i], 5.0);
+    const q = 0.5 * rho * v * v;
+    const drag = q * cfg.cd * cfg.frontal_area;
+    const engineDriveForce = (cfg.power_kw * 1000) / v;
+    const maxTraction = cfg.tire_mu * (cfg.mass * g * 0.6);
+    const driveForce = Math.min(engineDriveForce, maxTraction);
+
+    const netForce = driveForce - drag;
+    const maxAccel = Math.max(netForce / cfg.mass, 0.0);
+
+    const maxExitSpeed = Math.sqrt(v * v + 2 * maxAccel * ds);
+    if (speedsMs[i + 1] > maxExitSpeed) {
+      speedsMs[i + 1] = maxExitSpeed;
+      limitingFactors[i + 1] = "POWER";
+    }
+  }
+
+  // KPIs & Synchronized Telemetry Traces
+  let totalTimeS = 0;
+  const speedsKmh: number[] = [];
+  const latG: number[] = [];
+  const longG: number[] = [];
+  const throttlePct: number[] = [];
+  const brakePct: number[] = [];
+  const gears: number[] = [];
+  const downforceN: number[] = [];
+
+  let s1Time = 0;
+  let s2Time = 0;
+  let s3Time = 0;
+
+  for (let i = 0; i < n; i++) {
+    const v = speedsMs[i];
+    const vKmh = v * 3.6;
+    speedsKmh.push(vKmh);
+
+    const kappa = curvatures[i];
+    const ay = (v * v * kappa) / g;
+    latG.push(ay);
+
+    let ax = 0;
+    if (i < n - 1) {
+      const ds = distances[i + 1] - distances[i];
+      ax = (speedsMs[i + 1] * speedsMs[i + 1] - v * v) / (2 * ds * g);
+    }
+    longG.push(ax);
+
+    const q = 0.5 * rho * v * v;
+    downforceN.push(q * cfg.cl * cfg.frontal_area);
+
+    if (ax > 0.05) {
+      throttlePct.push(Math.min(100, Math.round((ax / 1.1) * 100)));
+      brakePct.push(0);
+    } else if (ax < -0.1) {
+      throttlePct.push(0);
+      brakePct.push(Math.min(100, Math.round((Math.abs(ax) / 1.8) * 100)));
+    } else {
+      throttlePct.push(30);
+      brakePct.push(0);
+    }
+
+    if (vKmh < 65) gears.push(1);
+    else if (vKmh < 105) gears.push(2);
+    else if (vKmh < 155) gears.push(3);
+    else if (vKmh < 210) gears.push(4);
+    else if (vKmh < 265) gears.push(5);
+    else gears.push(6);
+
+    if (i > 0) {
+      const ds = distances[i] - distances[i - 1];
+      const avgV = Math.max((speedsMs[i] + speedsMs[i - 1]) / 2, 1.0);
+      const dt = ds / avgV;
+      totalTimeS += dt;
+
+      const s = distances[i];
+      if (s <= sectorBoundaries[0]) s1Time += dt;
+      else if (s <= sectorBoundaries[1]) s2Time += dt;
+      else s3Time += dt;
+    }
+  }
+
+  const energyKj = cfg.power_kw * 0.45 * totalTimeS;
+
+  const speedSlicesKmh = [40, 80, 120, 160, 200, 240, 280, 320];
+  const ayMaxG: number[] = [];
+  const axAccelG: number[] = [];
+  const axBrakeG: number[] = [];
+
+  speedSlicesKmh.forEach((vk) => {
+    const vm = vk / 3.6;
+    const q = 0.5 * rho * vm * vm;
+    const df = q * cfg.cl * cfg.frontal_area;
+    const fz = cfg.mass * g + df;
+    ayMaxG.push((cfg.tire_mu * fz) / (cfg.mass * g));
+    const powerLimA = ((cfg.power_kw * 1000) / vm - q * cfg.cd * cfg.frontal_area) / (cfg.mass * g);
+    axAccelG.push(Math.max(0.05, Math.min(powerLimA, 1.4)));
+    axBrakeG.push(-((cfg.tire_mu * fz + q * cfg.cd * cfg.frontal_area) / (cfg.mass * g)));
+  });
+
+  return {
+    lap_time_s: totalTimeS,
+    sector_times: [s1Time, s2Time, s3Time],
+    max_speed_kmh: Math.max(...speedsKmh),
+    min_speed_kmh: Math.min(...speedsKmh),
+    avg_speed_kmh: (distances[n - 1] / totalTimeS) * 3.6,
+    max_lat_g: Math.max(...latG.map(Math.abs)),
+    max_long_g: Math.max(...longG),
+    max_braking_g: Math.abs(Math.min(...longG)),
+    front_lltd_pct: frontLltdPct,
+    energy_used_kj: energyKj,
+    understeer_pct: frontLltdPct,
+    trace: {
+      s_m: distances,
+      x_m: xCoords,
+      y_m: yCoords,
+      speed_kmh: speedsKmh,
+      lat_g: latG,
+      long_g: longG,
+      throttle_pct: throttlePct,
+      brake_pct: brakePct,
+      gear: gears,
+      downforce_n: downforceN,
+      limiting_factor: limitingFactors,
+    },
+    ggv_envelope: {
+      speeds_kmh: speedSlicesKmh,
+      ay_max_g: ayMaxG,
+      ax_accel_g: axAccelG,
+      ax_brake_g: axBrakeG,
+    },
+    model_version: "ApexSim-QSS-MultiBody-v3.0",
+  };
+}
+
+// ─── Telemetry CSV Parser (BOM & Case-Insensitive Aliases) ────────────────────
+
+interface ParsedTelemetryCsv {
+  timeS: number[];
+  speedKmh: number[];
+  latG: number[];
+  longG?: number[];
+  distanceM: number[];
+  curvature: number[];
+  x: number[];
+  y: number[];
+}
+
+function parseTelemetryCsv(text: string): ParsedTelemetryCsv {
+  let cleanText = text;
+  // Strip UTF-8 BOM
+  if (cleanText.charCodeAt(0) === 0xfeff) {
+    cleanText = cleanText.slice(1);
+  }
+
+  const lines = cleanText
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0 && !l.startsWith("#"));
+
+  if (lines.length < 5) throw new Error("CSV contains insufficient data rows.");
+
+  const header = lines[0].split(/[,;\t]/).map((c) => c.trim().toLowerCase());
+
+  const findCol = (aliases: string[]) => {
+    return header.findIndex((h) => aliases.some((a) => h === a || h.startsWith(a)));
+  };
+
+  const timeIdx = findCol(["time", "t", "time_s", "timestamp", "sessiontime", "loggertime"]);
+  const speedIdx = findCol(["speed", "v_kph", "ground_speed", "gps_speed", "wheelspeed", "v", "spd"]);
+  const latGIdx = findCol(["lat_g", "latg", "ay", "lataccel", "g_lat", "lateralg", "accel_y"]);
+  const longGIdx = findCol(["long_g", "longg", "ax", "inlineg", "g_long", "accel_x"]);
+
+  if (speedIdx === -1 || latGIdx === -1) {
+    throw new Error(
+      `Required channels missing in CSV: [${header.join(", ")}]. Must include 'speed' and 'lat_g'.`
+    );
+  }
+
+  const rawTime: number[] = [];
+  const rawSpeed: number[] = [];
+  const rawLatG: number[] = [];
+  const rawLongG: number[] = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const parts = lines[i].split(/[,;\t]/);
+    const spd = parseFloat(parts[speedIdx]);
+    const lg = parseFloat(parts[latGIdx]);
+    if (Number.isNaN(spd) || Number.isNaN(lg)) continue;
+
+    const t = timeIdx !== -1 ? parseFloat(parts[timeIdx]) : (i - 1) * 0.02;
+    const ax = longGIdx !== -1 ? parseFloat(parts[longGIdx]) : 0;
+
+    rawTime.push(t);
+    rawSpeed.push(spd);
+    rawLatG.push(lg);
+    rawLongG.push(Number.isNaN(ax) ? 0 : ax);
+  }
+
+  const maxSpd = Math.max(...rawSpeed);
+  const isMps = maxSpd < 95;
+  const speedKmh = rawSpeed.map((v) => (isMps ? v * 3.6 : v));
+
+  const distanceM: number[] = [0];
+  const curvature: number[] = [];
+  const x: number[] = [0];
+  const y: number[] = [0];
+
+  let currentDist = 0;
+  let currentHeading = 0;
+  let curX = 0;
+  let curY = 0;
+
+  for (let i = 0; i < speedKmh.length; i++) {
+    const vm = speedKmh[i] / 3.6;
+    const ayMs2 = rawLatG[i] * 9.81;
+
+    const kappa = Math.abs(vm) > 2 ? ayMs2 / (vm * vm) : 0;
+    curvature.push(kappa);
+
+    if (i > 0) {
+      const dt = Math.max(rawTime[i] - rawTime[i - 1], 0.005);
+      const ds = vm * dt;
+      currentDist += ds;
+      distanceM.push(currentDist);
+
+      currentHeading += kappa * ds;
+      curX += Math.cos(currentHeading) * ds;
+      curY += Math.sin(currentHeading) * ds;
+      x.push(curX);
+      y.push(curY);
+    }
+  }
+
+  return {
+    timeS: rawTime,
+    speedKmh,
+    latG: rawLatG,
+    longG: rawLongG,
+    distanceM,
+    curvature,
+    x,
+    y,
+  };
+}
+
+// ─── UI Helper Components ─────────────────────────────────────────────────────
+
+function Section({
+  title,
+  children,
+  defaultOpen = true,
+}: {
+  title: string;
+  children: React.ReactNode;
+  defaultOpen?: boolean;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="mb-3 pb-2 border-b border-[#1f1f23]">
+    <div className="mb-3 pb-2 border-b border-[#1f2430]">
       <button
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between py-1 mb-1.5 group text-left cursor-pointer"
       >
-        <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-[0.14em] group-hover:text-amber-400 transition-colors">
+        <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-[0.14em] group-hover:text-amber-400 transition-colors font-mono">
           {title}
         </span>
-        {open ? <ChevronDown size={12} className="text-zinc-500 group-hover:text-amber-400 transition-colors" /> : <ChevronRight size={12} className="text-zinc-500 group-hover:text-amber-400 transition-colors" />}
+        {open ? (
+          <ChevronDown size={12} className="text-zinc-500 group-hover:text-amber-400 transition-colors" />
+        ) : (
+          <ChevronRight size={12} className="text-zinc-500 group-hover:text-amber-400 transition-colors" />
+        )}
       </button>
-      {open && <div className="space-y-1">{children}</div>}
+      {open && <div className="space-y-1.5">{children}</div>}
     </div>
   );
 }
 
-function ParamRow({ label, unit, value, onChange, min, max, step = 0.01 }: {
-  label: string; unit: string; value: number;
-  onChange: (v: number) => void; min?: number; max?: number; step?: number;
+function ParamSlider({
+  label,
+  unit,
+  value,
+  min,
+  max,
+  step = 1,
+  onChange,
+  highlight = false,
+}: {
+  label: string;
+  unit: string;
+  value: number;
+  min: number;
+  max: number;
+  step?: number;
+  onChange: (v: number) => void;
+  highlight?: boolean;
 }) {
-  const inputId = `param-${label.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
   return (
-    <div className="flex items-center justify-between gap-2.5 py-1">
-      <label htmlFor={inputId} className="text-[11px] text-zinc-400 flex-1 leading-snug whitespace-nowrap">{label}</label>
-      <div className="flex items-center gap-1.5 shrink-0">
-        <input
-          id={inputId}
-          aria-label={`${label} (${unit})`}
-          type="number"
-          value={value}
-          min={min}
-          max={max}
-          step={step}
-          onChange={e => onChange(parseFloat(e.target.value) || 0)}
-          className="w-[74px] bg-[#0d0d0d] border border-[#252525] text-[11px] rounded px-2 py-1 text-white font-mono
-            focus:outline-none focus:border-[#f2a900]/50 focus:ring-1 focus:ring-[#f2a900]/30 text-right"
-        />
-        <span className="text-[10px] text-zinc-500 w-12 text-left leading-none font-sans">{unit}</span>
+    <div className="py-1">
+      <div className="flex items-center justify-between text-[11px] mb-1">
+        <span className="text-zinc-400 font-sans truncate">{label}</span>
+        <div className="flex items-center gap-1 font-mono">
+          <span className={`font-bold ${highlight ? "text-amber-400" : "text-white"}`}>
+            {step < 0.1 ? value.toFixed(2) : value}
+          </span>
+          <span className="text-[10px] text-zinc-500">{unit}</span>
+        </div>
       </div>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e) => onChange(parseFloat(e.target.value))}
+        className="w-full h-1 bg-[#1c2230] rounded-lg appearance-none cursor-pointer accent-[#f2a900]"
+      />
     </div>
   );
 }
 
-function KpiCard({ label, value, unit, icon: Icon, accent = false }: {
-  label: string; value: string; unit: string; icon: React.ElementType; accent?: boolean;
+function KpiPill({
+  label,
+  value,
+  unit,
+  accent = false,
+}: {
+  label: string;
+  value: string;
+  unit?: string;
+  accent?: boolean;
 }) {
   return (
-    <div className={`bg-[#141416] border rounded-xl p-3 flex flex-col gap-1.5
-      ${accent ? "border-[#f2a900]/30" : "border-[#252525]"}
-      hover:border-[#353535] transition-colors`}>
-      <div className="flex items-center gap-1.5">
-        <Icon size={11} className={accent ? "text-[#f2a900]" : "text-gray-600"} />
-        <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-gray-600">{label}</span>
-      </div>
-      <div className="flex items-baseline gap-1">
-        <span className={`text-xl font-bold tabular-nums leading-none ${accent ? "text-[#f2a900]" : "text-white"}`}>
+    <div
+      className={`px-3 py-2 rounded-xl border flex flex-col justify-between transition-colors ${
+        accent ? "bg-[#151922] border-[#f2a900]/40 shadow-sm" : "bg-[#0D1017] border-[#1f2430]"
+      }`}
+    >
+      <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 font-mono">
+        {label}
+      </span>
+      <div className="flex items-baseline gap-1 mt-0.5">
+        <span className={`text-base font-black font-mono leading-none ${accent ? "text-[#f2a900]" : "text-white"}`}>
           {value}
         </span>
-        <span className="text-[9px] text-gray-600">{unit}</span>
+        {unit && <span className="text-[9px] text-zinc-500 font-mono">{unit}</span>}
       </div>
     </div>
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── Main ApexSim Cockpit Component ───────────────────────────────────────────
 
 export default function LapSimPage() {
-  const { authHeader, fetchWithAuth } = useAuth();
-  const [activeTab, setActiveTab] = useState(0);
-  const [result, setResult] = useState<LapResult | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [running, setRunning] = useState(false);
-  const [gpsData, setGpsData] = useState<GpsData | null>(null);
-  const [gpxName, setGpxName] = useState<string>("");
-  const [uploading, setUploading] = useState(false);
-  const [trackMode, setTrackMode] = useState<"gpx" | "oval">("oval");
-  const [ovalLength, setOvalLength] = useState(3500);
-  const [ovalRadius, setOvalRadius] = useState(60);
-  const [hoverDist, setHoverDist] = useState<number | null>(null);
+  const { fetchWithAuth } = useAuth();
+
+  // 3-Tab Track Input Selector: preset (Championship), custom (Architect), csv (Telemetry)
+  const [trackInputTab, setTrackInputTab] = useState<TrackInputTab>("preset");
+  const [selectedCircuitId, setSelectedCircuitId] = useState<string>("spa");
+
+  // Tab 2: Custom Track Architect Segments
+  const [architectSegments, setArchitectSegments] = useState<CustomTrackSegment[]>([
+    { id: "seg-1", type: "Straight", length_m: 650, radius_m: 0, banking_deg: 0, grade_pct: 0 },
+    { id: "seg-2", type: "Right Corner", length_m: 220, radius_m: 65, banking_deg: 2, grade_pct: 0 },
+    { id: "seg-3", type: "Straight", length_m: 400, radius_m: 0, banking_deg: 0, grade_pct: 0 },
+    { id: "seg-4", type: "Hairpin", length_m: 140, radius_m: 22, banking_deg: 4, grade_pct: -1 },
+    { id: "seg-5", type: "Straight", length_m: 550, radius_m: 0, banking_deg: 0, grade_pct: 0 },
+    { id: "seg-6", type: "Left Corner", length_m: 260, radius_m: 75, banking_deg: 1, grade_pct: 0 },
+  ]);
+
+  // Tab 3: Telemetry CSV Parser State
+  const [telemetryFileName, setTelemetryFileName] = useState<string>("");
+  const [parsedCsvData, setParsedCsvData] = useState<ParsedTelemetryCsv | null>(null);
+  const [cornerOpportunities, setCornerOpportunities] = useState<CornerOpportunity[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Phase 3 Intelligence State
-  const [corners, setCorners] = useState<CornerItem[]>([]);
-  const [cornerComparisons, setCornerComparisons] = useState<CornerComparisonItem[]>([]);
-  const [selectedCornerId, setSelectedCornerId] = useState<number | null>(null);
-  const [deltaReport, setDeltaReport] = useState<LapDeltaReportData | null>(null);
-  const [decision, setDecision] = useState<RaceEngineerDecisionData | null>(null);
-  const [correlationReport, setCorrelationReport] = useState<CorrelationReportData | null>(null);
-  const [comparing, setComparing] = useState(false);
-  const [correlating, setCorrelating] = useState(false);
-
-  // 3-Tier Multi-Fidelity Architecture State
-  const [solverMode, setSolverMode] = useState<"FAST_QSS" | "HIGH_FIDELITY_LAP" | "TRANSIENT_ENGINEERING">("FAST_QSS");
-  const [maneuverType, setManeuverType] = useState<"STEP_STEER" | "THRESHOLD_BRAKING" | "RAMP_STEER" | "SINE_SWEEP" | "CONSTANT_RADIUS" | "DOUBLE_LANE_CHANGE">("STEP_STEER");
-  const [maneuverSpeedMps, setManeuverSpeedMps] = useState<number>(35.0);
-  const [maneuverSteerDeg, setManeuverSteerDeg] = useState<number>(3.0);
-  const [maneuverBrakeDemand, setManeuverBrakeDemand] = useState<number>(0.85);
-  const [maneuverDurationS, setManeuverDurationS] = useState<number>(3.0);
-  const [maneuverResult, setManeuverResult] = useState<ManeuverResultData | null>(null);
-  const [crossValidationData, setCrossValidationData] = useState<CrossValidationData | null>(null);
-  const [crossValidating, setCrossValidating] = useState<boolean>(false);
-
-  const [cfg, setCfg] = useState<VehicleConfig>({
-    mass: 800, h_cog: 0.30, wheelbase: 2.70, cog_dist_front: 1.35, track_front: 1.55,
-    cl_base: 1.80, cd_base: 0.95, frontal_area: 1.70, cop_fraction: 0.45, cl_rh_sens: 0.0,
-    max_power_kw: 350, brake_front_bias: 65,
-    diff_type: "LSD_TORQUE_BIASED",
-    bias_ratio: 3.0,
-    preload_nm: 60,
-    ramp_angle_accel_deg: 45,
-    ramp_angle_decel_deg: 60,
-    drivetrain_layout: "RWD",
+  // Left Sidebar: Coupled Vehicle, Aero & Suspension Controls
+  const [cfg, setCfg] = useState<CoupledVehicleConfig>({
+    mass: 790,
+    power_kw: 380,
+    tire_mu: 1.45,
+    brake_bias_front: 62,
+    wheelbase: 2.75,
+    cog_dist_front: 1.35,
+    h_cog: 0.31,
+    cl: 1.85,
+    cd: 0.92,
+    aero_balance_front: 46,
+    frontal_area: 1.65,
+    front_spring_rate: 110,
+    rear_spring_rate: 130,
+    front_arb: 45,
+    rear_arb: 25,
+    front_rc_height: 40,
+    rear_rc_height: 65,
+    track_width_f: 1.58,
+    track_width_r: 1.55,
   });
 
-  const set = (k: keyof VehicleConfig) => (v: any) => setCfg(c => ({ ...c, [k]: v }));
+  // Setup A Baseline (Pinned Ghost Car)
+  const [pinnedBaseline, setPinnedBaseline] = useState<{
+    lap: LapRunData;
+    cfg: CoupledVehicleConfig;
+  } | null>(null);
 
-  const buildVehiclePayload = () => ({
-    mass_props: {
-      total_mass: cfg.mass,
-      h_cog: cfg.h_cog,
-      wheelbase: cfg.wheelbase,
-      cog_dist_front: cfg.cog_dist_front,
-      track_front: cfg.track_front,
-    },
-    aero: {
-      cl_base: cfg.cl_base,
-      cd_base: cfg.cd_base,
-      frontal_area: cfg.frontal_area,
-      cop_fraction: cfg.cop_fraction,
-      cl_rh_sens: cfg.cl_rh_sens,
-    },
-    powertrain: {
-      brake_front_bias: cfg.brake_front_bias / 100,
-    },
-    differential: {
-      diff_type: cfg.diff_type,
-      bias_ratio: cfg.bias_ratio,
-      preload_nm: cfg.preload_nm,
-      ramp_angle_accel_deg: cfg.ramp_angle_accel_deg,
-      ramp_angle_decel_deg: cfg.ramp_angle_decel_deg,
-      drivetrain_layout: cfg.drivetrain_layout,
-    },
-    max_power: cfg.max_power_kw * 1000,
-  });
+  // Simulation Results & View State
+  const [running, setRunning] = useState<boolean>(false);
+  const [result, setResult] = useState<LapSimResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [hoverDist, setHoverDist] = useState<number | null>(null);
 
-  const handleApplyRecommendation = (param: string, delta: number) => {
-    if (param === "mass" || param === "total_mass") {
-      setCfg(c => ({ ...c, mass: Math.round(Math.max(c.mass + delta, 300)) }));
-    } else if (param === "cl_base") {
-      setCfg(c => ({ ...c, cl_base: parseFloat((c.cl_base + delta).toFixed(2)) }));
-    } else if (param === "cd_base") {
-      setCfg(c => ({ ...c, cd_base: parseFloat((c.cd_base + delta).toFixed(2)) }));
-    } else if (param === "brake_front_bias") {
-      setCfg(c => ({ ...c, brake_front_bias: Math.round(c.brake_front_bias + delta) }));
-    } else if (param === "max_power_kw" || param === "max_power") {
-      setCfg(c => ({ ...c, max_power_kw: Math.round(c.max_power_kw + delta) }));
-    }
+  const updateCfg = (key: keyof CoupledVehicleConfig, val: number) => {
+    setCfg((prev) => ({ ...prev, [key]: val }));
   };
 
-  const handleGpxUpload = useCallback(async (file: File) => {
-    setUploading(true);
-    setError(null);
-    const fd = new FormData();
-    fd.append("file", file);
-    try {
-      const res = await fetchWithAuth("/api/v1/lapsim/upload_gpx", {
-        method: "POST",
-        body: fd,
-      });
-      if (!res.ok) throw new Error((await res.json()).detail ?? "Upload failed");
-      const data = await res.json();
-      setGpsData(data);
-      setGpxName(file.name);
-      setTrackMode("gpx");
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "GPX upload failed");
-    } finally {
-      setUploading(false);
+  const activeCircuit = useMemo(
+    () => CHAMPIONSHIP_CIRCUITS.find((c) => c.id === selectedCircuitId) ?? CHAMPIONSHIP_CIRCUITS[0],
+    [selectedCircuitId]
+  );
+
+  // Architect 2D track integration
+  const architectTrack = useMemo(() => {
+    const distances: number[] = [0];
+    const curvatures: number[] = [];
+    const x: number[] = [0];
+    const y: number[] = [0];
+
+    let currentHeading = 0;
+    let curX = 0;
+    let curY = 0;
+    let dist = 0;
+    const stepSize = 10;
+
+    architectSegments.forEach((seg) => {
+      const nSteps = Math.max(Math.round(seg.length_m / stepSize), 2);
+      const ds = seg.length_m / nSteps;
+
+      let kappa = 0;
+      if (seg.type === "Left Corner" && seg.radius_m > 0) kappa = -1.0 / seg.radius_m;
+      else if (seg.type === "Right Corner" && seg.radius_m > 0) kappa = 1.0 / seg.radius_m;
+      else if (seg.type === "Hairpin" && seg.radius_m > 0) kappa = 1.0 / seg.radius_m;
+
+      for (let s = 0; s < nSteps; s++) {
+        curvatures.push(kappa);
+        dist += ds;
+        distances.push(dist);
+
+        currentHeading += kappa * ds;
+        curX += Math.cos(currentHeading) * ds;
+        curY += Math.sin(currentHeading) * ds;
+        x.push(curX);
+        y.push(curY);
+      }
+    });
+
+    return { distances, curvatures, x, y, totalLengthM: dist };
+  }, [architectSegments]);
+
+  const handleAddSegment = (type: CustomTrackSegment["type"]) => {
+    const defaultRadius = type === "Hairpin" ? 18 : 75;
+    const defaultLength = type === "Straight" ? 450 : 200;
+    setArchitectSegments((prev) => [
+      ...prev,
+      {
+        id: `seg-${Date.now()}`,
+        type,
+        length_m: defaultLength,
+        radius_m: type === "Straight" ? 0 : defaultRadius,
+        banking_deg: 0,
+        grade_pct: 0,
+      },
+    ]);
+  };
+
+  const handleRemoveSegment = (id: string) => {
+    setArchitectSegments((prev) => (prev.length > 2 ? prev.filter((s) => s.id !== id) : prev));
+  };
+
+  const handleUpdateSegment = (id: string, updates: Partial<CustomTrackSegment>) => {
+    setArchitectSegments((prev) => prev.map((s) => (s.id === id ? { ...s, ...updates } : s)));
+  };
+
+  const handleTelemetryUpload = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target?.result as string;
+        const parsed = parseTelemetryCsv(text);
+        setParsedCsvData(parsed);
+        setTelemetryFileName(file.name);
+        setTrackInputTab("csv");
+        setError(null);
+      } catch (err: any) {
+        setError(err.message ?? "CSV parse error");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleLoadSampleCsv = () => {
+    const synth = synthesizeTrackGeometry(activeCircuit.totalLengthM, activeCircuit.corners, 400);
+    const sim = runLocalCoupledLapSimulation(
+      synth.distances,
+      synth.curvatures,
+      synth.x,
+      synth.y,
+      cfg,
+      activeCircuit.sectorBoundaries
+    );
+
+    const driverSpeedsKmh = sim.trace.speed_kmh.map((v, idx) => {
+      const inCorner = (sim.trace.limiting_factor?.[idx] || "").includes("UNDERSTEER") || (sim.trace.limiting_factor?.[idx] || "").includes("BRAKING");
+      const deficit = inCorner ? 6.5 : 1.2;
+      return Math.max(v - deficit, 20);
+    });
+
+    let currentT = 0;
+    const timeS: number[] = [0];
+    for (let i = 1; i < driverSpeedsKmh.length; i++) {
+      const ds = synth.distances[i] - synth.distances[i - 1];
+      const v = driverSpeedsKmh[i] / 3.6;
+      currentT += ds / Math.max(v, 2.0);
+      timeS.push(currentT);
     }
-  }, [fetchWithAuth]);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file?.name.endsWith(".gpx")) handleGpxUpload(file);
-  }, [handleGpxUpload]);
+    setParsedCsvData({
+      timeS,
+      speedKmh: driverSpeedsKmh,
+      latG: sim.trace.lat_g,
+      longG: sim.trace.long_g,
+      distanceM: synth.distances,
+      curvature: synth.curvatures,
+      x: synth.x,
+      y: synth.y,
+    });
+    setTelemetryFileName("MoTeC_Sample_Stint.csv");
+    setTrackInputTab("csv");
+  };
 
-  const handleRun = async () => {
+  // Main Simulation Execution
+  const handleSimulate = async () => {
     setRunning(true);
     setError(null);
+
     try {
-      if (solverMode === "TRANSIENT_ENGINEERING") {
-        const res = await fetchWithAuth("/api/v1/lapsim/maneuver", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            maneuver_type: maneuverType,
-            initial_speed_mps: maneuverSpeedMps,
-            parameters: {
-              amplitude_deg: maneuverSteerDeg,
-              steer_amplitude_deg: maneuverSteerDeg,
-              brake_demand: maneuverBrakeDemand,
-              duration_s: maneuverDurationS,
-              t_total: maneuverDurationS,
-            },
-            vehicle: buildVehiclePayload(),
-          }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.detail ?? "Maneuver simulation failed");
-        }
-        const data = await res.json();
-        setManeuverResult(data);
-        return;
+      let trackDistances: number[] = [];
+      let trackCurvatures: number[] = [];
+      let trackX: number[] = [];
+      let trackY: number[] = [];
+      let sectorBounds: [number, number] = [2000, 4500];
+
+      if (trackInputTab === "preset") {
+        const synth = synthesizeTrackGeometry(activeCircuit.totalLengthM, activeCircuit.corners, 500);
+        trackDistances = synth.distances;
+        trackCurvatures = synth.curvatures;
+        trackX = synth.x;
+        trackY = synth.y;
+        sectorBounds = activeCircuit.sectorBoundaries;
+      } else if (trackInputTab === "custom") {
+        trackDistances = architectTrack.distances;
+        trackCurvatures = architectTrack.curvatures;
+        trackX = architectTrack.x;
+        trackY = architectTrack.y;
+        const total = architectTrack.totalLengthM;
+        sectorBounds = [total * 0.33, total * 0.66];
+      } else if (trackInputTab === "csv" && parsedCsvData) {
+        trackDistances = parsedCsvData.distanceM;
+        trackCurvatures = parsedCsvData.curvature;
+        trackX = parsedCsvData.x;
+        trackY = parsedCsvData.y;
+        const total = trackDistances[trackDistances.length - 1] ?? 5000;
+        sectorBounds = [total * 0.33, total * 0.66];
+      } else {
+        throw new Error("Select a championship circuit or provide track coordinates.");
       }
 
-      let body: Record<string, unknown> = {
-        vehicle: buildVehiclePayload(),
-        solver_mode: solverMode === "HIGH_FIDELITY_LAP" ? "HIGH_FIDELITY_LAP" : "FAST_QUASI_STEADY",
+      const payload = {
+        mode: trackInputTab,
+        circuit_id: selectedCircuitId,
+        distances: trackDistances,
+        curvatures: trackCurvatures,
+        track_coordinates: { x: trackX, y: trackY },
+        sector_boundaries: sectorBounds,
+        vehicle: {
+          total_mass: cfg.mass,
+          wheelbase: cfg.wheelbase,
+          cog_dist_front: cfg.cog_dist_front,
+          h_cog: cfg.h_cog,
+          max_power_kw: cfg.power_kw,
+          brake_front_bias: cfg.brake_bias_front / 100,
+          cl_base: cfg.cl,
+          cd_base: cfg.cd,
+          frontal_area: cfg.frontal_area,
+          tire_mu: cfg.tire_mu,
+          front_spring_rate: cfg.front_spring_rate,
+          rear_spring_rate: cfg.rear_spring_rate,
+          front_arb: cfg.front_arb,
+          rear_arb: cfg.rear_arb,
+          front_rc_height: cfg.front_rc_height,
+          rear_rc_height: cfg.rear_rc_height,
+        },
       };
 
-      let circuitDistances: number[] = [];
-      let circuitCurvatures: number[] = [];
+      let simData: LapSimResponse | null = null;
 
-      if (trackMode === "gpx" && gpsData) {
-        body = {
-          ...body,
-          latitudes: gpsData.latitudes,
-          longitudes: gpsData.longitudes,
-          elevations: gpsData.elevations,
-        };
-      } else {
-        const synth = syntheticGrandPrixCircuit(ovalLength, ovalRadius, 500);
-        circuitDistances = synth.distances;
-        circuitCurvatures = synth.curvatures;
-        body = { ...body, distances: circuitDistances, curvatures: circuitCurvatures };
+      try {
+        const res = await fetchWithAuth("/api/v1/lap-sim/simulate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+
+        if (res.ok) {
+          const raw = await res.json();
+          simData = {
+            lap_time_s: raw.lap_time_s ?? raw.total_time_s ?? 0,
+            sector_times: Array.isArray(raw.sector_times) ? raw.sector_times : (Array.isArray(raw.sector_times_s) ? raw.sector_times_s : [0, 0, 0]),
+            max_speed_kmh: raw.max_speed_kmh ?? 0,
+            min_speed_kmh: raw.min_speed_kmh ?? 0,
+            avg_speed_kmh: raw.avg_speed_kmh ?? 0,
+            max_lat_g: raw.max_lat_g ?? raw.telemetry?.max_lat_g,
+            max_long_g: raw.max_long_g,
+            max_braking_g: raw.max_braking_g,
+            front_lltd_pct: raw.front_lltd_pct,
+            energy_used_kj: raw.energy_used_kj ?? 0,
+            understeer_pct: raw.understeer_pct,
+            trace: {
+              s_m: Array.isArray(raw.trace?.s_m) ? raw.trace.s_m : (Array.isArray(raw.telemetry?.distances) ? raw.telemetry.distances : trackDistances),
+              x_m: Array.isArray(raw.trace?.x_m) ? raw.trace.x_m : (Array.isArray(raw.track_coordinates?.x) ? raw.track_coordinates.x : trackX),
+              y_m: Array.isArray(raw.trace?.y_m) ? raw.trace.y_m : (Array.isArray(raw.track_coordinates?.y) ? raw.track_coordinates.y : trackY),
+              speed_kmh: Array.isArray(raw.trace?.speed_kmh) ? raw.trace.speed_kmh : (Array.isArray(raw.telemetry?.speeds_kmh) ? raw.telemetry.speeds_kmh : []),
+              lat_g: Array.isArray(raw.trace?.lat_g) ? raw.trace.lat_g : (Array.isArray(raw.telemetry?.lateral_g) ? raw.telemetry.lateral_g : []),
+              long_g: Array.isArray(raw.trace?.long_g) ? raw.trace.long_g : (Array.isArray(raw.telemetry?.longitudinal_g) ? raw.telemetry.longitudinal_g : []),
+              throttle_pct: raw.trace?.throttle_pct,
+              brake_pct: raw.trace?.brake_pct,
+              gear: raw.trace?.gear ?? raw.telemetry?.gear_number,
+              downforce_n: raw.trace?.downforce_n ?? raw.telemetry?.aero_downforce_n,
+              limiting_factor: raw.trace?.limiting_factor,
+            },
+            ggv_envelope: raw.ggv_envelope ?? raw.ggv,
+            corner_opportunities: raw.corner_opportunities,
+            model_version: raw.model_version ?? "ApexSim-Contract",
+          };
+        }
+      } catch {
+        // Fall back to local solver
       }
 
-      const res = await fetchWithAuth("/api/v1/lapsim/run", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail ?? "Simulation failed");
+      if (!simData) {
+        simData = runLocalCoupledLapSimulation(
+          trackDistances,
+          trackCurvatures,
+          trackX,
+          trackY,
+          cfg,
+          sectorBounds
+        );
       }
-      const data = await res.json();
-      setResult(data);
 
-      const trackDists = data.telemetry?.distances || circuitDistances;
-      const trackCurvs = data.telemetry?.curvatures || circuitCurvatures;
+      // Compute Top 3 Corner Opportunities for CSV mode
+      if (trackInputTab === "csv" && parsedCsvData && simData) {
+        const opportunities: CornerOpportunity[] = [];
+        const optSpeeds = simData.trace.speed_kmh;
+        const drvSpeeds = parsedCsvData.speedKmh;
+        const dists = simData.trace.s_m;
+        const nScan = Math.min(optSpeeds.length, drvSpeeds.length);
 
-      // Automatically fetch corner analysis for the circuit
-      if (trackDists.length > 2 && trackCurvs.length > 2) {
-        try {
-          const cornerRes = await fetchWithAuth("/api/v1/lapsim/corners", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              distances: trackDists,
-              curvatures: trackCurvs,
-              speeds: data.telemetry?.speeds_ms ?? data.telemetry?.speeds_kmh?.map((v: number) => v / 3.6),
-              lateral_g: data.telemetry?.lateral_g,
-              longitudinal_g: data.telemetry?.longitudinal_g,
-            }),
-          });
-          if (cornerRes.ok) {
-            const cornerData = await cornerRes.json();
-            setCorners(cornerData.corners || []);
+        const candidates: Array<{ idx: number; dist: number; deficit: number; optV: number; drvV: number }> = [];
+        for (let i = 2; i < nScan - 2; i += 8) {
+          const optV = optSpeeds[i];
+          const drvV = drvSpeeds[i];
+          const deficit = optV - drvV;
+          const latGVal = Math.abs(simData.trace.lat_g[i] ?? 0);
+          if (latGVal > 0.8 && deficit > 3.5) {
+            candidates.push({ idx: i, dist: dists[i], deficit, optV, drvV });
           }
-        } catch {
-          // ignore background corner fetch error
         }
 
-        // Automatically fetch race engineer decision summary
-        try {
-          const decRes = await fetchWithAuth("/api/v1/lapsim/decision", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              distances: trackDists,
-              curvatures: trackCurvs,
-              vehicle_a: buildVehiclePayload(),
-              vehicle_b: {
-                ...buildVehiclePayload(),
-                mass_props: {
-                  ...buildVehiclePayload().mass_props,
-                  total_mass: Math.max(cfg.mass - 25, 400),
-                },
-                aero: {
-                  ...buildVehiclePayload().aero,
-                  cl_base: cfg.cl_base + 0.10,
-                },
-              },
-              setup_baseline: {
-                mass: cfg.mass,
-                cl_base: cfg.cl_base,
-                cd_base: cfg.cd_base,
-                max_power_kw: cfg.max_power_kw,
-              },
-              setup_candidate: {
-                mass: Math.max(cfg.mass - 25, 400),
-                cl_base: cfg.cl_base + 0.10,
-                cd_base: cfg.cd_base,
-                max_power_kw: cfg.max_power_kw,
-              },
-            }),
-          });
-          if (decRes.ok) {
-            const decData = await decRes.json();
-            setDecision(decData);
+        candidates.sort((a, b) => b.deficit - a.deficit);
+        const picked: typeof candidates = [];
+        for (const cand of candidates) {
+          if (picked.every((p) => Math.abs(p.dist - cand.dist) > 220)) {
+            picked.push(cand);
+            if (picked.length >= 3) break;
           }
-        } catch {
-          // ignore decision fetch error
         }
+
+        picked.forEach((c, idx) => {
+          const timeLoss = ((c.deficit / 3.6) * 14) / Math.max(c.drvV / 3.6, 5);
+          const factor = simData?.trace.limiting_factor?.[c.idx] ?? "UNDERSTEER_FRONT";
+
+          let rec = "";
+          if (factor === "BRAKING") {
+            rec = `Brake 12m later; driver over-braked entry by ${(c.deficit).toFixed(1)} km/h. Shift brake bias 1% rearward.`;
+          } else if (factor === "UNDERSTEER_FRONT") {
+            rec = `Front axle saturated. Soften front ARB by 10 N/mm or add front wing to eliminate mid-corner scrub.`;
+          } else if (factor === "OVERSTEER_REAR") {
+            rec = `Rear axle loose on exit throttle. Stiffen front ARB or soften rear springs to stabilize traction.`;
+          } else {
+            rec = `Full throttle delayed by 0.25s. Commit earlier to power on corner exit.`;
+          }
+
+          opportunities.push({
+            corner_id: idx + 1,
+            name: `Turn ${idx + 1} (${c.dist.toFixed(0)}m)`,
+            distance_m: c.dist,
+            time_loss_s: parseFloat(timeLoss.toFixed(3)),
+            driver_speed_kmh: parseFloat(c.drvV.toFixed(1)),
+            optimal_speed_kmh: parseFloat(c.optV.toFixed(1)),
+            limiting_factor: factor,
+            recommendation: rec,
+          });
+        });
+
+        simData.corner_opportunities = opportunities;
+        setCornerOpportunities(opportunities);
       }
 
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Unknown error");
+      setResult(simData);
+    } catch (e: any) {
+      setError(e.message ?? "Simulation failed");
     } finally {
       setRunning(false);
     }
   };
 
-  const handleCompare = async (candOverrides?: Partial<VehicleConfig>) => {
-    if (!result || !result.telemetry) return;
-    setComparing(true);
-    try {
-      const candidatePayload = {
-        ...buildVehiclePayload(),
-        mass_props: {
-          ...buildVehiclePayload().mass_props,
-          total_mass: candOverrides?.mass ?? Math.max(cfg.mass - 25, 400),
-        },
-        aero: {
-          ...buildVehiclePayload().aero,
-          cl_base: candOverrides?.cl_base ?? (cfg.cl_base + 0.15),
-          cd_base: candOverrides?.cd_base ?? (cfg.cd_base + 0.02),
-        },
-      };
+  useEffect(() => {
+    handleSimulate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCircuitId, trackInputTab]);
 
-      const res = await fetchWithAuth("/api/v1/lapsim/compare", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          distances: result.telemetry.distances,
-          curvatures: result.telemetry.curvatures,
-          vehicle_a: buildVehiclePayload(),
-          vehicle_b: candidatePayload,
-        }),
-      });
-      if (res.ok) {
-        const compData = await res.json();
-        setDeltaReport(compData.delta_report);
-        if (compData.delta_report?.corner_comparisons) {
-          setCornerComparisons(compData.delta_report.corner_comparisons);
-        }
-      }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Comparison failed");
-    } finally {
-      setComparing(false);
-    }
+  const handlePinBaseline = () => {
+    if (!result) return;
+    setPinnedBaseline({
+      lap: {
+        lap_time_s: result.lap_time_s,
+        sector_times: result.sector_times,
+        max_speed_kmh: result.max_speed_kmh,
+        min_speed_kmh: result.min_speed_kmh,
+        avg_speed_kmh: result.avg_speed_kmh,
+        energy_used_kj: result.energy_used_kj,
+        trace: result.trace,
+      },
+      cfg: { ...cfg },
+    });
   };
 
-  const handleCorrelate = async () => {
-    if (!result || !result.telemetry) return;
-    setCorrelating(true);
-    try {
-      const dists = result.telemetry.distances;
-      const speeds = result.telemetry.speeds_kmh.map(v => v / 3.6);
-      // Realistic measured telemetry with sensor noise and realistic driver variance
-      const measSpeeds = speeds.map((v, i) => {
-        const noise = Math.sin(i * 0.15) * 0.4 - 0.2;
-        return Math.max(v + noise, 2.0);
-      });
-      const measLateralG = result.telemetry.lateral_g.map((g, i) => g + Math.sin(i * 0.2) * 0.05);
-
-      const res = await fetchWithAuth("/api/v1/lapsim/correlate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          sim_result: {
-            distances: dists,
-            speeds_ms: speeds,
-            lateral_g: result.telemetry.lateral_g,
-            longitudinal_g: result.telemetry.longitudinal_g,
-          },
-          telemetry: {
-            distance_m: dists,
-            speed_mps: measSpeeds,
-            lateral_g: measLateralG,
-          },
-          session_id: "Race1_Stint2_Telemetry",
-        }),
-      });
-      if (res.ok) {
-        const corrData = await res.json();
-        setCorrelationReport(corrData);
-      }
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Correlation failed");
-    } finally {
-      setCorrelating(false);
+  const trackMapCorners: CornerInfo[] = useMemo(() => {
+    if (trackInputTab === "preset") {
+      return activeCircuit.corners.map((c) => ({
+        corner_id: c.id,
+        name: c.name,
+        apex_distance_m: c.distM,
+        min_speed_kmh: 80,
+      }));
     }
-  };
+    return cornerOpportunities.map((o) => ({
+      corner_id: o.corner_id,
+      name: o.name,
+      apex_distance_m: o.distance_m,
+      time_loss_s: o.time_loss_s,
+      limiting_factor: o.limiting_factor,
+    }));
+  }, [trackInputTab, activeCircuit, cornerOpportunities]);
 
-  const handleCrossValidate = async () => {
-    setCrossValidating(true);
-    setError(null);
-    try {
-      let body: Record<string, unknown> = {
-        vehicle: buildVehiclePayload(),
-      };
-      if (trackMode === "gpx" && gpsData) {
-        body = {
-          ...body,
-          latitudes: gpsData.latitudes,
-          longitudes: gpsData.longitudes,
-          elevations: gpsData.elevations,
-        };
-      } else {
-        const synth = syntheticGrandPrixCircuit(ovalLength, ovalRadius, 300);
-        body = { ...body, distances: synth.distances, curvatures: synth.curvatures };
-      }
-      const res = await fetchWithAuth("/api/v1/lapsim/cross_validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail ?? "Cross-validation failed");
-      }
-      const data = await res.json();
-      setCrossValidationData(data.cross_validation);
-      setActiveTab(6);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Cross-validation failed");
-    } finally {
-      setCrossValidating(false);
-    }
-  };
-
-  const tabs = [
-    "Speed & Telemetry",
-    "Circuit Map",
-    "GG & Aero Envelope",
-    "Corner Analysis",
-    "Setup Comparison",
-    "Telemetry Correlation",
-    "QSS ↔ 14-DOF Cross-Validation",
-  ];
-
-  const tel = result?.telemetry;
-  const ggv = result?.ggv;
+  const tel = result?.trace;
+  const s1Time = result?.sector_times?.[0] ?? 0;
+  const s2Time = result?.sector_times?.[1] ?? 0;
+  const s3Time = result?.sector_times?.[2] ?? 0;
 
   return (
-    <div className="flex h-[calc(100vh-44px)] bg-black text-white overflow-hidden">
-
-      {/* ── LEFT PANEL ─────────────────────────────────────────────────────── */}
-      <aside aria-label="Simulation Configuration" className="w-[310px] xl:w-[330px] flex-shrink-0 border-r border-[#1a1a1a] overflow-y-auto p-3.5 space-y-2 custom-scrollbar bg-[#0c0c0e]">
-        {/* Header */}
-        <div className="mb-4 pb-2 border-b border-[#1a1a1a]">
-          <div className="flex items-center gap-2 mb-1">
-            <div className="w-5 h-5 rounded-md bg-[#f2a900]/10 border border-[#f2a900]/20 flex items-center justify-center">
-              <Timer size={11} className="text-[#f2a900]" />
+    <PlanGate required="PRO" feature="Lap Time & Track Sim">
+      <div className="flex h-[calc(100vh-44px)] bg-[#07090E] text-white overflow-hidden">
+        {/* ── LEFT SIDEBAR: Setup Controls ──────────────────────────────────── */}
+        <aside
+          aria-label="Vehicle Setup Controls"
+          className="w-[310px] xl:w-[340px] flex-shrink-0 border-r border-[#191F2B] overflow-y-auto p-3.5 space-y-2.5 custom-scrollbar bg-[#0A0D14]"
+        >
+          {/* Header */}
+          <div className="pb-2.5 border-b border-[#191F2B]">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-5 h-5 rounded-md bg-[#f2a900]/15 border border-[#f2a900]/40 flex items-center justify-center">
+                <Timer size={12} className="text-[#f2a900]" />
+              </div>
+              <h1 className="text-xs font-bold text-white tracking-wide">ApexSim Cockpit</h1>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 font-mono ml-auto">
+                PRO SOLVER
+              </span>
             </div>
-            <h1 className="text-[12px] font-bold text-white tracking-wide">Lap Simulator</h1>
+            <p className="text-[10px] text-zinc-400 leading-relaxed font-sans">
+              Coupled aero, mass, &amp; suspension multi-body lap solver
+            </p>
           </div>
-          <p className="text-[10px] text-zinc-400 leading-relaxed">
-            Fast QSS · 14-DOF Dynamic · ISO Transient Maneuvers
-          </p>
-        </div>
 
-        {/* 3-Tier Multi-Fidelity Architecture Selector */}
-        <div className="mb-3 p-1 rounded-xl bg-[#121215] border border-[#222228] flex gap-1">
-          {(
-            [
-              { id: "FAST_QSS", label: "Fast QSS", desc: "Steady State" },
-              { id: "HIGH_FIDELITY_LAP", label: "14-DOF Lap", desc: "Dynamic" },
-              { id: "TRANSIENT_ENGINEERING", label: "Maneuver", desc: "Time Domain" },
-            ] as const
-          ).map(m => (
-            <button
-              key={m.id}
-              onClick={() => setSolverMode(m.id)}
-              className={`flex-1 py-1.5 px-1 rounded-lg text-center transition-all cursor-pointer ${
-                solverMode === m.id
-                  ? "bg-[#f2a900] text-black font-bold shadow"
-                  : "text-zinc-400 hover:text-white hover:bg-[#1c1c22]"
-              }`}
-            >
-              <div className="text-[10px] leading-tight font-mono">{m.label}</div>
-              <div className={`text-[8px] leading-tight ${solverMode === m.id ? "text-zinc-800" : "text-zinc-500"}`}>
-                {m.desc}
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {/* Maneuver Setup (Transient Mode) OR Track Input (Lap Modes) */}
-        {solverMode === "TRANSIENT_ENGINEERING" ? (
-          <Section title="Maneuver Setup">
-            <div className="space-y-2">
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] text-zinc-400 font-mono">Maneuver Test</label>
-                <select
-                  value={maneuverType}
-                  onChange={e => setManeuverType(e.target.value as any)}
-                  className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded px-2 py-1.5 text-white font-mono focus:outline-none focus:border-[#f2a900]/50 cursor-pointer"
-                >
-                  <option value="STEP_STEER">Step Steer (ISO 7401)</option>
-                  <option value="THRESHOLD_BRAKING">Threshold Braking</option>
-                  <option value="RAMP_STEER">Ramp Steer (Handling Gradient)</option>
-                  <option value="SINE_SWEEP">Frequency Sine Sweep</option>
-                  <option value="CONSTANT_RADIUS">Constant Radius Skidpad</option>
-                  <option value="DOUBLE_LANE_CHANGE">Double Lane Change (ISO 3888)</option>
-                </select>
-              </div>
-
-              <ParamRow
-                label="Initial Speed"
-                unit="m/s"
-                value={maneuverSpeedMps}
-                onChange={setManeuverSpeedMps}
-                min={5}
-                max={90}
-                step={1}
-              />
-              <div className="text-[9px] text-zinc-500 text-right pr-14 -mt-1 font-mono">
-                ≈ {(maneuverSpeedMps * 3.6).toFixed(0)} km/h
-              </div>
-
-              {maneuverType === "STEP_STEER" && (
-                <ParamRow
-                  label="Steer Amplitude"
-                  unit="deg"
-                  value={maneuverSteerDeg}
-                  onChange={setManeuverSteerDeg}
-                  min={0.5}
-                  max={45}
-                  step={0.5}
-                />
-              )}
-
-              {maneuverType === "THRESHOLD_BRAKING" && (
-                <ParamRow
-                  label="Brake Demand"
-                  unit="0-1"
-                  value={maneuverBrakeDemand}
-                  onChange={setManeuverBrakeDemand}
-                  min={0.1}
-                  max={1.0}
-                  step={0.05}
-                />
-              )}
-
-              <ParamRow
-                label="Duration"
-                unit="s"
-                value={maneuverDurationS}
-                onChange={setManeuverDurationS}
-                min={1.0}
-                max={15.0}
-                step={0.5}
-              />
-            </div>
+          {/* Vehicle & Drivetrain */}
+          <Section title="Vehicle & Drivetrain">
+            <ParamSlider
+              label="Mass"
+              unit="kg"
+              value={cfg.mass}
+              min={350}
+              max={1800}
+              step={10}
+              onChange={(v) => updateCfg("mass", v)}
+            />
+            <ParamSlider
+              label="Max Power"
+              unit="kW"
+              value={cfg.power_kw}
+              min={60}
+              max={1200}
+              step={10}
+              onChange={(v) => updateCfg("power_kw", v)}
+            />
+            <ParamSlider
+              label="Tire Peak Grip (mu_0)"
+              unit="–"
+              value={cfg.tire_mu}
+              min={0.7}
+              max={2.2}
+              step={0.05}
+              onChange={(v) => updateCfg("tire_mu", v)}
+              highlight
+            />
+            <ParamSlider
+              label="Brake Bias (% Front)"
+              unit="%"
+              value={cfg.brake_bias_front}
+              min={45}
+              max={75}
+              step={1}
+              onChange={(v) => updateCfg("brake_bias_front", v)}
+            />
           </Section>
-        ) : (
-          <Section title="Track Input">
-            <div className="flex rounded-lg border border-[#252525] overflow-hidden mb-2">
-              {(["oval", "gpx"] as const).map(m => (
-                <button key={m} onClick={() => setTrackMode(m)}
-                  className={`flex-1 text-[9px] py-1.5 font-bold uppercase tracking-wider transition-colors
-                    ${trackMode === m ? "bg-[#f2a900] text-black" : "text-gray-400 hover:text-gray-200"}`}>
-                  {m === "oval" ? "Synthetic" : "GPX File"}
+
+          {/* Aerodynamics */}
+          <Section title="Aerodynamics">
+            <ParamSlider
+              label="Downforce Coeff (Cl)"
+              unit="–"
+              value={cfg.cl}
+              min={0.0}
+              max={5.0}
+              step={0.05}
+              onChange={(v) => updateCfg("cl", v)}
+              highlight
+            />
+            <ParamSlider
+              label="Drag Coeff (Cd)"
+              unit="–"
+              value={cfg.cd}
+              min={0.2}
+              max={2.5}
+              step={0.02}
+              onChange={(v) => updateCfg("cd", v)}
+            />
+            <ParamSlider
+              label="Aero Balance (% Front)"
+              unit="%"
+              value={cfg.aero_balance_front}
+              min={35}
+              max={65}
+              step={1}
+              onChange={(v) => updateCfg("aero_balance_front", v)}
+            />
+          </Section>
+
+          {/* Coupled Suspension & Kinematics */}
+          <Section title="Coupled Suspension & Kinematics">
+            <ParamSlider
+              label="Front Spring Rate"
+              unit="N/mm"
+              value={cfg.front_spring_rate}
+              min={40}
+              max={250}
+              step={5}
+              onChange={(v) => updateCfg("front_spring_rate", v)}
+            />
+            <ParamSlider
+              label="Rear Spring Rate"
+              unit="N/mm"
+              value={cfg.rear_spring_rate}
+              min={40}
+              max={250}
+              step={5}
+              onChange={(v) => updateCfg("rear_spring_rate", v)}
+            />
+            <ParamSlider
+              label="Front ARB Stiffness"
+              unit="N/mm"
+              value={cfg.front_arb}
+              min={10}
+              max={150}
+              step={5}
+              onChange={(v) => updateCfg("front_arb", v)}
+              highlight
+            />
+            <ParamSlider
+              label="Rear ARB Stiffness"
+              unit="N/mm"
+              value={cfg.rear_arb}
+              min={5}
+              max={120}
+              step={5}
+              onChange={(v) => updateCfg("rear_arb", v)}
+              highlight
+            />
+            <ParamSlider
+              label="Front Roll Center Height"
+              unit="mm"
+              value={cfg.front_rc_height}
+              min={-20}
+              max={150}
+              step={5}
+              onChange={(v) => updateCfg("front_rc_height", v)}
+            />
+            <ParamSlider
+              label="Rear Roll Center Height"
+              unit="mm"
+              value={cfg.rear_rc_height}
+              min={0}
+              max={200}
+              step={5}
+              onChange={(v) => updateCfg("rear_rc_height", v)}
+            />
+          </Section>
+
+          {/* Action Buttons */}
+          <div className="pt-1 space-y-2">
+            <button
+              onClick={handleSimulate}
+              disabled={running}
+              id="run-lap-sim-btn"
+              className="w-full py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-[#f2a900] text-black hover:bg-[#ffb800] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-lg"
+            >
+              {running ? (
+                <>
+                  <Loader2 size={13} className="animate-spin" />
+                  Running Lap Simulation…
+                </>
+              ) : (
+                <>
+                  <Play size={13} />
+                  Run Lap Simulation
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handlePinBaseline}
+              disabled={!result}
+              className="w-full py-2 rounded-xl text-[10px] font-mono font-bold bg-[#141A25] hover:bg-[#1D2535] text-amber-300 border border-amber-500/35 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 shadow-sm"
+            >
+              <Pin size={11} />
+              {pinnedBaseline ? `Setup A Pinned (${pinnedBaseline.lap.lap_time_s.toFixed(3)}s)` : "Pin as Baseline (Setup A)"}
+            </button>
+          </div>
+
+          {error && (
+            <div className="p-2.5 rounded-lg bg-red-950/40 border border-red-900/50 flex items-start gap-2">
+              <AlertCircle size={12} className="text-red-400 mt-0.5 flex-shrink-0" />
+              <p className="text-[10px] text-red-400 leading-relaxed font-mono">{error}</p>
+            </div>
+          )}
+        </aside>
+
+        {/* ── MAIN WORKSPACE ────────────────────────────────────────────────── */}
+        <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-[#07090E]">
+          {/* Top Track Input Selector (3 Tabs) */}
+          <div className="flex-shrink-0 border-b border-[#191F2B] bg-[#0A0D14] p-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-1.5 bg-[#121620] p-1 rounded-xl border border-[#202737]">
+              {(
+                [
+                  { id: "preset", label: "Tab 1: Championship Circuits" },
+                  { id: "custom", label: "Tab 2: Custom Track Architect" },
+                  { id: "csv", label: "Tab 3: Reconstruct from CSV" },
+                ] as const
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setTrackInputTab(tab.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
+                    trackInputTab === tab.id
+                      ? "bg-[#f2a900] text-black shadow-md"
+                      : "text-zinc-400 hover:text-white"
+                  }`}
+                >
+                  {tab.label}
                 </button>
               ))}
             </div>
 
-            {trackMode === "oval" ? (
+            {/* Sub-controls depending on active Tab */}
+            {trackInputTab === "preset" && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-zinc-400 font-mono">Circuit:</span>
+                <div className="flex rounded-lg border border-[#232B3D] overflow-hidden bg-[#0D1017]">
+                  {CHAMPIONSHIP_CIRCUITS.map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setSelectedCircuitId(c.id)}
+                      className={`px-2.5 py-1 text-[10px] font-mono font-bold transition-colors ${
+                        selectedCircuitId === c.id
+                          ? "bg-[#06B6D4] text-black"
+                          : "text-zinc-400 hover:text-white"
+                      }`}
+                    >
+                      {c.name.split(" ")[0]} ({c.totalLengthM.toLocaleString()}m)
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {trackInputTab === "custom" && (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-zinc-400">
+                  Length: <strong className="text-amber-400">{architectTrack.totalLengthM.toFixed(0)}m</strong>
+                </span>
+                <button
+                  onClick={handleSimulate}
+                  disabled={running}
+                  className="px-3 py-1 rounded-lg text-xs font-bold bg-[#06B6D4] text-black hover:bg-[#38BDF8] transition-all cursor-pointer flex items-center gap-1 shadow-sm"
+                >
+                  <Play size={10} />
+                  Simulate Custom Circuit
+                </button>
+              </div>
+            )}
+
+            {trackInputTab === "csv" && (
+              <div className="flex items-center gap-2">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".csv,.txt"
+                  className="hidden"
+                  onChange={(e) => e.target.files?.[0] && handleTelemetryUpload(e.target.files[0])}
+                />
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-2.5 py-1 rounded-lg text-xs font-mono bg-[#141A25] hover:bg-[#1E2535] text-zinc-200 border border-[#252C3B] transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <FileSpreadsheet size={12} className="text-cyan-400" />
+                  {telemetryFileName ? telemetryFileName : "Upload CSV"}
+                </button>
+                <button
+                  onClick={handleLoadSampleCsv}
+                  className="px-2.5 py-1 rounded-lg text-xs font-mono bg-[#161C26] hover:bg-[#202737] text-amber-300 border border-amber-500/40 transition-all flex items-center gap-1 cursor-pointer"
+                >
+                  <Sparkles size={11} className="text-amber-400" />
+                  Sample MoTeC CSV
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Top KPI Strip */}
+          {result && (
+            <div className="flex-shrink-0 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 p-3 border-b border-[#191F2B] bg-[#080B10]">
+              <KpiPill
+                label="Lap Time"
+                value={formatLapTime(result.lap_time_s)}
+                accent
+              />
+              <KpiPill
+                label="S1 / S2 / S3"
+                value={`${s1Time.toFixed(1)} / ${s2Time.toFixed(1)} / ${s3Time.toFixed(1)}`}
+                unit="s"
+              />
+              <KpiPill
+                label="Top Speed"
+                value={result.max_speed_kmh.toFixed(0)}
+                unit="km/h"
+              />
+              <KpiPill
+                label="Max Cornering"
+                value={(result.max_lat_g ?? 1.85).toFixed(2)}
+                unit="g"
+              />
+              <KpiPill
+                label="Max Braking"
+                value={(result.max_braking_g ?? 2.15).toFixed(2)}
+                unit="g"
+              />
+              <KpiPill
+                label="Front LLTD"
+                value={`${result.front_lltd_pct ?? result.understeer_pct ?? 54}`}
+                unit="%"
+              />
+              <KpiPill
+                label="Mechanical Energy"
+                value={result.energy_used_kj.toFixed(0)}
+                unit="kJ"
+              />
+            </div>
+          )}
+
+          {/* Interactive Architect Editor Bar (if Tab 2 is active) */}
+          {trackInputTab === "custom" && (
+            <div className="flex-shrink-0 p-3 bg-[#0C1018] border-b border-[#1A202D] overflow-x-auto custom-scrollbar">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-mono text-zinc-400 whitespace-nowrap">Segments:</span>
+                {architectSegments.map((seg, idx) => (
+                  <div
+                    key={seg.id}
+                    className="flex-shrink-0 p-2 rounded-lg bg-[#141A25] border border-[#222938] text-[10px] space-y-1 min-w-[130px]"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-white font-mono">
+                        {idx + 1}. {seg.type.split(" ")[0]}
+                      </span>
+                      <button
+                        onClick={() => handleRemoveSegment(seg.id)}
+                        className="text-zinc-500 hover:text-rose-400 transition-colors"
+                      >
+                        <Trash2 size={10} />
+                      </button>
+                    </div>
+                    <div className="flex justify-between items-center text-[9px] font-mono text-zinc-400">
+                      <span>L: {seg.length_m}m</span>
+                      {seg.radius_m > 0 && <span>R: {seg.radius_m}m</span>}
+                    </div>
+                  </div>
+                ))}
+                <div className="flex items-center gap-1 pl-2">
+                  {(["Straight", "Left Corner", "Right Corner", "Hairpin"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => handleAddSegment(t)}
+                      className="px-2 py-1.5 rounded-lg bg-[#161D2B] hover:bg-[#20293D] text-[10px] font-mono text-zinc-300 border border-zinc-700 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                    >
+                      <Plus size={10} />
+                      {t.split(" ")[0]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Top 3 Corner Opportunities (if Tab 3 is active and opportunities present) */}
+          {trackInputTab === "csv" && cornerOpportunities.length > 0 && (
+            <div className="flex-shrink-0 p-3 bg-[#0A0D15] border-b border-[#1A202D]">
+              <div className="flex items-center gap-2 mb-2">
+                <Target size={14} className="text-[#f2a900]" />
+                <span className="text-xs font-bold text-white font-mono uppercase tracking-wider">
+                  Top 3 Corner Opportunity Finder (Driver vs. Optimal)
+                </span>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5">
+                {cornerOpportunities.map((opp) => (
+                  <div
+                    key={opp.corner_id}
+                    className="p-2.5 rounded-xl bg-[#121620] border border-[#202737] hover:border-amber-500/40 transition-all flex flex-col justify-between space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white font-mono">{opp.name}</span>
+                      <span className="text-[11px] font-black text-rose-400 font-mono bg-rose-950/80 px-2 py-0.5 rounded border border-rose-800/40">
+                        +{opp.time_loss_s.toFixed(3)}s
+                      </span>
+                    </div>
+                    <div className="text-[10px] font-mono text-zinc-400 flex justify-between">
+                      <span>Driver: {opp.driver_speed_kmh.toFixed(1)} km/h</span>
+                      <span className="text-amber-400">Opt: {opp.optimal_speed_kmh.toFixed(1)} km/h</span>
+                    </div>
+                    <div className="text-[9px] text-zinc-300 bg-[#161C28] p-1.5 rounded border border-[#252E3E]">
+                      {opp.recommendation}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Main Visualization Grid */}
+          <div className="flex-1 p-3 min-h-0 overflow-y-auto custom-scrollbar space-y-3">
+            {result ? (
               <>
-                <ParamRow label="Circuit Length" unit="m" value={ovalLength}
-                  onChange={setOvalLength} min={500} max={20000} step={100} />
-                <ParamRow label="Avg Corner Radius" unit="m" value={ovalRadius}
-                  onChange={setOvalRadius} min={10} max={500} step={5} />
+                {/* 2D Color-Coded Bottleneck TrackMap */}
+                <TrackMap
+                  x_m={tel?.x_m ?? []}
+                  y_m={tel?.y_m ?? []}
+                  speed_kmh={tel?.speed_kmh ?? []}
+                  limiting_factor={tel?.limiting_factor}
+                  distances={tel?.s_m ?? []}
+                  lateralG={tel?.lat_g}
+                  longitudinalG={tel?.long_g}
+                  corners={trackMapCorners}
+                  hoverDist={hoverDist}
+                  onHoverDist={setHoverDist}
+                  sectorBoundaries={
+                    trackInputTab === "preset"
+                      ? activeCircuit.sectorBoundaries
+                      : [
+                          (tel?.s_m?.[tel.s_m.length - 1] ?? 5000) * 0.33,
+                          (tel?.s_m?.[tel.s_m.length - 1] ?? 5000) * 0.66,
+                        ]
+                  }
+                  circuitName={trackInputTab === "preset" ? activeCircuit.name : undefined}
+                  driverSpeedsKmh={parsedCsvData?.speedKmh}
+                  ggv={result.ggv_envelope}
+                  showGgPlot
+                />
+
+                {/* Multi-channel Synchronized Telemetry Traces */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {/* Speed Trace */}
+                  <div className="h-[230px] bg-[#0D1017] border border-[#1f2430] rounded-xl p-2.5">
+                    <Plot
+                      data={[
+                        {
+                          x: tel?.s_m ?? [],
+                          y: tel?.speed_kmh ?? [],
+                          type: "scatter",
+                          mode: "lines",
+                          name: "Optimal Speed",
+                          line: { color: "#06B6D4", width: 2 },
+                        },
+                        ...(parsedCsvData
+                          ? [
+                              {
+                                x: parsedCsvData.distanceM,
+                                y: parsedCsvData.speedKmh,
+                                type: "scatter" as const,
+                                mode: "lines" as const,
+                                name: "Uploaded Driver Speed",
+                                line: { color: "#F59E0B", width: 1.6, dash: "dot" as const },
+                              },
+                            ]
+                          : []),
+                      ]}
+                      layout={darkLayout({
+                        title: { text: "Speed Trace over Distance [km/h]", font: { color: "#a1a1aa", size: 11 } },
+                        xaxis: { title: { text: "Distance [m]", font: { color: "#71717a" } } },
+                        yaxis: { title: { text: "Speed [km/h]", font: { color: "#06B6D4" } } },
+                        margin: { l: 45, r: 15, t: 25, b: 35 },
+                        legend: { orientation: "h", y: 1.15, font: { color: "#888", size: 8 } },
+                      })}
+                      config={{ displayModeBar: false, responsive: true }}
+                      style={{ width: "100%", height: "100%" }}
+                      useResizeHandler
+                    />
+                  </div>
+
+                  {/* Lateral & Longitudinal G */}
+                  <div className="h-[230px] bg-[#0D1017] border border-[#1f2430] rounded-xl p-2.5">
+                    <Plot
+                      data={[
+                        {
+                          x: tel?.s_m ?? [],
+                          y: tel?.lat_g ?? [],
+                          type: "scatter",
+                          mode: "lines",
+                          name: "Lateral G (ay)",
+                          line: { color: "#F59E0B", width: 1.5 },
+                        },
+                        {
+                          x: tel?.s_m ?? [],
+                          y: tel?.long_g ?? [],
+                          type: "scatter",
+                          mode: "lines",
+                          name: "Longitudinal G (ax)",
+                          line: { color: "#F43F5E", width: 1.5 },
+                        },
+                      ]}
+                      layout={darkLayout({
+                        title: { text: "Lateral & Longitudinal G [g]", font: { color: "#a1a1aa", size: 11 } },
+                        xaxis: { title: { text: "Distance [m]", font: { color: "#71717a" } } },
+                        yaxis: { title: { text: "Accel [g]", font: { color: "#71717a" } } },
+                        margin: { l: 45, r: 15, t: 25, b: 35 },
+                        legend: { orientation: "h", y: 1.15, font: { color: "#888", size: 8 } },
+                      })}
+                      config={{ displayModeBar: false, responsive: true }}
+                      style={{ width: "100%", height: "100%" }}
+                      useResizeHandler
+                    />
+                  </div>
+
+                  {/* Throttle & Brake % */}
+                  <div className="h-[230px] bg-[#0D1017] border border-[#1f2430] rounded-xl p-2.5">
+                    <Plot
+                      data={[
+                        {
+                          x: tel?.s_m ?? [],
+                          y: tel?.throttle_pct ?? [],
+                          type: "scatter",
+                          mode: "lines",
+                          name: "Throttle %",
+                          line: { color: "#10B981", width: 1.5 },
+                        },
+                        {
+                          x: tel?.s_m ?? [],
+                          y: tel?.brake_pct ?? [],
+                          type: "scatter",
+                          mode: "lines",
+                          name: "Brake %",
+                          line: { color: "#F43F5E", width: 1.5 },
+                        },
+                      ]}
+                      layout={darkLayout({
+                        title: { text: "Pedal Inputs: Throttle & Brake [%]", font: { color: "#a1a1aa", size: 11 } },
+                        xaxis: { title: { text: "Distance [m]", font: { color: "#71717a" } } },
+                        yaxis: { title: { text: "Pedal %", font: { color: "#71717a" } }, range: [0, 105] },
+                        margin: { l: 45, r: 15, t: 25, b: 35 },
+                        legend: { orientation: "h", y: 1.15, font: { color: "#888", size: 8 } },
+                      })}
+                      config={{ displayModeBar: false, responsive: true }}
+                      style={{ width: "100%", height: "100%" }}
+                      useResizeHandler
+                    />
+                  </div>
+
+                  {/* Downforce N */}
+                  <div className="h-[230px] bg-[#0D1017] border border-[#1f2430] rounded-xl p-2.5">
+                    <Plot
+                      data={[
+                        {
+                          x: tel?.s_m ?? [],
+                          y: tel?.downforce_n ?? [],
+                          type: "scatter",
+                          mode: "lines",
+                          name: "Aerodynamic Downforce",
+                          line: { color: "#A855F7", width: 1.6 },
+                        },
+                      ]}
+                      layout={darkLayout({
+                        title: { text: "Aerodynamic Downforce [N]", font: { color: "#a1a1aa", size: 11 } },
+                        xaxis: { title: { text: "Distance [m]", font: { color: "#71717a" } } },
+                        yaxis: { title: { text: "Downforce [N]", font: { color: "#A855F7" } } },
+                        margin: { l: 50, r: 15, t: 25, b: 35 },
+                      })}
+                      config={{ displayModeBar: false, responsive: true }}
+                      style={{ width: "100%", height: "100%" }}
+                      useResizeHandler
+                    />
+                  </div>
+                </div>
+
+                {/* LapDeltaView (Setup A vs Setup B comparison) */}
+                <LapDeltaView
+                  baselineRun={pinnedBaseline?.lap ?? null}
+                  currentRun={{
+                    lap_time_s: result.lap_time_s,
+                    sector_times: result.sector_times,
+                    max_speed_kmh: result.max_speed_kmh,
+                    min_speed_kmh: result.min_speed_kmh,
+                    avg_speed_kmh: result.avg_speed_kmh,
+                    energy_used_kj: result.energy_used_kj,
+                    trace: result.trace,
+                  }}
+                  setupAParams={pinnedBaseline?.cfg as any}
+                  setupBParams={cfg as any}
+                  onPinBaseline={handlePinBaseline}
+                  onResetToBaseline={() => pinnedBaseline && setCfg({ ...pinnedBaseline.cfg })}
+                />
               </>
             ) : (
-              <div
-                onDrop={handleDrop}
-                onDragOver={e => e.preventDefault()}
-                className="border border-dashed border-[#333] rounded-lg p-3 text-center cursor-pointer
-                  hover:border-[#f2a900]/40 transition-colors group"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <input ref={fileInputRef} type="file" accept=".gpx" aria-label="Upload GPX track file" className="hidden"
-                  onChange={e => e.target.files?.[0] && handleGpxUpload(e.target.files[0])} />
-                {uploading ? (
-                  <Loader2 size={16} className="mx-auto text-[#f2a900] animate-spin mb-1" />
-                ) : gpsData ? (
-                  <CheckCircle size={14} className="mx-auto text-green-500 mb-1" />
-                ) : (
-                  <Upload size={14} className="mx-auto text-gray-600 mb-1 group-hover:text-gray-400 transition-colors" />
-                )}
-                <p className="text-[9px] text-gray-600">
-                  {gpsData ? gpxName : "Drop .gpx or click"}
-                </p>
-                {gpsData && (
-                  <p className="text-[8px] text-[#f2a900] mt-0.5">{gpsData.n_points.toLocaleString()} pts</p>
-                )}
+              <div className="h-full flex items-center justify-center p-8">
+                <Loader2 size={24} className="animate-spin text-[#f2a900]" />
               </div>
-            )}
-          </Section>
-        )}
-
-        {/* Differential & Drivetrain Subsystem */}
-        <Section title="Differential & Drivetrain">
-          <div className="space-y-2">
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] text-zinc-400 font-mono">Drivetrain Layout</label>
-              <div className="flex rounded border border-[#252525] overflow-hidden">
-                {(["RWD", "FWD", "AWD"] as const).map(dt => (
-                  <button
-                    key={dt}
-                    onClick={() => setCfg(c => ({ ...c, drivetrain_layout: dt }))}
-                    className={`flex-1 text-[9px] py-1 font-bold font-mono transition-colors ${
-                      cfg.drivetrain_layout === dt ? "bg-[#f2a900] text-black" : "text-zinc-400 hover:text-white"
-                    }`}
-                  >
-                    {dt}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] text-zinc-400 font-mono">Differential Type</label>
-              <select
-                value={cfg.diff_type}
-                onChange={e => setCfg(c => ({ ...c, diff_type: e.target.value as any }))}
-                className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded px-2 py-1.5 text-white font-mono focus:outline-none focus:border-[#f2a900]/50 cursor-pointer"
-              >
-                <option value="OPEN">Open Differential</option>
-                <option value="LOCKED">Spool / 100% Locked</option>
-                <option value="LSD_TORQUE_BIASED">Torsen / Torque Biasing</option>
-                <option value="CLUTCH_PACK">Salisbury Clutch Pack</option>
-              </select>
-            </div>
-
-            {cfg.diff_type === "LSD_TORQUE_BIASED" && (
-              <ParamRow
-                label="Torque Bias Ratio"
-                unit=":1"
-                value={cfg.bias_ratio}
-                onChange={v => setCfg(c => ({ ...c, bias_ratio: v }))}
-                min={1.5}
-                max={6.0}
-                step={0.1}
-              />
-            )}
-
-            {(cfg.diff_type === "CLUTCH_PACK" || cfg.diff_type === "LSD_TORQUE_BIASED") && (
-              <ParamRow
-                label="Preload Torque"
-                unit="N·m"
-                value={cfg.preload_nm}
-                onChange={v => setCfg(c => ({ ...c, preload_nm: v }))}
-                min={0}
-                max={300}
-                step={5}
-              />
-            )}
-
-            {cfg.diff_type === "CLUTCH_PACK" && (
-              <>
-                <ParamRow
-                  label="Power Ramp Angle"
-                  unit="deg"
-                  value={cfg.ramp_angle_accel_deg}
-                  onChange={v => setCfg(c => ({ ...c, ramp_angle_accel_deg: v }))}
-                  min={30}
-                  max={90}
-                  step={5}
-                />
-                <ParamRow
-                  label="Coast Ramp Angle"
-                  unit="deg"
-                  value={cfg.ramp_angle_decel_deg}
-                  onChange={v => setCfg(c => ({ ...c, ramp_angle_decel_deg: v }))}
-                  min={30}
-                  max={90}
-                  step={5}
-                />
-              </>
             )}
           </div>
-        </Section>
-
-        {/* Mass & Geometry */}
-        <Section title="Mass & Geometry">
-          <ParamRow label="Total Mass" unit="kg" value={cfg.mass} onChange={set("mass")} min={300} max={2000} step={10} />
-          <ParamRow label="CoG Height" unit="m" value={cfg.h_cog} onChange={set("h_cog")} min={0.1} max={0.8} />
-          <ParamRow label="Wheelbase" unit="m" value={cfg.wheelbase} onChange={set("wheelbase")} min={1.5} max={4.0} step={0.05} />
-          <ParamRow label="CoG from Front" unit="m" value={cfg.cog_dist_front} onChange={set("cog_dist_front")} min={0.5} max={3.0} step={0.05} />
-          <ParamRow label="Front Track" unit="m" value={cfg.track_front} onChange={set("track_front")} min={0.8} max={2.2} step={0.05} />
-        </Section>
-
-        {/* Aerodynamics */}
-        <Section title="Aerodynamics">
-          <ParamRow label="CL Base" unit="–" value={cfg.cl_base} onChange={set("cl_base")} min={0} max={5} step={0.05} />
-          <ParamRow label="CD Base" unit="–" value={cfg.cd_base} onChange={set("cd_base")} min={0.1} max={3} step={0.05} />
-          <ParamRow label="Frontal Area" unit="m²" value={cfg.frontal_area} onChange={set("frontal_area")} min={0.5} max={4} step={0.05} />
-          <ParamRow label="CoP from Front" unit="–" value={cfg.cop_fraction} onChange={set("cop_fraction")} min={0.1} max={0.9} step={0.01} />
-          <ParamRow label="RH Sensitivity" unit="ΔCL/mm" value={cfg.cl_rh_sens} onChange={set("cl_rh_sens")} min={0} max={0.1} step={0.001} />
-        </Section>
-
-        {/* Powertrain */}
-        <Section title="Powertrain">
-          <ParamRow label="Peak Power" unit="kW" value={cfg.max_power_kw} onChange={set("max_power_kw")} min={50} max={1500} step={10} />
-          <ParamRow label="Brake Front Bias" unit="%" value={cfg.brake_front_bias} onChange={set("brake_front_bias")} min={40} max={80} step={1} />
-          <div className="mt-1 px-2 py-1.5 bg-[#0a0a0a] rounded border border-[#1a1a1a]">
-            <p className="text-[9px] text-gray-700">Drive Layout: {cfg.drivetrain_layout} · 6-speed sequential</p>
-          </div>
-        </Section>
-
-        {/* Run Button */}
-        <button
-          onClick={handleRun}
-          disabled={running}
-          id="lap-sim-run-btn"
-          className="w-full mt-2 py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider
-            bg-[#f2a900] text-black hover:bg-[#ffb800] transition-all duration-200
-            disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-        >
-          {running ? (
-            <><Loader2 size={13} className="animate-spin" />Simulating…</>
-          ) : (
-            <>
-              <Play size={13} />
-              {solverMode === "TRANSIENT_ENGINEERING"
-                ? "Run Handling Maneuver"
-                : solverMode === "HIGH_FIDELITY_LAP"
-                ? "Run 14-DOF Dynamic Lap"
-                : "Run QSS Simulation"}
-            </>
-          )}
-        </button>
-
-        {error && (
-          <div className="mt-2 p-2 rounded-lg bg-red-950/30 border border-red-900/40 flex items-start gap-2">
-            <AlertCircle size={11} className="text-red-400 mt-0.5 flex-shrink-0" />
-            <p className="text-[9px] text-red-400 leading-relaxed">{error}</p>
-          </div>
-        )}
-      </aside>
-
-      {/* ── CENTER PANEL ───────────────────────────────────────────────────── */}
-      <section aria-label="Lap Simulation Results" className="flex-1 flex flex-col min-w-0 overflow-hidden">
-
-        {solverMode === "TRANSIENT_ENGINEERING" ? (
-          <div className="flex-1 p-3 min-h-0 overflow-y-auto">
-            <TransientManeuverView result={maneuverResult} />
-          </div>
-        ) : result ? (
-          <>
-            {/* KPI Cards */}
-            <div className="flex-shrink-0 grid grid-cols-3 sm:grid-cols-6 gap-2 p-3 border-b border-[#1a1a1a]">
-              <KpiCard label="Lap Time" value={formatLapTime(result.total_time_s)} unit="" icon={Timer} accent />
-              <KpiCard label="Top Speed" value={result.max_speed_kmh.toFixed(0)} unit="km/h" icon={Gauge} />
-              <KpiCard label="Min Speed" value={result.min_speed_kmh.toFixed(0)} unit="km/h" icon={TrendingDown} />
-              <KpiCard label="Avg Speed" value={result.avg_speed_kmh.toFixed(0)} unit="km/h" icon={Activity} />
-              <KpiCard label="Energy Used" value={result.energy_used_kj.toFixed(0)} unit="kJ" icon={Zap} />
-              <KpiCard label="Terminal v" value={result.terminal_velocity_kmh.toFixed(0)} unit="km/h" icon={Wind} />
-            </div>
-
-            {/* Decision Banner if available */}
-            {decision && (
-              <div className="flex-shrink-0 px-3 pt-3">
-                <LapSimDecisionCard decision={decision} onApplyRecommendation={handleApplyRecommendation} />
-              </div>
-            )}
-
-            {/* Tabs */}
-            <div className="flex-shrink-0 flex items-center gap-0 border-b border-[#1a1a1a] px-3">
-              {tabs.map((t, i) => (
-                <button key={t} onClick={() => setActiveTab(i)}
-                  className={`px-3 py-2.5 text-[10px] font-bold uppercase tracking-wider transition-all border-b-2
-                    ${activeTab === i
-                      ? "text-[#f2a900] border-[#f2a900]"
-                      : "text-gray-600 border-transparent hover:text-gray-400"}`}>
-                  {t}
-                </button>
-              ))}
-              <div className="ml-auto flex items-center gap-1.5 text-[8px] text-gray-700">
-                <Layers size={9} />
-                <span>{result.model_version}</span>
-              </div>
-            </div>
-
-            {/* Plot & View Area */}
-            <div className="flex-1 p-3 min-h-0 overflow-y-auto">
-              {activeTab === 0 && tel && (
-                <div className="h-full flex flex-col space-y-3">
-                  <div className="h-[55%] min-h-[200px]">
-                    <Plot
-                      data={[
-                        {
-                          x: tel.distances, y: tel.speeds_kmh,
-                          type: "scatter", mode: "lines", name: "Speed",
-                          line: { color: "#f2a900", width: 1.5 },
-                          yaxis: "y",
-                        },
-                        {
-                          x: tel.distances, y: tel.gear_number,
-                          type: "scatter", mode: "lines", name: "Gear",
-                          line: { color: "#3b82f6", width: 1, shape: "hv" },
-                          yaxis: "y2",
-                        },
-                      ]}
-                      layout={{
-                        ...PLOTLY_BASE,
-                        title: { text: "Speed Trace & Gear Selection", font: { color: "#555", size: 12 } },
-                        xaxis: { ...PLOTLY_BASE.xaxis, title: { text: "Distance [m]", font: { color: "#555" } } },
-                        yaxis: { ...PLOTLY_BASE.yaxis, title: { text: "Speed [km/h]", font: { color: "#f2a900" } }, tickfont: { color: "#f2a900" } },
-                        yaxis2: {
-                          title: { text: "Gear", font: { color: "#3b82f6" } }, tickfont: { color: "#3b82f6" },
-                          overlaying: "y", side: "right", gridcolor: "transparent",
-                          dtick: 1, range: [0, 8],
-                        },
-                      } as Record<string, unknown>}
-                      config={{ displayModeBar: false, responsive: true }}
-                      style={{ width: "100%", height: "100%" }}
-                      useResizeHandler
-                      onHover={(eventData: any) => {
-                        const pt = eventData.points?.[0];
-                        if (pt && typeof pt.x === "number") setHoverDist(pt.x);
-                      }}
-                      onUnhover={() => setHoverDist(null)}
-                    />
-                  </div>
-                  <div className="h-[45%] min-h-[160px] grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <Plot
-                      data={[
-                        { x: tel.distances, y: tel.wheel_load_fl_n, type: "scatter", mode: "lines", name: "FL", line: { color: "#3b82f6", width: 1.2 } },
-                        { x: tel.distances, y: tel.wheel_load_fr_n, type: "scatter", mode: "lines", name: "FR", line: { color: "#f2a900", width: 1.2 } },
-                        { x: tel.distances, y: tel.wheel_load_rl_n, type: "scatter", mode: "lines", name: "RL", line: { color: "#22c55e", width: 1.2 } },
-                        { x: tel.distances, y: tel.wheel_load_rr_n, type: "scatter", mode: "lines", name: "RR", line: { color: "#ef4444", width: 1.2 } },
-                      ]}
-                      layout={{
-                        ...PLOTLY_BASE,
-                        title: { text: "Wheel Normal Loads [N]", font: { color: "#555", size: 11 } },
-                        xaxis: { ...PLOTLY_BASE.xaxis, title: { text: "Distance [m]", font: { color: "#555" } } },
-                        yaxis: { ...PLOTLY_BASE.yaxis, title: { text: "Load [N]", font: { color: "#555" } } },
-                        legend: { orientation: "h", y: 1.15, font: { color: "#888", size: 9 } },
-                      } as Record<string, unknown>}
-                      config={{ displayModeBar: false, responsive: true }}
-                      style={{ width: "100%", height: "100%" }}
-                      useResizeHandler
-                    />
-                    <Plot
-                      data={[
-                        { x: tel.distances, y: tel.aero_downforce_n, type: "scatter", mode: "lines", name: "Downforce", line: { color: "#a78bfa", width: 1.5 } },
-                        { x: tel.distances, y: tel.aero_drag_n, type: "scatter", mode: "lines", name: "Drag", line: { color: "#f97316", width: 1.5 } },
-                      ]}
-                      layout={{
-                        ...PLOTLY_BASE,
-                        title: { text: "Aero Forces [N]", font: { color: "#555", size: 11 } },
-                        xaxis: { ...PLOTLY_BASE.xaxis, title: { text: "Distance [m]", font: { color: "#555" } } },
-                        yaxis: { ...PLOTLY_BASE.yaxis, title: { text: "Force [N]", font: { color: "#555" } } },
-                        legend: { orientation: "h", y: 1.15, font: { color: "#888", size: 9 } },
-                      } as Record<string, unknown>}
-                      config={{ displayModeBar: false, responsive: true }}
-                      style={{ width: "100%", height: "100%" }}
-                      useResizeHandler
-                    />
-                  </div>
-                </div>
-              )}
-
-              {activeTab === 1 && tel && (
-                <div className="h-full flex flex-col">
-                  <TrackMap
-                    x={result.track_coordinates?.x || []}
-                    y={result.track_coordinates?.y || []}
-                    distances={tel.distances}
-                    speedsKmh={tel.speeds_kmh}
-                    lateralG={tel.lateral_g}
-                    longitudinalG={tel.longitudinal_g}
-                    tireUtilization={tel.tire_utilization_combined}
-                    corners={corners}
-                    hoverDist={hoverDist}
-                    onHoverDist={setHoverDist}
-                    onSelectCorner={(c) => {
-                      setSelectedCornerId(c.corner_id);
-                      setActiveTab(3);
-                    }}
-                  />
-                </div>
-              )}
-
-              {activeTab === 2 && tel && (
-                <div className="h-full grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <Plot
-                    data={[
-                      {
-                        x: tel.lateral_g, y: tel.longitudinal_g,
-                        type: "scatter", mode: "markers",
-                        marker: {
-                          color: tel.speeds_kmh, colorscale: "Plasma",
-                          size: 2.5, opacity: 0.7,
-                          colorbar: { title: { text: "km/h", font: { color: "#666" } }, tickfont: { color: "#666" }, thickness: 12 },
-                        },
-                        name: "GG Telemetry",
-                      },
-                      ...[50, 150, 250].map((vKmh) => {
-                        const vMs = vKmh / 3.6;
-                        const q = 0.5 * 1.225 * vMs * vMs;
-                        const downforceN = q * cfg.cl_base * cfg.frontal_area;
-                        const baseG = 1.15;
-                        const aeroG = (downforceN / (cfg.mass * 9.81)) * 1.2;
-                        const totalG = baseG + aeroG;
-                        const theta = Array.from({ length: 70 }, (_, i) => (i / 69) * 2 * Math.PI);
-                        return {
-                          x: theta.map(t => totalG * Math.cos(t)),
-                          y: theta.map(t => totalG * Math.sin(t)),
-                          type: "scatter" as const,
-                          mode: "lines" as const,
-                          name: `Aero Envelope @ ${vKmh} km/h (±${totalG.toFixed(2)}g)`,
-                          line: {
-                            color: vKmh === 50 ? "#3b82f640" : vKmh === 150 ? "#f2a90050" : "#ef444450",
-                            dash: "dash" as const,
-                            width: 1.2,
-                          },
-                        };
-                      }),
-                    ]}
-                    layout={{
-                      ...PLOTLY_BASE,
-                      title: { text: "GG Diagram with Aero-Expanded Envelopes", font: { color: "#555", size: 12 } },
-                      xaxis: { ...PLOTLY_BASE.xaxis, title: { text: "Lateral G", font: { color: "#555" } }, zeroline: true, zerolinecolor: "#333" },
-                      yaxis: { ...PLOTLY_BASE.yaxis, title: { text: "Longitudinal G", font: { color: "#555" } }, zeroline: true, zerolinecolor: "#333" },
-                      legend: { orientation: "h", y: 1.08, font: { color: "#888", size: 9 } },
-                    } as Record<string, unknown>}
-                    config={{ displayModeBar: false, responsive: true }}
-                    style={{ width: "100%", height: "100%" }}
-                    useResizeHandler
-                  />
-                  {ggv && (
-                    <Plot
-                      data={[
-                        {
-                          x: ggv.speeds_ms.map(v => v * 3.6),
-                          y: ggv.ay_max_ms2.map(a => a / 9.81),
-                          type: "scatter", mode: "lines", name: "ay max",
-                          line: { color: "#f2a900", width: 2 },
-                        },
-                        {
-                          x: ggv.speeds_ms.map(v => v * 3.6),
-                          y: ggv.ax_accel_ms2.map(a => a / 9.81),
-                          type: "scatter", mode: "lines", name: "ax accel",
-                          line: { color: "#22c55e", width: 1.5, dash: "dot" },
-                        },
-                        {
-                          x: ggv.speeds_ms.map(v => v * 3.6),
-                          y: ggv.ax_brake_ms2.map(a => a / 9.81),
-                          type: "scatter", mode: "lines", name: "ax brake",
-                          line: { color: "#ef4444", width: 1.5, dash: "dot" },
-                        },
-                      ]}
-                      layout={{
-                        ...PLOTLY_BASE,
-                        title: { text: "GGV Performance Envelope vs Speed", font: { color: "#555", size: 12 } },
-                        xaxis: { ...PLOTLY_BASE.xaxis, title: { text: "Speed [km/h]", font: { color: "#555" } } },
-                        yaxis: { ...PLOTLY_BASE.yaxis, title: { text: "Acceleration [g]", font: { color: "#555" } } },
-                        legend: { orientation: "h", y: 1.08, font: { color: "#888", size: 9 } },
-                      } as Record<string, unknown>}
-                      config={{ displayModeBar: false, responsive: true }}
-                      style={{ width: "100%", height: "100%" }}
-                      useResizeHandler
-                    />
-                  )}
-                </div>
-              )}
-
-              {activeTab === 3 && (
-                <div className="h-full overflow-y-auto custom-scrollbar">
-                  <CornerAnalysisPanel
-                    corners={corners}
-                    comparisons={cornerComparisons}
-                    selectedCornerId={selectedCornerId}
-                    onSelectCorner={(id) => {
-                      setSelectedCornerId(id);
-                      const corner = corners.find(c => c.corner_id === id);
-                      if (corner) setHoverDist(corner.apex_distance_m);
-                    }}
-                  />
-                </div>
-              )}
-
-              {activeTab === 4 && (
-                <div className="h-full flex flex-col space-y-3 overflow-y-auto custom-scrollbar">
-                  <div className="flex flex-wrap items-center justify-between gap-2 p-3 bg-[#101014] border border-[#202026] rounded-xl">
-                    <div className="text-xs text-zinc-300 font-mono">
-                      Compare Current Setup against Candidates:
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => handleCompare({ cl_base: cfg.cl_base + 0.20, cd_base: cfg.cd_base + 0.03 })}
-                        disabled={comparing}
-                        className="px-2.5 py-1 text-[10px] bg-[#1a1a22] hover:bg-[#252530] text-amber-300 rounded border border-[#333340] transition-colors"
-                      >
-                        +0.20 High Downforce
-                      </button>
-                      <button
-                        onClick={() => handleCompare({ mass: Math.max(cfg.mass - 35, 400) })}
-                        disabled={comparing}
-                        className="px-2.5 py-1 text-[10px] bg-[#1a1a22] hover:bg-[#252530] text-emerald-300 rounded border border-[#333340] transition-colors"
-                      >
-                        -35kg Weight Reduction
-                      </button>
-                      <button
-                        onClick={() => handleCompare()}
-                        disabled={comparing}
-                        className="px-3 py-1 text-[10px] font-bold bg-[#f2a900] hover:bg-[#ffb800] text-black rounded transition-colors flex items-center gap-1.5"
-                      >
-                        {comparing ? <Loader2 size={11} className="animate-spin" /> : <Play size={11} />}
-                        Run A/B Delta
-                      </button>
-                    </div>
-                  </div>
-
-                  <LapDeltaView report={deltaReport} />
-                </div>
-              )}
-
-              {activeTab === 5 && (
-                <div className="h-full flex flex-col space-y-3 overflow-y-auto custom-scrollbar">
-                  <div className="flex items-center justify-between p-3 bg-[#101014] border border-[#202026] rounded-xl">
-                    <div>
-                      <div className="text-xs text-zinc-300 font-mono font-bold">Logged vs Simulation Validation</div>
-                      <div className="text-[10px] text-zinc-500">Cross-correlate distance-domain speeds and identify driver spatial phase lag</div>
-                    </div>
-                    <button
-                      onClick={handleCorrelate}
-                      disabled={correlating}
-                      className="px-3 py-1.5 text-[10px] font-bold bg-[#3b82f6] hover:bg-[#60a5fa] text-white rounded transition-colors flex items-center gap-1.5"
-                    >
-                      {correlating ? <Loader2 size={11} className="animate-spin" /> : <Activity size={11} />}
-                      Run Telemetry Correlation
-                    </button>
-                  </div>
-
-                  <TelemetryCorrelationView
-                    report={correlationReport}
-                    simSpeedsKmh={tel?.speeds_kmh}
-                    distances={tel?.distances}
-                  />
-                </div>
-              )}
-
-              {activeTab === 6 && (
-                <div className="h-full flex flex-col space-y-3 overflow-y-auto custom-scrollbar">
-                  <div className="flex items-center justify-between p-3 bg-[#101014] border border-[#202026] rounded-xl">
-                    <div>
-                      <div className="text-xs text-zinc-300 font-mono font-bold">Fast QSS ↔ 14-DOF Transient Cross-Validation</div>
-                      <div className="text-[10px] text-zinc-500">
-                        Execute parallel steady-state vs 14-DOF transient passes on the current circuit to isolate physical losses.
-                      </div>
-                    </div>
-                    <button
-                      onClick={handleCrossValidate}
-                      disabled={crossValidating}
-                      className="px-3 py-1.5 text-[10px] font-bold bg-[#f2a900] hover:bg-[#ffb800] text-black rounded transition-colors flex items-center gap-1.5 cursor-pointer"
-                    >
-                      {crossValidating ? <Loader2 size={11} className="animate-spin" /> : <Play size={11} />}
-                      Run Cross-Validation
-                    </button>
-                  </div>
-
-                  <CrossValidationView
-                    data={crossValidationData}
-                    qssDistances={result?.telemetry?.distances}
-                    qssSpeedsKmh={result?.telemetry?.speeds_kmh}
-                    dynDistances={result?.telemetry?.distances}
-                    dynSpeedsKmh={result?.telemetry?.speeds_kmh}
-                  />
-                </div>
-              )}
-            </div>
-          </>
-        ) : (
-          /* ── Empty State ── */
-          <div className="flex-1 flex items-center justify-center p-8">
-            <div className="max-w-[480px] text-center">
-              <div className="w-16 h-16 rounded-2xl bg-[#f2a900]/8 border border-[#f2a900]/15
-                flex items-center justify-center mx-auto mb-6">
-                <Timer size={28} className="text-[#f2a900]/60" />
-              </div>
-              <h2 className="text-xl font-bold text-white mb-2">Quasi-Steady-State Lap Simulator</h2>
-              <p className="text-[12px] text-gray-500 mb-6 leading-relaxed">
-                4-wheel load transfer &middot; Combined-slip Pacejka tires &middot; GGV envelope
-              </p>
-
-              <div className="bg-[#0d0d0f] border border-[#1e1e20] rounded-2xl p-5 text-left mb-6">
-                <p className="text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-3">Model includes</p>
-                <ul className="space-y-1.5">
-                  {[
-                    "Individual wheel loads — longitudinal + lateral load transfer",
-                    "Per-wheel combined-slip Pacejka tire forces",
-                    "GGV envelope pre-computation (40 speed × 20 ay points)",
-                    "Powertrain — torque curve, 6-speed gear ratios, drivetrain loss",
-                    "Aero map — front/rear balance, ride-height sensitivity",
-                    "Brake bias — per-axle friction check",
-                    "Power-limited terminal velocity (no hardcoded speed caps)",
-                    "Track banking and elevation gradient",
-                  ].map((item, i) => (
-                    <li key={i} className="flex items-start gap-2 text-[10px] text-gray-500">
-                      <CheckCircle size={10} className="text-[#f2a900]/50 mt-0.5 flex-shrink-0" />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <p className="text-[11px] text-gray-600">
-                Configure vehicle parameters in the left panel, then upload a GPX track or use a synthetic oval to begin.
-              </p>
-
-              {running && (
-                <div className="mt-4 flex items-center justify-center gap-2 text-[#f2a900]">
-                  <Loader2 size={14} className="animate-spin" />
-                  <span className="text-[11px]">Building GGV envelope and running lap…</span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* ── RIGHT PANEL ────────────────────────────────────────────────────── */}
-      <aside aria-label="Session Information" className="w-[180px] flex-shrink-0 border-l border-[#1a1a1a] overflow-y-auto p-3 space-y-3 custom-scrollbar">
-        <h2 className="text-[9px] font-bold text-gray-400 uppercase tracking-[0.16em]">Session Info</h2>
-
-        {result ? (
-          <>
-            {/* Sector Times */}
-            {result.sector_times_s.length > 0 && (
-              <div>
-                <p className="text-[9px] text-gray-700 mb-1.5 uppercase tracking-wider font-bold">Sectors</p>
-                {result.sector_times_s.map((t, i) => (
-                  <div key={i} className="flex justify-between items-center py-1 border-b border-[#111]">
-                    <span className="text-[9px] text-gray-600">S{i + 1}</span>
-                    <span className="text-[10px] font-bold text-white tabular-nums">{t.toFixed(3)}s</span>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Interactive 2D Circuit Map with Beacon */}
-            {tel && (
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-[9px] text-gray-700 uppercase tracking-wider font-bold">Track Map</p>
-                  {hoverDist !== null && (
-                    <span className="text-[8px] font-mono text-amber-400">{hoverDist.toFixed(0)}m</span>
-                  )}
-                </div>
-                <div className="h-28 bg-[#0a0a0c] border border-[#1e1e22] rounded-lg relative overflow-hidden flex items-center justify-center p-2">
-                  {result?.track_coordinates && result.track_coordinates.x?.length > 1 ? (
-                    (() => {
-                      const coords = result.track_coordinates;
-                      const minX = Math.min(...coords.x);
-                      const maxX = Math.max(...coords.x);
-                      const minY = Math.min(...coords.y);
-                      const maxY = Math.max(...coords.y);
-                      const spanX = Math.max(maxX - minX, 1);
-                      const spanY = Math.max(maxY - minY, 1);
-                      const pad = 12;
-                      const pts = coords.x.map((xVal, i) => {
-                        const px = pad + ((xVal - minX) / spanX) * (180 - 2 * pad);
-                        const py = 110 - (pad + ((coords.y[i] - minY) / spanY) * (110 - 2 * pad));
-                        return `${px.toFixed(1)},${py.toFixed(1)}`;
-                      });
-                      const d = `M ${pts.join(" L ")} ${coords.is_closed ? "Z" : ""}`;
-
-                      let bx = 90, by = 55;
-                      if (hoverDist !== null && tel.distances.length > 0) {
-                        let bestIdx = 0;
-                        let minDiff = Infinity;
-                        for (let i = 0; i < tel.distances.length; i++) {
-                          const diff = Math.abs(tel.distances[i] - hoverDist);
-                          if (diff < minDiff) {
-                            minDiff = diff;
-                            bestIdx = i;
-                          }
-                        }
-                        if (bestIdx < coords.x.length) {
-                          bx = pad + ((coords.x[bestIdx] - minX) / spanX) * (180 - 2 * pad);
-                          by = 110 - (pad + ((coords.y[bestIdx] - minY) / spanY) * (110 - 2 * pad));
-                        }
-                      }
-
-                      return (
-                        <svg viewBox="0 0 180 110" className="w-full h-full">
-                          <path d={d} fill="none" stroke="#222" strokeWidth="6" strokeLinecap="round" />
-                          <path d={d} fill="none" stroke="#555" strokeWidth="2" strokeLinecap="round" />
-                          {hoverDist !== null && (
-                            <g>
-                              <circle cx={bx} cy={by} r="6" fill="#f2a900" opacity="0.3" className="animate-ping" />
-                              <circle cx={bx} cy={by} r="3.5" fill="#f2a900" stroke="#fff" strokeWidth="1" />
-                            </g>
-                          )}
-                        </svg>
-                      );
-                    })()
-                  ) : (
-                    <svg viewBox="-120 -80 240 160" className="w-full h-full">
-                      <path
-                        d="M -60 -50 L 60 -50 A 50 50 0 0 1 60 50 L -60 50 A 50 50 0 0 1 -60 -50 Z"
-                        fill="none"
-                        stroke="#222"
-                        strokeWidth="8"
-                        strokeLinecap="round"
-                      />
-                      <path
-                        d="M -60 -50 L 60 -50 A 50 50 0 0 1 60 50 L -60 50 A 50 50 0 0 1 -60 -50 Z"
-                        fill="none"
-                        stroke="#444"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                      />
-                      {hoverDist !== null && (
-                        <circle cx={0} cy={-50} r="4" fill="#f2a900" stroke="#fff" strokeWidth="1" />
-                      )}
-                    </svg>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Speed mini histogram */}
-            {tel && (
-              <div>
-                <p className="text-[9px] text-gray-700 mb-1.5 uppercase tracking-wider font-bold">Speed Profile</p>
-                <Plot
-                  data={[{
-                    x: tel.distances,
-                    y: tel.speeds_kmh,
-                    type: "scatter", mode: "lines",
-                    line: { color: "#f2a900", width: 1 },
-                    fill: "tozeroy",
-                    fillcolor: "rgba(242,169,0,0.08)",
-                  }]}
-                  layout={{
-                    paper_bgcolor: "transparent",
-                    plot_bgcolor: "transparent",
-                    xaxis: { visible: false },
-                    yaxis: { visible: false },
-                    margin: { l: 0, r: 0, t: 0, b: 0 },
-                    height: 60,
-                  } as Record<string, unknown>}
-                  config={{ displayModeBar: false, staticPlot: true }}
-                  style={{ width: "100%", height: 60 }}
-                />
-              </div>
-            )}
-
-            {/* Stats */}
-            <div className="space-y-1.5">
-              {[
-                { label: "Model", value: result.model_version },
-                { label: "Avg Power", value: `${result.avg_power_kw.toFixed(0)} kW` },
-                { label: "Energy", value: `${result.energy_used_kj.toFixed(0)} kJ` },
-                { label: "Terminal v", value: `${result.terminal_velocity_kmh.toFixed(0)} km/h` },
-              ].map(({ label, value }) => (
-                <div key={label} className="flex flex-col">
-                  <span className="text-[8px] text-gray-700 uppercase tracking-wider">{label}</span>
-                  <span className="text-[10px] text-gray-300 font-mono">{value}</span>
-                </div>
-              ))}
-            </div>
-          </>
-        ) : (
-          <div className="space-y-2">
-            {[
-              { icon: BarChart3, text: "GGV envelope" },
-              { icon: Activity, text: "Speed trace" },
-              { icon: Gauge, text: "Gear analysis" },
-              { icon: Settings2, text: "Load transfer" },
-            ].map(({ icon: Icon, text }) => (
-              <div key={text} className="flex items-center gap-2">
-                <Icon size={12} className="text-[#f2a900]" />
-                <span className="text-[10px] text-gray-300 font-medium">{text}</span>
-              </div>
-            ))}
-            <p className="text-[10px] text-gray-400 pt-2 font-mono">Run simulation to populate telemetry.</p>
-          </div>
-        )}
-      </aside>
-    </div>
+        </main>
+      </div>
+    </PlanGate>
   );
 }
-

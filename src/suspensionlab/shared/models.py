@@ -229,6 +229,7 @@ class HalfCarResultSchema(BaseModel):
     rms_susp_travel_r: float
     rms_tire_load_f: float
     rms_tire_load_r: float
+    tire_liftoff_detected: Optional[bool] = False
 
 
 class FullCarParamsSchema(BaseModel):
@@ -335,6 +336,7 @@ class FullCarResultSchema(BaseModel):
     contact_states_rl: Optional[List[str]] = None
     contact_states_rr: Optional[List[str]] = None
     minimum_Fz: Optional[float] = None
+    tire_liftoff_detected: Optional[bool] = False
     diagnostics: Optional[Dict[str, Any]] = None
     provenance: Optional[Dict[str, Any]] = None
 

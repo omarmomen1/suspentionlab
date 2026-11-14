@@ -24,6 +24,8 @@ from suspensionlab.physics.lap_sim import (
     LapSimVehicle, MassProperties, AeroMap, PowertrainModel,
     parse_track_from_gps, parse_track_from_curvature, solve_lap, TrackSegment,
     FAST_QUASI_STEADY,
+    simulate_lap, compute_ggv_surface, get_builtin_track,
+    parse_segments_array, parse_telemetry_csv, VehicleParameters,
 )
 from suspensionlab.physics.dynamic_lap_sim import (
     DynamicLapSimulator,
@@ -434,6 +436,145 @@ def _extract_track_segments(request_data: Dict[str, Any]) -> List[TrackSegment]:
 # ─────────────────────────────────────────────────────────────────────────────
 # Routes
 # ─────────────────────────────────────────────────────────────────────────────
+
+@router.post("/api/v1/lap-sim/simulate", summary="Coupled 3-Pass GGV & Closed-Loop QSS Lap Simulation")
+@router.post("/lap-sim/simulate", summary="Coupled 3-Pass GGV & Closed-Loop QSS Lap Simulation")
+@router.post("/simulate", summary="Coupled 3-Pass GGV & Closed-Loop QSS Lap Simulation")
+async def simulate_lap_endpoint(
+    request_data: Dict[str, Any],
+):
+    """
+    Locked JSON Contract endpoint for Coupled 3-Pass GGV & Closed-Loop QSS Lap Solver.
+    Supports:
+      - Built-in tracks: 'spa', 'silverstone', 'monza', 'fsae_endurance'
+      - Custom segment arrays: [{type, length_m, radius_m, banking_deg, grade_pct}]
+      - Telemetry CSV / data: [{time_s, speed_ms, lat_g}]
+      - Vehicle & Suspension parameters
+    """
+    # 1. Track resolution
+    track_arg = request_data.get("track", "spa")
+    segments_arg = request_data.get("segments")
+    telemetry_arg = request_data.get("telemetry")
+    csv_data = request_data.get("csv_data")
+
+    if isinstance(csv_data, str) and len(csv_data.strip()) > 0:
+        import io, csv
+        reader = csv.DictReader(io.StringIO(csv_data.strip()))
+        rows = list(reader)
+        if len(rows) > 0 and "time_s" in rows[0]:
+            telemetry_arg = {
+                "time_s": [float(r["time_s"]) for r in rows],
+                "speed_ms": [float(r["speed_ms"]) for r in rows],
+                "lat_g": [float(r["lat_g"]) for r in rows],
+            }
+    elif isinstance(csv_data, list) and len(csv_data) > 0:
+        telemetry_arg = {
+            "time_s": [float(r["time_s"]) for r in csv_data],
+            "speed_ms": [float(r["speed_ms"]) for r in csv_data],
+            "lat_g": [float(r["lat_g"]) for r in csv_data],
+        }
+
+    # Backward compatibility: top-level distances and curvatures
+    if not segments_arg and not telemetry_arg and "distances" in request_data and "curvatures" in request_data:
+        track_arg = parse_track_from_curvature(
+            request_data["distances"],
+            request_data["curvatures"],
+            elevations=request_data.get("elevations"),
+            bank_angles=request_data.get("bank_angles"),
+            sectors=request_data.get("sectors"),
+        )
+    elif not segments_arg and not telemetry_arg and "latitudes" in request_data and "longitudes" in request_data:
+        track_arg = parse_track_from_gps(
+            request_data["latitudes"],
+            request_data["longitudes"],
+            request_data.get("elevations"),
+        )
+
+    # 2. Vehicle & Suspension parameters
+    vehicle_dict = dict(request_data.get("vehicle", {})) if isinstance(request_data.get("vehicle"), dict) else {}
+    if "suspension" in request_data and isinstance(request_data["suspension"], dict):
+        if "suspension" not in vehicle_dict:
+            vehicle_dict["suspension"] = {}
+        vehicle_dict["suspension"].update(request_data["suspension"])
+
+    # Also top-level vehicle and suspension overrides
+    all_param_keys = (
+        "mass_kg", "mass", "total_mass", "weight_dist_front", "weight_dist_f", "weight_dist",
+        "cg_height_m", "h_cog", "wheelbase_m", "wheelbase",
+        "track_front_m", "track_f_m", "track_front", "track_rear_m", "track_r_m", "track_rear",
+        "cl_total", "cl", "aero_cl", "cl_base", "cd_total", "cd", "aero_cd", "cd_base",
+        "frontal_area_m2", "frontal_area", "aero_balance_front", "cop_front", "cop_fraction",
+        "rho_air", "c_rr", "crr", "rolling_resistance",
+        "k_spring_front_n_m", "k_spring_f", "k_spring_front", "front_spring_rate",
+        "k_spring_rear_n_m", "k_spring_r", "k_spring_rear", "rear_spring_rate",
+        "motion_ratio_front", "mr_f", "motion_ratio_rear", "mr_r",
+        "k_arb_front_nm_rad", "k_arb_f", "k_arb_front", "front_arb",
+        "k_arb_rear_nm_rad", "k_arb_r", "k_arb_rear", "rear_arb",
+        "roll_center_front_m", "roll_center_f_m", "roll_center_front", "front_rc_height",
+        "roll_center_rear_m", "roll_center_r_m", "roll_center_rear", "rear_rc_height",
+        "camber_gain_front", "camber_gain_rear",
+        "mu_0", "fz_nom_n", "Fz_nom", "k_load_sensitivity", "k_load", "tire_mu", "mu",
+        "max_power_kw", "max_power", "gear_ratios", "final_drive",
+        "max_rpm", "rev_limit", "wheel_radius_m", "wheel_radius",
+        "drivetrain_efficiency", "drivetrain_loss", "shift_time_s",
+        "max_brake_force_n", "max_brake_force", "brake_bias_front", "brake_bias_f", "brake_front_bias",
+    )
+    for k in all_param_keys:
+        if k in request_data and k not in vehicle_dict:
+            vehicle_dict[k] = request_data[k]
+
+    is_closed = bool(request_data.get("is_closed", True))
+
+    import asyncio
+    loop = asyncio.get_running_loop()
+
+    try:
+        sim_res = await loop.run_in_executor(
+            None,
+            lambda: simulate_lap(
+                vehicle=vehicle_dict,
+                track=track_arg,
+                segments=segments_arg,
+                telemetry=telemetry_arg,
+                is_closed=is_closed,
+            )
+        )
+    except Exception as e:
+        raise HTTPException(500, f"Lap simulation failed: {e}")
+
+    # Build locked contract output
+    response_payload = sim_res.to_contract_dict()
+
+    # Add backward-compatible fields
+    response_payload.update({
+        "status": "success",
+        "total_time_s": sim_res.lap_time_s,
+        "telemetry": {
+            "distances": sim_res.trace["s_m"],
+            "speeds_ms": [s / 3.6 for s in sim_res.trace["speed_kmh"]],
+            "speeds_kmh": sim_res.trace["speed_kmh"],
+            "lateral_g": sim_res.trace["lat_g"],
+            "longitudinal_g": sim_res.trace["long_g"],
+            "throttle_pct": sim_res.trace["throttle_pct"],
+            "brake_pct": sim_res.trace["brake_pct"],
+            "gear_number": sim_res.trace["gear"],
+            "aero_downforce_n": sim_res.trace["downforce_n"],
+            "limiting_factor": sim_res.trace["limiting_factor"],
+        },
+        "ggv": {
+            "speeds_kmh": sim_res.ggv_envelope["speeds_kmh"],
+            "max_lat_g": sim_res.ggv_envelope["max_lat_g"],
+            "max_accel_g": sim_res.ggv_envelope["max_accel_g"],
+            "max_brake_g": sim_res.ggv_envelope["max_brake_g"],
+        },
+        "track_coordinates": {
+            "x": sim_res.trace["x_m"],
+            "y": sim_res.trace["y_m"],
+        },
+    })
+
+    return response_payload
+
 
 @router.post("/lapsim/run")
 @router.post("/lap-sim/run")

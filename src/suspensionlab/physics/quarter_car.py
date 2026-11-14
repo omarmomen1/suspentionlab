@@ -84,7 +84,7 @@ from suspensionlab.physics.contracts import (
 class QuarterCarParams:
     """All physical parameters for the 2-DOF quarter car model.
 
-    Default parameters are chosen to produce a zeta_s ≈ 0.44 (optimal range) 
+    Default parameters are chosen to produce a zeta_s ≈ 0.28 (optimal range) 
     with the default spring/mass configuration.
 
     Attributes
@@ -332,6 +332,7 @@ class QuarterCarResult:
     # Metrics
     rms_body_accel:    float = 0.0
     rms_body_accel_wk: float = 0.0  # ISO 2631-1 Wk frequency-weighted RMS acceleration [m/s²]
+    vdv:               float = 0.0  # ISO 2631-1 Vibration Dose Value [m/s^1.75]
     rms_susp_travel:   float = 0.0
     rms_tire_load:     float = 0.0
     peak_susp_travel:  float = 0.0
@@ -1099,57 +1100,71 @@ def simulate_time_response(
 # Performance & Comfort Metrics
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _apply_wk_weighting(ddz_s: np.ndarray, dt: float) -> np.ndarray:
+def calculate_vdv(accel_wk: np.ndarray, fs: float) -> float:
+    """Calculate Vibration Dose Value (VDV) [m/s^1.75] per ISO 2631-1.
+
+    VDV = ( \\int_0^T a_wk(t)^4 dt )^(1/4)
+    """
+    if len(accel_wk) < 2 or fs <= 0.0:
+        return 0.0
+    dt = 1.0 / fs
+    try:
+        from scipy.integrate import trapezoid as trapz_fn
+    except ImportError:
+        try:
+            from numpy import trapezoid as trapz_fn
+        except ImportError:
+            trapz_fn = np.trapz
+    integral = float(trapz_fn(accel_wk**4, dx=dt))
+    return float(np.maximum(0.0, integral)**0.25)
+
+
+def _apply_wk_weighting(ddz_s: np.ndarray, dt: float = 0.002, fs: Optional[float] = None) -> np.ndarray:
     """
     Apply ISO 2631-1 Wk frequency weighting to vertical acceleration.
-    Uses exact bilinear-transformed IIR filter coefficients from ISO 2631-1:1997 Annex B.
+    Uses exact continuous s-domain transfer function from ISO 2631-1:1997 / ISO 8041 Annex A:
+      H_wk(s) = H_h(s) * H_l(s) * H_t(s) * H_s(s)
+    Evaluated in the frequency domain via rfft/irfft to eliminate bilinear warping near Nyquist.
     """
-    fs = 1.0 / dt
+    if fs is None:
+        fs = 1.0 / dt
+    
+    arr = np.asarray(ddz_s, dtype=np.float64)
+    n = len(arr)
+    if n < 4:
+        return arr.copy()
+    
+    # Pad to 2*n to prevent circular convolution wrap-around on non-periodic transients
+    n_fft = 2 * n
+    freqs = np.fft.rfftfreq(n_fft, d=1.0 / fs)
+    s = 1j * 2.0 * np.pi * freqs
     
     # ISO 2631-1 Wk exact parameters
-    f1, f2 = 0.4, 100.0
-    f3, f4 = 12.5, 12.5
-    f5, f6 = 2.37, 3.35
-    Q5, Q6 = 0.91, 0.91
+    f1, Q1 = 0.4, 1.0 / np.sqrt(2.0)
+    f2, Q2 = 100.0, 1.0 / np.sqrt(2.0)
+    f3, f4, Q4 = 12.5, 12.5, 0.63
+    f5, Q5 = 2.37, 0.91
+    f6, Q6 = 3.35, 0.91
     
-    w1, w2 = 2*np.pi*f1, 2*np.pi*f2
-    w3, w4 = 2*np.pi*f3, 2*np.pi*f4
-    w5, w6 = 2*np.pi*f5, 2*np.pi*f6
+    w1, w2 = 2.0 * np.pi * f1, 2.0 * np.pi * f2
+    w3, w4 = 2.0 * np.pi * f3, 2.0 * np.pi * f4
+    w5, w6 = 2.0 * np.pi * f5, 2.0 * np.pi * f6
     
-    # H_h (High-pass)
-    z_h = [0, 0]
-    p_h = [-w1/np.sqrt(2) + 1j*w1/np.sqrt(2), -w1/np.sqrt(2) - 1j*w1/np.sqrt(2)]
-    k_h = 1.0
+    H_wk = np.zeros(len(freqs), dtype=complex)
+    idx_nz = freqs > 0
+    snz = s[idx_nz]
     
-    # H_l (Low-pass)
-    z_l = []
-    p_l = [-w2/np.sqrt(2) + 1j*w2/np.sqrt(2), -w2/np.sqrt(2) - 1j*w2/np.sqrt(2)]
-    k_l = w2**2
+    H_h = (snz**2) / (snz**2 + (w1 / Q1) * snz + w1**2)
+    H_l = (w2**2) / (snz**2 + (w2 / Q2) * snz + w2**2)
+    H_t = ((snz + w3) * (w4**2 / w3)) / (snz**2 + (w4 / Q4) * snz + w4**2)
+    H_s = (snz**2 + (w5 / Q5) * snz + w5**2) / (snz**2 + (w6 / Q6) * snz + w6**2)
     
-    # H_t (Transition)
-    z_t = [-w3]
-    p_t = [-w4]
-    k_t = w4 / w3
+    H_wk[idx_nz] = H_h * H_l * H_t * H_s
     
-    # H_s (Up-step)
-    disc5 = complex((w5/Q5)**2 - 4*w5**2)
-    r5 = np.sqrt(disc5)
-    z_s = [(-w5/Q5 + r5)/2, (-w5/Q5 - r5)/2]
-    
-    disc6 = complex((w6/Q6)**2 - 4*w6**2)
-    r6 = np.sqrt(disc6)
-    p_s = [(-w6/Q6 + r6)/2, (-w6/Q6 - r6)/2]
-    k_s = 1.0  # Monic polynomial form: (s^2 + w5/Q5*s + w5^2) / (s^2 + w6/Q6*s + w6^2) has asymptotic gain 1.0
-    
-    z = np.concatenate([z_h, z_l, z_t, z_s])
-    p = np.concatenate([p_h, p_l, p_t, p_s])
-    k = k_h * k_l * k_t * k_s
-    
-    # Convert analog to digital via bilinear transform
-    zd, pd, kd = signal.bilinear_zpk(z, p, k, fs)
-    sos = signal.zpk2sos(zd, pd, kd)
-    
-    return signal.sosfiltfilt(sos, ddz_s)
+    A = np.fft.rfft(arr, n=n_fft)
+    filtered = np.fft.irfft(A * H_wk, n=n_fft)[:n]
+    return filtered
+
 
 def compute_metrics(time_data: dict, p: QuarterCarParams) -> dict:
     """
@@ -1162,7 +1177,7 @@ def compute_metrics(time_data: dict, p: QuarterCarParams) -> dict:
         1.0–2.0       :  Uncomfortable
         > 2.0         :  Very uncomfortable
 
-    Returns dict with rms_body_accel, rms_body_accel_wk, rms_susp_travel, rms_tire_load,
+    Returns dict with rms_body_accel, rms_body_accel_wk, vdv, rms_susp_travel, rms_tire_load,
     peak_susp_travel, comfort_rating.
     """
     ddz_s        = time_data["ddz_s"]
@@ -1172,7 +1187,10 @@ def compute_metrics(time_data: dict, p: QuarterCarParams) -> dict:
     rms_accel   = float(np.sqrt(np.mean(ddz_s ** 2)))
     
     dt = time_data["time"][1] - time_data["time"][0] if len(time_data["time"]) > 1 else 0.002
-    rms_body_accel_wk = float(np.sqrt(np.mean(_apply_wk_weighting(ddz_s, dt)**2)))
+    fs = 1.0 / dt
+    accel_wk = _apply_wk_weighting(ddz_s, dt=dt, fs=fs)
+    rms_body_accel_wk = float(np.sqrt(np.mean(accel_wk**2)))
+    vdv = calculate_vdv(accel_wk, fs=fs)
 
     rms_susp    = float(np.sqrt(np.mean(susp_travel ** 2)))
     rms_tire    = float(np.sqrt(np.mean(tire_lv ** 2)))
@@ -1191,12 +1209,13 @@ def compute_metrics(time_data: dict, p: QuarterCarParams) -> dict:
         comfort = "VERY UNCOMFORTABLE"
 
     return {
-        "rms_body_accel":   rms_accel,
+        "rms_body_accel":    rms_accel,
         "rms_body_accel_wk": rms_body_accel_wk,
-        "rms_susp_travel":  rms_susp,
-        "rms_tire_load":    rms_tire,
-        "peak_susp_travel": peak_travel,
-        "comfort_rating":   comfort,
+        "vdv":               vdv,
+        "rms_susp_travel":   rms_susp,
+        "rms_tire_load":     rms_tire,
+        "peak_susp_travel":  peak_travel,
+        "comfort_rating":    comfort,
     }
 
 
@@ -1320,6 +1339,7 @@ def run_quarter_car_analysis(
         # Metrics
         rms_body_accel   = metrics["rms_body_accel"],
         rms_body_accel_wk= metrics["rms_body_accel_wk"],
+        vdv              = metrics.get("vdv", 0.0),
         rms_susp_travel  = metrics["rms_susp_travel"],
         rms_tire_load    = metrics["rms_tire_load"],
         peak_susp_travel = metrics["peak_susp_travel"],

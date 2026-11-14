@@ -161,14 +161,19 @@ class TireCoeffs:
     pVx2: float = 0.0      # Load variation of Svx
 
     # ── Combined slip — Similarity Method ─────────────────────────────────
-    rBx1: float = 10.0     # Slope factor for Gxα
-    rBx2: float = 8.0      # Kappa influence on Gxα slope
+    rBx1: float = 13.0     # Slope factor for Gxα
+    rBx2: float = 9.7      # Kappa influence on Gxα slope
     rCx1: float = 1.0      # Shape factor for Gxα
-    rBy1: float = 10.0     # Slope factor for Gyκ
-    rBy2: float = 8.0      # Alpha influence on Gyκ slope
+    rBy1: float = 10.6     # Slope factor for Gyκ
+    rBy2: float = 7.8      # Alpha influence on Gyκ slope
     rCy1: float = 1.0      # Shape factor for Gyκ
     rHx1: float = 0.0      # Shift in Gxα
     rHy1: float = 0.0      # Shift in Gyκ
+    camber_stiffness_rad: float = 0.85
+    f_nomin: float = 4000.0
+    lambda_mux: float = 1.0
+    lambda_muy: float = 1.0
+    lambda_ky: float = 1.0
 
     # ── Aligning Moment & Pneumatic Trail ─────────────────────────────────
     qBz1: float = 9.0      # Trail slope factor
@@ -240,7 +245,7 @@ class TireCoeffs:
 # Core Numba-JIT functions
 # ─────────────────────────────────────────────────────────────────────────────
 
-@njit(fastmath=_FASTMATH, cache=True)
+@njit(cache=True)
 def _magic_formula_base(x: float, B: float, C: float, D: float, E: float) -> float:
     """Core Pacejka equation: Y = D · sin(C · arctan(B·x - E·(B·x - arctan(B·x))))"""
     E = min(E, 0.999)
@@ -248,7 +253,7 @@ def _magic_formula_base(x: float, B: float, C: float, D: float, E: float) -> flo
     return D * np.sin(C * np.arctan(Bx - E * (Bx - np.arctan(Bx))))
 
 
-@njit(fastmath=_FASTMATH, cache=True)
+@njit(cache=True)
 def _calc_tire_forces_fast(
     Fz: float,
     alpha_rad: float,
@@ -262,13 +267,7 @@ def _calc_tire_forces_fast(
 
     Returns (Fx, Fy) [N].
     """
-    if np.isnan(Fz) or np.isinf(Fz) or Fz <= 0.0:
-        return 0.0, 0.0
-    if np.isnan(alpha_rad) or np.isinf(alpha_rad):
-        return 0.0, 0.0
-    if np.isnan(kappa) or np.isinf(kappa):
-        return 0.0, 0.0
-    if np.isnan(camber_rad) or np.isinf(camber_rad):
+    if not (np.isfinite(Fz) and np.isfinite(alpha_rad) and np.isfinite(kappa) and np.isfinite(camber_rad)) or Fz <= 0.0:
         return 0.0, 0.0
 
     Fz = min(Fz, 100000.0)
@@ -370,10 +369,19 @@ def _calc_tire_forces_fast(
     Fx = Fx0 * Gxalpha
     Fy = Fy0 * Gykappa
 
+    # Friction ellipse saturation guard
+    mu_peak = max(abs(mu_x), abs(mu_y))
+    F_max = mu_peak * Fz
+    F_tot = np.hypot(Fx, Fy)
+    if F_max > 0.0 and F_tot > F_max:
+        scale = F_max / F_tot
+        Fx *= scale
+        Fy *= scale
+
     return Fx, Fy
 
 
-@njit(fastmath=_FASTMATH, cache=True)
+@njit(cache=True)
 def _calc_tire_forces_and_moments_fast(
     Fz: float,
     alpha_rad: float,
@@ -383,12 +391,7 @@ def _calc_tire_forces_and_moments_fast(
     pressure_bar: float = 2.0,
     T_c: float = 85.0,
 ) -> Tuple[float, float, float, float]:
-    if (
-        np.isnan(Fz) or np.isinf(Fz) or Fz <= 0.0 or
-        np.isnan(alpha_rad) or np.isinf(alpha_rad) or
-        np.isnan(kappa) or np.isinf(kappa) or
-        np.isnan(camber_rad) or np.isinf(camber_rad)
-    ):
+    if not (np.isfinite(Fz) and np.isfinite(alpha_rad) and np.isfinite(kappa) and np.isfinite(camber_rad)) or Fz <= 0.0:
         return 0.0, 0.0, 0.0, 0.0
 
     Fx, Fy = _calc_tire_forces_fast(
@@ -439,7 +442,7 @@ def _calc_tire_forces_and_moments_fast(
     return Fx, Fy, Mz, t_trail
 
 
-@njit(fastmath=_FASTMATH, cache=True)
+@njit(cache=True)
 def calc_tire_forces_vectorized(
     Fz_arr: np.ndarray,
     alpha_arr: np.ndarray,
@@ -466,12 +469,7 @@ def calc_tire_forces(
     T_c: float = 85.0,
 ) -> Tuple[float, float]:
     """Canonical function wrapper returning (Fx, Fy) [N]."""
-    if (
-        math.isnan(Fz) or math.isinf(Fz) or Fz <= 0.0 or
-        math.isnan(alpha_rad) or math.isinf(alpha_rad) or
-        math.isnan(kappa) or math.isinf(kappa) or
-        math.isnan(camber_rad) or math.isinf(camber_rad)
-    ):
+    if not (math.isfinite(Fz) and math.isfinite(alpha_rad) and math.isfinite(kappa) and math.isfinite(camber_rad)) or Fz <= 0.0:
         return 0.0, 0.0
 
     if coeffs is None:
@@ -491,12 +489,7 @@ def calc_tire_forces_3d(
     T_c: float = 85.0,
 ) -> Tuple[float, float, float]:
     """Canonical function wrapper returning (Fx, Fy, Mz) [N, N, N·m]."""
-    if (
-        math.isnan(Fz) or math.isinf(Fz) or Fz <= 0.0 or
-        math.isnan(alpha_rad) or math.isinf(alpha_rad) or
-        math.isnan(kappa) or math.isinf(kappa) or
-        math.isnan(camber_rad) or math.isinf(camber_rad)
-    ):
+    if not (math.isfinite(Fz) and math.isfinite(alpha_rad) and math.isfinite(kappa) and math.isfinite(camber_rad)) or Fz <= 0.0:
         return 0.0, 0.0, 0.0
 
     if coeffs is None:

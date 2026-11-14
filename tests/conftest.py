@@ -47,23 +47,22 @@ src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src"))
 sys.path = [p for p in sys.path if not p.rstrip("/\\").endswith("src")]
 sys.path.insert(0, src_path)
 
-from suspensionlab.backend.api.main import app
-from suspensionlab.backend.security.auth import verify_api_key
-
 @pytest.fixture(autouse=True)
 def reset_authority_key_cache():
     """Reset Ed25519 authority key cache to prevent inter-test key leakage."""
-    try:
-        from suspensionlab.backend.services.report_service import reset_authority_keypair_cache
-        reset_authority_keypair_cache()
-    except Exception:
-        pass
+    if "suspensionlab.backend.services.report_service" in sys.modules:
+        try:
+            from suspensionlab.backend.services.report_service import reset_authority_keypair_cache
+            reset_authority_keypair_cache()
+        except Exception:
+            pass
     yield
-    try:
-        from suspensionlab.backend.services.report_service import reset_authority_keypair_cache
-        reset_authority_keypair_cache()
-    except Exception:
-        pass
+    if "suspensionlab.backend.services.report_service" in sys.modules:
+        try:
+            from suspensionlab.backend.services.report_service import reset_authority_keypair_cache
+            reset_authority_keypair_cache()
+        except Exception:
+            pass
 
 @pytest.fixture(scope="session")
 def anyio_backend():
@@ -186,15 +185,21 @@ async def db_session(db_engine):
 from httpx import AsyncClient, ASGITransport
 
 @pytest.fixture
-async def client(db_session):
+def app_instance():
+    from suspensionlab.backend.api.main import app
+    return app
+
+@pytest.fixture
+async def client(db_session, app_instance):
+    from suspensionlab.backend.database.core import get_db_dependency
     async def override_get_db():
         yield db_session
-    app.dependency_overrides[get_db_dependency] = override_get_db
+    app_instance.dependency_overrides[get_db_dependency] = override_get_db
     
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+    async with AsyncClient(transport=ASGITransport(app=app_instance), base_url="http://test") as ac:
         yield ac
     
-    app.dependency_overrides.pop(get_db_dependency, None)
+    app_instance.dependency_overrides.pop(get_db_dependency, None)
 
 @pytest.fixture
 def mock_user():
@@ -212,12 +217,15 @@ def mock_user():
 def clean_dependency_overrides():
     """Ensure no test leaks global FastAPI dependency overrides into subsequent tests."""
     yield
-    app.dependency_overrides.clear()
+    if "suspensionlab.backend.api.main" in sys.modules:
+        from suspensionlab.backend.api.main import app
+        app.dependency_overrides.clear()
 
 
 @pytest.fixture
-async def authenticated_client(client, mock_user):
-    app.dependency_overrides[verify_api_key] = lambda: mock_user
+async def authenticated_client(client, mock_user, app_instance):
+    from suspensionlab.backend.security.auth import verify_api_key
+    app_instance.dependency_overrides[verify_api_key] = lambda: mock_user
     with patch("suspensionlab.backend.api.routes.billing_routes._get_user_id_from_request", return_value="00000000-0000-0000-0000-000000000000"):
         yield client
-    app.dependency_overrides.pop(verify_api_key, None)
+    app_instance.dependency_overrides.pop(verify_api_key, None)

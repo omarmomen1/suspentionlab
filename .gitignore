@@ -54,6 +54,8 @@ backend_vercel/
 .env.production.secret
 .env*.local
 
-# Executables
+# Executables & Debug Artifacts
 *.exe
+debug_*.png
+*.patch
 

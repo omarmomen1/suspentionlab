@@ -185,8 +185,11 @@ class HalfCarResult:
     contact_states_r: List[Any] = field(default_factory=list)
     liftoff_time_f: Optional[float] = None
     liftoff_time_r: Optional[float] = None
+    tire_liftoff_detected: bool = False
     minimum_Fz_f: float = 0.0
     minimum_Fz_r: float = 0.0
+    total_Fz_f: np.ndarray = field(default_factory=lambda: np.array([]))
+    total_Fz_r: np.ndarray = field(default_factory=lambda: np.array([]))
     diagnostics: Optional[PhysicsDiagnostics] = None
     provenance: Optional[PhysicsProvenance] = None
     ledger: Optional[ForceMomentLedger] = None
@@ -506,13 +509,19 @@ def simulate_time_response(
     
     susp_travel_f = z_sf - z_uf
     susp_travel_r = z_sr - z_ur
-    tire_load_f = p.k_tf * (z_uf - z_rf_arr)
-    tire_load_r = p.k_tr * (z_ur - z_rr_arr)
-    # Total vertical tire forces
+    # Static tire loads
     static_front = (p.m_s * p.b / (p.a + p.b) + p.m_uf) * 9.81
     static_rear  = (p.m_s * p.a / (p.a + p.b) + p.m_ur) * 9.81
-    total_Fz_f = np.maximum(0.0, static_front + tire_load_f)
-    total_Fz_r = np.maximum(0.0, static_rear + tire_load_r)
+
+    # Unilateral tire normal forces: clamp total vertical tire load Fz >= 0
+    # Tire in compression (z_r > z_u) pushes UP; in wheel-hop extension (z_u > z_r) pulls DOWN until liftoff
+    total_Fz_f = np.maximum(0.0, static_front + p.k_tf * (z_rf_arr - z_uf))
+    total_Fz_r = np.maximum(0.0, static_rear + p.k_tr * (z_rr_arr - z_ur))
+
+    # Dynamic tire force perturbation (clamped by unilateral liftoff)
+    tire_load_f = total_Fz_f - static_front
+    tire_load_r = total_Fz_r - static_rear
+    tire_liftoff_detected = bool(np.any(total_Fz_f <= 1e-3) or np.any(total_Fz_r <= 1e-3))
 
     contact_states_f = []
     contact_states_r = []
@@ -575,8 +584,11 @@ def simulate_time_response(
         "contact_states_r": contact_states_r,
         "liftoff_time_f": liftoff_time_f,
         "liftoff_time_r": liftoff_time_r,
+        "tire_liftoff_detected": tire_liftoff_detected,
         "minimum_Fz_f": float(np.min(total_Fz_f)),
         "minimum_Fz_r": float(np.min(total_Fz_r)),
+        "total_Fz_f": total_Fz_f,
+        "total_Fz_r": total_Fz_r,
         "diagnostics": diagnostics,
         "provenance": provenance,
         "ledger": ForceMomentLedger(
@@ -659,8 +671,11 @@ def run_half_car_analysis(
         contact_states_r=time_data.get("contact_states_r", [])[::step],
         liftoff_time_f=time_data.get("liftoff_time_f", None),
         liftoff_time_r=time_data.get("liftoff_time_r", None),
+        tire_liftoff_detected=time_data.get("tire_liftoff_detected", False),
         minimum_Fz_f=time_data.get("minimum_Fz_f", 0.0),
         minimum_Fz_r=time_data.get("minimum_Fz_r", 0.0),
+        total_Fz_f=time_data.get("total_Fz_f", np.array([]))[::step],
+        total_Fz_r=time_data.get("total_Fz_r", np.array([]))[::step],
         diagnostics=time_data.get("diagnostics", None),
         provenance=time_data.get("provenance", None),
     )

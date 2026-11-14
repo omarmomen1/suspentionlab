@@ -20,15 +20,17 @@ def _active_quarter_car_ode(t, x, p: ActiveQuarterCarParams, zr_fn, dzr_fn):
     v_damper = v_rel * p.MR
     dz_s_damper = dz_s * p.MR
     
-    # Ideal Skyhook Control Logic for Semi-Active Damper
-    # The damper can only dissipate energy, not add it.
-    if dz_s_damper * v_damper > 0:
-        F_damper = p.c_sky * dz_s_damper
+    # Karnopp Semi-Active Skyhook Control Logic
+    # The semi-active damper can only dissipate energy (passivity constraint c_eff >= c_min >= 0).
+    c_min = getattr(p, "c_min", 300.0)
+    c_max = min(2.0 * p.c_sky, 8000.0)
+    if dz_s_damper * v_damper > 0.0 and abs(v_damper) > 1e-6:
+        c_req = (p.c_sky * dz_s_damper) / v_damper
+        c_eff = min(max(c_req, c_min), c_max)
     else:
-        F_damper = p.c_min * v_damper
+        c_eff = c_min
 
-    # Clip F_damper to simulate damper limits (e.g., max force 5000 N)
-    F_damper = np.clip(F_damper, -5000.0, 5000.0)
+    F_damper = c_eff * v_damper
     
     # Scale damper force back to wheel
     F_d = F_damper * p.MR
@@ -87,12 +89,17 @@ def simulate_active_time_response(
     v_damper = v_rel * p.MR
     dz_s_damper = dz_s * p.MR
     
-    F_damper = np.where(
-        dz_s_damper * v_damper > 0,
-        p.c_sky * dz_s_damper,
-        p.c_min * v_damper
+    c_min = getattr(p, "c_min", 300.0)
+    c_max = min(2.0 * p.c_sky, 8000.0)
+    
+    # Vectorized Karnopp semi-active skyhook
+    v_damper_safe = np.where(np.abs(v_damper) < 1e-6, 1e-6, v_damper)
+    c_eff = np.where(
+        (dz_s_damper * v_damper > 0.0) & (np.abs(v_damper) > 1e-6),
+        np.clip((p.c_sky * dz_s_damper) / v_damper_safe, c_min, c_max),
+        c_min
     )
-    F_damper = np.clip(F_damper, -5000.0, 5000.0)
+    F_damper = c_eff * v_damper
     F_d = F_damper * p.MR
     
     ddz_s = (1.0 / p.m_s) * (-F_d - p.k_w * (z_s - z_u))
@@ -105,9 +112,12 @@ def simulate_active_time_response(
     # Metrics
     rms_body_accel = float(np.sqrt(np.mean(ddz_s**2)))
     
-    from .quarter_car import _apply_wk_weighting
+    from .quarter_car import _apply_wk_weighting, calculate_vdv
     dt = time[1] - time[0] if len(time) > 1 else 0.002
-    rms_body_accel_wk = float(np.sqrt(np.mean(_apply_wk_weighting(ddz_s, dt)**2)))
+    fs = 1.0 / dt
+    accel_wk = _apply_wk_weighting(ddz_s, dt=dt, fs=fs)
+    rms_body_accel_wk = float(np.sqrt(np.mean(accel_wk**2)))
+    vdv = calculate_vdv(accel_wk, fs=fs)
     
     rms_susp_travel = float(np.sqrt(np.mean(susp_travel**2)))
     rms_tire_load = float(np.sqrt(np.mean(tire_load_var**2)))
@@ -126,6 +136,7 @@ def simulate_active_time_response(
     res.tire_load_var = tire_load_var
     res.rms_body_accel = rms_body_accel
     res.rms_body_accel_wk = rms_body_accel_wk
+    res.vdv = vdv
     res.rms_susp_travel = rms_susp_travel
     res.rms_tire_load = rms_tire_load
     res.peak_susp_travel = peak_susp_travel

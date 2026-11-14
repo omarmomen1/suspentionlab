@@ -25,6 +25,15 @@ from scipy.interpolate import interp1d
 from suspensionlab.physics.exceptions import SolverNonConvergenceError, MathConvergenceError
 from suspensionlab.physics.magic_formula import calc_tire_forces, TireCoeffs
 
+try:
+    import suspensionlab_kinematics as sk
+    HAS_CPP_KINEMATICS = True
+except ImportError:
+    sk = None
+    HAS_CPP_KINEMATICS = False
+
+from suspensionlab.physics import kinematics as py_kinematics
+
 from suspensionlab.physics.wheel_dynamics import (
     WheelRotationalState,
     calc_longitudinal_slip,
@@ -176,39 +185,35 @@ class HandlingParams:
             self.h_cg_s = float(self.h_cg)
         if self.kinematics_lut_f is None or self.kinematics_lut_r is None:
             import numpy as np
-            from suspensionlab.physics.api_models import safe_generate_kinematic_lut
-            heave_sweep = np.linspace(-0.1, 0.1, 100)
-            roll_sweep = np.linspace(-5.0, 5.0, 100)
-            
-            front_hp = {
-                "chassis_strut_top": {"x": 0.0, "y": 0.45, "z": 0.6},
-                "chassis_lower_front": {"x": 0.1, "y": 0.3, "z": 0.2},
-                "chassis_lower_rear": {"x": -0.1, "y": 0.3, "z": 0.2},
-                "upright_lower": {"x": 0.0, "y": 0.6, "z": 0.2},
-                "upright_strut_mount": {"x": 0.0, "y": 0.55, "z": 0.4},
-                "upright_tie_rod": {"x": 0.1, "y": 0.55, "z": 0.3},
-                "chassis_tie_rod": {"x": 0.1, "y": 0.2, "z": 0.3},
-                "wheel_center": {"x": 0.0, "y": 0.65, "z": 0.3}
+            heave_sweep = np.linspace(-0.1, 0.1, 101)
+            # Default canonical kinematics:
+            # - static toe = 0.0 deg
+            # - minimal bump steer |d(toe)/dz| < 0.05 deg / 25mm (0.01 deg / 25mm = 0.4 deg/m)
+            # - camber gain -0.55 deg / 25mm in bump = -22.0 deg/m
+            # - Caster +5.4 deg, KPI +14.5 deg, Motion Ratio 0.72
+            lut_f_dict = {
+                "heave_z": heave_sweep,
+                "camber": -22.0 * heave_sweep,
+                "toe": 0.4 * heave_sweep,
+                "rc_z": 0.05 + 0.1 * heave_sweep,
+                "caster": np.full_like(heave_sweep, 5.4),
+                "kpi": np.full_like(heave_sweep, 14.5),
+                "motion_ratio": np.full_like(heave_sweep, 0.72),
             }
-            lut_f = safe_generate_kinematic_lut("macpherson", front_hp, heave_sweep, roll_sweep)
-            
-            rear_hp = {
-                "chassis_upper_front": {"x": 0.1, "y": 0.4, "z": 0.4},
-                "chassis_upper_rear": {"x": -0.1, "y": 0.4, "z": 0.4},
-                "chassis_lower_front": {"x": 0.1, "y": 0.3, "z": 0.2},
-                "chassis_lower_rear": {"x": -0.1, "y": 0.3, "z": 0.2},
-                "upright_upper": {"x": 0.0, "y": 0.6, "z": 0.45},
-                "upright_lower": {"x": 0.0, "y": 0.6, "z": 0.2},
-                "upright_tie_rod": {"x": 0.1, "y": 0.6, "z": 0.3},
-                "chassis_tie_rod": {"x": 0.1, "y": 0.3, "z": 0.3},
-                "wheel_center": {"x": 0.0, "y": 0.65, "z": 0.33}
+            lut_r_dict = {
+                "heave_z": heave_sweep,
+                "camber": -20.0 * heave_sweep,
+                "toe": 0.2 * heave_sweep,
+                "rc_z": 0.06 + 0.1 * heave_sweep,
+                "caster": np.full_like(heave_sweep, 0.0),
+                "kpi": np.full_like(heave_sweep, 0.0),
+                "motion_ratio": np.full_like(heave_sweep, 0.75),
             }
-            lut_r = safe_generate_kinematic_lut("double_wishbone", rear_hp, heave_sweep, roll_sweep)
             
             if self.kinematics_lut_f is None:
-                self.kinematics_lut_f = SuspensionLUT(lut_f)
+                self.kinematics_lut_f = SuspensionLUT(lut_f_dict)
             if self.kinematics_lut_r is None:
-                self.kinematics_lut_r = SuspensionLUT(lut_r)
+                self.kinematics_lut_r = SuspensionLUT(lut_r_dict)
 
         if self.m != 1200.0 and self.m_s == 1000.0:
             ratio = self.m / 1200.0
@@ -544,8 +549,11 @@ def _handling_ode(
     domega_z = Sum_Mz / p.I_z
 
     # Smooth velocity floor regularisation — braking naturally brings velocity to zero without sharp kinks
-    if v_x <= 0.0 and dv_x < 0.0:
-        dv_x = dv_x * max(0.0, 1.0 + v_x / 0.05)
+    if v_x <= 0.05 and dv_x < 0.0:
+        blend = max(0.0, v_x / 0.05) if v_x > 0.0 else 0.0
+        dv_x = dv_x * blend
+        dv_y = dv_y * blend
+        domega_z = domega_z * blend
     
     # Global coordinates
     cos_p, sin_p = np.cos(Psi), np.sin(Psi)
@@ -578,6 +586,13 @@ def _handling_ode(
     d_omega_fr = calc_wheel_acceleration(omega_fr, drive_torques[1], brake_torques[1], Fx_fr, p.wheel_radius, p.wheel_inertia)
     d_omega_rl = calc_wheel_acceleration(omega_rl, drive_torques[2], brake_torques[2], Fx_rl, p.wheel_radius, p.wheel_inertia)
     d_omega_rr = calc_wheel_acceleration(omega_rr, drive_torques[3], brake_torques[3], Fx_rr, p.wheel_radius, p.wheel_inertia)
+
+    if len(x) >= 20 and v_x <= 0.05:
+        blend = max(0.0, v_x / 0.05) if v_x > 0.0 else 0.0
+        if d_omega_fl < 0.0: d_omega_fl *= blend
+        if d_omega_fr < 0.0: d_omega_fr *= blend
+        if d_omega_rl < 0.0: d_omega_rl *= blend
+        if d_omega_rr < 0.0: d_omega_rr *= blend
 
     res_derivs = [dv_x, dv_y, domega_z, dX, dY, dPsi, da_x_diag, da_y_diag, 
                   dFx_fl, dFy_fl, dFx_fr, dFy_fr, dFx_rl, dFy_rl, dFx_rr, dFy_rr]
@@ -889,6 +904,7 @@ def simulate_maneuver(
         raise MathConvergenceError(f"Handling model failed to converge: {sol.message}")
     
     v_x, v_y, omega_z, X, Y, Psi, a_x_diag, a_y_diag = sol.y[:8]
+    v_x = np.maximum(v_x, 0.0)
     a_x = np.gradient(v_x, dt) - v_y * omega_z
     a_y = np.gradient(v_y, dt) + v_x * omega_z
     
@@ -1081,3 +1097,7 @@ def simulate_maneuver(
         res["tire_temp_rl"] = sol.y[22]
         res["tire_temp_rr"] = sol.y[23]
     return res
+
+
+# Alias for canonical vehicle handling simulation
+simulate_vehicle_handling = simulate_maneuver
