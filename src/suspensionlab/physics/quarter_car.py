@@ -1139,7 +1139,7 @@ def _apply_wk_weighting(ddz_s: np.ndarray, dt: float) -> np.ndarray:
     disc6 = complex((w6/Q6)**2 - 4*w6**2)
     r6 = np.sqrt(disc6)
     p_s = [(-w6/Q6 + r6)/2, (-w6/Q6 - r6)/2]
-    k_s = (w6 / w5)**2
+    k_s = 1.0  # Monic polynomial form: (s^2 + w5/Q5*s + w5^2) / (s^2 + w6/Q6*s + w6^2) has asymptotic gain 1.0
     
     z = np.concatenate([z_h, z_l, z_t, z_s])
     p = np.concatenate([p_h, p_l, p_t, p_s])

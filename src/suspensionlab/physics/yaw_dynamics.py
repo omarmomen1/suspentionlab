@@ -529,9 +529,9 @@ def compute_stability_metrics(params: BicycleModelParams, v: float) -> dict:
     K_us_deg = K_us_rad * g * (180.0 / math.pi)
 
 
-    # Neutral steer speed
+    # Neutral steer speed: V_char = sqrt(L / Kus_rad)
     if K_us_rad > 1e-9:
-        V_char = math.sqrt(g * L / K_us_rad)
+        V_char = math.sqrt(L / K_us_rad)
     else:
         V_char = math.inf
 

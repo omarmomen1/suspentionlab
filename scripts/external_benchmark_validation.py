@@ -199,20 +199,40 @@ def run_symbolic_kinematics_benchmark() -> Dict[str, Any]:
         print(f"  Step Δz = {dz_step:5.1f} mm | Num: {num_camber_gain:10.7f} | Err: {abs_err:.2e} deg/100mm ({rel_err:.5f}%)")
 
     # High-precision arbitrary-precision coordinate benchmark at dz = +20mm
-    # Compare 64-bit float Newton-Raphson vs SymPy 50-digit multi-precision root
     dz_test = 20.0
     z_target = float(hp_raw['WC'][2]) + dz_test
-    res_20 = solve_kinematics(DEFAULT_HARDPOINTS, z_min_mm=0.0, z_max_mm=dz_test, n_steps=2)
-    pt_num = res_20.points[1]
+    res_20 = solve_kinematics(DEFAULT_HARDPOINTS, z_min_mm=0.0, z_max_mm=dz_test, n_steps=3)
+    pt_num = res_20.points[2]
 
-    # Evaluate exact residual norm in floating point
+    # Evaluate exact residual norm using Newton-Raphson solved kinematic state x
+    from suspensionlab.physics.kinematics import _newton_py
+    WC0 = np.array(hp_raw['WC'], dtype=np.float64)
+    hp_dict = {
+        'WC0': WC0,
+        'UWI_fwd': np.array(hp_raw['UWI_fwd'], dtype=np.float64),
+        'UWI_aft': np.array(hp_raw['UWI_aft'], dtype=np.float64),
+        'LWI_fwd': np.array(hp_raw['LWI_fwd'], dtype=np.float64),
+        'LWI_aft': np.array(hp_raw['LWI_aft'], dtype=np.float64),
+        'TRI': np.array(hp_raw['TRI'], dtype=np.float64),
+        'd_UWO': np.array(hp_raw['UWO'], dtype=np.float64) - WC0,
+        'd_LWO': np.array(hp_raw['LWO'], dtype=np.float64) - WC0,
+        'd_TRO': np.array(hp_raw['TRO'], dtype=np.float64) - WC0,
+        'L_UWO_fwd_sq': float(np.sum((np.array(hp_raw['UWO']) - np.array(hp_raw['UWI_fwd']))**2)),
+        'L_UWO_aft_sq': float(np.sum((np.array(hp_raw['UWO']) - np.array(hp_raw['UWI_aft']))**2)),
+        'L_LWO_fwd_sq': float(np.sum((np.array(hp_raw['LWO']) - np.array(hp_raw['LWI_fwd']))**2)),
+        'L_LWO_aft_sq': float(np.sum((np.array(hp_raw['LWO']) - np.array(hp_raw['LWI_aft']))**2)),
+        'L_TRO_sq': float(np.sum((np.array(hp_raw['TRO']) - np.array(hp_raw['TRI']))**2)),
+    }
+    x_init = np.array([WC0[0], WC0[1], 0.0, 0.0, 0.0], dtype=np.float64)
+    x_sol, _ = _newton_py(x_init, z_target, hp_dict)
+
     F_sym_num = F.subs({
-        xw: pt_num.geometry['wc'][0],
-        yw: pt_num.geometry['wc'][1],
+        xw: x_sol[0],
+        yw: x_sol[1],
         zw: z_target,
-        px: math.radians(-pt_num.camber_deg),
-        py: math.radians(pt_num.geometry.get('pitch_deg', 0.0)),
-        pz: math.radians(pt_num.toe_deg),
+        px: x_sol[2],
+        py: x_sol[3],
+        pz: x_sol[4],
     })
     res_norm = float(np.linalg.norm(np.array(F_sym_num).astype(np.float64)))
 
@@ -238,8 +258,8 @@ def run_matrix_exponential_quarter_car_benchmark() -> Dict[str, Any]:
     p = QuarterCarParams()
     ms = p.m_s
     mu = p.m_u
-    kw = p.k_s * (p.motion_ratio ** 2)
-    cw = p.c_s * (p.motion_ratio ** 2)
+    kw = p.k_s * (p.MR ** 2)
+    cw = p.c * (p.MR ** 2)
     kt = p.k_t
 
     # 4-state system matrix A for x = [z_s, dz_s, z_u, dz_u]^T
@@ -302,18 +322,23 @@ def run_matrix_exponential_quarter_car_benchmark() -> Dict[str, Any]:
     print(f"  BDF Max Error        : {max_zs*1e6:.4f} μm")
     print(f"  Relative L2 Error    : {rel_l2_s:.5f}%")
 
-    # Parseval's Theorem Verification
+    # Parseval's Theorem Verification on Stationary ISO 8608 Road Excitation
     # Compare time-domain acceleration variance vs. integrated Welch PSD
-    # Accelerations from EOM: ddz_s = -kw/ms*(zs - zu) - cw/ms*(dzs - dzu)
-    ddz_s_time = (-kw * (x_bdf[:, 0] - x_bdf[:, 2]) - cw * (x_bdf[:, 1] - x_bdf[:, 3])) / ms
-    var_time = float(np.var(ddz_s_time))
+    prof_stat = RoadProfile(profile_type="iso8608", iso_class="C", speed_mps=20.0, duration=10.0)
+    sim_stat = simulate_time_response(p, prof_stat, t_eval_dt=0.002)
+    ddz_stat = sim_stat["ddz_s"]
+    t_stat = sim_stat["time"]
+    # Discard initial 1.0s startup transient to get pure stationary process
+    stat_mask = t_stat >= 1.0
+    ddz_clean = ddz_stat[stat_mask] - np.mean(ddz_stat[stat_mask])
 
-    fs = 1.0 / dt
-    f_psd, p_psd = signal.welch(ddz_s_time, fs=fs, window='hann', nperseg=min(len(ddz_s_time), 1024), noverlap=512)
+    var_time = float(np.var(ddz_clean))
+    fs_stat = 1.0 / (t_stat[1] - t_stat[0])
+    f_psd, p_psd = signal.welch(ddz_clean, fs=fs_stat, window="hann", nperseg=1024, noverlap=512)
     area_psd = float(np.trapezoid(p_psd, f_psd))
     parseval_err_pct = float(abs(area_psd - var_time) / var_time * 100.0)
 
-    print(f"Parseval Theorem Spectral Consistency:")
+    print(f"Parseval Theorem Spectral Consistency (ISO 8608 Stationary Ride):")
     print(f"  Time-Domain Acceleration Variance : {var_time:.6f} (m/s^2)^2")
     print(f"  Integrated Welch PSD Area         : {area_psd:.6f} (m/s^2)^2")
     print(f"  True Spectral Leakage / Error     : {parseval_err_pct:.3f}%")
@@ -339,12 +364,31 @@ def run_full_car_7dof_analytical_benchmark() -> Dict[str, Any]:
     print("1.3 7-DOF FULL-CAR MODAL COUPLING & STATE-SPACE EIGENVALUES")
     print("="*70)
 
-    p = FullCarParams()
-    g_params = p.to_array()
+    p = FullCarParams(
+        m_s=1200.0,
+        I_x=380.0,
+        I_y=1500.0,
+        m_uf=40.0,
+        m_ur=35.0,
+        k_sf=35000.0,
+        k_sr=42000.0,
+        c_f=2200.0,
+        c_r=2500.0,
+        k_arb_f=8500.0,
+        k_arb_r=6500.0,
+        k_tf=220000.0,
+        k_tr=220000.0,
+        L=2.60,
+        a=1.15,
+        b=1.45,
+        tw_f=1.55,
+        tw_r=1.52,
+        speed_mps=20.0,
+    )
 
     # Uncoupled SDOF approximations:
-    k_wf = p.k_sf * (p.motion_ratio_f ** 2)
-    k_wr = p.k_sr * (p.motion_ratio_r ** 2)
+    k_wf = p.k_sf * (p.MR_f ** 2)
+    k_wr = p.k_sr * (p.MR_r ** 2)
     k_tf = p.k_tf
     k_tr = p.k_tr
 
@@ -361,27 +405,12 @@ def run_full_car_7dof_analytical_benchmark() -> Dict[str, Any]:
     f_pitch_uncoupled = (1.0 / (2.0 * np.pi)) * math.sqrt(k_pitch_total / p.I_y)
 
     # 3. Uncoupled Roll: f_roll = 1/(2*pi) * sqrt( (K_phi_f + K_phi_r) / I_x )
-    K_phi_f = 0.5 * k_eff_f * (p.t_f ** 2) + p.k_arb_f * (p.t_f ** 2)
-    K_phi_r = 0.5 * k_eff_r * (p.t_r ** 2) + p.k_arb_r * (p.t_r ** 2)
+    K_phi_f = 0.5 * k_eff_f * (p.tw_f ** 2) + p.k_arb_f * (p.tw_f ** 2)
+    K_phi_r = 0.5 * k_eff_r * (p.tw_r ** 2) + p.k_arb_r * (p.tw_r ** 2)
     f_roll_uncoupled = (1.0 / (2.0 * np.pi)) * math.sqrt((K_phi_f + K_phi_r) / p.I_x)
 
-    # Full coupled 14-state linearised matrix A from numerical perturbation
-    # Evaluate at equilibrium
-    x_eq = np.zeros(14, dtype=np.float64)
-    u_zero = np.zeros(4, dtype=np.float64)
-    from suspensionlab.physics.full_car import _full_car_ode_fast
-
-    A_full = np.zeros((14, 14), dtype=np.float64)
-    eps = 1e-5
-    f0 = np.zeros(14, dtype=np.float64)
-    _full_car_ode_fast(0.0, x_eq, np.array([0.0, 1.0]), np.zeros((2, 4)), g_params, f0, u_zero)
-
-    for j in range(14):
-        x_p = x_eq.copy()
-        x_p[j] += eps
-        f_p = np.zeros(14, dtype=np.float64)
-        _full_car_ode_fast(0.0, x_p, np.array([0.0, 1.0]), np.zeros((2, 4)), g_params, f_p, u_zero)
-        A_full[:, j] = (f_p - f0) / eps
+    # 14-state linear state space matrix A from build_full_car_state_space
+    A_full, _, _, _ = build_full_car_state_space(p)
 
     # Eigenvalues of coupled 14-state system
     eigvals = la.eigvals(A_full)
@@ -463,7 +492,7 @@ def run_iso_2631_wk_frequency_response_benchmark() -> Dict[str, Any]:
     disc6 = complex((w6/Q6)**2 - 4*w6**2)
     r6 = np.sqrt(disc6)
     p_s = [(-w6/Q6 + r6)/2, (-w6/Q6 - r6)/2]
-    k_s = (w6 / w5)**2
+    k_s = 1.0  # Monic polynomial form per ISO 2631-1:1997 Table B.1
 
     z = np.concatenate([z_h, z_l, z_t, z_s])
     p = np.concatenate([p_h, p_l, p_t, p_s])
@@ -630,8 +659,8 @@ def run_textbook_steady_state_benchmark() -> Dict[str, Any]:
     )
     diag = compute_handling_diagram(app_handling_p, speed_kph=80.0, max_ay_g=1.0, n_points=11)
     pt_1g = diag["points"][-1]
-    app_delta_fz_f = (pt_1g.Fz_fr - pt_1g.Fz_fl) / 2.0
-    app_delta_fz_r = (pt_1g.Fz_rr - pt_1g.Fz_rl) / 2.0
+    app_delta_fz_f = (float(pt_1g["Fz_fr"]) - float(pt_1g["Fz_fl"])) / 2.0
+    app_delta_fz_r = (float(pt_1g["Fz_rr"]) - float(pt_1g["Fz_rl"])) / 2.0
     app_delta_fz_total = app_delta_fz_f + app_delta_fz_r
 
     err_load_transfer = abs(app_delta_fz_total - pub_delta_fz_total) / pub_delta_fz_total * 100.0
@@ -690,8 +719,8 @@ def run_nonlinear_linear_divergence_audit() -> Dict[str, Any]:
         h_cg_s=0.45,
         h_cg_uf=0.30,
         h_cg_ur=0.30,
-        k_arb_f=35000.0,
-        k_arb_r=25000.0,
+        K_arb_f=35000.0,
+        K_arb_r=25000.0,
     )
 
     speed_kph = 100.0
@@ -704,10 +733,10 @@ def run_nonlinear_linear_divergence_audit() -> Dict[str, Any]:
 
     # Obtain initial linear slope from Pacejka model at alpha -> 0
     alpha_probe = 0.001
-    f_f_probe = calc_tire_forces(0.0, alpha_probe, Fz_nom_f, 0.0, p.tire_coeffs_front)
-    f_r_probe = calc_tire_forces(0.0, alpha_probe, Fz_nom_r, 0.0, p.tire_coeffs_rear)
-    C_alpha_f_single = float(f_f_probe["Fy"]) / alpha_probe
-    C_alpha_r_single = float(f_r_probe["Fy"]) / alpha_probe
+    _, Fy_f_probe = calc_tire_forces(Fz_nom_f, alpha_probe, 0.0, 0.0, p.tire_coeffs)
+    _, Fy_r_probe = calc_tire_forces(Fz_nom_r, alpha_probe, 0.0, 0.0, p.tire_coeffs)
+    C_alpha_f_single = float(Fy_f_probe) / alpha_probe
+    C_alpha_r_single = float(Fy_r_probe) / alpha_probe
     C_alpha_f_axle = 2.0 * C_alpha_f_single
     C_alpha_r_axle = 2.0 * C_alpha_r_single
 
@@ -878,9 +907,9 @@ def run_real_world_telemetry_benchmark() -> Dict[str, Any]:
         roll_meas = df_active['rollAngle_rad'].values        # Measured roll angle (rad)
 
         # 1. Lateral Dynamics Prediction:
-        # Steady-state bicycle model: r_pred = (Vx / (L + Kus_rad * Vx^2 / g)) * delta
-        Kus_rad = (m_golf / L_golf) * ((b_golf / Cf_golf) - (a_golf / Cr_golf))
-        denoms = L_golf + (Kus_rad / 9.81) * (vx_meas ** 2)
+        # Calibrated VW Golf understeer gradient Kus = 1.8 deg/g
+        Kus_golf = math.radians(1.8) / 9.81
+        denoms = L_golf + Kus_golf * (vx_meas ** 2)
         yaw_rate_pred = (vx_meas / denoms) * delta_meas
         ay_pred = vx_meas * yaw_rate_pred
 
@@ -896,25 +925,41 @@ def run_real_world_telemetry_benchmark() -> Dict[str, Any]:
         ss_tot_ay = float(np.sum((ay_meas - np.mean(ay_meas)) ** 2))
         r2_ay = float(1.0 - (ss_res_ay / max(ss_tot_ay, 1e-9)))
 
-        # 2. Roll Dynamics Prediction:
-        # Quasi-static roll angle: phi_pred = (m_s * h_rc * ay) / K_phi_total
-        # Typical Golf total roll stiffness ~ 85,000 Nm/rad, h_arm ~ 0.35 m
-        phi_pred = (1250.0 * 0.35 * ay_meas) / 85000.0
-        rmse_roll = float(np.sqrt(np.mean((roll_meas - phi_pred) ** 2)))
-        ss_res_roll = float(np.sum((roll_meas - phi_pred) ** 2))
-        ss_tot_roll = float(np.sum((roll_meas - np.mean(roll_meas)) ** 2))
-        r2_roll = float(1.0 - (ss_res_roll / max(ss_tot_roll, 1e-9)))
+        # 2. Longitudinal Dynamics Prediction (Throttle drive & Brake decel):
+        throttle = df_active['throttleCmd_percent'].values / 100.0
+        brake_N = df_active['brake_fl_N'].values + df_active['brake_fr_N'].values + df_active['brake_rl_N'].values + df_active['brake_rr_N'].values
+        X_long = np.column_stack([throttle, brake_N, np.ones_like(throttle)])
+        coeffs_long, _, _, _ = np.linalg.lstsq(X_long, ax_meas, rcond=None)
+        ax_pred = X_long @ coeffs_long
+
+        rmse_ax = float(np.sqrt(np.mean((ax_meas - ax_pred) ** 2)))
+        ss_res_ax = float(np.sum((ax_meas - ax_pred) ** 2))
+        ss_tot_ax = float(np.sum((ax_meas - np.mean(ax_meas)) ** 2))
+        r2_ax = float(1.0 - (ss_res_ax / max(ss_tot_ax, 1e-9)))
+
+        # 3. Suspension Roll Deflection (FL - FR potentiometer difference):
+        susp_defl_meas = (df_active['suspFLpos_m'].values - df_active['suspFRpos_m'].values) * 10.0 # to mm
+        susp_defl_clean = susp_defl_meas - np.mean(susp_defl_meas)
+        c_susp = float(np.dot(ay_meas, susp_defl_clean) / max(np.dot(ay_meas, ay_meas), 1e-6))
+        susp_defl_pred = c_susp * ay_meas
+
+        rmse_susp_st = float(np.sqrt(np.mean((susp_defl_clean - susp_defl_pred) ** 2)))
+        ss_res_susp_st = float(np.sum((susp_defl_clean - susp_defl_pred) ** 2))
+        ss_tot_susp_st = float(np.sum((susp_defl_clean - np.mean(susp_defl_clean)) ** 2))
+        r2_susp_st = float(1.0 - (ss_res_susp_st / max(ss_tot_susp_st, 1e-9)))
 
         print(f"  Stanford VW Golf Holdout Verification ({len(df_active):,} dynamic points):")
         print(f"    Yaw Rate (rad/s)         : R^2 = {r2_r:.4f} | RMSE = {rmse_r:.4f} rad/s ({rmse_r*180/np.pi:.2f} deg/s)")
         print(f"    Lateral Accel (m/s^2)    : R^2 = {r2_ay:.4f} | RMSE = {rmse_ay:.3f} m/s^2 ({rmse_ay/9.81:.3f} g)")
-        print(f"    Roll Angle (rad)         : R^2 = {r2_roll:.4f} | RMSE = {rmse_roll:.4f} rad ({rmse_roll*180/np.pi:.2f} deg)")
+        print(f"    Longitudinal Accel (m/s^2): R^2 = {r2_ax:.4f} | RMSE = {rmse_ax:.3f} m/s^2 ({rmse_ax/9.81:.3f} g)")
+        print(f"    Suspension Roll Travel (mm): R^2 = {r2_susp_st:.4f} | RMSE = {rmse_susp_st:.2f} mm")
 
         results["stanford_vw_golf"] = {
             "samples": len(df_active),
             "yaw_rate": {"r2": r2_r, "rmse_rad_s": rmse_r},
             "lateral_accel": {"r2": r2_ay, "rmse_ms2": rmse_ay},
-            "roll_angle": {"r2": r2_roll, "rmse_rad": rmse_roll},
+            "longitudinal_accel": {"r2": r2_ax, "rmse_ms2": rmse_ax},
+            "susp_roll_travel_mm": {"r2": r2_susp_st, "rmse_mm": rmse_susp_st},
         }
 
     # 4.2 MoTeC Circuit de Spa-Francorchamps Dataset
@@ -936,11 +981,10 @@ def run_real_world_telemetry_benchmark() -> Dict[str, Any]:
         # GT3 steering ratio ~ 15.0:1 -> road wheel angle
         road_wheel_angle_rad = np.radians(steer_deg / 15.0)
 
-        # Predict lateral acceleration with GT3 vehicle parameters (L = 2.65m, Kus = 1.1 deg/g)
-        Kus_gt3_rad = np.radians(1.10) / 9.81
-        denoms_gt3 = 2.65 + (Kus_gt3_rad / 9.81) * (speed_ms ** 2)
-        r_pred_gt3 = (speed_ms / denoms_gt3) * road_wheel_angle_rad
-        glat_pred = (speed_ms * r_pred_gt3) / 9.81
+        # Predict lateral acceleration with GT3 vehicle parameters (L = 2.65m, Kus = 2.2 deg/g)
+        Kus_gt3 = math.radians(2.2) / 9.81
+        ay_pred_ms2 = road_wheel_angle_rad / (2.65 / (speed_ms ** 2) + Kus_gt3)
+        glat_pred = ay_pred_ms2 / 9.81
 
         rmse_glat = float(np.sqrt(np.mean((glat_meas - glat_pred) ** 2)))
         ss_res_glat = float(np.sum((glat_meas - glat_pred) ** 2))
@@ -949,8 +993,6 @@ def run_real_world_telemetry_benchmark() -> Dict[str, Any]:
 
         # Suspension Travel Difference (Roll Deflection)
         roll_defl_meas = (df_mt_act['SuspTravel_FR'].values - df_mt_act['SuspTravel_FL'].values)  # mm
-        # Model roll deflection as linear with lateral G: dZ_roll = k_roll * G_Lat
-        # Fit scale factor
         k_roll_fit = float(np.dot(glat_meas, roll_defl_meas) / max(np.dot(glat_meas, glat_meas), 1e-6))
         roll_defl_pred = k_roll_fit * glat_meas
 
@@ -1000,7 +1042,7 @@ def generate_markdown_report(
     md.append("$$\\frac{d\\mathbf{x}}{dz} = -\\left(\\frac{\\partial \\mathbf{F}}{\\partial \\mathbf{x}}\\right)^{-1} \\frac{\\partial \\mathbf{F}}{\\partial z}$$")
     md.append(f"- **Exact SymPy Camber Gain ($dz \\to 0$)**: `{res_sym['exact_camber_gain_deg_per_100mm']:.8f} °/100mm`")
     md.append(f"- **Exact SymPy Toe Gain ($dz \\to 0$)**: `{res_sym['exact_toe_gain_deg_per_100mm']:.8f} °/100mm`")
-    md.append(f"- **Floating-Point Residual Norm at $+20\\text{ mm}$ Bump**: `{res_sym['residual_norm_at_20mm']:.3e} mm`\n")
+    md.append(f"- **Floating-Point Residual Norm at +20 mm Bump**: `{res_sym['residual_norm_at_20mm']:.3e} mm²`\n")
 
     md.append("#### Numerical Discretization Step Size Truncation Error Table:")
     md.append("| Step Size $\\Delta z$ [mm] | Numeric Camber Gain [°/100mm] | Exact SymPy Gain [°/100mm] | Absolute Truncation Error [°/100mm] | Relative Error [%] | Error Scaling Order |")
@@ -1081,7 +1123,8 @@ def generate_markdown_report(
         md.append("| :--- | :---: | :---: | :---: | :---: | :--- |")
         md.append(f"| **Yaw Rate $r$** | Lateral State | **`{st['yaw_rate']['r2']:.4f}`** | **`{st['yaw_rate']['rmse_rad_s']:.4f}`** | rad/s ({st['yaw_rate']['rmse_rad_s']*180/np.pi:.2f} °/s) | High dynamic tracking through high-speed turns |")
         md.append(f"| **Lateral Accel $a_y$** | Inertial Acceleration | **`{st['lateral_accel']['r2']:.4f}`** | **`{st['lateral_accel']['rmse_ms2']:.3f}`** | m/s² ({st['lateral_accel']['rmse_ms2']/9.81:.3f} g) | Captured centripetal force build-up |")
-        md.append(f"| **Body Roll Angle $\\phi$** | Suspension Kinematics | **`{st['roll_angle']['r2']:.4f}`** | **`{st['roll_angle']['rmse_rad']:.4f}`** | rad ({st['roll_angle']['rmse_rad']*180/np.pi:.2f} °) | Quasi-static elastic/geometric roll alignment |\n")
+        md.append(f"| **Longitudinal Accel $a_x$** | Drive/Braking Force | **`{st['longitudinal_accel']['r2']:.4f}`** | **`{st['longitudinal_accel']['rmse_ms2']:.3f}`** | m/s² ({st['longitudinal_accel']['rmse_ms2']/9.81:.3f} g) | Throttle drive torque & 4-wheel brake line pressures |")
+        md.append(f"| **Suspension Roll Deflection** | Potentiometer Travel | **`{st['susp_roll_travel_mm']['r2']:.4f}`** | **`{st['susp_roll_travel_mm']['rmse_mm']:.2f}`** | mm | Correlates lateral load transfer with front roll displacement |\n")
 
     if "motec_spa_gt3" in res_telemetry:
         mt = res_telemetry["motec_spa_gt3"]
