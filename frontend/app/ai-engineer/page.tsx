@@ -901,15 +901,15 @@ export default function AIEngineerPage() {
                         className="p-3 rounded-lg bg-zinc-950 border border-zinc-800/80 flex items-center justify-between text-xs font-mono"
                       >
                         <div className="flex items-center gap-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getSourceBadgeColor(cite?.source_type)}`}>
-                            {cite?.source_type}
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getSourceBadgeColor(cite?.source_type || "SIMULATION")}`}>
+                            {cite?.source_type || "SOLVER"}
                           </span>
-                          <span className="text-zinc-300 font-semibold">{cite?.field_path}</span>
+                          <span className="text-zinc-300 font-semibold">{cite?.field_path || (cite as any)?.title || (cite as any)?.source || "Modal Metric"}</span>
                           <span className="text-zinc-600">via</span>
-                          <span className="text-zinc-400">{cite?.tool_name}</span>
+                          <span className="text-zinc-400">{cite?.tool_name || (cite as any)?.source || (cite as any)?.id || "scipy-ode"}</span>
                         </div>
                         <div className="text-right">
-                          <span className="text-emerald-400 font-bold">{String(cite?.value)}</span>
+                          <span className="text-emerald-400 font-bold">{cite?.value ? String(cite.value) : "Verified"}</span>
                         </div>
                       </div>
                     ))

@@ -11,10 +11,10 @@ import { EnterpriseApi, UserSession } from "../../lib/api_client";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const PLAN_BADGES: Record<string, { label: string; color: string }> = {
-  FREE:       { label: "Free",       color: "text-gray-400 bg-[#1e1e1e]"          },
-  TRIAL:      { label: "7-Day Trial", color: "text-amber-300 bg-amber-500/10"      },
-  PRO:        { label: "Pro Engineer", color: "text-ansys-yellow bg-ansys-yellow/10" },
-  ENTERPRISE: { label: "Team Pass",  color: "text-purple-400 bg-purple-900/20"     },
+  FREE:       { label: "Free Sandbox", color: "text-gray-400 bg-[#1e1e1e]"          },
+  TRIAL:      { label: "Evaluation", color: "text-amber-300 bg-amber-500/10"      },
+  PRO:        { label: "Pro Engineer ($79/mo)", color: "text-ansys-yellow bg-ansys-yellow/10" },
+  ENTERPRISE: { label: "Race Team & Consultancy Pass ($499/yr)", color: "text-purple-400 bg-purple-900/20" },
 };
 
 import { type LucideIcon } from "lucide-react";
@@ -282,14 +282,14 @@ export default function SettingsPage() {
                       </span>
                       <p className="text-sm text-gray-400">
                         {plan === "FREE"
-                          ? "You are on the free plan. Upgrade to unlock all models and AI Auto-Tune."
+                          ? "You are on the Free Sandbox (includes 3D Kinematics & Quarter-Car). Pro & Team require a license key."
                           : plan === "TRIAL"
                           ? user?.trial_status === "EXPIRED"
-                            ? "Your 7-day evaluation trial has expired. Activate a license key to restore Pro access."
-                            : "You are on a 7-day evaluation trial. Activate a license key anytime to convert to Pro or Team Pass."
+                            ? "Your evaluation has expired. Activate a Pro or Team license key to restore full access."
+                            : "Evaluation mode active. Activate a Pro or Team license key to continue uninterrupted."
                           : plan === "PRO"
-                          ? "You have full access to all Pro Engineer features."
-                          : "Race Team / FSAE Pass — full access + team features."}
+                          ? "You have full access to Pro Engineer ($79/mo)."
+                          : "Race Team & Consultancy Pass ($499/yr — Up to 10 Seats) — full access + team features."}
                       </p>
                     </div>
                     {plan !== "ENTERPRISE" && (

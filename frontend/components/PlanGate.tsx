@@ -17,12 +17,12 @@ const PLAN_COPY = {
   PRO: {
     badge: "PRO",
     color: "text-amber-400 border-amber-500/30 bg-amber-500/10",
-    desc: "Upgrade to Pro Engineer ($29/mo) or start a 7-day trial to unlock full telemetry, multi-body solvers, and exports.",
+    desc: "Upgrade to Pro Engineer ($79/mo) to unlock full telemetry, multi-body solvers, and exports.",
   },
   ENTERPRISE: {
     badge: "ENTERPRISE",
     color: "text-cyan-400 border-cyan-500/30 bg-cyan-950/20",
-    desc: "This capability is included with the Race Team / FSAE Pass ($199/yr) for institutional setup lineage and signed approvals.",
+    desc: "This capability is included with the Race Team & Consultancy Pass ($499/yr — Up to 10 Seats) for institutional setup lineage and signed approvals.",
   },
 };
 
@@ -139,9 +139,11 @@ export default function PlanGate({ required, children, overlay = false, compact 
         </div>
         <div className="text-right font-mono">
           <div className="text-xs font-bold text-amber-400">
-            {required === "ENTERPRISE" ? "$199 / yr" : "$29 / mo"}
+            {required === "ENTERPRISE" ? "$499 / yr" : "$79 / mo"}
           </div>
-          <div className="text-[10px] text-slate-400">7-day free trial</div>
+          <div className="text-[10px] text-slate-400">
+            {required === "ENTERPRISE" ? "Up to 10 Seats" : "License key required"}
+          </div>
         </div>
       </div>
 
@@ -165,17 +167,46 @@ export default function PlanGate({ required, children, overlay = false, compact 
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-3 pt-2 border-t border-white/[0.06]">
+        {required === "ENTERPRISE" ? (
+          process.env.NEXT_PUBLIC_GUMROAD_TEAM_URL ? (
+            <a
+              href={process.env.NEXT_PUBLIC_GUMROAD_TEAM_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold tracking-wide transition-all shadow-md"
+            >
+              Unlock Race Team Pass ($499/yr) -&gt;
+            </a>
+          ) : (
+            <Link
+              href="/pricing"
+              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold tracking-wide transition-all shadow-md"
+            >
+              Unlock Race Team Pass ($499/yr) -&gt;
+            </Link>
+          )
+        ) : process.env.NEXT_PUBLIC_GUMROAD_PRO_URL ? (
+          <a
+            href={process.env.NEXT_PUBLIC_GUMROAD_PRO_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold tracking-wide transition-all shadow-md"
+          >
+            Unlock Pro Pass on Gumroad ($79/mo) -&gt;
+          </a>
+        ) : (
+          <Link
+            href="/pricing"
+            className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold tracking-wide transition-all shadow-md"
+          >
+            Unlock Pro Pass on Gumroad ($79/mo) -&gt;
+          </Link>
+        )}
         <Link
-          href="/pricing"
-          className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold tracking-wide transition-all shadow-md"
-        >
-          {required === "ENTERPRISE" ? "Unlock Race Team / FSAE Pass ($199/yr)" : "Start 7-Day Free Pro Trial"}
-        </Link>
-        <Link
-          href="/pricing"
+          href="/settings#billing"
           className="inline-flex items-center justify-center px-4 py-2.5 rounded-xl bg-[#14161f] hover:bg-[#1c1f2b] border border-[#282c3d] text-slate-200 text-xs font-semibold transition-all"
         >
-          {required === "ENTERPRISE" ? "View Enterprise Plans" : "Unlock Pro ($29/mo)"}
+          Already have a License Key? Activate -&gt;
         </Link>
       </div>
     </div>

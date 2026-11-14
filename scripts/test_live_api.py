@@ -28,6 +28,19 @@ print(f"Login response status: {status}")
 token = data.get('token')
 print(f"Token received: {token[:25]}...")
 
+# 1b. Activate PRO License
+print("\nActivating PRO License...")
+pro_key = "SLPRO-PRO-eyJleHAiOjE4MjYxMjcxMzUsImp0aSI6ImIzOGQ0Mjg1MDdiZiIsIm1heF91c2VzIjoxLCJwbGFuIjoiUFJPIn0.UCy0a_VxvFPtNZ_5qNkP34CAXxCVbRCdHybcohRdlt0"
+act_req = urllib.request.Request(
+    'https://suspensionlab-api.vercel.app/api/v1/billing/verify-license',
+    data=json.dumps({'license_key': pro_key}).encode('utf-8'),
+    headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'},
+    method='POST'
+)
+act_status, act_data = fetch_with_retry(act_req)
+print(f"License Activation status: {act_status}")
+print(f"License Activation response: {act_data}")
+
 # 2. Simulate Quarter-Car
 print("\nTesting Simulate (Synchronous ODE on Vercel)...")
 sim_payload = {

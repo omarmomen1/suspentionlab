@@ -29,7 +29,7 @@ const PLANS = [
   {
     name: "Pro Engineer",
     planKey: "PRO",
-    price: "$29",
+    price: "$79",
     billing: "/ month",
     description: "Full-Car, Damper LUTs, Telemetry Correlation, Setup Optimizer & PDF Reports.",
     color: "border-ansys-yellow shadow-[0_0_40px_rgba(242,169,0,0.08)]",
@@ -49,11 +49,11 @@ const PLANS = [
     icon: Shield,
   },
   {
-    name: "Race Team / FSAE Pass",
+    name: "Race Team & Consultancy Pass",
     planKey: "ENTERPRISE",
-    price: "$199",
+    price: "$499",
     billing: "/ year",
-    description: "Up to 10 team seats, Engineering Memory, Shared Reports & FMI Co-Sim.",
+    description: "Up to 10 Seats, Engineering Memory, Shared Reports & FMI Co-Sim.",
     color: "border-[#252525]",
     badge: null,
     features: [
@@ -79,7 +79,7 @@ const FAQS = [
   },
   {
     q: "What physics models are included in each tier?",
-    a: "Starter includes 3D Kinematics & Quarter-Car Preview. Pro Engineer ($29/month) unlocks Full-Car (7-DOF), Damper LUTs, Telemetry Correlation, Setup Optimizer, and PDF Reports. Race Team / FSAE Pass ($199/year) adds up to 10 seats, Engineering Memory, Shared Reports, and FMI Co-Sim.",
+    a: "Starter includes 3D Kinematics & Quarter-Car Preview. Pro Engineer ($79/month) unlocks Full-Car (7-DOF), Damper LUTs, Telemetry Correlation, Setup Optimizer, and PDF Reports. Race Team & Consultancy Pass ($499/year) adds up to 10 seats, Engineering Memory, Shared Reports, and FMI Co-Sim.",
   },
   {
     q: "How do I activate my license after purchasing?",
@@ -87,7 +87,7 @@ const FAQS = [
   },
   {
     q: "Do you offer direct invoicing for Formula Student / FSAE or OEM teams?",
-    a: "Yes. Teams can purchase the Race Team / FSAE Pass directly or request a direct invoice and SLPRO team license key by contacting our engineering team.",
+    a: "Yes. Teams can purchase the Race Team & Consultancy Pass directly or request a direct invoice and SLPRO team license key by contacting our engineering team.",
   },
 ];
 
@@ -191,7 +191,7 @@ export default function PricingPage() {
                       rel="noopener noreferrer"
                       className={`w-full py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2 ${plan.ctaStyle}`}
                     >
-                      Buy on Gumroad ($29) <ExternalLink size={14} />
+                      Buy on Gumroad ($79) <ExternalLink size={14} />
                     </a>
                     <Link
                       href="/settings#billing"
@@ -208,7 +208,7 @@ export default function PricingPage() {
                       rel="noopener noreferrer"
                       className={`w-full py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2 ${plan.ctaStyle}`}
                     >
-                      Buy Team Pass ($199/yr) <ExternalLink size={14} />
+                      Buy Team Pass ($499/yr) <ExternalLink size={14} />
                     </a>
                     <Link
                       href="/settings#billing"
@@ -224,6 +224,12 @@ export default function PricingPage() {
                   >
                     {ctaText} <ArrowRight size={14} />
                   </Link>
+                )}
+
+                {plan.planKey === "ENTERPRISE" && (
+                  <div className="mt-4 p-3 rounded-xl bg-purple-950/30 border border-purple-500/20 text-xs text-purple-200 text-center leading-relaxed">
+                    <span className="font-semibold text-purple-300">University Formula Student (FSAE / Formula Bharat / FSG) teams:</span> Use code <span className="font-mono font-bold text-ansys-yellow">FSAE50</span> at checkout for 50% academic sponsorship ($249/yr).
+                  </div>
                 )}
               </div>
             );

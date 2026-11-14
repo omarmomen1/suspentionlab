@@ -296,13 +296,13 @@ describe("PricingPage Gumroad Studio Tiers", () => {
     expect(html).toContain("Starter");
     expect(html).toContain("3D Kinematics &amp; Quarter-Car Preview");
     expect(html).toContain("Pro Engineer");
-    expect(html).toContain("$29");
+    expect(html).toContain("$79");
     expect(html).toContain("Full-Car, Damper LUTs, Telemetry Correlation, Setup Optimizer &amp; PDF Reports");
-    expect(html).toContain("Race Team / FSAE Pass");
-    expect(html).toContain("$199");
-    expect(html).toContain("Up to 10 team seats, Engineering Memory, Shared Reports &amp; FMI Co-Sim");
+    expect(html).toContain("Race Team &amp; Consultancy Pass");
+    expect(html).toContain("$499");
+    expect(html).toContain("Up to 10 Seats");
     expect(html).toContain('href="/settings#billing"');
-    expect(html).not.toContain("Buy on Gumroad ($29)");
+    expect(html).not.toContain("Buy on Gumroad ($79)");
   });
 
   it("renders Gumroad checkout links in new tab when NEXT_PUBLIC_GUMROAD_* env vars are set", () => {
@@ -311,7 +311,7 @@ describe("PricingPage Gumroad Studio Tiers", () => {
 
     const html = renderWithAuth(makeUser({ plan: "FREE" }), React.createElement(PricingPage));
 
-    expect(html).toContain("Buy on Gumroad ($29)");
+    expect(html).toContain("Buy on Gumroad ($79)");
     expect(html).toContain('href="https://gumroad.com/l/suspensionlab-pro"');
     expect(html).toContain('target="_blank"');
     expect(html).toContain("Activate License Key →");
@@ -325,8 +325,8 @@ describe("Landing Page, Offline Fonts, Settings #billing & Env Files", () => {
     const html = renderWithAuth(null, React.createElement(HomePage));
     expect(html).toContain("Launch 3D Kinematics Studio (Free)");
     expect(html).toContain('href="/kinematics"');
-    expect(html).toContain("Start 7-Day Pro Trial");
-    expect(html).toContain('href="/auth/register"');
+    expect(html).toContain("View Pro &amp; Team Passes ($79/mo)");
+    expect(html).toContain('href="/pricing"');
     expect(html).toContain("3D Kinematics &amp; Hardpoints");
     expect(html).toContain("Quarter-Car &amp; Damper Studio");
     expect(html).toContain("Full-Car &amp; Handling");
@@ -334,8 +334,8 @@ describe("Landing Page, Offline Fonts, Settings #billing & Env Files", () => {
     expect(html).toContain("Setup Sensitivity &amp; Optimizer");
     expect(html).toContain("Engineering Memory &amp; Reports");
     expect(html).toContain("$0");
-    expect(html).toContain("$29/mo");
-    expect(html).toContain("$199/yr");
+    expect(html).toContain("$79/mo");
+    expect(html).toContain("$499/yr");
     expect(html).not.toContain("Engineering Command Center");
   });
 

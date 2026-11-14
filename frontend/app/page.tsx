@@ -80,7 +80,7 @@ const PRICING_PREVIEW = [
   },
   {
     name: "Pro Engineer",
-    price: "$29/mo",
+    price: "$79/mo",
     cadence: "Gumroad license key",
     desc: "Full-Car, Damper LUTs, Telemetry Correlation, Setup Optimizer & PDF Reports.",
     icon: Shield,
@@ -91,14 +91,14 @@ const PRICING_PREVIEW = [
       "Kinematics & Pareto Setup Optimizer",
       "PDF Setup Sheets, CSV & MATLAB Exports",
     ],
-    ctaLabel: "Start 7-Day Pro Trial",
-    ctaHref: "/auth/register",
+    ctaLabel: "View Pro & Team Passes ($79/mo)",
+    ctaHref: "/pricing",
   },
   {
-    name: "Race Team / FSAE Pass",
-    price: "$199/yr",
-    cadence: "annual team pass",
-    desc: "Up to 10 team seats, Engineering Memory, Shared Reports & FMI Co-Sim.",
+    name: "Race Team & Consultancy Pass",
+    price: "$499/yr",
+    cadence: "annual team pass (10 seats)",
+    desc: "Up to 10 Seats, Engineering Memory, Shared Reports & FMI Co-Sim.",
     icon: Building2,
     highlight: false,
     features: [
@@ -145,10 +145,10 @@ export default function HomePage() {
               </Link>
 
               <Link
-                href="/auth/register"
+                href="/pricing"
                 className="px-6 py-3.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/15 text-white font-semibold text-sm transition-all inline-flex items-center gap-2"
               >
-                <span>Start 7-Day Pro Trial</span>
+                <span>View Pro &amp; Team Passes ($79/mo)</span>
               </Link>
 
               {user && (
