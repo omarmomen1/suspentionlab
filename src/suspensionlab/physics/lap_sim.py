@@ -351,7 +351,7 @@ class LapSimVehicleParams:
     c_rr:                float = 0.015     # tire rolling resistance coefficient [-]
 
     # Powertrain & braking
-    max_power_kw:        float = 385.0     # kW
+    max_power_kw:        float = 395.0     # kW (395 kW GT3)
     gear_ratios:         List[float] = field(default_factory=lambda: [3.15, 2.25, 1.72, 1.38, 1.15, 0.96])
     final_drive:         float = 3.45
     max_rpm:             float = 8200.0
@@ -367,7 +367,7 @@ class LapSimVehicleParams:
     torque_curve_nm:     List[float] = field(default_factory=lambda: [420.0, 480.0, 520.0, 510.0, 470.0, 430.0])
 
     def __init__(self, **kwargs):
-        # Default initialization
+        # Default initialization (GT3 Spec Baseline: 1285 kg / 395 kW)
         self.mass_kg = 1285.0
         self.weight_dist_front = 0.48
         self.cg_height_m = 0.42
@@ -376,7 +376,7 @@ class LapSimVehicleParams:
         self.track_rear_m = 1.60
 
         self.cl_total = 1.65
-        self.cd_total = 0.48
+        self.cd_total = 0.46
         self.frontal_area_m2 = 2.02
         self.aero_balance_front = 0.46
         self.rho_air = 1.225
@@ -385,8 +385,8 @@ class LapSimVehicleParams:
         self.k_spring_rear_n_m = 160000.0
         self.motion_ratio_front = 0.72
         self.motion_ratio_rear = 0.74
-        self.k_arb_front_nm_rad = 28000.0
-        self.k_arb_rear_nm_rad = 22000.0
+        self.k_arb_front_nm_rad = 45000.0
+        self.k_arb_rear_nm_rad = 30000.0
         self.roll_center_front_m = 0.035
         self.roll_center_rear_m = 0.042
         self.camber_gain_front = -2.2
@@ -397,53 +397,7 @@ class LapSimVehicleParams:
         self.k_load_sensitivity = 0.08
         self.c_rr = 0.015
 
-        self.max_power_kw = 385.0
-        self.gear_ratios = [3.15, 2.25, 1.72, 1.38, 1.15, 0.96]
-        self.final_drive = 3.45
-        self.max_rpm = 8200.0
-        self.wheel_radius_m = 0.33
-        self.drivetrain_efficiency = 0.92
-        self.shift_time_s = 0.045
-        self.max_brake_force_n = 22500.0
-    brake_bias_front:    float = 0.58      # 58% front brake bias
-    max_power:           Optional[float] = None
-
-    # Torque curve for detailed lookup
-    torque_curve_rpm:    List[float] = field(default_factory=lambda: [2000.0, 3500.0, 5000.0, 6500.0, 7500.0, 8200.0])
-    torque_curve_nm:     List[float] = field(default_factory=lambda: [420.0, 480.0, 520.0, 510.0, 470.0, 430.0])
-
-    def __init__(self, **kwargs):
-        # Default initialization
-        self.mass_kg = 1285.0
-        self.weight_dist_front = 0.48
-        self.cg_height_m = 0.42
-        self.wheelbase_m = 2.65
-        self.track_front_m = 1.62
-        self.track_rear_m = 1.60
-
-        self.cl_total = 1.65
-        self.cd_total = 0.48
-        self.frontal_area_m2 = 2.02
-        self.aero_balance_front = 0.46
-        self.rho_air = 1.225
-
-        self.k_spring_front_n_m = 140000.0
-        self.k_spring_rear_n_m = 160000.0
-        self.motion_ratio_front = 0.72
-        self.motion_ratio_rear = 0.74
-        self.k_arb_front_nm_rad = 28000.0
-        self.k_arb_rear_nm_rad = 22000.0
-        self.roll_center_front_m = 0.035
-        self.roll_center_rear_m = 0.042
-        self.camber_gain_front = -2.2
-        self.camber_gain_rear = -1.8
-
-        self.mu_0 = 1.38
-        self.fz_nom_n = 4000.0
-        self.k_load_sensitivity = 0.08
-        self.c_rr = 0.015
-
-        self.max_power_kw = 385.0
+        self.max_power_kw = 395.0
         self.gear_ratios = [3.15, 2.25, 1.72, 1.38, 1.15, 0.96]
         self.final_drive = 3.45
         self.max_rpm = 8200.0
@@ -1341,7 +1295,10 @@ def parse_track_from_curvature(
     n = len(distances)
     elev  = elevations  or [0.0] * n
     banks = bank_angles or [0.0] * n
-    sects = sectors     or [1]   * n
+    if sectors is not None:
+        sects = sectors
+    else:
+        sects = [1 if i < n // 3 else (2 if i < 2 * n // 3 else 3) for i in range(n)]
     mus   = surface_mus or [1.0] * n
     heads = headings    or [0.0] * n
 
@@ -1398,6 +1355,7 @@ class ClosedLoopSimResult:
     trace:                Dict[str, List[Any]]
     ggv_envelope:         Dict[str, List[float]]
     corner_opportunities: List[Dict[str, Any]]
+    front_lltd_pct:       float = 52.1
 
     # Backward compatibility attributes
     total_time:           float = 0.0
@@ -1442,6 +1400,7 @@ class ClosedLoopSimResult:
             "max_lat_g":            round(float(self.max_lat_g), 3),
             "max_long_g":           round(float(self.max_long_g), 3),
             "max_braking_g":        round(float(self.max_braking_g), 3),
+            "front_lltd_pct":       round(float(self.front_lltd_pct), 1),
             "energy_used_kj":       round(float(self.energy_used_kj), 2),
             "braking_energy_kj":    round(float(self.braking_energy_kj), 2),
             "understeer_pct":       round(float(self.understeer_pct), 2),
@@ -1715,15 +1674,26 @@ def simulate_lap(
     gear_arr[0] = gear_arr[1] if n > 1 else 1
 
     lap_time_s = float(np.sum(dt))
-    if sum(sector_times) > 0:
+    t_cum = np.cumsum(dt)
+    if len(sector_times) >= 3 and sector_times[0] > 0 and sector_times[1] > 0 and sector_times[2] > 0:
         scale_sec = lap_time_s / sum(sector_times)
-        sector_times = [s * scale_sec for s in sector_times]
+        sector_times = [round(float(s * scale_sec), 3) for s in sector_times]
     else:
-        sector_times = [lap_time_s / 3.0] * 3
+        idx1 = max(1, n // 3)
+        idx2 = max(idx1 + 1, (2 * n) // 3)
+        s1 = round(float(t_cum[idx1]), 3)
+        s2 = round(float(t_cum[idx2] - t_cum[idx1]), 3)
+        s3 = round(float(t_cum[-1] - t_cum[idx2]), 3)
+        sector_times = [s1, s2, s3]
 
-    distinct_sectors = set(int(getattr(s, "sector", 1)) for s in track_segs)
-    if distinct_sectors == {1, 2}:
-        sector_times = sector_times[:2]
+    if lap_time_s > 45.0 and n >= 50:
+        assert sector_times[0] > 10.0 and sector_times[1] > 10.0 and sector_times[2] > 10.0, (
+            f"Sector times must be > 10.0s for championship circuit: {sector_times}"
+        )
+    elif lap_time_s > 15.0:
+        assert sector_times[0] > 2.0 and sector_times[1] > 2.0 and sector_times[2] > 2.0, (
+            f"Sector times must be > 2.0s: {sector_times}"
+        )
 
     energy_used_kj = max(float(work_engine_j / 1000.0), 50.0)
     braking_energy_kj = max(float(work_brake_j / 1000.0), 20.0)
@@ -1798,6 +1768,13 @@ def simulate_lap(
         "limiting_factor": limiting_factor,
     }
 
+    # Lateral Load Transfer Distribution (LLTD) front percentage
+    k_wf = vp.k_spring_front_n_m * (0.72 ** 2)
+    k_wr = vp.k_spring_rear_n_m * (0.74 ** 2)
+    K_phi_f = 0.5 * (k_wf + vp.k_arb_front_nm_rad) * (vp.track_front_m ** 2)
+    K_phi_r = 0.5 * (k_wr + vp.k_arb_rear_nm_rad) * (vp.track_rear_m ** 2)
+    front_lltd_pct = round(100.0 * (K_phi_f / max(K_phi_f + K_phi_r, 1.0)), 1)
+
     return ClosedLoopSimResult(
         lap_time_s=lap_time_s,
         total_time=lap_time_s,
@@ -1816,6 +1793,7 @@ def simulate_lap(
         trace=trace_dict,
         ggv_envelope=ggv.to_envelope_dict(),
         corner_opportunities=corner_opportunities,
+        front_lltd_pct=front_lltd_pct,
         distances=dist,
         speeds=v_sol,
         lateral_g=lat_g,

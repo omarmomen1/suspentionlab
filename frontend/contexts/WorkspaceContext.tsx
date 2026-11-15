@@ -155,13 +155,13 @@ export interface WorkspaceContextType {
 }
 
 const DEFAULT_VEHICLE: VehicleState = {
-  id: "car-07-gt3",
-  name: "Formula 1 2026 Spec (CAR 07)",
-  version: "v2.8",
-  mass_kg: 798,
-  wheelbase_m: 3.6,
-  track_width_m: 1.6,
-  cg_height_m: 0.31,
+  id: "gt3-spec-baseline",
+  name: "GT3 Spec Baseline",
+  version: "1285 kg / 395 kW",
+  mass_kg: 1285,
+  wheelbase_m: 2.65,
+  track_width_m: 1.62,
+  cg_height_m: 0.42,
 };
 
 const DEFAULT_SETUP: SetupState = {

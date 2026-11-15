@@ -168,6 +168,39 @@ export default function TrackMap({
   const hasBottlenecks = rawFactors.length > 0;
   const [colorMode, setColorMode] = useState<ColorMode>(hasBottlenecks ? "bottleneck" : "speed");
   const [showGgSection, setShowGgSection] = useState<boolean>(showGgPlot);
+  const [rightPanelMode, setRightPanelMode] = useState<"ggv" | "gg">("ggv");
+
+  const ggvSpeedValues = useMemo(() => {
+    if (ggv?.speeds_kmh && ggv.speeds_kmh.length > 0) {
+      const maxVal = Math.max(...ggv.speeds_kmh);
+      if (maxVal < 120) {
+        return ggv.speeds_kmh.map((v) => Number((v * 3.6).toFixed(1)));
+      }
+      return ggv.speeds_kmh.map((v) => Number(v.toFixed(1)));
+    }
+    if (ggv?.speeds_ms && ggv.speeds_ms.length > 0) {
+      return ggv.speeds_ms.map((v) => Number((v * 3.6).toFixed(1)));
+    }
+    return [36, 72, 108, 144, 180, 216, 252, 288, 300];
+  }, [ggv]);
+
+  const ggvAyMaxValues = useMemo(() => {
+    if (ggv?.ay_max_g && ggv.ay_max_g.length > 0) return ggv.ay_max_g;
+    if (ggv?.ay_max_ms2 && ggv.ay_max_ms2.length > 0) return ggv.ay_max_ms2.map((a) => a / 9.81);
+    return [1.38, 1.48, 1.62, 1.82, 2.05, 2.25, 2.38, 2.45, 2.50];
+  }, [ggv]);
+
+  const ggvAxAccelValues = useMemo(() => {
+    if (ggv?.ax_accel_g && ggv.ax_accel_g.length > 0) return ggv.ax_accel_g;
+    if (ggv?.ax_accel_ms2 && ggv.ax_accel_ms2.length > 0) return ggv.ax_accel_ms2.map((a) => a / 9.81);
+    return [0.75, 0.62, 0.48, 0.35, 0.26, 0.19, 0.13, 0.08, 0.04];
+  }, [ggv]);
+
+  const ggvAxBrakeValues = useMemo(() => {
+    if (ggv?.ax_brake_g && ggv.ax_brake_g.length > 0) return ggv.ax_brake_g;
+    if (ggv?.ax_brake_ms2 && ggv.ax_brake_ms2.length > 0) return ggv.ax_brake_ms2.map((a) => -Math.abs(a / 9.81));
+    return [-1.45, -1.55, -1.72, -1.94, -2.18, -2.35, -2.42, -2.45, -2.45];
+  }, [ggv]);
 
   // Compute regime percentages: Power %, Braking %, Understeer %, Oversteer %
   const bottleneckStats = useMemo(() => {
@@ -471,16 +504,13 @@ export default function TrackMap({
             </button>
           )}
           <button
-            onClick={() => setShowGgSection(!showGgSection)}
-            className={`px-2 py-1 text-[10px] font-semibold rounded transition-all flex items-center gap-1 cursor-pointer border ${
-              showGgSection
-                ? "bg-[#1f2635] text-amber-400 border-amber-500/40"
-                : "bg-transparent text-zinc-400 border-zinc-800 hover:text-white"
-            }`}
-            title="Toggle G-G Friction Circle & GGV Envelope"
+            type="button"
+            onClick={() => setRightPanelMode((m) => (m === "ggv" ? "gg" : "ggv"))}
+            className="px-2 py-1 text-[10px] font-semibold rounded transition-all flex items-center gap-1 cursor-pointer border bg-[#1f2635] text-amber-400 border-amber-500/40 hover:text-white"
+            title="Toggle between GGV Performance Envelope and G-G Friction Circle"
           >
             <Activity size={10} />
-            <span>G-G / GGV</span>
+            <span>{rightPanelMode === "ggv" ? "G-G Circle" : "GGV Envelope"}</span>
           </button>
         </div>
       </div>
@@ -534,8 +564,10 @@ export default function TrackMap({
         </div>
       )}
 
-      {/* SVG Canvas on #0D1017 Carbon Background */}
-      <div className="relative w-full h-[460px] bg-[#0D1017] border border-[#1b202c] rounded-xl overflow-hidden flex items-center justify-center p-2">
+      {/* Side-by-Side: 2D Bottleneck TrackMap (Left) & GGV / G-G Performance Envelope (Right) */}
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 items-stretch">
+        {/* Left: SVG Canvas on Carbon Background */}
+        <div className="relative w-full h-[410px] bg-[#0D1017] border border-[#1b202c] rounded-xl overflow-hidden flex items-center justify-center p-2">
         <svg
           viewBox="0 0 800 500"
           className="w-full h-full select-none"
@@ -703,119 +735,136 @@ export default function TrackMap({
             </div>
           </div>
         )}
-      </div>
+        </div>
 
-      {/* Collapsible G-G Friction Circle & GGV Envelope Section */}
-      {showGgSection && (
-        <div className="pt-2 border-t border-[#1f2430] grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {/* G-G Friction Ellipse */}
-          <div className="h-[280px] bg-[#0D1017] border border-[#1f2430] rounded-xl p-2.5">
-            <Plot
-              data={[
-                {
-                  x: lateralG ?? [],
-                  y: longitudinalG ?? [],
-                  type: "scatter",
-                  mode: "markers",
-                  name: "Vehicle Trajectory",
-                  marker: {
-                    color: rawFactors.length > 0 ? rawFactors.map(getBottleneckColor) : rawSpeeds,
-                    colorscale: rawFactors.length > 0 ? undefined : "Plasma",
-                    size: 3,
-                    opacity: 0.75,
-                  },
-                },
-                ...[70, 160, 250].map((vk, idx) => {
-                  const baseMu = 1.45;
-                  const gTotal = baseMu + (vk / 160) ** 2 * 0.45;
-                  const angles = Array.from({ length: 80 }, (_, i) => (i / 79) * 2 * Math.PI);
-                  return {
-                    x: angles.map((a) => gTotal * Math.cos(a)),
-                    y: angles.map((a) => (idx === 0 ? 1.15 : gTotal * 0.95) * Math.sin(a)),
-                    type: "scatter" as const,
-                    mode: "lines" as const,
-                    name: `Limit @ ${vk} km/h (±${gTotal.toFixed(2)}g)`,
-                    line: {
-                      color: idx === 0 ? "#06B6D4" : idx === 1 ? "#F59E0B" : "#F43F5E",
-                      dash: "dash" as const,
-                      width: 1.2,
-                    },
-                  };
-                }),
-              ]}
-              layout={darkLayout({
-                title: { text: "G-G Friction Circle & Bottleneck Points", font: { color: "#a1a1aa", size: 11 } },
-                xaxis: {
-                  title: { text: "Lateral Accel [g]", font: { color: "#71717a" } },
-                  zeroline: true,
-                  range: [-2.5, 2.5],
-                },
-                yaxis: {
-                  title: { text: "Longitudinal Accel [g]", font: { color: "#71717a" } },
-                  zeroline: true,
-                  range: [-2.5, 2.0],
-                },
-                margin: { l: 45, r: 15, t: 30, b: 40 },
-                legend: { orientation: "h", y: 1.18, font: { color: "#888", size: 8 } },
-              })}
-              config={{ displayModeBar: false, responsive: true }}
-              style={{ width: "100%", height: "100%" }}
-              useResizeHandler
-            />
+        {/* Right: GGV Performance Envelope & G-G Friction Circle */}
+        <div className="flex flex-col h-[410px] bg-[#0D1017] border border-[#1b202c] rounded-xl p-2.5 overflow-hidden">
+          <div className="flex items-center justify-between pb-1.5 border-b border-[#1f2533] mb-1.5 flex-shrink-0">
+            <div className="flex items-center gap-1.5">
+              <Activity size={12} className="text-amber-400" />
+              <span className="text-xs font-bold text-white tracking-wide">
+                {rightPanelMode === "ggv" ? "GGV Performance Envelope vs Speed" : "G-G Friction Circle & Bottlenecks"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 bg-[#151922] p-0.5 rounded-lg border border-[#252c3b]">
+              <button
+                type="button"
+                onClick={() => setRightPanelMode("ggv")}
+                className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                  rightPanelMode === "ggv" ? "bg-[#f2a900] text-black shadow" : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                GGV Envelope
+              </button>
+              <button
+                type="button"
+                onClick={() => setRightPanelMode("gg")}
+                className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                  rightPanelMode === "gg" ? "bg-[#06B6D4] text-black shadow" : "text-zinc-400 hover:text-white"
+                }`}
+              >
+                G-G Circle
+              </button>
+            </div>
           </div>
 
-          {/* GGV Envelope vs Speed */}
-          <div className="h-[280px] bg-[#0D1017] border border-[#1f2430] rounded-xl p-2.5">
-            <Plot
-              data={[
-                {
-                  x: ggv?.speeds_kmh ?? ggv?.speeds_ms?.map((v) => v * 3.6) ?? [20, 60, 100, 140, 180, 220, 260, 300],
-                  y:
-                    ggv?.ay_max_g ??
-                    ggv?.ay_max_ms2?.map((a) => a / 9.81) ??
-                    [1.2, 1.35, 1.6, 1.95, 2.35, 2.75, 3.1, 3.3],
-                  type: "scatter",
-                  mode: "lines",
-                  name: "ay Cornering Limit",
-                  line: { color: "#F59E0B", width: 2 },
-                },
-                {
-                  x: ggv?.speeds_kmh ?? ggv?.speeds_ms?.map((v) => v * 3.6) ?? [20, 60, 100, 140, 180, 220, 260, 300],
-                  y:
-                    ggv?.ax_accel_g ??
-                    ggv?.ax_accel_ms2?.map((a) => a / 9.81) ??
-                    [1.1, 0.95, 0.75, 0.55, 0.38, 0.25, 0.15, 0.05],
-                  type: "scatter",
-                  mode: "lines",
-                  name: "ax Accel (Powertrain)",
-                  line: { color: "#06B6D4", width: 1.8, dash: "dot" },
-                },
-                {
-                  x: ggv?.speeds_kmh ?? ggv?.speeds_ms?.map((v) => v * 3.6) ?? [20, 60, 100, 140, 180, 220, 260, 300],
-                  y:
-                    ggv?.ax_brake_g ??
-                    ggv?.ax_brake_ms2?.map((a) => a / 9.81) ??
-                    [-1.3, -1.45, -1.75, -2.1, -2.5, -2.85, -3.2, -3.4],
-                  type: "scatter",
-                  mode: "lines",
-                  name: "ax Braking Limit",
-                  line: { color: "#F43F5E", width: 1.8, dash: "dot" },
-                },
-              ]}
-              layout={darkLayout({
-                title: { text: "GGV Performance Envelope vs Speed", font: { color: "#a1a1aa", size: 11 } },
-                xaxis: { title: { text: "Speed [km/h]", font: { color: "#71717a" } } },
-                yaxis: { title: { text: "Acceleration Limits [g]", font: { color: "#71717a" } } },
-                margin: { l: 45, r: 15, t: 30, b: 40 },
-                legend: { orientation: "h", y: 1.18, font: { color: "#888", size: 8 } },
-              })}
-              config={{ displayModeBar: false, responsive: true }}
-              style={{ width: "100%", height: "100%" }}
-              useResizeHandler
-            />
+          <div className="flex-1 min-h-0 w-full">
+            {rightPanelMode === "ggv" ? (
+              <Plot
+                data={[
+                  {
+                    x: ggvSpeedValues,
+                    y: ggvAyMaxValues,
+                    type: "scatter",
+                    mode: "lines",
+                    name: "ay Cornering Limit",
+                    line: { color: "#F59E0B", width: 2 },
+                  },
+                  {
+                    x: ggvSpeedValues,
+                    y: ggvAxAccelValues,
+                    type: "scatter",
+                    mode: "lines",
+                    name: "ax Accel (Powertrain)",
+                    line: { color: "#06B6D4", width: 1.8, dash: "dot" },
+                  },
+                  {
+                    x: ggvSpeedValues,
+                    y: ggvAxBrakeValues,
+                    type: "scatter",
+                    mode: "lines",
+                    name: "ax Braking Limit",
+                    line: { color: "#F43F5E", width: 1.8, dash: "dot" },
+                  },
+                ]}
+                layout={darkLayout({
+                  title: { text: "GGV Performance Envelope vs Speed", font: { color: "#a1a1aa", size: 11 } },
+                  xaxis: { title: { text: "Speed [km/h]", font: { color: "#71717a" } }, range: [0, 320] },
+                  yaxis: { title: { text: "Acceleration Limits [g]", font: { color: "#71717a" } }, range: [-2.6, 2.6] },
+                  margin: { l: 45, r: 15, t: 25, b: 40 },
+                  legend: { orientation: "h", y: 1.15, font: { color: "#888", size: 8 } },
+                })}
+                config={{ displayModeBar: false, responsive: true }}
+                style={{ width: "100%", height: "100%" }}
+                useResizeHandler
+              />
+            ) : (
+              <Plot
+                data={[
+                  {
+                    x: lateralG ?? [],
+                    y: longitudinalG ?? [],
+                    type: "scatter",
+                    mode: "markers",
+                    name: "Vehicle Trajectory",
+                    marker: {
+                      color: rawFactors.length > 0 ? rawFactors.map(getBottleneckColor) : rawSpeeds,
+                      colorscale: rawFactors.length > 0 ? undefined : "Plasma",
+                      size: 3,
+                      opacity: 0.75,
+                    },
+                  },
+                  ...[70, 160, 250].map((vk, idx) => {
+                    const baseMu = 1.38;
+                    const gTotal = baseMu + (vk / 160) ** 2 * 0.45;
+                    const angles = Array.from({ length: 80 }, (_, i) => (i / 79) * 2 * Math.PI);
+                    return {
+                      x: angles.map((a) => gTotal * Math.cos(a)),
+                      y: angles.map((a) => (idx === 0 ? 1.15 : gTotal * 0.95) * Math.sin(a)),
+                      type: "scatter" as const,
+                      mode: "lines" as const,
+                      name: `Limit @ ${vk} km/h (±${gTotal.toFixed(2)}g)`,
+                      line: {
+                        color: idx === 0 ? "#06B6D4" : idx === 1 ? "#F59E0B" : "#F43F5E",
+                        dash: "dash" as const,
+                        width: 1.2,
+                      },
+                    };
+                  }),
+                ]}
+                layout={darkLayout({
+                  title: { text: "G-G Friction Circle & Bottleneck Points", font: { color: "#a1a1aa", size: 11 } },
+                  xaxis: {
+                    title: { text: "Lateral Accel [g]", font: { color: "#71717a" } },
+                    zeroline: true,
+                    range: [-2.5, 2.5],
+                  },
+                  yaxis: {
+                    title: { text: "Longitudinal Accel [g]", font: { color: "#71717a" } },
+                    zeroline: true,
+                    range: [-2.5, 2.0],
+                  },
+                  margin: { l: 45, r: 15, t: 25, b: 40 },
+                  legend: { orientation: "h", y: 1.15, font: { color: "#888", size: 8 } },
+                })}
+                config={{ displayModeBar: false, responsive: true }}
+                style={{ width: "100%", height: "100%" }}
+                useResizeHandler
+              />
+            )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

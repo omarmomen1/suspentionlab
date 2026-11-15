@@ -549,6 +549,7 @@ async def simulate_lap_endpoint(
     response_payload.update({
         "status": "success",
         "total_time_s": sim_res.lap_time_s,
+        "front_lltd_pct": round(float(sim_res.front_lltd_pct), 1),
         "telemetry": {
             "distances": sim_res.trace["s_m"],
             "speeds_ms": [s / 3.6 for s in sim_res.trace["speed_kmh"]],
