@@ -419,8 +419,8 @@ def _extract_track_segments(request_data: Dict[str, Any]) -> List[TrackSegment]:
             raise HTTPException(422, f"Failed to parse GPS track: {e}")
 
     elif distances and curvatures:
-        if len(distances) != len(curvatures):
-            raise HTTPException(400, "distances and curvatures must be the same length.")
+        if len(distances) != len(curvatures) and len(distances) != len(curvatures) + 1:
+            raise HTTPException(400, "distances and curvatures must be compatible lengths.")
         elevations  = request_data.get("elevations")
         bank_angles = request_data.get("bank_angles")
         sectors     = request_data.get("sectors")
@@ -474,19 +474,30 @@ async def simulate_lap_endpoint(
             "lat_g": [float(r["lat_g"]) for r in csv_data],
         }
 
+    KNOWN_PRESETS = {"spa", "silverstone", "monza", "fsae_endurance", "spa_francorchamps", "silverstone_gp", "autodromo_nazionale_monza", "fsae"}
+    is_preset_requested = isinstance(track_arg, str) and track_arg.lower().strip() in KNOWN_PRESETS
+
     # Backward compatibility: top-level distances and curvatures
-    if not segments_arg and not telemetry_arg and "distances" in request_data and "curvatures" in request_data:
+    if not is_preset_requested and not segments_arg and not telemetry_arg and "distances" in request_data and "curvatures" in request_data:
+        dists = request_data["distances"]
+        curvs = request_data["curvatures"]
+        if len(dists) > 10_000:
+            raise HTTPException(422, "Track point count exceeds maximum 10,000 points.")
         track_arg = parse_track_from_curvature(
-            request_data["distances"],
-            request_data["curvatures"],
+            dists,
+            curvs,
             elevations=request_data.get("elevations"),
             bank_angles=request_data.get("bank_angles"),
             sectors=request_data.get("sectors"),
         )
-    elif not segments_arg and not telemetry_arg and "latitudes" in request_data and "longitudes" in request_data:
+    elif not is_preset_requested and not segments_arg and not telemetry_arg and "latitudes" in request_data and "longitudes" in request_data:
+        lats = request_data["latitudes"]
+        lons = request_data["longitudes"]
+        if len(lats) > 10_000:
+            raise HTTPException(422, "GPS track too long. Maximum 10,000 points.")
         track_arg = parse_track_from_gps(
-            request_data["latitudes"],
-            request_data["longitudes"],
+            lats,
+            lons,
             request_data.get("elevations"),
         )
 
@@ -539,8 +550,11 @@ async def simulate_lap_endpoint(
                 is_closed=is_closed,
             )
         )
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(500, f"Lap simulation failed: {e}")
+        logger.error(f"Lap simulation failed: {e}")
+        raise HTTPException(500, "Simulation failed due to numerical convergence or invalid input parameters.")
 
     # Build locked contract output
     response_payload = sim_res.to_contract_dict()
@@ -550,6 +564,16 @@ async def simulate_lap_endpoint(
         "status": "success",
         "total_time_s": sim_res.lap_time_s,
         "front_lltd_pct": round(float(sim_res.front_lltd_pct), 1),
+        "min_rh_front_mm": sim_res.min_rh_front_mm,
+        "min_rh_rear_mm": sim_res.min_rh_rear_mm,
+        "bottoming_events_count": sim_res.bottoming_events_count,
+        "setup_surface": sim_res.setup_surface,
+        "aero_drag_energy_kj": sim_res.aero_drag_energy_kj,
+        "rolling_energy_kj": sim_res.rolling_energy_kj,
+        "braking_energy_kj": sim_res.braking_energy_kj,
+        "energy_balance_error_pct": sim_res.energy_balance_error_pct,
+        "max_roll_deg": sim_res.max_roll_deg,
+        "max_pitch_deg": sim_res.max_pitch_deg,
         "telemetry": {
             "distances": sim_res.trace["s_m"],
             "speeds_ms": [s / 3.6 for s in sim_res.trace["speed_kmh"]],
@@ -561,12 +585,19 @@ async def simulate_lap_endpoint(
             "gear_number": sim_res.trace["gear"],
             "aero_downforce_n": sim_res.trace["downforce_n"],
             "limiting_factor": sim_res.trace["limiting_factor"],
+            "ride_height_front_mm": sim_res.trace.get("ride_height_front_mm", []),
+            "ride_height_rear_mm": sim_res.trace.get("ride_height_rear_mm", []),
+            "pitch_deg": sim_res.trace.get("pitch_deg", []),
+            "roll_deg": sim_res.trace.get("roll_deg", []),
         },
         "ggv": {
             "speeds_kmh": sim_res.ggv_envelope["speeds_kmh"],
             "max_lat_g": sim_res.ggv_envelope["max_lat_g"],
             "max_accel_g": sim_res.ggv_envelope["max_accel_g"],
             "max_brake_g": sim_res.ggv_envelope["max_brake_g"],
+            "ay_max_g": sim_res.ggv_envelope.get("ay_max_g", sim_res.ggv_envelope["max_lat_g"]),
+            "ax_accel_g": sim_res.ggv_envelope.get("ax_accel_g", sim_res.ggv_envelope["max_accel_g"]),
+            "ax_brake_g": sim_res.ggv_envelope.get("ax_brake_g", sim_res.ggv_envelope["max_brake_g"]),
         },
         "track_coordinates": {
             "x": sim_res.trace["x_m"],
@@ -628,8 +659,11 @@ async def run_lap_sim(
             result = await loop.run_in_executor(None, solve_dynamic_lap, dyn_sim, dyn_track)
         else:
             result = await loop.run_in_executor(None, solve_lap, vehicle, segments)
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(500, f"Lap simulation failed: {e}")
+        logger.error(f"Lap simulation failed: {e}")
+        raise HTTPException(500, "Simulation failed due to numerical convergence or invalid input parameters.")
 
     return _result_to_dict(result)
 
@@ -1140,8 +1174,12 @@ async def sweep_setup(
 
     if not distances or not curvatures:
         raise HTTPException(400, "Must provide distances and curvatures arrays.")
+    if len(distances) > 10_000:
+        raise HTTPException(422, "Track exceeds 10,000 points.")
     if not parameter or values is None:
         raise HTTPException(400, "Must provide 'parameter' and 'values' for sweep.")
+    if len(values) > 50:
+        raise HTTPException(422, "Parameter sweep supports a maximum of 50 values.")
 
     v_input = None
     if "vehicle" in request_data:

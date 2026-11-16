@@ -467,3 +467,72 @@ def test_gt3_track_calibrations():
     assert 1445.0 <= res_fsae.distances[-1] <= 1455.0, f"FSAE length {res_fsae.distances[-1]} not 1450m"
     assert 62.0 <= res_fsae.lap_time_s <= 88.0, f"FSAE lap time {res_fsae.lap_time_s}s outside [62, 88]s"
     assert 1.80 <= res_fsae.max_braking_g <= 2.45, f"FSAE max brake g {res_fsae.max_braking_g} outside [1.80, 2.45]g"
+
+
+def test_track_geometry_closure_all_presets():
+    """Verify that all 4 championship circuit presets form closed loops: (x[-1], y[-1]) == (x[0], y[0])."""
+    for track_key in ("spa", "silverstone", "monza", "fsae_endurance"):
+        segs = get_builtin_track(track_key)
+        assert len(segs) > 10, f"{track_key} too short"
+        x0, y0 = segs[0].x_m, segs[0].y_m
+        x_end, y_end = segs[-1].x_m, segs[-1].y_m
+        err = np.hypot(x_end - x0, y_end - y0)
+        assert err < 1e-4, f"Circuit {track_key} has non-zero closure gap: {err:.6f} m"
+
+
+def test_stage_l3_dynamic_ride_height_and_pitch():
+    """Verify Stage L3 dynamic ride height, pitch calculations, and contract serialization."""
+    from suspensionlab.physics.lap_sim import LapSimVehicleParams, simulate_lap
+
+    vp = LapSimVehicleParams(static_rh_front_mm=55.0, static_rh_rear_mm=70.0)
+    res = simulate_lap(vehicle=vp, track="spa")
+
+    # Verify trace telemetry
+    assert "ride_height_front_mm" in res.trace
+    assert "ride_height_rear_mm" in res.trace
+    assert "pitch_deg" in res.trace
+    assert len(res.trace["ride_height_front_mm"]) == len(res.trace["s_m"])
+
+    # Physical checks: ride height compresses under aero downforce but stays positive
+    min_f = res.min_rh_front_mm
+    min_r = res.min_rh_rear_mm
+    assert 5.0 <= min_f < 55.0, f"Unexpected min front ride height: {min_f}"
+    assert 5.0 <= min_r < 70.0, f"Unexpected min rear ride height: {min_r}"
+
+    # Verify contract dict serialization
+    c_dict = res.to_contract_dict()
+    assert "min_rh_front_mm" in c_dict
+    assert "min_rh_rear_mm" in c_dict
+    assert "bottoming_events_count" in c_dict
+    assert c_dict["min_rh_front_mm"] == min_f
+    assert c_dict["min_rh_rear_mm"] == min_r
+
+
+def test_stage_l4_setup_response_surface():
+    """Verify Stage L4 2D setup response surface and 1-click optimizer payload."""
+    from suspensionlab.physics.lap_sim import LapSimVehicleParams, simulate_lap, compute_setup_response_surface
+
+    surf = compute_setup_response_surface(
+        base_lap_time_s=137.15,
+        current_front_arb=45.0,
+        current_aero_bal=44.0,
+    )
+    assert len(surf["front_arb_n_mm"]) == 5
+    assert len(surf["aero_balance_front_pct"]) == 5
+    assert len(surf["z_lap_time_s"]) == 5
+    assert len(surf["z_lap_time_s"][0]) == 5
+
+    # Check that optimal setup has positive or zero time gain
+    opt = surf["optimal_setup"]
+    assert "optimal_setup" in surf
+    assert opt["time_gain_s"] >= 0.0
+    assert opt["lap_time_s"] <= 137.15
+
+    # Check full simulate_lap serialization
+    res = simulate_lap(track="spa")
+    assert res.setup_surface is not None
+    assert "optimal_setup" in res.setup_surface
+    c_dict = res.to_contract_dict()
+    assert "setup_surface" in c_dict
+    assert len(c_dict["setup_surface"]["z_lap_time_s"]) == 5
+

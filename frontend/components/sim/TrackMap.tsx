@@ -171,33 +171,31 @@ export default function TrackMap({
   const [rightPanelMode, setRightPanelMode] = useState<"ggv" | "gg">("ggv");
 
   const ggvSpeedValues = useMemo(() => {
-    if (ggv?.speeds_kmh && ggv.speeds_kmh.length > 0) {
-      const maxVal = Math.max(...ggv.speeds_kmh);
-      if (maxVal < 120) {
-        return ggv.speeds_kmh.map((v) => Number((v * 3.6).toFixed(1)));
-      }
-      return ggv.speeds_kmh.map((v) => Number(v.toFixed(1)));
-    }
-    if (ggv?.speeds_ms && ggv.speeds_ms.length > 0) {
-      return ggv.speeds_ms.map((v) => Number((v * 3.6).toFixed(1)));
+    const rawSpeeds = ggv?.speeds_kmh ?? ggv?.speeds_ms ?? [];
+    if (rawSpeeds.length > 0) {
+      const maxRaw = Math.max(...rawSpeeds, 0);
+      return rawSpeeds.map((v: number) => (maxRaw > 0 && maxRaw <= 110 ? Number((v * 3.6).toFixed(1)) : Number(v.toFixed(1))));
     }
     return [36, 72, 108, 144, 180, 216, 252, 288, 300];
   }, [ggv]);
 
   const ggvAyMaxValues = useMemo(() => {
     if (ggv?.ay_max_g && ggv.ay_max_g.length > 0) return ggv.ay_max_g;
+    if ((ggv as any)?.max_lat_g && (ggv as any).max_lat_g.length > 0) return (ggv as any).max_lat_g;
     if (ggv?.ay_max_ms2 && ggv.ay_max_ms2.length > 0) return ggv.ay_max_ms2.map((a) => a / 9.81);
     return [1.38, 1.48, 1.62, 1.82, 2.05, 2.25, 2.38, 2.45, 2.50];
   }, [ggv]);
 
   const ggvAxAccelValues = useMemo(() => {
     if (ggv?.ax_accel_g && ggv.ax_accel_g.length > 0) return ggv.ax_accel_g;
+    if ((ggv as any)?.max_accel_g && (ggv as any).max_accel_g.length > 0) return (ggv as any).max_accel_g;
     if (ggv?.ax_accel_ms2 && ggv.ax_accel_ms2.length > 0) return ggv.ax_accel_ms2.map((a) => a / 9.81);
     return [0.75, 0.62, 0.48, 0.35, 0.26, 0.19, 0.13, 0.08, 0.04];
   }, [ggv]);
 
   const ggvAxBrakeValues = useMemo(() => {
     if (ggv?.ax_brake_g && ggv.ax_brake_g.length > 0) return ggv.ax_brake_g;
+    if ((ggv as any)?.max_brake_g && (ggv as any).max_brake_g.length > 0) return (ggv as any).max_brake_g.map((b: number) => -Math.abs(b));
     if (ggv?.ax_brake_ms2 && ggv.ax_brake_ms2.length > 0) return ggv.ax_brake_ms2.map((a) => -Math.abs(a / 9.81));
     return [-1.45, -1.55, -1.72, -1.94, -2.18, -2.35, -2.42, -2.45, -2.45];
   }, [ggv]);
@@ -258,17 +256,16 @@ export default function TrackMap({
     const spanX = Math.max(maxX - minX, 1);
     const spanY = Math.max(maxY - minY, 1);
 
-    const width = 800;
-    const height = 500;
-    const padding = 55;
+    const svgWidth = 800;
+    const svgHeight = 500;
+    const padX = svgWidth * 0.14;
+    const padY = svgHeight * 0.14;
 
-    const scale = Math.min((width - 2 * padding) / spanX, (height - 2 * padding) / spanY);
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
+    const scale = Math.min((svgWidth - 2 * padX) / spanX, (svgHeight - 2 * padY) / spanY);
 
-    const toSvgX = (valX: number) => (valX - centerX) * scale + width / 2;
-    // Invert Y so North is up
-    const toSvgY = (valY: number) => height / 2 - (valY - centerY) * scale;
+    const toSvgX = (x: number) => padX + (svgWidth - 2 * padX - spanX * scale) / 2 + (x - minX) * scale;
+    // Invert Y so North is up, auto-fitted with padding
+    const toSvgY = (y: number) => padY + (svgHeight - 2 * padY - spanY * scale) / 2 + (maxY - y) * scale;
 
     let vals = rawSpeeds;
     let palette = SPEED_PALETTE;
@@ -738,7 +735,7 @@ export default function TrackMap({
         </div>
 
         {/* Right: GGV Performance Envelope & G-G Friction Circle */}
-        <div className="flex flex-col h-[410px] bg-[#0D1017] border border-[#1b202c] rounded-xl p-2.5 overflow-hidden">
+        <div className="flex flex-col min-h-[420px] bg-[#0D1017] border border-[#1b202c] rounded-xl p-2.5">
           <div className="flex items-center justify-between pb-1.5 border-b border-[#1f2533] mb-1.5 flex-shrink-0">
             <div className="flex items-center gap-1.5">
               <Activity size={12} className="text-amber-400" />
@@ -768,7 +765,7 @@ export default function TrackMap({
             </div>
           </div>
 
-          <div className="flex-1 min-h-0 w-full">
+          <div className="flex-1 w-full" style={{ width: "100%", height: "340px", minHeight: "340px" }}>
             {rightPanelMode === "ggv" ? (
               <Plot
                 data={[
@@ -798,14 +795,14 @@ export default function TrackMap({
                   },
                 ]}
                 layout={darkLayout({
-                  title: { text: "GGV Performance Envelope vs Speed", font: { color: "#a1a1aa", size: 11 } },
-                  xaxis: { title: { text: "Speed [km/h]", font: { color: "#71717a" } }, range: [0, 320] },
-                  yaxis: { title: { text: "Acceleration Limits [g]", font: { color: "#71717a" } }, range: [-2.6, 2.6] },
-                  margin: { l: 45, r: 15, t: 25, b: 40 },
-                  legend: { orientation: "h", y: 1.15, font: { color: "#888", size: 8 } },
+                  title: { text: "GGV Performance Envelope vs Speed", font: { color: "#94A3B8", size: 12, family: "JetBrains Mono, monospace" } },
+                  xaxis: { title: { text: "Speed [km/h]", font: { color: "#71717a" } }, range: [0, 310] },
+                  yaxis: { title: { text: "Acceleration Limits [g]", font: { color: "#71717a" } }, range: [-2.6, 2.6], zeroline: true },
+                  margin: { t: 48, r: 20, b: 44, l: 52 },
+                  legend: { orientation: "h", y: 1.18, x: 0.05, font: { color: "#a1a1aa", size: 9 } },
                 })}
                 config={{ displayModeBar: false, responsive: true }}
-                style={{ width: "100%", height: "100%" }}
+                style={{ width: "100%", height: "340px" }}
                 useResizeHandler
               />
             ) : (

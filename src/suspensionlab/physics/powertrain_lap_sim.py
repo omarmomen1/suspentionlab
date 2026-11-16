@@ -190,24 +190,11 @@ class PowertrainCorrectedLapSimulator(DynamicLapSimulator):
         derivs["torque_engine_crank_nm"] = t_crank
         derivs["torque_axle_nm"] = t_drive_total
 
-        # Record driveline accounting ledger step
-        r_eff = max(st.u_mps / max(omega_drive, 0.1), 0.315)
-        # Decompose total ratio into gearbox and final drive
-        fd_ratio = 4.2381 if active_gear <= 4 else 3.2174
-        gb_ratio = gr / fd_ratio
-
-        ledger_rec = self.accounting.record_step(
-            time_s=getattr(st, "time_s", 0.0),
-            engine_torque_nm=t_crank,
-            engine_rpm=rpm_engine,
-            gear=active_gear,
-            gearbox_ratio=gb_ratio,
-            final_drive_ratio=fd_ratio,
-            dynamic_rolling_radius_m=r_eff,
-            vehicle_speed_mps=st.u_mps,
-            torque_provenance=t_provenance,
-        )
-        self.ledger_history.append(ledger_rec)
+        self._last_step_t_crank = t_crank
+        self._last_step_rpm_engine = rpm_engine
+        self._last_step_active_gear = active_gear
+        self._last_step_gr = gr
+        self._last_step_t_provenance = t_provenance
 
         return derivs
 
@@ -251,7 +238,7 @@ class PowertrainCorrectedLapSimulator(DynamicLapSimulator):
                 t_now=t_now,
             )
 
-        return super().step(
+        next_state = super().step(
             current_state=current_state,
             controls=controls,
             track_point=track_point,
@@ -260,3 +247,34 @@ class PowertrainCorrectedLapSimulator(DynamicLapSimulator):
             road_elevation_m=road_elevation_m,
             road_grade_rad=road_grade_rad,
         )
+
+        p = self.params
+        if p.drivetrain_layout == "FWD":
+            omega_drive = max(0.5 * (next_state.omega_fl + next_state.omega_fr), 0.0)
+        else:
+            omega_drive = max(0.5 * (next_state.omega_rl + next_state.omega_rr), 0.0)
+
+        t_crank = getattr(self, "_last_step_t_crank", 0.0)
+        rpm_engine = getattr(self, "_last_step_rpm_engine", 1000.0)
+        active_gear = getattr(self, "_last_step_active_gear", 1)
+        gr = getattr(self, "_last_step_gr", 1.0)
+        t_provenance = getattr(self, "_last_step_t_provenance", "ENDOGENOUS_PREDICTION")
+
+        r_eff = max(next_state.u_mps / max(omega_drive, 0.1), 0.315)
+        fd_ratio = 4.2381 if active_gear <= 4 else 3.2174
+        gb_ratio = gr / fd_ratio
+
+        ledger_rec = self.accounting.record_step(
+            time_s=getattr(next_state, "time_s", 0.0),
+            engine_torque_nm=t_crank,
+            engine_rpm=rpm_engine,
+            gear=active_gear,
+            gearbox_ratio=gb_ratio,
+            final_drive_ratio=fd_ratio,
+            dynamic_rolling_radius_m=r_eff,
+            vehicle_speed_mps=next_state.u_mps,
+            torque_provenance=t_provenance,
+        )
+        self.ledger_history.append(ledger_rec)
+
+        return next_state
