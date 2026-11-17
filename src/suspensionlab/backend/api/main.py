@@ -189,8 +189,8 @@ from suspensionlab.shared.models import PlanTier
 app.include_router(teams_router, prefix="/api/v1", dependencies=protected)
 
 from suspensionlab.backend.api.routes.lap_sim_routes import router as lap_sim_router
-app.include_router(lap_sim_router, prefix="/api/v1", dependencies=protected)
-app.include_router(lap_sim_router, dependencies=protected)
+app.include_router(lap_sim_router, prefix="/api/v1")
+app.include_router(lap_sim_router)
 
 from suspensionlab.backend.api.routes.kinematics_routes import router as kinematics_router
 app.include_router(kinematics_router, prefix="/api/v1", dependencies=[Depends(inline_compute_guard), Depends(RateLimiter("rate_limit_simulate"))])
