@@ -47,56 +47,23 @@ const STUDIO_ICONS: Record<StudioIconKey, LucideIcon> = {
 function StudioToolLabel({ id, fallback }: { id: string; fallback: string }) {
   switch (id) {
     case "kinematics":
-      return (
-        <>
-          3D Kinematics<span className="sr-only min-[1440px]:not-sr-only"> &amp; Hardpoints</span>
-        </>
-      );
+      return <span className="whitespace-nowrap">3D Kinematics</span>;
     case "quarter-car":
-      return (
-        <>
-          Quarter-Car<span className="sr-only min-[1440px]:not-sr-only"> &amp; Damper Studio</span>
-        </>
-      );
+      return <span className="whitespace-nowrap">Quarter-Car</span>;
     case "full-car-handling":
-      return (
-        <>
-          Full-Car<span className="sr-only xl:not-sr-only"> &amp; Handling</span>
-        </>
-      );
+      return <span className="whitespace-nowrap">Full-Car</span>;
     case "correlation-compare":
-      return (
-        <>
-          <span className="sr-only xl:not-sr-only">Telemetry &amp; </span>
-          <span className="sr-only min-[1440px]:not-sr-only">Setup </span>
-          Correlation
-        </>
-      );
+      return <span className="whitespace-nowrap">Correlation</span>;
     case "sensitivity-optimizer":
-      return (
-        <span className="whitespace-nowrap">
-          <span className="sr-only min-[1440px]:not-sr-only">Setup &amp; </span>
-          <span className="sr-only xl:not-sr-only">Optimize</span>
-          <span className="xl:hidden">Optimizer</span>
-          <span className="sr-only">Optimizer</span>
-        </span>
-      );
+      return <span className="whitespace-nowrap">Setup &amp; Opt</span>;
     case "memory-reports":
-      return (
-        <>
-          <span className="sr-only min-[1440px]:not-sr-only">Engineering </span>
-          <span className="sr-only xl:not-sr-only">Memory &amp; </span>
-          Reports
-        </>
-      );
+      return <span className="whitespace-nowrap">Memory &amp; PDF</span>;
     case "ai-engineer":
-      return (
-        <>
-          AI Race<span className="sr-only min-[1440px]:not-sr-only"> Engineer</span>
-        </>
-      );
+      return <span className="whitespace-nowrap">AI Engineer</span>;
+    case "lap-sim":
+      return <span className="whitespace-nowrap">ApexSim</span>;
     default:
-      return <>{fallback}</>;
+      return <span className="whitespace-nowrap">{fallback}</span>;
   }
 }
 
@@ -193,7 +160,7 @@ export default function Navbar() {
           href={tool.href}
           title={tool.label}
           aria-current={active ? "page" : undefined}
-          className={`flex items-center gap-1.5 px-2 min-[1440px]:px-2.5 py-1.5 rounded-lg whitespace-nowrap transition-all ${
+          className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg whitespace-nowrap transition-all text-xs shrink-0 ${
             active
               ? "text-white bg-white/[0.08] font-semibold border border-white/10 shadow-sm"
               : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
@@ -221,7 +188,7 @@ export default function Navbar() {
             href={tool.href}
             title={tool.label}
             aria-current={active ? "page" : undefined}
-            className="flex items-center gap-1.5 pl-2 min-[1440px]:pl-2.5 pr-1 py-1.5 font-medium whitespace-nowrap"
+            className="flex items-center gap-1.5 pl-2 pr-0.5 py-1.5 font-medium whitespace-nowrap text-xs"
           >
             <Icon size={13} className={`shrink-0 ${active ? "text-ansys-yellow" : "text-zinc-500"}`} />
             <span className="whitespace-nowrap">
@@ -301,12 +268,12 @@ export default function Navbar() {
         {studioMode ? (
           <div
             data-studio-mode="true"
-            className="hidden lg:flex items-center space-x-0.5 xl:space-x-1 text-[11px] min-[1440px]:text-xs font-medium"
+            className="hidden lg:flex flex-1 min-w-0 items-center justify-center gap-1.5 px-2 text-xs font-medium overflow-hidden"
           >
             {STUDIO_TOOLS.map(renderStudioTool)}
           </div>
         ) : (
-          <div className="hidden lg:flex items-center space-x-1 text-xs font-medium">
+          <div className="hidden lg:flex flex-1 min-w-0 items-center justify-center gap-1.5 px-2 text-xs font-medium overflow-hidden">
             {/* Stage 1: Setup */}
             <Link
               href="/garage"

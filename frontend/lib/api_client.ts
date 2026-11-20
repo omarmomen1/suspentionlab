@@ -1224,14 +1224,19 @@ export interface AiEpistemicBadge {
 }
 
 export interface AiApprovalGate {
-  action_type: string;
-  target_id: string;
-  parameters: Record<string, any>;
-  change_summary: string;
-  impact_assessment: string;
-  required_role: string;
-  status: "PENDING" | "APPROVED" | "REJECTED";
-  warning: string;
+  action_type?: string;
+  target_id?: string;
+  parameters?: Record<string, any>;
+  change_summary?: string;
+  impact_assessment?: string;
+  required_role?: string;
+  role_required?: string;
+  decision_type?: string;
+  decision_id?: string;
+  rationale?: string;
+  status: string;
+  warning?: string;
+  required?: boolean;
 }
 
 export interface AiChatResponse {
@@ -1250,7 +1255,7 @@ export interface AiChatResponse {
     baseline: number;
     predicted: number;
     change_pct: number;
-  }>;
+  }> | Record<string, any> | string;
   constraint_violations: string[];
   confidence: number;
   evidence: {

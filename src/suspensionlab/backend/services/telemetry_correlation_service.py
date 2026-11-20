@@ -250,10 +250,25 @@ class TelemetryCorrelationService:
             "evidence_source": "IMU Gyro Rate Integrator",
         })
 
-        # 3. Roll Angle (deg)
+        # 3. Roll Angle (deg) - Analytical steady-state roll angle from vehicle roll stiffness
         finite_roll = telem["roll_deg"][np.isfinite(telem["roll_deg"])]
         m_roll = float(np.percentile(np.abs(finite_roll), 95)) if len(finite_roll) > 0 else 3.92
-        s_roll = round(m_roll * 1.031, 2)  # Independent lateral load transfer calculation
+        # K_phi = 0.5 * k_s * MR^2 * track^2 per axle
+        k_s_val = float(p_dict.get("k_s", 35000.0))
+        mr_val = float(p_dict.get("MR", 0.85))
+        track_val = float(p_dict.get("track", 1.62))
+        m_s_corner = float(p_dict.get("m_s", 320.0))
+        h_arm = float(p_dict.get("h_cg", 0.42)) - float(p_dict.get("rc_height", 0.04))
+        k_phi_axle = 0.5 * k_s_val * (mr_val ** 2) * (track_val ** 2)
+        k_phi_total = max(2.0 * k_phi_axle + float(p_dict.get("k_arb", 20000.0)), 1000.0)
+        # Peak lateral acceleration from telemetry or nominal cornering level
+        if "lat_g" in telem and len(telem["lat_g"]) > 0:
+            finite_lat = telem["lat_g"][np.isfinite(telem["lat_g"])]
+            ay_peak = float(np.percentile(np.abs(finite_lat), 95)) * 9.81 if len(finite_lat) > 0 else 1.2 * 9.81
+        else:
+            ay_peak = 1.2 * 9.81
+        roll_moment = (4.0 * m_s_corner) * ay_peak * max(h_arm, 0.25)
+        s_roll = round(float((roll_moment / k_phi_total) * (180.0 / np.pi)), 2)
         e_roll = _estimate_channel(finite_roll, s_roll, gain=0.85)
         err_abs_roll = abs(s_roll - m_roll)
         err_pct_roll = (err_abs_roll / m_roll * 100.0) if m_roll > 0 else 0.0
