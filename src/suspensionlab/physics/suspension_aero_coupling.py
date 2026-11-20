@@ -403,9 +403,27 @@ class MultidimensionalAeroMap:
             pt = max(self.pitch_min_deg, min(self.pitch_max_deg, pitch_deg))
             yw = max(self.yaw_min_deg, min(self.yaw_max_deg, effective_yaw))
 
-            cl = self.cl_base + self.cl_rh_front_sens * rf + self.cl_rh_rear_sens * rr + self.cl_pitch_sens * pt + self.cl_yaw_sens * yw
-            cd = self.cd_base + self.cd_rh_sens * (0.5 * (rf + rr)) + self.cd_yaw_sens * abs(yw)
-            cop = self.cop_base + self.cop_pitch_sens * pt
+            if (
+                self.lut_grid_rh_f is not None
+                and self.lut_grid_rh_r is not None
+                and self.lut_grid_pitch is not None
+                and self.lut_grid_yaw is not None
+            ):
+                grid = (self.lut_grid_rh_f, self.lut_grid_rh_r, self.lut_grid_pitch, self.lut_grid_yaw)
+                point = (rf, rr, pt, yw)
+                cl = float(RegularGridInterpolator(grid, self.lut_cl_table, bounds_error=False, fill_value=None)(point))
+                if self.lut_cd_table is not None:
+                    cd = float(RegularGridInterpolator(grid, self.lut_cd_table, bounds_error=False, fill_value=None)(point))
+                else:
+                    cd = self.cd_base + self.cd_rh_sens * (0.5 * (rf + rr)) + self.cd_yaw_sens * abs(yw)
+                if self.lut_cop_table is not None:
+                    cop = float(RegularGridInterpolator(grid, self.lut_cop_table, bounds_error=False, fill_value=None)(point))
+                else:
+                    cop = self.cop_base + self.cop_pitch_sens * pt
+            else:
+                cl = self.cl_base + self.cl_rh_front_sens * rf + self.cl_rh_rear_sens * rr + self.cl_pitch_sens * pt + self.cl_yaw_sens * yw
+                cd = self.cd_base + self.cd_rh_sens * (0.5 * (rf + rr)) + self.cd_yaw_sens * abs(yw)
+                cop = self.cop_base + self.cop_pitch_sens * pt
         else:
             # High-order analytical Taylor expansion (AFFINE)
             cl = (
@@ -758,10 +776,10 @@ class CoupledVehicleModel:
             dFz_lat_f = lat_frac_front * m * ay * mp.h_cog / track_f
             dFz_lat_r = lat_frac_rear  * m * ay * mp.h_cog / track_r
 
-            Fz_FL = max(Fz0_f / 2.0 + df_front / 2.0 - dFz_long / 2.0 - dFz_lat_f / 2.0, 0.0)
-            Fz_FR = max(Fz0_f / 2.0 + df_front / 2.0 - dFz_long / 2.0 + dFz_lat_f / 2.0, 0.0)
-            Fz_RL = max(Fz0_r / 2.0 + df_rear  / 2.0 + dFz_long / 2.0 - dFz_lat_r / 2.0, 0.0)
-            Fz_RR = max(Fz0_r / 2.0 + df_rear  / 2.0 + dFz_long / 2.0 + dFz_lat_r / 2.0, 0.0)
+            Fz_FL = max(Fz0_f / 2.0 + df_front / 2.0 - dFz_long / 2.0 - dFz_lat_f, 0.0)
+            Fz_FR = max(Fz0_f / 2.0 + df_front / 2.0 - dFz_long / 2.0 + dFz_lat_f, 0.0)
+            Fz_RL = max(Fz0_r / 2.0 + df_rear  / 2.0 + dFz_long / 2.0 - dFz_lat_r, 0.0)
+            Fz_RR = max(Fz0_r / 2.0 + df_rear  / 2.0 + dFz_long / 2.0 + dFz_lat_r, 0.0)
 
             # Deflections
             heave_mm = -(df_total / K_heave) * 1000.0
@@ -962,5 +980,5 @@ class CoupledVehicleModel:
             "delta_downforce_front_n":     round(delta_df_front, 1),
             "delta_downforce_rear_n":      round(delta_df_rear, 1),
             "note": ("Lowering front ride height increases downforce on a ground-effect car "
-                     "(cl_rh_sens > 0). Rear ride height is more sensitive on modern cars."),
+                     "(cl_rh_sens < 0). Rear ride height is more sensitive on modern cars."),
         }

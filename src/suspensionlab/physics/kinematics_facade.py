@@ -823,7 +823,7 @@ class CppKinematicsBackend:
             "motion_ratio": _to_list(lut.get("motion_ratio"), [1.0] * n_steps),
             "scrub_radius_mm": _to_list(lut.get("scrub_radius_mm", lut.get("scrub_radius")), [0.0] * n_steps),
             "roll_center_height_mm": _to_list(lut.get("roll_center_height_mm", lut.get("rc_z")), [0.0] * n_steps),
-            "rc_y_mm": ic_y_default,
+            "rc_y_mm": _to_list(lut.get("rc_y_mm", lut.get("rc_y")), [0.0] * n_steps),
             "converged": conv_list,
         }
         val_eval = py_kin.PhysicalValidityEvaluator.evaluate(
