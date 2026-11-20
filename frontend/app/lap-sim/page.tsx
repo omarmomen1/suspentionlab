@@ -617,64 +617,6 @@ function runLocalCoupledLapSimulation(
   const minRhF = Math.min(...rhFrontMm);
   const minRhR = Math.min(...rhRearMm);
 
-  // Stage L4 2D Setup Response Grid Calculation
-  const frontArbGrid = cfg.mass < 500 ? [10, 14, 18, 22, 26] : [20, 35, 50, 65, 80];
-  const aeroBalGrid = [40, 44, 48, 52, 56];
-  const targetLltd = cfg.mass < 500 ? 50.0 : 52.2;
-  const targetAero = 48.0;
-
-  const evalPenalty = (arbVal: number, aeroVal: number) => {
-    const arbNmRad = arbVal * 1000.0;
-    const kPhiF = 0.5 * (kWf + arbNmRad) * (cfg.track_width_f ** 2);
-    const kPhiR = 0.5 * (kWr + kArbR) * (cfg.track_width_r ** 2);
-    const lltdPct = 100.0 * (kPhiF / Math.max(kPhiF + kPhiR, 1.0));
-    const dLltd = lltdPct - targetLltd;
-    const dtMech = 0.085 * (dLltd ** 2);
-    const dAero = aeroVal - targetAero;
-    const dtAero = 0.058 * (dAero ** 2);
-    const dCross = -0.015 * ((arbVal - (cfg.mass < 500 ? 18.0 : 50.0)) / (cfg.mass < 500 ? 10.0 : 30.0)) * dAero;
-    return dtMech + dtAero + dCross;
-  };
-
-  const currPenalty = evalPenalty(cfg.front_arb, cfg.aero_balance_front);
-  const zGrid: number[][] = [];
-  let minTime = Infinity;
-  let optArb = frontArbGrid[2];
-  let optAero = aeroBalGrid[2];
-
-  for (const aeroV of aeroBalGrid) {
-    const row: number[] = [];
-    for (const arbV of frontArbGrid) {
-      const p = evalPenalty(arbV, aeroV);
-      const tVal = Number((totalTimeS + (p - currPenalty)).toFixed(3));
-      row.push(tVal);
-      if (tVal < minTime) {
-        minTime = tVal;
-        optArb = arbV;
-        optAero = aeroV;
-      }
-    }
-    zGrid.push(row);
-  }
-
-  const timeGain = Math.max(0, Number((totalTimeS - minTime).toFixed(3)));
-  const setupSurface: SetupSurfaceResult = {
-    front_arb_n_mm: frontArbGrid,
-    aero_balance_front_pct: aeroBalGrid,
-    z_lap_time_s: zGrid,
-    current_setup: {
-      front_arb_n_mm: cfg.front_arb,
-      aero_balance_front_pct: cfg.aero_balance_front,
-      lap_time_s: Number(totalTimeS.toFixed(3)),
-    },
-    optimal_setup: {
-      front_arb_n_mm: optArb,
-      aero_balance_front_pct: optAero,
-      lap_time_s: Number(minTime.toFixed(3)),
-      time_gain_s: timeGain,
-    },
-  };
-
   const speedSlicesKmh = [40, 80, 120, 160, 200, 240, 280, 320];
   const ayMaxG: number[] = [];
   const axAccelG: number[] = [];
@@ -728,7 +670,7 @@ function runLocalCoupledLapSimulation(
       ax_accel_g: axAccelG,
       ax_brake_g: axBrakeG,
     },
-    setup_surface: setupSurface,
+    setup_surface: undefined,
     model_version: "ApexSim-QSS-MultiBody-v3.0",
   };
 }
@@ -1154,10 +1096,10 @@ function KpiPill({
 const FSAE_EV_PROFILE: CoupledVehicleConfig = {
   mass: 295,
   power_kw: 80,
-  tire_mu: 1.52,
+  tire_mu: 1.45,
   brake_bias_front: 60,
-  cl: 2.65,
-  cd: 1.15,
+  cl: 1.85,
+  cd: 1.05,
   aero_balance_front: 48,
   front_spring_rate: 55,
   rear_spring_rate: 65,

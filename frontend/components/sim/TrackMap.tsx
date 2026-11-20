@@ -194,7 +194,7 @@ export default function TrackMap({
   }, [ggv]);
 
   const ggvAxBrakeValues = useMemo(() => {
-    if (ggv?.ax_brake_g && ggv.ax_brake_g.length > 0) return ggv.ax_brake_g;
+    if (ggv?.ax_brake_g && ggv.ax_brake_g.length > 0) return ggv.ax_brake_g.map((v: number) => -Math.abs(v));
     if ((ggv as any)?.max_brake_g && (ggv as any).max_brake_g.length > 0) return (ggv as any).max_brake_g.map((b: number) => -Math.abs(b));
     if (ggv?.ax_brake_ms2 && ggv.ax_brake_ms2.length > 0) return ggv.ax_brake_ms2.map((a) => -Math.abs(a / 9.81));
     return [-1.45, -1.55, -1.72, -1.94, -2.18, -2.35, -2.42, -2.45, -2.45];
@@ -795,11 +795,10 @@ export default function TrackMap({
                   },
                 ]}
                 layout={darkLayout({
-                  title: { text: "GGV Performance Envelope vs Speed", font: { color: "#94A3B8", size: 12, family: "JetBrains Mono, monospace" } },
                   xaxis: { title: { text: "Speed [km/h]", font: { color: "#71717a" } }, range: [0, 310] },
                   yaxis: { title: { text: "Acceleration Limits [g]", font: { color: "#71717a" } }, range: [-2.6, 2.6], zeroline: true },
-                  margin: { t: 48, r: 20, b: 44, l: 52 },
-                  legend: { orientation: "h", y: 1.18, x: 0.05, font: { color: "#a1a1aa", size: 9 } },
+                  margin: { t: 36, r: 16, b: 42, l: 50 },
+                  legend: { orientation: "h", y: 1.12, x: 0, font: { color: "#a1a1aa", size: 9 } },
                 })}
                 config={{ displayModeBar: false, responsive: true }}
                 style={{ width: "100%", height: "340px" }}

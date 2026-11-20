@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   Activity,
   AlertOctagon,
@@ -576,6 +576,71 @@ function CorrelationCockpitContent() {
 
   const activeChannelData = modelComparisonData?.channels?.find((c: any) => c.channel_key === selectedChannelKey) || modelComparisonData?.channels?.[0];
 
+  const { channelYMin, channelYMax, dynamicTimeLabels, scaleChannelY, scaleResidualY, channelZeroY } = useMemo(() => {
+    const meas = (activeChannelData?.measured || []) as number[];
+    const sim = (activeChannelData?.simulated || []) as number[];
+    const res = (activeChannelData?.residual || []) as number[];
+    const timeArr = (activeChannelData?.time || modelComparisonData?.time || []) as number[];
+
+    const allVals = [...meas, ...sim];
+    let min = allVals.length > 0 ? Math.min(...allVals) : -1.0;
+    let max = allVals.length > 0 ? Math.max(...allVals) : 1.0;
+    if (min === max) {
+      min -= 1;
+      max += 1;
+    }
+    const range = max - min;
+    const padding = range * 0.12;
+    const effYMin = min - padding;
+    const effYMax = max + padding;
+
+    const scaleChannelY = (val: number) => {
+      const norm = (val - effYMin) / Math.max(effYMax - effYMin, 1e-4);
+      return Math.max(4, Math.min(116, 120 - norm * 120));
+    };
+
+    const maxAbsRes = Math.max(...res.map((r: number) => Math.abs(r)), 1e-3);
+    const zeroY = effYMin <= 0 && effYMax >= 0 ? scaleChannelY(0) : 60;
+    const scaleResidualY = (val: number) => {
+      const deltaY = (val / (maxAbsRes * 2.0)) * 45;
+      return Math.max(4, Math.min(116, zeroY - deltaY));
+    };
+
+    const tStart = timeArr.length > 0 ? timeArr[0] : 0;
+    const tEnd = timeArr.length > 0 ? timeArr[timeArr.length - 1] : 6.0;
+    const dt = (tEnd - tStart) / 4;
+    const dynamicTimeLabels = [
+      `${tStart.toFixed(1)}s`,
+      `${(tStart + dt).toFixed(1)}s`,
+      `${(tStart + 2 * dt).toFixed(1)}s`,
+      `${(tStart + 3 * dt).toFixed(1)}s`,
+      `${tEnd.toFixed(1)}s`,
+    ];
+
+    return { channelYMin: effYMin, channelYMax: effYMax, dynamicTimeLabels, scaleChannelY, scaleResidualY, channelZeroY: zeroY };
+  }, [activeChannelData, modelComparisonData?.time]);
+
+  const residualHistogramBins = useMemo(() => {
+    const residuals = (activeChannelData?.residual || []) as number[];
+    if (residuals.length === 0) return Array(20).fill(0);
+    let min = Math.min(...residuals);
+    let max = Math.max(...residuals);
+    if (min === max) {
+      min -= 0.1;
+      max += 0.1;
+    }
+    const binCount = 20;
+    const binWidth = (max - min) / binCount;
+    const counts = Array(binCount).fill(0);
+    for (const r of residuals) {
+      let idx = Math.floor((r - min) / binWidth);
+      if (idx >= binCount) idx = binCount - 1;
+      if (idx < 0) idx = 0;
+      counts[idx]++;
+    }
+    return counts;
+  }, [activeChannelData?.residual]);
+
   return (
     <div className="min-h-screen bg-[#090a0d] text-white flex flex-col font-sans">
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
@@ -590,9 +655,11 @@ function CorrelationCockpitContent() {
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight flex flex-wrap items-center gap-3">
                 <span>Telemetry &amp; Correlation Cockpit</span>
-                <span className="text-xs px-2.5 py-1 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 font-mono font-normal">
-                  ANTI-TAUTOLOGY VERIFIED
-                </span>
+                {!isSampleDataset && (
+                  <span className="text-xs px-2.5 py-1 rounded bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 font-mono font-normal">
+                    ANTI-TAUTOLOGY VERIFIED
+                  </span>
+                )}
                 {isSampleDataset && <SampleDemoTelemetryBadge size="sm" />}
               </h1>
               <div className="flex items-center gap-2 text-xs font-mono text-neutral-400 mt-2">
@@ -1105,72 +1172,71 @@ function CorrelationCockpitContent() {
 
                   <div className="h-56 bg-neutral-900/60 rounded-lg border border-neutral-800/80 p-3 flex flex-col justify-end">
                     <svg className="w-full h-44 overflow-visible" viewBox="0 0 600 120" preserveAspectRatio="none">
-                      <line x1="0" y1="60" x2="600" y2="60" stroke="#333" strokeDasharray="3,3" />
+                      <line x1="0" y1={channelZeroY} x2="600" y2={channelZeroY} stroke="#333" strokeDasharray="3,3" />
 
                       {/* Uncertainty Area if present */}
                       {activeChannelData.uncertainty_upper && (
                         <polygon
                           points={
-                            (activeChannelData.uncertainty_upper || []).slice(0, 100).map((val: number, i: number) => {
-                              const x = (i / 100) * 600;
-                              const y = 60 - val * 24;
-                              return `${x},${y}`;
+                            (activeChannelData.uncertainty_upper || []).slice(0, 100).map((val: number, i: number, arr: number[]) => {
+                              const x = (i / Math.max(arr.length - 1, 1)) * 600;
+                              const y = scaleChannelY(val);
+                              return `${x.toFixed(1)},${y.toFixed(1)}`;
                             }).join(" ") +
                             " " +
-                            (activeChannelData.uncertainty_lower || []).slice(0, 100).reverse().map((val: number, i: number) => {
-                              const x = ((99 - i) / 100) * 600;
-                              const y = 60 - val * 24;
-                              return `${x},${y}`;
+                            (activeChannelData.uncertainty_lower || []).slice(0, 100).reverse().map((val: number, i: number, arr: number[]) => {
+                              const x = ((arr.length - 1 - i) / Math.max(arr.length - 1, 1)) * 600;
+                              const y = scaleChannelY(val);
+                              return `${x.toFixed(1)},${y.toFixed(1)}`;
                             }).join(" ")
                           }
                           fill="rgba(168, 85, 247, 0.15)"
                         />
                       )}
 
-                      {/* Measured trace (Blue solid) */}
+                      {/* Measured trace (Cyan solid) */}
                       <path
-                        d={(activeChannelData.measured || []).slice(0, 100).map((val: number, i: number) => {
-                          const x = (i / 100) * 600;
-                          const y = 60 - val * 24;
-                          return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
-                        }).join(" ")}
-                        fill="none"
-                        stroke="#3b82f6"
-                        strokeWidth="2"
-                      />
-
-                      {/* Model trace (Cyan dashed) */}
-                      <path
-                        d={(activeChannelData.simulated || []).slice(0, 100).map((val: number, i: number) => {
-                          const x = (i / 100) * 600;
-                          const y = 60 - val * 24;
+                        d={(activeChannelData.measured || []).slice(0, 100).map((val: number, i: number, arr: number[]) => {
+                          const x = (i / Math.max(arr.length - 1, 1)) * 600;
+                          const y = scaleChannelY(val);
                           return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
                         }).join(" ")}
                         fill="none"
                         stroke="#06B6D4"
                         strokeWidth="2"
-                        strokeDasharray="4,2"
                       />
 
-                      {/* Residual trace (Amber dotted) */}
+                      {/* Model trace (Amber dashed) */}
                       <path
-                        d={(activeChannelData.residual || []).slice(0, 100).map((val: number, i: number) => {
-                          const x = (i / 100) * 600;
-                          const y = 60 - val * 35;
+                        d={(activeChannelData.simulated || []).slice(0, 100).map((val: number, i: number, arr: number[]) => {
+                          const x = (i / Math.max(arr.length - 1, 1)) * 600;
+                          const y = scaleChannelY(val);
                           return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
                         }).join(" ")}
                         fill="none"
-                        stroke="#f59e0b"
+                        stroke="#F59E0B"
+                        strokeWidth="2"
+                        strokeDasharray="4,2"
+                      />
+
+                      {/* Residual trace (Coral dotted) */}
+                      <path
+                        d={(activeChannelData.residual || []).slice(0, 100).map((val: number, i: number, arr: number[]) => {
+                          const x = (i / Math.max(arr.length - 1, 1)) * 600;
+                          const y = scaleResidualY(val);
+                          return `${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${y.toFixed(1)}`;
+                        }).join(" ")}
+                        fill="none"
+                        stroke="#F43F5E"
                         strokeWidth="1.5"
+                        strokeDasharray="2,2"
                       />
                     </svg>
 
                     <div className="flex justify-between text-[10px] font-mono text-neutral-500 mt-2">
-                      <span>0.0s</span>
-                      <span>1.5s</span>
-                      <span>3.0s</span>
-                      <span>4.5s</span>
-                      <span>6.0s</span>
+                      {dynamicTimeLabels.map((lbl: string, idx: number) => (
+                        <span key={idx}>{lbl}</span>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -1267,8 +1333,9 @@ function CorrelationCockpitContent() {
                   <span className="text-neutral-500">Gaussian fit overlay</span>
                 </div>
                 <div className="h-36 bg-neutral-900/60 rounded border border-neutral-800 flex items-end gap-1.5 p-3">
-                  {[4, 8, 15, 26, 42, 68, 95, 120, 145, 130, 98, 62, 38, 22, 12, 7, 3, 2, 1, 1].map((cnt, i) => {
-                    const heightPct = (cnt / 145) * 100;
+                  {residualHistogramBins.map((cnt: number, i: number) => {
+                    const maxBin = Math.max(...residualHistogramBins, 1);
+                    const heightPct = (cnt / maxBin) * 100;
                     return (
                       <div key={i} className="flex-1 bg-amber-500/70 hover:bg-amber-400 rounded-t transition-all relative group" style={{ height: `${heightPct}%` }}>
                         <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-1 bg-neutral-800 text-[9px] font-mono px-1 py-0.5 rounded pointer-events-none whitespace-nowrap z-10">

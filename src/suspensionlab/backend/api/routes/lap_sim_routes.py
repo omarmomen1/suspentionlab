@@ -15,8 +15,11 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 import defusedxml.ElementTree as ET
 import gpxpy
+import logging
 import numpy as np
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from suspensionlab.backend.database.core import get_db_dependency
 from suspensionlab.backend.security.auth import verify_api_key
@@ -527,6 +530,7 @@ async def simulate_lap_endpoint(
         "k_spring_front_n_m", "k_spring_f", "k_spring_front", "front_spring_rate",
         "k_spring_rear_n_m", "k_spring_r", "k_spring_rear", "rear_spring_rate",
         "motion_ratio_front", "mr_f", "motion_ratio_rear", "mr_r",
+        "static_rh_front_mm", "static_rh_rear_mm", "front_ride_height", "rear_ride_height",
         "k_arb_front_nm_rad", "k_arb_f", "k_arb_front", "front_arb",
         "k_arb_rear_nm_rad", "k_arb_r", "k_arb_rear", "rear_arb",
         "roll_center_front_m", "roll_center_f_m", "roll_center_front", "front_rc_height",

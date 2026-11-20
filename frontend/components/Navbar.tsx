@@ -74,11 +74,12 @@ function StudioToolLabel({ id, fallback }: { id: string; fallback: string }) {
       );
     case "sensitivity-optimizer":
       return (
-        <>
-          <span className="sr-only min-[1440px]:not-sr-only">Setup </span>
-          <span className="sr-only xl:not-sr-only">Sensitivity &amp; </span>
-          Optimizer
-        </>
+        <span className="whitespace-nowrap">
+          <span className="sr-only min-[1440px]:not-sr-only">Setup &amp; </span>
+          <span className="sr-only xl:not-sr-only">Optimize</span>
+          <span className="xl:hidden">Optimizer</span>
+          <span className="sr-only">Optimizer</span>
+        </span>
       );
     case "memory-reports":
       return (
@@ -208,7 +209,7 @@ export default function Navbar() {
 
     const isOpen = openMenu === menuKey;
     return (
-      <div key={tool.id} className="relative">
+      <div key={tool.id} className="relative shrink-0">
         <div
           className={`flex items-center rounded-lg whitespace-nowrap transition-all border ${
             active || isOpen
@@ -220,10 +221,10 @@ export default function Navbar() {
             href={tool.href}
             title={tool.label}
             aria-current={active ? "page" : undefined}
-            className="flex items-center gap-1.5 pl-2 min-[1440px]:pl-2.5 pr-1 py-1.5 font-medium"
+            className="flex items-center gap-1.5 pl-2 min-[1440px]:pl-2.5 pr-1 py-1.5 font-medium whitespace-nowrap"
           >
             <Icon size={13} className={`shrink-0 ${active ? "text-ansys-yellow" : "text-zinc-500"}`} />
-            <span>
+            <span className="whitespace-nowrap">
               <StudioToolLabel id={tool.id} fallback={tool.label} />
             </span>
           </Link>

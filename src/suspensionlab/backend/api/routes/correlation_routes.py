@@ -11,6 +11,7 @@ GET  /api/v1/telemetry/channel-detail          → Raw, filtered, model, residua
 from __future__ import annotations
 
 import json
+import logging
 from typing import Any, Dict, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -19,6 +20,8 @@ from pydantic import BaseModel, Field
 from suspensionlab.backend.security.auth import require_permission, UserContext
 from suspensionlab.backend.security.permissions import Permission
 from suspensionlab.backend.services.telemetry_correlation_service import TelemetryCorrelationService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/telemetry", tags=["telemetry-correlation"])
 

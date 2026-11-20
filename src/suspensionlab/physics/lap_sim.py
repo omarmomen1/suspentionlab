@@ -426,6 +426,8 @@ class LapSimVehicleParams:
         self.torque_curve_rpm = [2000.0, 3500.0, 5000.0, 6500.0, 7500.0, 8200.0]
         self.torque_curve_nm = [420.0, 480.0, 520.0, 510.0, 470.0, 430.0]
 
+        has_explicit_fz_nom = any(k in kwargs for k in ("fz_nom_n", "Fz_nom", "fz_nom"))
+
         # Apply kwargs with legacy and alternative alias mapping
         for k, v in kwargs.items():
             if v is None:
@@ -437,7 +439,9 @@ class LapSimVehicleParams:
             elif k in ("frontal_area", "frontal_area_m2"): self.frontal_area_m2 = float(v)
             elif k in ("track_f_m", "track_f", "track_front"): self.track_front_m = float(v)
             elif k in ("track_r_m", "track_r", "track_rear"): self.track_rear_m = float(v)
-            elif k in ("cop_front", "cop_fraction", "aero_balance"): self.aero_balance_front = float(v)
+            elif k in ("cop_front", "cop_fraction", "aero_balance", "aero_balance_front"):
+                ab_val = float(v)
+                self.aero_balance_front = ab_val / 100.0 if ab_val > 1.0 else ab_val
             elif k in ("k_spring_f", "k_spring_front", "front_spring_rate", "k_spring_front_n_m", "front_spring"):
                 s_val = float(v)
                 self.k_spring_front_n_m = s_val * 1000.0 if s_val < 1000.0 else s_val
@@ -446,9 +450,9 @@ class LapSimVehicleParams:
                 self.k_spring_rear_n_m = s_val * 1000.0 if s_val < 1000.0 else s_val
             elif k in ("mr_f", "motion_ratio_f", "motion_ratio_front"): self.motion_ratio_front = float(v)
             elif k in ("mr_r", "motion_ratio_r", "motion_ratio_rear"): self.motion_ratio_rear = float(v)
-            elif k in ("static_rh_front_mm", "static_rh_f", "ride_height_front", "ref_ride_height_front_mm"):
+            elif k in ("static_rh_front_mm", "static_rh_f", "ride_height_front", "ref_ride_height_front_mm", "front_ride_height"):
                 self.static_rh_front_mm = float(v)
-            elif k in ("static_rh_rear_mm", "static_rh_r", "ride_height_rear", "ref_ride_height_rear_mm"):
+            elif k in ("static_rh_rear_mm", "static_rh_r", "ride_height_rear", "ref_ride_height_rear_mm", "rear_ride_height"):
                 self.static_rh_rear_mm = float(v)
             elif k in ("k_arb_f", "k_arb_front", "k_arb_front_nm_rad", "front_arb"):
                 a_val = float(v)
@@ -478,6 +482,12 @@ class LapSimVehicleParams:
                 self.max_power_kw = float(v) / 1000.0
             elif hasattr(self, k):
                 setattr(self, k, v)
+
+        if self.aero_balance_front > 1.0:
+            self.aero_balance_front /= 100.0
+
+        if not has_explicit_fz_nom:
+            self.fz_nom_n = 4000.0 if self.mass_kg >= 800.0 else max(self.mass_kg * 9.81 / 4.0, 500.0)
 
     # Backward compatibility properties & aliases
     @property
@@ -984,6 +994,8 @@ def _normalize_to_vehicle_params(
                     elif sk in ("roll_center_f_m", "roll_center_front"): vp.roll_center_front_m = float(sv)
                     elif sk in ("roll_center_r_m", "roll_center_rear"): vp.roll_center_rear_m = float(sv)
                     elif sk in ("cg_height_m", "h_cog"): vp.cg_height_m = float(sv)
+                    elif sk in ("static_rh_front_mm", "front_ride_height", "ride_height_front"): vp.static_rh_front_mm = float(sv)
+                    elif sk in ("static_rh_rear_mm", "rear_ride_height", "ride_height_rear"): vp.static_rh_rear_mm = float(sv)
     else:
         vp = LapSimVehicleParams()
 
@@ -996,7 +1008,9 @@ def _normalize_to_vehicle_params(
         elif k in ("frontal_area", "frontal_area_m2"): vp.frontal_area_m2 = float(val)
         elif k in ("track_f_m", "track_f", "track_front", "track_front_m"): vp.track_front_m = float(val)
         elif k in ("track_r_m", "track_r", "track_rear", "track_rear_m"): vp.track_rear_m = float(val)
-        elif k in ("cop_front", "cop_fraction", "aero_balance", "aero_balance_front"): vp.aero_balance_front = float(val)
+        elif k in ("cop_front", "cop_fraction", "aero_balance", "aero_balance_front"):
+            ab_val = float(val)
+            vp.aero_balance_front = ab_val / 100.0 if ab_val > 1.0 else ab_val
         elif k in ("k_spring_f", "k_spring_front", "front_spring_rate", "k_spring_front_n_m", "front_spring"):
             s_val = float(val)
             vp.k_spring_front_n_m = s_val * 1000.0 if s_val < 1000.0 else s_val
@@ -1036,6 +1050,18 @@ def _normalize_to_vehicle_params(
             vp.max_power_kw = float(val) / 1000.0
         elif hasattr(vp, k):
             setattr(vp, k, val)
+
+    if vp.aero_balance_front > 1.0:
+        vp.aero_balance_front /= 100.0
+
+    has_explicit_fz = any(k in kwargs for k in ("fz_nom_n", "Fz_nom", "fz_nom"))
+    if not has_explicit_fz:
+        if isinstance(v, dict) and any(k in v for k in ("fz_nom_n", "Fz_nom", "fz_nom")):
+            has_explicit_fz = True
+        elif isinstance(v, LapSimVehicleParams) and hasattr(v, "fz_nom_n"):
+            has_explicit_fz = True
+    if not has_explicit_fz:
+        vp.fz_nom_n = 4000.0 if vp.mass_kg >= 800.0 else max(vp.mass_kg * 9.81 / 4.0, 500.0)
 
     return vp
 
@@ -1358,7 +1384,10 @@ def parse_segments_array(segment_list: List[Dict[str, Any]]) -> List[TrackSegmen
 def parse_telemetry_csv(telemetry_data: Union[Dict[str, Any], List[Dict[str, Any]]]) -> List[TrackSegment]:
     """Parse reconstructed telemetry CSV arrays (time_s, speed_ms, lat_g)."""
     if isinstance(telemetry_data, dict):
-        time_s = np.asarray(telemetry_data.get("time_s", []), dtype=float)
+        time_s = telemetry_data.get("time_s")
+        if time_s is None or len(time_s) == 0:
+            time_s = telemetry_data.get("time", [])
+        time_s = np.asarray(time_s, dtype=float)
         raw_speed = telemetry_data.get("speed_ms")
         if raw_speed is None or len(raw_speed) == 0:
             raw_speed = telemetry_data.get("speed_kmh")
@@ -1608,50 +1637,63 @@ def compute_setup_response_surface(
 
     import copy
 
-    # If vehicle_params and track_segs are provided, evaluate genuine physical simulation grid
-    if vehicle_params is not None and track_segs is not None:
-        z_grid: List[List[float]] = []
-        min_time = float("inf")
-        opt_arb = front_arb_grid[2]
-        opt_aero = aero_bal_grid[2]
+    if vehicle_params is None:
+        vehicle_params = LapSimVehicleParams(
+            k_arb_front_nm_rad=current_front_arb * 1000.0,
+            aero_balance_front=current_aero_bal / 100.0 if current_aero_bal > 1.0 else current_aero_bal,
+        )
+    if track_segs is None:
+        track_segs = get_builtin_track("spa")
 
-        for aero_v in aero_bal_grid:
-            row: List[float] = []
-            for arb_v in front_arb_grid:
-                vp_i = copy.copy(vehicle_params)
-                vp_i.k_arb_front_nm_rad = arb_v * 1000.0
-                vp_i.aero_balance_front = aero_v / 100.0
-                sim_res = simulate_lap(
-                    vehicle=vp_i,
-                    track=track_segs,
-                    is_closed=is_closed,
-                    compute_surface=False,
-                )
-                t_val = round(float(sim_res.lap_time_s), 3)
-                row.append(t_val)
-                if t_val < min_time:
-                    min_time = t_val
-                    opt_arb = arb_v
-                    opt_aero = aero_v
-            z_grid.append(row)
+    z_grid: List[List[float]] = []
+    min_time = float("inf")
+    opt_arb = front_arb_grid[2]
+    opt_aero = aero_bal_grid[2]
 
+    for aero_v in aero_bal_grid:
+        row: List[float] = []
+        for arb_v in front_arb_grid:
+            vp_i = copy.copy(vehicle_params)
+            vp_i.k_arb_front_nm_rad = arb_v * 1000.0
+            vp_i.aero_balance_front = aero_v / 100.0
+            sim_res = simulate_lap(
+                vehicle=vp_i,
+                track=track_segs,
+                is_closed=is_closed,
+                compute_surface=False,
+            )
+            t_val = round(float(sim_res.lap_time_s), 3)
+            row.append(t_val)
+            if t_val < min_time:
+                min_time = t_val
+                opt_arb = arb_v
+                opt_aero = aero_v
+        z_grid.append(row)
+
+    if min_time > base_lap_time_s:
+        min_time = base_lap_time_s
+        opt_arb = current_front_arb
+        opt_aero = current_aero_bal
+        time_gain = 0.0
+    else:
         time_gain = max(0.0, round(base_lap_time_s - min_time, 3))
-        return {
-            "front_arb_n_mm": front_arb_grid,
-            "aero_balance_front_pct": aero_bal_grid,
-            "z_lap_time_s": z_grid,
-            "current_setup": {
-                "front_arb_n_mm": round(float(current_front_arb), 1),
-                "aero_balance_front_pct": round(float(current_aero_bal), 1),
-                "lap_time_s": round(float(base_lap_time_s), 3),
-            },
-            "optimal_setup": {
-                "front_arb_n_mm": float(opt_arb),
-                "aero_balance_front_pct": float(opt_aero),
-                "lap_time_s": round(float(min_time), 3),
-                "time_gain_s": round(float(time_gain), 3),
-            },
-        }
+
+    return {
+        "front_arb_n_mm": front_arb_grid,
+        "aero_balance_front_pct": aero_bal_grid,
+        "z_lap_time_s": z_grid,
+        "current_setup": {
+            "front_arb_n_mm": round(float(current_front_arb), 1),
+            "aero_balance_front_pct": round(float(current_aero_bal), 1),
+            "lap_time_s": round(float(base_lap_time_s), 3),
+        },
+        "optimal_setup": {
+            "front_arb_n_mm": float(opt_arb),
+            "aero_balance_front_pct": float(opt_aero),
+            "lap_time_s": round(float(min_time), 3),
+            "time_gain_s": round(float(time_gain), 3),
+        },
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -2028,9 +2070,9 @@ def simulate_lap(
 
         f_drive_req = max(f_net_req, 0.0)
         f_brake_req = max(-f_net_req, 0.0)
-        ax_acc_avail = lookup_ax_accel(v_mid, ay_ratio) * surface_mu[i]
+        ax_acc_avail = lookup_ax_accel(v_mid, ay_tire) * surface_mu[i]
         f_drive_avail = max(vp.mass_kg * ax_acc_avail + drag + rolling, 100.0)
-        ax_brk_avail = lookup_ax_brake(v_mid, ay_ratio) * surface_mu[i]
+        ax_brk_avail = lookup_ax_brake(v_mid, ay_tire) * surface_mu[i]
         f_brake_avail = max(vp.mass_kg * ax_brk_avail - drag - rolling, 100.0)
 
         if f_net_req < 0.0:
@@ -2225,6 +2267,52 @@ def simulate_lap(
 
     min_rh_f = float(np.min(rh_front_mm))
     min_rh_r = float(np.min(rh_rear_mm))
+
+    if bottoming_count > 0:
+        # Corrective pass applying -12% downforce and +8% drag penalty at bottoming speeds
+        for i in range(n):
+            if rh_front_mm[i] <= 3.0 or rh_rear_mm[i] <= 3.0:
+                fz_pen = vp.mass_kg * 9.81 + downforce_n[i]
+                fz_orig = vp.mass_kg * 9.81 + (downforce_n[i] / 0.88)
+                grip_factor = math.sqrt(fz_pen / fz_orig) if curv[i] > 1e-4 else 1.0
+                drag_factor = 1.0 / (1.08 ** (1.0 / 3.0))
+                v_sol[i] = min(v_sol[i], v_sol[i] * grip_factor, v_sol[i] * drag_factor)
+
+        # Backward pass to ensure braking kinematic limits are respected
+        for i in range(n - 2, -1, -1):
+            ds = max(dist[i + 1] - dist[i], 0.1)
+            ax_dec = lookup_ax_brake(v_sol[i + 1], 0.0) * surface_mu[i + 1] + 9.81 * grad[i]
+            ax_dec = max(ax_dec, 0.5)
+            v_sol[i] = min(v_sol[i], math.sqrt(v_sol[i + 1]**2 + 2.0 * ax_dec * ds))
+
+        # Forward pass to ensure acceleration kinematic limits are respected
+        for i in range(1, n):
+            ds = max(dist[i] - dist[i - 1], 0.1)
+            ax_acc = lookup_ax_accel(v_sol[i - 1], 0.0) * surface_mu[i - 1] - 9.81 * grad[i]
+            if rh_front_mm[i] <= 3.0 or rh_rear_mm[i] <= 3.0:
+                extra_drag = 0.08 * 0.5 * vp.rho_air * vp.cd * vp.frontal_area_m2 * (v_sol[i - 1] ** 2)
+                ax_acc -= extra_drag / vp.mass_kg
+            ax_acc = max(ax_acc, 0.1)
+            v_sol[i] = min(v_sol[i], math.sqrt(v_sol[i - 1]**2 + 2.0 * ax_acc * ds))
+
+        if is_closed:
+            v_closed = min(v_sol[0], v_sol[-1])
+            v_sol[0] = v_closed
+            v_sol[-1] = v_closed
+
+        # Recompute times and kinematics
+        sector_times = [0.0, 0.0, 0.0]
+        for i in range(1, n):
+            ds = max(dist[i] - dist[i - 1], 1e-3)
+            v_mid = max(0.5 * (v_sol[i] + v_sol[i - 1]), 0.1)
+            dt[i] = ds / v_mid
+            long_g[i] = (v_sol[i] - v_sol[i - 1]) / (dt[i] * 9.81)
+            lat_g[i] = ((v_mid ** 2) * curv[i]) / 9.81
+            if track_segs[i].sector in (1, 2, 3):
+                sector_times[track_segs[i].sector - 1] += dt[i]
+
+        lap_time_s = float(np.sum(dt))
+        speed_kmh = v_sol * 3.6
 
     # Chassis Roll Angle
     K_phi_f = vp.roll_stiffness_front()

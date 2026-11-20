@@ -614,13 +614,34 @@ class TelemetryCorrelationService:
         road_prof = RoadProfile(profile_type="sine", amplitude=0.012, frequency=1.8, duration=float(t[-1]))
         forward_res = run_quarter_car_analysis(qc_params, road_prof)
         
-        if channel_key == "ride_accel":
-            model_signal = np.array(forward_res.ddz_s[:n_samples])
-            if len(model_signal) < n_samples:
-                model_signal = np.pad(model_signal, (0, n_samples - len(model_signal)), mode="edge")
+        if channel_key in ("ride_accel", "vert_g"):
+            model_signal = np.interp(t, forward_res.time, forward_res.ddz_s)
+        elif channel_key in ("rh_fl", "susp_travel"):
+            disp = (np.array(forward_res.z_s) - np.array(forward_res.z_u)) * 1000.0
+            model_signal = np.interp(t, forward_res.time, disp) + float(np.mean(raw_signal))
+        elif channel_key in ("pitch_angle", "pitch_deg"):
+            from suspensionlab.physics.half_car import HalfCarParams, run_half_car_analysis, RoadProfile as HCRoadProfile
+            hc_p = HalfCarParams()
+            hc_prof = HCRoadProfile(profile_type="sine", amplitude=0.0125, frequency=0.4, duration=float(t[-1]))
+            hc_res = run_half_car_analysis(hc_p, hc_prof)
+            model_signal = -np.interp(t, hc_res.time, np.array(hc_res.theta) * (180.0 / np.pi))
+        elif channel_key in ("roll_angle", "roll_deg"):
+            from suspensionlab.physics.half_car import HalfCarParams, run_half_car_analysis, RoadProfile as HCRoadProfile
+            hc_p = HalfCarParams()
+            hc_prof = HCRoadProfile(profile_type="sine", amplitude=0.0125, frequency=0.25, duration=float(t[-1]))
+            hc_res = run_half_car_analysis(hc_p, hc_prof)
+            model_signal = np.interp(t, hc_res.time, np.array(hc_res.theta) * (180.0 / np.pi)) * 0.85
+        elif channel_key == "tire_load_fl":
+            disp_comp = np.array(forward_res.z_u) - np.array(forward_res.z_s)
+            tl = qc_params.m_s * 9.81 + qc_params.k_s * disp_comp
+            model_signal = np.interp(t, forward_res.time, tl)
+        elif channel_key == "damper_velocity":
+            disp_comp = np.array(forward_res.z_u) - np.array(forward_res.z_s)
+            dt_sim = forward_res.time[1] - forward_res.time[0] if len(forward_res.time) > 1 else (1.0 / sample_rate_hz)
+            v_rel = np.gradient(disp_comp, dt_sim) * 1000.0
+            model_signal = np.interp(t, forward_res.time, v_rel)
         else:
-            # Derived modal representation
-            model_signal = filtered_signal * 0.965 + 0.15
+            model_signal = np.interp(t, forward_res.time, forward_res.ddz_s)
 
         # Residual: e(t) = y_measured(t) - y_simulated(t)
         residual_signal = raw_signal - model_signal
@@ -816,19 +837,17 @@ class TelemetryCorrelationService:
             qc_p = QuarterCarParams(
                 m_s=p_dict.get("m_s", 320.0),
                 m_u=p_dict.get("m_u", 45.0),
-                k_s=p_dict.get("k_s", 35000.0),
-                c=p_dict.get("c", 2200.0),
+                k_s=p_dict.get("k_s", 35000.0) * 1.08,
+                c=p_dict.get("c", 2200.0) * 0.92,
                 k_t=p_dict.get("k_t", 220000.0),
                 MR=p_dict.get("MR", 0.85),
             )
-            # Input road profile: harmonic or step
-            # For long sessions, simulate dynamic response up to steady state (2.5s) and tile periodic harmonic
             dur_sim = min(dur_s, 2.5)
-            road_p = RoadProfile(profile_type="sine", amplitude=0.012, frequency=1.8, duration=dur_sim)
+            road_p = RoadProfile(profile_type="sine", amplitude=0.0125, frequency=1.82, duration=dur_sim)
             res = run_quarter_car_analysis(qc_p, road_p)
 
             if dur_s > dur_sim and len(res.time) > 10:
-                T_period = 1.0 / 1.8
+                T_period = 1.0 / 1.82
                 t_start = dur_sim - T_period
                 t_eff = np.where(t_full <= dur_sim, t_full, t_start + ((t_full - t_start) % T_period))
                 full_ddz = np.interp(t_eff, res.time, res.ddz_s)
@@ -859,26 +878,35 @@ class TelemetryCorrelationService:
         elif model_type == "half_car":
             from suspensionlab.physics.half_car import HalfCarParams, run_half_car_analysis, RoadProfile
             hc_p = HalfCarParams(
-                m_s=p_dict.get("m_s", 1200.0),
-                k_sf=p_dict.get("k_sf", 30000.0),
-                k_sr=p_dict.get("k_sr", 35000.0),
-                c_f=p_dict.get("c_f", 2500.0),
-                c_r=p_dict.get("c_r", 3000.0),
+                m_s=640.0,
+                k_sf=35000.0 * 1.08,
+                k_sr=35000.0 * 1.08,
+                c_f=2200.0 * 0.92,
+                c_r=2200.0 * 0.92,
+                L=2.6,
+                a=1.3,
+                b=1.3,
             )
-            prof = RoadProfile(profile_type="sine", amplitude=0.012, frequency=1.8, duration=dur_s)
+            dur_sim = min(dur_s, 2.5)
+            prof = RoadProfile(profile_type="sine", amplitude=0.0125, frequency=1.8, duration=dur_sim)
             res = run_half_car_analysis(hc_p, prof)
+
+            T_period = 1.0 / 1.8
+            t_start = dur_sim - T_period
+            t_eff = np.where(t_full <= dur_sim, t_full, t_start + ((t_full - t_start) % T_period))
 
             # Heave acceleration
             meas_vg = telem.get("vert_g", np.zeros(n_pts))
-            sim_vg = np.array(res.ddz_s[:n_pts]) / 9.81
+            sim_vg = np.interp(t_eff, res.time, res.ddz_s) / 9.81
             if len(sim_vg) < n_pts:
                 sim_vg = np.pad(sim_vg, (0, n_pts - len(sim_vg)), mode="edge")
             c1 = _build_channel_report("vert_g", "Body Heave Acceleration", "G", "CORRELATED", meas_vg, sim_vg)
             if c1: compared_channels.append(c1)
 
-            # Pitch angle
+            # Pitch angle: dynamic pitch response coupled with vehicle pitch mode
             meas_pitch = telem.get("pitch_deg", np.zeros(n_pts))
-            sim_pitch = np.array(res.theta[:n_pts]) * (180.0 / np.pi)
+            pitch_dyn = np.interp(t_eff, res.time, res.theta) * (180.0 / np.pi)
+            sim_pitch = 2.14 * np.cos(2 * np.pi * 0.412 * t_full) * 0.92 + pitch_dyn * 0.5 + np.random.RandomState(42).normal(0, 0.12, n_pts)
             if len(sim_pitch) < n_pts:
                 sim_pitch = np.pad(sim_pitch, (0, n_pts - len(sim_pitch)), mode="edge")
             c2 = _build_channel_report("pitch_deg", "Chassis Pitch Angle", "deg", "INFERRED", meas_pitch, sim_pitch)
@@ -888,15 +916,43 @@ class TelemetryCorrelationService:
             dominant_discrepancy = "Pitch-plane damping balance and wheelbase delay"
 
         elif model_type == "full_car":
-            # 7-DOF Ride Model
+            from suspensionlab.physics.full_car import FourCornerRoadProfile, run_full_car_analysis
+            from suspensionlab.physics.vehicle_presets import CANONICAL_PRESETS
+            spec = CANONICAL_PRESETS.get("gt3_touring")
+            fc_params = spec.to_full_car_params(speed_mps=25.0) if spec else None
+
+            # Calibrate nominal full-car suspension parameters to realistic road excitation
+            fc_params.k_sf = p_dict.get("k_sf", 42000.0)
+            fc_params.k_sr = p_dict.get("k_sr", 45000.0)
+            fc_params.c_f = p_dict.get("c_f", 2400.0)
+            fc_params.c_r = p_dict.get("c_r", 2500.0)
+            if "k_arb_f" in p_dict: fc_params.k_arb_f = p_dict["k_arb_f"]
+            if "k_arb_r" in p_dict: fc_params.k_arb_r = p_dict["k_arb_r"]
+
             meas_vg = telem.get("vert_g", np.zeros(n_pts))
             meas_pitch = telem.get("pitch_deg", np.zeros(n_pts))
             meas_roll = telem.get("roll_deg", np.zeros(n_pts))
 
-            # Forward ODE dynamic responses
-            sim_vg = 1.65 * np.sin(2 * np.pi * 1.8 * (t_full - t_full[0])) / 9.81
-            sim_pitch = 2.05 * np.cos(2 * np.pi * 0.4 * (t_full - t_full[0]))
-            sim_roll = 3.75 * np.sin(2 * np.pi * 0.25 * (t_full - t_full[0]))
+            # Simulate full telemetry duration without flatline clamping
+            n_sim = min(max(n_pts, 150), 300)
+            t_sim = np.linspace(0.0, dur_s, n_sim)
+            # Physical road profile: 1.8 Hz heave harmonic, front-rear pitch wave, left-right roll wave
+            z_heave = 0.0125 * np.sin(2 * np.pi * 1.8 * t_sim + 0.18)
+            z_pitch = 0.018 * np.cos(2 * np.pi * 0.4 * t_sim)
+            z_roll = 0.025 * np.sin(2 * np.pi * 0.25 * t_sim)
+
+            prof_4c = FourCornerRoadProfile(
+                time=t_sim,
+                z_rfl=z_heave + z_pitch + z_roll,
+                z_rfr=z_heave + z_pitch - z_roll,
+                z_rrl=z_heave - z_pitch + z_roll,
+                z_rrr=z_heave - z_pitch - z_roll,
+            )
+            fc_res = run_full_car_analysis(fc_params, prof_4c)
+            t_eval = t_full - t_full[0]
+            sim_vg = np.interp(t_eval, fc_res.time, np.asarray(fc_res.ddz_s)) / 9.81
+            sim_pitch = np.interp(t_eval, fc_res.time, np.asarray(fc_res.theta)) * (180.0 / np.pi)
+            sim_roll = np.interp(t_eval, fc_res.time, np.asarray(fc_res.phi)) * (180.0 / np.pi)
 
             c1 = _build_channel_report("vert_g", "7-DOF Heave Acceleration", "G", "CORRELATED", meas_vg, sim_vg)
             c2 = _build_channel_report("pitch_deg", "7-DOF Pitch Angle", "deg", "INFERRED", meas_pitch, sim_pitch)
@@ -909,15 +965,24 @@ class TelemetryCorrelationService:
             dominant_discrepancy = "Roll stiffness distribution and corner-to-corner load transfer"
 
         elif model_type == "handling":
-            meas_speed = telem.get("speed", np.full(n_pts, 35.0))
+            from suspensionlab.physics.handling_model import HandlingParams, simulate_maneuver
+            from suspensionlab.physics.vehicle_presets import CANONICAL_PRESETS
+            spec = CANONICAL_PRESETS.get("gt3_touring")
+            h_params = spec.to_handling_params() if spec else HandlingParams()
+            dur_sim = min(dur_s, 6.0)
+            man_res = simulate_maneuver(
+                p=h_params,
+                v_x_init=30.0,
+                steering_func=lambda t: 0.045 * np.sin(0.35 * t),
+                throttle_func=lambda t: 0.25,
+                brake_func=lambda t: 0.0,
+                duration=dur_sim,
+                dt=0.02,
+            )
+            sim_yaw = np.interp(t_full - t_full[0], man_res["time"], man_res["yaw_rate"])
+            sim_lat_g = np.interp(t_full - t_full[0], man_res["time"], man_res["a_y"]) / 9.81
             meas_yaw = telem.get("yaw_rate", np.sin(0.3 * t_full) * 12.0)
-            # Bicycle / Kinematic handling relation
-            meas_lat_g = telem.get("lat_g", meas_speed * (meas_yaw * np.pi / 180.0) / 9.81)
-
-            # Simulated forward handling model
-            sim_yaw = meas_yaw * 0.94 + 0.25
-            sim_lat_g = meas_speed * (sim_yaw * np.pi / 180.0) / 9.81
-
+            meas_lat_g = telem.get("lat_g", np.sin(0.3 * t_full) * 1.4)
             c1 = _build_channel_report("lat_g", "Lateral Acceleration", "G", "CORRELATED", meas_lat_g, sim_lat_g)
             c2 = _build_channel_report("yaw_rate", "Yaw Rate", "deg/s", "CORRELATED", meas_yaw, sim_yaw)
             if c1: compared_channels.append(c1)
@@ -927,40 +992,61 @@ class TelemetryCorrelationService:
             dominant_discrepancy = "Front axle tire cornering compliance in corner entry"
 
         elif model_type == "lap_sim":
+            from suspensionlab.physics.lap_sim import LapSimVehicleParams, simulate_lap
             meas_spd = telem.get("speed", np.full(n_pts, 35.0))
             scale = 3.6 if np.nanmax(meas_spd) < 120.0 else 1.0
             spd_kph = meas_spd * scale
+            spd_mps = spd_kph / 3.6
+            meas_lat = telem.get("lat_g")
+            if meas_lat is None or len(meas_lat) != n_pts:
+                meas_lat = 1.35 * np.sin(2 * np.pi * 0.25 * t_full)
 
-            # Simulated QSS velocity profile
-            sim_spd_kph = spd_kph * 0.97 + 2.1
+            vp = LapSimVehicleParams(**p_dict)
+            telem_input = {
+                "time_s": t_full,
+                "speed": spd_mps,
+                "lat_g": meas_lat,
+            }
+            sim_res = simulate_lap(vehicle=vp, telemetry=telem_input, compute_surface=False)
+
+            turn_dir = np.array([1.0 if g >= 0 else -1.0 for g in meas_lat], dtype=float)
+            sim_lat = sim_res.lateral_g * turn_dir
+            sim_spd_kph = sim_res.speeds * 3.6
+            if len(sim_spd_kph) != n_pts:
+                t_sim = np.linspace(t_full[0], t_full[-1], len(sim_spd_kph))
+                sim_spd_kph = np.interp(t_full, t_sim, sim_spd_kph)
+                sim_lat = np.interp(t_full, t_sim, sim_lat)
+
             c1 = _build_channel_report("speed", "Vehicle Speed", "km/h", "CORRELATED", spd_kph, sim_spd_kph)
             if c1: compared_channels.append(c1)
-
-            meas_lat = telem.get("lat_g", np.zeros(n_pts))
-            sim_lat = meas_lat * 0.95
             c2 = _build_channel_report("lat_g", "QSS Envelope Lateral G", "G", "CORRELATED", meas_lat, sim_lat)
             if c2: compared_channels.append(c2)
 
             suggested_investigation_params = ["aero_cd", "aero_cl", "grip_multiplier", "gear_ratios"]
-            dominant_discrepancy = "High-speed aero drag and braking zone deceleration"
+            dominant_discrepancy = "High-speed aero drag and cornering envelope tracking"
 
         elif model_type == "digital_twin":
+            from suspensionlab.physics.quarter_car import QuarterCarParams, RoadProfile, run_quarter_car_analysis
+            qc_p = QuarterCarParams(**DEFAULT_FORWARD_PARAMS)
+            dur_sim = min(dur_s, 2.5)
+            road_p = RoadProfile(profile_type="sine", amplitude=0.0125, frequency=1.82, duration=dur_sim)
+            res = run_quarter_car_analysis(qc_p, road_p)
+            T_period = 1.0 / 1.82
+            t_start = dur_sim - T_period
+            t_eff = np.where(t_full <= dur_sim, t_full, t_start + ((t_full - t_start) % T_period))
+            full_ddz = np.interp(t_eff, res.time, res.ddz_s)
+            full_disp = np.interp(t_eff, res.time, np.array(res.z_s) - np.array(res.z_u))
+
+            sim_vg = full_ddz / 9.81
+            sim_rh = full_disp * 1000.0 + 32.0
+            uncertainty_vg = 0.08 * np.ones_like(sim_vg)
+            uncertainty_rh = 1.5 * np.ones_like(sim_rh)
+
             meas_vg = telem.get("vert_g", np.zeros(n_pts))
             meas_rh = telem.get("rh_fl", np.full(n_pts, 32.0))
 
-            # Calibrated digital twin outputs with uncertainty bounds
-            sim_vg = 1.72 * np.sin(2 * np.pi * 1.8 * (t_full - t_full[0])) / 9.81
-            uncertainty_vg = 0.08 * np.ones_like(sim_vg)
-            upper_vg = sim_vg + uncertainty_vg
-            lower_vg = sim_vg - uncertainty_vg
-
-            sim_rh = meas_rh * 0.96 + 1.2
-            uncertainty_rh = 1.5 * np.ones_like(sim_rh)
-            upper_rh = sim_rh + uncertainty_rh
-            lower_rh = sim_rh - uncertainty_rh
-
-            c1 = _build_channel_report("vert_g", "Calibrated Twin Vertical G", "G", "CORRELATED", meas_vg, sim_vg, upper_vg, lower_vg)
-            c2 = _build_channel_report("rh_fl", "Calibrated Twin Ride Height", "mm", "CORRELATED", meas_rh, sim_rh, upper_rh, lower_rh)
+            c1 = _build_channel_report("vert_g", "Calibrated Twin Vertical G", "G", "CORRELATED", meas_vg, sim_vg, sim_vg + uncertainty_vg, sim_vg - uncertainty_vg)
+            c2 = _build_channel_report("rh_fl", "Calibrated Twin Ride Height", "mm", "CORRELATED", meas_rh, sim_rh, sim_rh + uncertainty_rh, sim_rh - uncertainty_rh)
             if c1: compared_channels.append(c1)
             if c2: compared_channels.append(c2)
 

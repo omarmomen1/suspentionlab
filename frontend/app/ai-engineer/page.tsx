@@ -139,6 +139,7 @@ export default function AIEngineerPage() {
   const [activeTab, setActiveTab] = useState<"analysis" | "tools" | "citations">("analysis");
   const [availableTools, setAvailableTools] = useState<AiToolSchema[]>([]);
   const [expandedCitation, setExpandedCitation] = useState<number | null>(null);
+  const [attackDrawerOpen, setAttackDrawerOpen] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Human Approval Gate State
@@ -278,7 +279,11 @@ export default function AIEngineerPage() {
               <span className="text-zinc-300">{user?.team_id || "Production Squad"}</span>
               <span className="text-zinc-600">|</span>
               <span className="text-zinc-500">ROLE:</span>
-              <span className="text-emerald-400 font-semibold">{user?.team_role || "ENGINEER"}</span>
+              <span className="text-emerald-400 font-semibold">
+                {user?.plan === "PRO" || user?.plan === "ENTERPRISE" || user?.is_admin || !user?.team_role || user?.team_role === "ENGINEER" || user?.team_role === "MEMBER"
+                  ? "Race Engineer"
+                  : user.team_role}
+              </span>
             </div>
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs font-mono text-purple-300">
               <Cpu size={12} />
@@ -365,31 +370,49 @@ export default function AIEngineerPage() {
           </div>
         </div>
 
-        {/* Attack Defense Matrix Preset Buttons */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
+        {/* Attack Defense Matrix Preset Drawer (Hidden by default) */}
+        <div className="mb-6 rounded-xl border border-zinc-800 bg-zinc-950/40 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setAttackDrawerOpen((prev) => !prev)}
+            className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-zinc-900/40 transition"
+          >
             <span className="text-xs font-semibold text-zinc-400 flex items-center gap-1.5 uppercase tracking-wider font-mono">
               <ShieldAlert size={14} className="text-rose-400" />
-              Attack Prompts & Red-Team Testing
+              Attack Prompts &amp; Red-Team Testing
             </span>
-            <span className="text-[11px] text-zinc-500">Tests system refusal against rule violations</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {ATTACK_PRESETS.map((attack) => (
-              <button
-                key={attack.label}
-                onClick={() => {
-                  setProblem(attack.prompt);
-                  handleSubmit(attack.prompt);
-                }}
-                disabled={loading}
-                className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-mono transition flex items-center gap-1.5"
-              >
-                <Shield size={12} className="text-rose-400" />
-                {attack.label}
-              </button>
-            ))}
-          </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] text-zinc-500">
+                {attackDrawerOpen ? "Hide safety tests" : "Expand safety tests"}
+              </span>
+              {attackDrawerOpen ? (
+                <ChevronUp size={14} className="text-zinc-400" />
+              ) : (
+                <ChevronDown size={14} className="text-zinc-400" />
+              )}
+            </div>
+          </button>
+          {attackDrawerOpen && (
+            <div className="px-4 pb-3 pt-1 border-t border-zinc-800/60">
+              <p className="text-[11px] text-zinc-500 mb-2">Tests system refusal against rule violations</p>
+              <div className="flex flex-wrap gap-2">
+                {ATTACK_PRESETS.map((attack) => (
+                  <button
+                    key={attack.label}
+                    onClick={() => {
+                      setProblem(attack.prompt);
+                      handleSubmit(attack.prompt);
+                    }}
+                    disabled={loading}
+                    className="px-3 py-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs font-mono transition flex items-center gap-1.5"
+                  >
+                    <Shield size={12} className="text-rose-400" />
+                    {attack.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Input Textarea & Submit */}
