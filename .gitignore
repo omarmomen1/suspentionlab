@@ -56,6 +56,9 @@ backend_vercel/
 
 # Executables & Debug Artifacts
 *.exe
-debug_*.png
+*.png
+!frontend/public/**
 *.patch
+*.tmp
+_audit_export/
 
