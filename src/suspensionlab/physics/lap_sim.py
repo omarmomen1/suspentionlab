@@ -2110,7 +2110,11 @@ def simulate_lap(
 
     lap_time_s = float(np.sum(dt))
     t_cum = np.cumsum(dt)
-    if len(sector_times) >= 3 and sector_times[0] > 0 and sector_times[1] > 0 and sector_times[2] > 0:
+    explicit_sectors = sorted({s.sector for s in track_segs if s.sector in (1, 2, 3)})
+    if explicit_sectors == [1, 2] and sector_times[0] > 0 and sector_times[1] > 0:
+        scale_sec = lap_time_s / (sector_times[0] + sector_times[1])
+        sector_times = [round(float(sector_times[0] * scale_sec), 3), round(float(sector_times[1] * scale_sec), 3)]
+    elif len(sector_times) >= 3 and sector_times[0] > 0 and sector_times[1] > 0 and sector_times[2] > 0:
         scale_sec = lap_time_s / sum(sector_times)
         sector_times = [round(float(s * scale_sec), 3) for s in sector_times]
     else:
@@ -2312,6 +2316,12 @@ def simulate_lap(
                 sector_times[track_segs[i].sector - 1] += dt[i]
 
         lap_time_s = float(np.sum(dt))
+        if explicit_sectors == [1, 2] and sector_times[0] > 0 and sector_times[1] > 0:
+            scale_sec = lap_time_s / (sector_times[0] + sector_times[1])
+            sector_times = [round(float(sector_times[0] * scale_sec), 3), round(float(sector_times[1] * scale_sec), 3)]
+        elif len(sector_times) >= 3 and sector_times[0] > 0 and sector_times[1] > 0 and sector_times[2] > 0:
+            scale_sec = lap_time_s / sum(sector_times)
+            sector_times = [round(float(s * scale_sec), 3) for s in sector_times]
         speed_kmh = v_sol * 3.6
 
     # Chassis Roll Angle

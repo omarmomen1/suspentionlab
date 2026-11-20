@@ -381,13 +381,17 @@ def _compute_forces(p: HalfCarParams, z_s, dz_s, theta, dtheta, z_uf, dz_uf, z_u
     
     # Bump Stops
     if p.bump_stop_rate_f > 0:
-        bump_comp_f = np.where(z_rel_f > p.bump_stop_comp_f, p.bump_stop_rate_f * (np.exp(p.bump_stop_exp_f * (z_rel_f - p.bump_stop_comp_f)) - 1.0), 0.0)
-        bump_ext_f = np.where(z_rel_f < p.bump_stop_ext_f, -p.bump_stop_rate_f * (np.exp(p.bump_stop_exp_f * (p.bump_stop_ext_f - z_rel_f)) - 1.0), 0.0)
+        dz_comp_f = np.clip(z_rel_f - p.bump_stop_comp_f, 0.0, 0.05)
+        bump_comp_f = np.where(z_rel_f > p.bump_stop_comp_f, p.bump_stop_rate_f * (np.exp(p.bump_stop_exp_f * dz_comp_f) - 1.0), 0.0)
+        dz_ext_f = np.clip(p.bump_stop_ext_f - z_rel_f, 0.0, 0.05)
+        bump_ext_f = np.where(z_rel_f < p.bump_stop_ext_f, -p.bump_stop_rate_f * (np.exp(p.bump_stop_exp_f * dz_ext_f) - 1.0), 0.0)
         F_sf += bump_comp_f + bump_ext_f
         
     if p.bump_stop_rate_r > 0:
-        bump_comp_r = np.where(z_rel_r > p.bump_stop_comp_r, p.bump_stop_rate_r * (np.exp(p.bump_stop_exp_r * (z_rel_r - p.bump_stop_comp_r)) - 1.0), 0.0)
-        bump_ext_r = np.where(z_rel_r < p.bump_stop_ext_r, -p.bump_stop_rate_r * (np.exp(p.bump_stop_exp_r * (p.bump_stop_ext_r - z_rel_r)) - 1.0), 0.0)
+        dz_comp_r = np.clip(z_rel_r - p.bump_stop_comp_r, 0.0, 0.05)
+        bump_comp_r = np.where(z_rel_r > p.bump_stop_comp_r, p.bump_stop_rate_r * (np.exp(p.bump_stop_exp_r * dz_comp_r) - 1.0), 0.0)
+        dz_ext_r = np.clip(p.bump_stop_ext_r - z_rel_r, 0.0, 0.05)
+        bump_ext_r = np.where(z_rel_r < p.bump_stop_ext_r, -p.bump_stop_rate_r * (np.exp(p.bump_stop_exp_r * dz_ext_r) - 1.0), 0.0)
         F_sr += bump_comp_r + bump_ext_r
     
     return F_sf, F_sr, z_sf, z_sr
@@ -504,8 +508,23 @@ def simulate_time_response(
     # Reconstruct accelerations
     F_sf, F_sr, z_sf, z_sr = _compute_forces(p, z_s, dz_s, theta, dtheta, z_uf, dz_uf, z_ur, dz_ur)
 
-    ddz_s = (F_sf + F_sr) / p.m_s
-    ddtheta = (-p.a * F_sf + p.b * F_sr) / p.I_y
+    # Longitudinal load transfer and kinematic anti-reaction forces
+    L = max(p.a + p.b, 0.5)
+    delta_Fz_long = (p.m_s * p.a_x * p.h_cg) / L  # >0 for forward accel, <0 for braking
+
+    if p.a_x < 0.0:
+        trans_front = -delta_Fz_long
+        F_anti_f = p.anti_dive_f * trans_front
+        F_anti_r = -p.anti_lift_r * trans_front
+    else:
+        trans_rear = delta_Fz_long
+        F_anti_r = p.anti_squat_r * trans_rear
+        F_anti_f = -p.anti_lift_f * trans_rear
+
+    M_pitch_inertial = -p.m_s * p.a_x * p.h_cg
+
+    ddz_s = (F_sf + F_sr + F_anti_f + F_anti_r) / p.m_s
+    ddtheta = (-p.a * (F_sf + F_anti_f) + p.b * (F_sr + F_anti_r) + M_pitch_inertial) / p.I_y
     
     susp_travel_f = z_sf - z_uf
     susp_travel_r = z_sr - z_ur
@@ -544,8 +563,8 @@ def simulate_time_response(
             contact_states_r.append(ContactState.CONTACT)
 
     diagnostics = PhysicsDiagnostics(
-        force_residual_max_n=float(np.max(np.abs(p.m_s * ddz_s - (F_sf + F_sr)))),
-        moment_residual_max_nm=float(np.max(np.abs(p.I_y * ddtheta - (-p.a * F_sf + p.b * F_sr)))),
+        force_residual_max_n=float(np.max(np.abs(p.m_s * ddz_s - (F_sf + F_sr + F_anti_f + F_anti_r)))),
+        moment_residual_max_nm=float(np.max(np.abs(p.I_y * ddtheta - (-p.a * (F_sf + F_anti_f) + p.b * (F_sr + F_anti_r) + M_pitch_inertial)))),
         contact_violations_count=int(np.sum(total_Fz_f < -1e-6) + np.sum(total_Fz_r < -1e-6)),
         contact_states=contact_states_f,
         liftoff_time_s=liftoff_time_f,

@@ -420,10 +420,10 @@ def _handling_ode(
     z_rl = heave_r + roll_r * (p.tw_r / 2)
     z_rr = heave_r - roll_r * (p.tw_r / 2)
     
-    kin_fl = p.kinematics_lut_f.evaluate(z_fl)
-    kin_fr = p.kinematics_lut_f.evaluate(z_fr)
-    kin_rl = p.kinematics_lut_r.evaluate(z_rl)
-    kin_rr = p.kinematics_lut_r.evaluate(z_rr)
+    kin_fl = p.kinematics_lut_f.evaluate(-z_fl)
+    kin_fr = p.kinematics_lut_f.evaluate(-z_fr)
+    kin_rl = p.kinematics_lut_r.evaluate(-z_rl)
+    kin_rr = p.kinematics_lut_r.evaluate(-z_rr)
     
     h_rc_f_dynamic = (kin_fl["h_rc"] + kin_fr["h_rc"]) / 2.0
     h_rc_r_dynamic = (kin_rl["h_rc"] + kin_rr["h_rc"]) / 2.0
@@ -741,10 +741,10 @@ def compute_instantaneous_wheel_state(
     z_rl = heave_r + roll_r * (p.tw_r / 2)
     z_rr = heave_r - roll_r * (p.tw_r / 2)
 
-    kin_fl = p.kinematics_lut_f.evaluate(z_fl)
-    kin_fr = p.kinematics_lut_f.evaluate(z_fr)
-    kin_rl = p.kinematics_lut_r.evaluate(z_rl)
-    kin_rr = p.kinematics_lut_r.evaluate(z_rr)
+    kin_fl = p.kinematics_lut_f.evaluate(-z_fl)
+    kin_fr = p.kinematics_lut_f.evaluate(-z_fr)
+    kin_rl = p.kinematics_lut_r.evaluate(-z_rl)
+    kin_rr = p.kinematics_lut_r.evaluate(-z_rr)
 
     h_rc_f_dynamic = (kin_fl["h_rc"] + kin_fr["h_rc"]) / 2.0
     h_rc_r_dynamic = (kin_rl["h_rc"] + kin_rr["h_rc"]) / 2.0

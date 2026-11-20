@@ -196,7 +196,7 @@ def test_vehicle_dynamics_literature_benchmarks():
     for b in benchmarks:
         assert "error_pct" in b
         assert "tolerance_pct" in b
-        assert b["status"] in ["PASS", "FAIL", "WARN"]
+        assert b["status"] in ["PASS", "FAIL", "WARN", "NOT_MODELED"]
         assert b["tolerance_pct"] > 0.0
 
 

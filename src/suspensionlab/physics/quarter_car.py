@@ -742,15 +742,22 @@ def _quarter_car_ode(t, x, p: QuarterCarParams, zr_fn, dzr_fn):
     v_damper = v_susp * p.MR
     
     # Progressive Dampers (Split curves)
-    if v_damper > 0 and p.damper_curve_v_comp is not None and p.damper_curve_f_comp is not None:
-        F_damper = np.interp(v_damper, p.damper_curve_v_comp, p.damper_curve_f_comp)
-        F_damper_w = F_damper * p.MR
-    elif v_damper < 0 and p.damper_curve_v_reb is not None and p.damper_curve_f_reb is not None:
-        F_damper = np.interp(v_damper, p.damper_curve_v_reb, p.damper_curve_f_reb)
+    # Compression: dz_u > dz_s (v_comp > 0) -> engages comp curve, pushes sprung mass UP (F_damper_w < 0 -> -F_damper_w > 0)
+    # Extension / Rebound: dz_s > dz_u (v_comp < 0) -> engages reb curve, pulls sprung mass DOWN (F_damper_w > 0 -> -F_damper_w < 0)
+    v_comp = (dz_u - dz_s) * p.MR
+    if v_comp > 0 and p.damper_curve_v_comp is not None and p.damper_curve_f_comp is not None:
+        v_table_c = np.abs(np.asarray(p.damper_curve_v_comp, dtype=float))
+        f_table_c = np.abs(np.asarray(p.damper_curve_f_comp, dtype=float))
+        F_damper = np.interp(v_comp, v_table_c, f_table_c)
+        F_damper_w = -F_damper * p.MR
+    elif v_comp < 0 and p.damper_curve_v_reb is not None and p.damper_curve_f_reb is not None:
+        v_table_r = np.abs(np.asarray(p.damper_curve_v_reb, dtype=float))
+        f_table_r = np.abs(np.asarray(p.damper_curve_f_reb, dtype=float))
+        F_damper = np.interp(-v_comp, v_table_r, f_table_r)
         F_damper_w = F_damper * p.MR
     elif p.damper_curve_v is not None and p.damper_curve_f is not None and len(p.damper_curve_v) > 1:
-        F_damper = np.interp(v_damper, p.damper_curve_v, p.damper_curve_f)
-        F_damper_w = F_damper * p.MR
+        F_damper = np.interp(v_comp, p.damper_curve_v, p.damper_curve_f)
+        F_damper_w = -F_damper * p.MR
     else:
         F_damper_w = p.c_w * v_susp
         
@@ -770,13 +777,17 @@ def _quarter_car_ode(t, x, p: QuarterCarParams, zr_fn, dzr_fn):
         F_spring_w = p.k_w * z_susp_adj
     
     # Exponential Bump Stops
+    # Compression (jounce): z_u > z_s -> pushes sprung mass UP (F_spring_w -= bump_jounce -> -F_spring_w > 0)
+    # Extension (rebound): z_s > z_u -> pulls sprung mass DOWN (F_spring_w += bump_rebound -> -F_spring_w < 0)
     if p.bump_stop_rate > 0:
-        if z_susp > p.bump_stop_jounce:
-            dz = min(z_susp - p.bump_stop_jounce, 0.05)
-            F_spring_w += p.bump_stop_rate * (np.exp(p.bump_stop_exp * dz) - 1.0) * p.MR**2
-        elif z_susp < p.bump_stop_rebound:
-            dz_reb = min(p.bump_stop_rebound - z_susp, 0.05)
-            F_spring_w -= p.bump_stop_rate * (np.exp(p.bump_stop_exp * dz_reb) - 1.0) * p.MR**2
+        jounce_gap = abs(p.bump_stop_jounce)
+        rebound_gap = abs(p.bump_stop_rebound)
+        if (z_u - z_s) > jounce_gap:
+            dz = min((z_u - z_s) - jounce_gap, 0.05)
+            F_spring_w -= p.bump_stop_rate * (np.exp(p.bump_stop_exp * dz) - 1.0) * p.MR**2
+        elif (z_s - z_u) > rebound_gap:
+            dz_reb = min((z_s - z_u) - rebound_gap, 0.05)
+            F_spring_w += p.bump_stop_rate * (np.exp(p.bump_stop_exp * dz_reb) - 1.0) * p.MR**2
 
     # Sprung acceleration
     ddz_s = (1.0 / p.m_s) * (-F_damper_w - F_spring_w)
@@ -951,15 +962,21 @@ def simulate_time_response(
     v_damper = v_susp * p.MR
     
     # Progressive Dampers (Split curves)
+    # Compression: dz_u > dz_s (v_comp > 0) -> engages comp curve, pushes sprung mass UP (F_damper_w < 0 -> -F_damper_w > 0)
+    # Extension / Rebound: dz_s > dz_u (v_comp < 0) -> engages reb curve, pulls sprung mass DOWN (F_damper_w > 0 -> -F_damper_w < 0)
+    v_comp = (dz_u - dz_s) * p.MR
     F_damper_w = np.zeros_like(v_susp)
     if p.damper_curve_v_comp is not None and p.damper_curve_f_comp is not None and p.damper_curve_v_reb is not None and p.damper_curve_f_reb is not None:
-        F_damper_comp = np.interp(v_damper, p.damper_curve_v_comp, p.damper_curve_f_comp)
-        F_damper_reb = np.interp(v_damper, p.damper_curve_v_reb, p.damper_curve_f_reb)
-        F_damper = np.where(v_damper > 0, F_damper_comp, F_damper_reb)
-        F_damper_w = F_damper * p.MR
+        v_table_c = np.abs(np.asarray(p.damper_curve_v_comp, dtype=float))
+        f_table_c = np.abs(np.asarray(p.damper_curve_f_comp, dtype=float))
+        v_table_r = np.abs(np.asarray(p.damper_curve_v_reb, dtype=float))
+        f_table_r = np.abs(np.asarray(p.damper_curve_f_reb, dtype=float))
+        F_damper_comp = np.interp(np.maximum(0.0, v_comp), v_table_c, f_table_c)
+        F_damper_reb = np.interp(np.maximum(0.0, -v_comp), v_table_r, f_table_r)
+        F_damper_w = np.where(v_comp > 0, -F_damper_comp * p.MR, F_damper_reb * p.MR)
     elif p.damper_curve_v is not None and p.damper_curve_f is not None and len(p.damper_curve_v) > 1:
-        F_damper = np.interp(v_damper, p.damper_curve_v, p.damper_curve_f)
-        F_damper_w = F_damper * p.MR
+        F_damper = np.interp(v_comp, p.damper_curve_v, p.damper_curve_f)
+        F_damper_w = -F_damper * p.MR
     else:
         F_damper_w = p.c_w * v_susp
         
@@ -979,14 +996,20 @@ def simulate_time_response(
         F_spring_w = p.k_w * z_susp_adj
     
     # Exponential Bump Stops
-    bump_stop_force = np.zeros_like(z_susp)
+    # Compression (jounce): z_u > z_s -> pushes sprung mass UP (F_spring_w -= bump_jounce -> -F_spring_w > 0)
+    # Extension (rebound): z_s > z_u -> pulls sprung mass DOWN (F_spring_w += bump_rebound -> -F_spring_w < 0)
+    bump_stop_force = np.zeros_like(z_s)
     if p.bump_stop_rate > 0:
-        dz_j = np.clip(z_susp - p.bump_stop_jounce, 0.0, 0.05)
-        bump_jounce = np.where(z_susp > p.bump_stop_jounce, p.bump_stop_rate * (np.exp(p.bump_stop_exp * dz_j) - 1.0) * p.MR**2, 0.0)
-        dz_r = np.clip(p.bump_stop_rebound - z_susp, 0.0, 0.05)
-        bump_rebound = np.where(z_susp < p.bump_stop_rebound, -p.bump_stop_rate * (np.exp(p.bump_stop_exp * dz_r) - 1.0) * p.MR**2, 0.0)
-        bump_stop_force = bump_jounce + bump_rebound
-        F_spring_w += bump_stop_force
+        jounce_gap = abs(p.bump_stop_jounce)
+        rebound_gap = abs(p.bump_stop_rebound)
+        z_comp = z_u - z_s
+        dz_j = np.clip(z_comp - jounce_gap, 0.0, 0.05)
+        bump_jounce = np.where(z_comp > jounce_gap, p.bump_stop_rate * (np.exp(p.bump_stop_exp * dz_j) - 1.0) * p.MR**2, 0.0)
+        z_ext = z_s - z_u
+        dz_r = np.clip(z_ext - rebound_gap, 0.0, 0.05)
+        bump_rebound = np.where(z_ext > rebound_gap, p.bump_stop_rate * (np.exp(p.bump_stop_exp * dz_r) - 1.0) * p.MR**2, 0.0)
+        bump_stop_force = bump_jounce - bump_rebound
+        F_spring_w += -bump_jounce + bump_rebound
     
     ddz_s = (1.0 / p.m_s) * (-F_damper_w - F_spring_w)
 
@@ -998,7 +1021,11 @@ def simulate_time_response(
     if p.enable_contact_loss:
         tire_load_var = np.maximum(tire_load_var, -static_tire_load)
 
-    total_Fz = static_tire_load + tire_load_var
+    # Dynamic tire force (upward positive in perturbation coordinates)
+    F_tire_dyn = p.k_t * (z_r_arr - z_u) + p.c_t * (dz_r_arr - dz_u)
+    if p.enable_contact_loss:
+        F_tire_dyn = np.maximum(F_tire_dyn, -static_tire_load)
+    total_Fz = static_tire_load + F_tire_dyn
 
     # ── Contact State & Liftoff / Recontact Tracking ────────────────────────
     contact_states = []
@@ -1031,8 +1058,7 @@ def simulate_time_response(
 
     # ── Conservation Diagnostics ───────────────────────────────────────────
     # 1. Force Residual
-    F_tire_dyn = tire_load_var
-    ddz_u_eom = (F_damper_w + F_spring_w - F_tire_dyn) / p.m_u
+    ddz_u_eom = (F_damper_w + F_spring_w + F_tire_dyn) / p.m_u
     force_res_s = np.max(np.abs(p.m_s * ddz_s + F_damper_w + F_spring_w))
     
     # 2. Energy Residual: E_kin + E_pot + E_diss - W_ext

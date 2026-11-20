@@ -276,7 +276,7 @@ def compute_handling_diagram(
             saturation_reason = "REAR_AXLE_SATURATED"
 
         # Vehicle kinematics
-        beta_rad = alpha_r_rad + (p.b * ay_val) / (V**2)
+        beta_rad = (p.b * ay_val) / (V**2) - alpha_r_rad
         delta_steer_rad = delta_ack_rad + alpha_f_rad - alpha_r_rad
         understeer_angle_rad = alpha_f_rad - alpha_r_rad
         kus_deg_per_g = (understeer_angle_rad * 180.0 / np.pi) / max(ay_g_val, 0.01)
@@ -505,7 +505,7 @@ def simulate_yaw_response_scenario(
     yaw_gain = (yaw_ss / max(steer_ss, 0.1)) if steer_ss > 0.05 else 0.0
 
     # Yaw time constant (time from steer onset to 63.2% of steady state)
-    steer_onset_t = 1.0
+    steer_onset_t = 0.0 if scenario_type == "constant_radius" else (0.5 if scenario_type == "speed_sweep" else 1.0)
     yaw_target_63 = yaw_ss * 0.632
     time_constant_ms = 180.0  # fallback
     
@@ -655,7 +655,7 @@ def compare_handling_setups(
 
     if delta_kus > 0.15:
         what_improved.append(f"High-speed corner-entry directional stability enhanced (K_us increased by {delta_kus:+.2f} deg/g, resisting snap oversteer).")
-        what_got_worse.append(f"Low-speed turn-in agility compromised: requires +{delta_kus:+.2f} deg more steering wheel angle per G of lateral acceleration.")
+        what_got_worse.append(f"Low-speed turn-in agility compromised: requires {delta_kus:+.2f} deg more steering wheel angle per G of lateral acceleration.")
     elif delta_kus < -0.15:
         what_improved.append(f"Turn-in responsiveness sharpened: understeer gradient reduced by {abs(delta_kus):.2f} deg/g, improving apex yaw rate development.")
         what_got_worse.append(f"Rear axle lateral safety margin reduced: rear tire saturation threshold lowered by {abs(delta_kus):.2f} deg/g under high-speed trail-braking.")
@@ -668,13 +668,13 @@ def compare_handling_setups(
     if delta_tau < -15.0:
         what_improved.append(f"Transient yaw response time accelerated by {abs(delta_tau):.0f} ms (tau shortened from {tau_a:.0f} ms to {tau_b:.0f} ms).")
     elif delta_tau > 15.0:
-        what_got_worse.append(f"Transient yaw response delayed by +{delta_tau:.0f} ms, feeling slightly more lethargic on initial steering input.")
+        what_got_worse.append(f"Transient yaw response delayed by {delta_tau:.0f} ms, feeling slightly more lethargic on initial steering input.")
 
     # Step-by-step physical causality explanation
     if delta_roll_dist > 0.01 or delta_k_arb_f > 100.0:
         why_explanation = (
             f"Stiffening the front roll stiffness ({r_dist_a*100:.1f}% -> {r_dist_b*100:.1f}%) "
-            f"increases the elastic lateral load transfer borne by the front axle by +{delta_roll_dist*100:+.1f}%. "
+            f"increases the elastic lateral load transfer borne by the front axle by {delta_roll_dist*100:+.1f}%. "
             f"Due to the non-linear degressive nature of tire friction (Pacejka MF 5.2 load sensitivity), the heavily "
             f"loaded outer front tire experiences a reduction in peak friction coefficient (mu_peak), while the unloaded "
             f"inner front tire does not gain proportional grip. Consequently, front axle cornering stiffness C_alpha_f "

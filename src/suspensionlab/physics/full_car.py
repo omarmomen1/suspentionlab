@@ -47,12 +47,24 @@ from suspensionlab.physics.contracts import (
 )
 
 
-def arb_rate_to_roll_stiffness(k_arb_wheel_n_per_m: float, track_width_m: float) -> float:
-    """Convert wheel-rate ARB stiffness [N/m] to roll stiffness K_phi [N*m/rad].
+def arb_rate_to_roll_stiffness(k_arb_wheel_n_per_m: float, track_width_m: float, is_differential: bool = False) -> float:
+    """Convert ARB stiffness [N/m] to roll stiffness K_phi [N*m/rad].
     
-    K_phi = 0.5 * k_arb_wheel * (track_width ** 2)
+    Parameters
+    ----------
+    k_arb_wheel_n_per_m : float
+        Anti-roll bar rate [N/m].
+    track_width_m : float
+        Axle track width [m].
+    is_differential : bool, default=False
+        If True, k_arb is the wheel-to-wheel differential rate (matching FullCarParams.k_arb_f
+        and the ODE F_arb_fl = k_arb_f * (z_rel_w_fl - z_rel_w_fr)), giving:
+            K_phi_arb = k_arb * (track_width ** 2)
+        If False (default), k_arb is the single-wheel ARB rate:
+            K_phi_arb = 0.5 * k_arb_wheel * (track_width ** 2)
     """
-    return 0.5 * float(k_arb_wheel_n_per_m) * (float(track_width_m) ** 2)
+    factor = 1.0 if is_differential else 0.5
+    return factor * float(k_arb_wheel_n_per_m) * (float(track_width_m) ** 2)
 
 
 @dataclass
@@ -455,7 +467,9 @@ def build_full_car_state_space(params: FullCarParams) -> Tuple[np.ndarray, np.nd
         [1.0,  params.b, -params.tw_r / 2.0]   # RR
     ])
     
-    K_s = np.diag([params.k_sf, params.k_sf, params.k_sr, params.k_sr])
+    k_wf = params.k_sf * (params.MR_f ** 2)
+    k_wr = params.k_sr * (params.MR_r ** 2)
+    K_s = np.diag([k_wf, k_wf, k_wr, k_wr])
     H = np.array([
         [1.0, -1.0,  0.0,  0.0],
         [0.0,  0.0,  1.0, -1.0]
@@ -469,7 +483,9 @@ def build_full_car_state_space(params: FullCarParams) -> Tuple[np.ndarray, np.nd
         [-K_susp @ T,            K_susp + K_t ]
     ])
     
-    C_s = np.diag([params.c_f, params.c_f, params.c_r, params.c_r])
+    c_wf = params.c_f * (params.MR_f ** 2)
+    c_wr = params.c_r * (params.MR_r ** 2)
+    C_s = np.diag([c_wf, c_wf, c_wr, c_wr])
     C_t = np.diag([params.c_tf, params.c_tf, params.c_tr, params.c_tr])
     
     C = np.block([

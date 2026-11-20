@@ -1103,19 +1103,17 @@ def get_kinematics_benchmarks(
     })
 
     # 5. Elastokinematic Toe Compliance
-    toe_comp = 0.045
     toe_ref = 0.045
-    toe_err = 0.0
     benchmarks.append({
         "id": "BENCH-05-TOE-COMPLIANCE",
         "name": "Elastokinematic Toe Compliance",
         "reference_source": "Reimpell & Stoll The Automotive Chassis (2001), Sec 3.4 [REFERENCE / LITERATURE SOURCE: empirical benchmark compliance gradient 0.045 deg/kN]",
         "reference_value": toe_ref,
-        "production_value": round(toe_comp, 3),
+        "production_value": None,
         "unit": "deg/kN",
-        "error_pct": round(toe_err, 1),
+        "error_pct": None,
         "tolerance_pct": 30.0,
-        "status": "PASS",
+        "status": "NOT_MODELED",
         "description": "Lateral force steer compliance gradient maintaining roll understeer stability.",
     })
 

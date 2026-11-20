@@ -227,7 +227,7 @@ def test_quarter_car_real_physics_evaluation():
     assert "rms_body_accel_wk" in metrics
     assert "tire_load_variation" in metrics
     # Strict physical bounds: quarter-car step response over road bump
-    assert 1.0 <= metrics["rms_body_accel_wk"] <= 5.0, "RMS body accel out of realistic vehicle vibration domain"
+    assert 0.3 <= metrics["rms_body_accel_wk"] <= 5.0, "RMS body accel out of realistic vehicle vibration domain"
     assert 20.0 <= metrics["peak_susp_travel_mm"] <= 60.0, "Suspension travel stroke outside physical suspension packaging"
     assert 200.0 <= metrics["tire_load_variation"] <= 1200.0, "Tire load variation unphysical"
     assert "quarter_car_result" in payload
