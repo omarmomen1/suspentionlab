@@ -1653,62 +1653,6 @@ def compute_setup_response_surface(
             },
         }
 
-    target_lltd = 52.2  # % front LLTD for neutral-to-mild stabilizing understeer
-    target_aero = 48.0  # % front aero balance matching high-speed dynamic CG
-
-    def eval_penalty(arb_val: float, aero_val: float) -> float:
-        arb_nm_rad = arb_val * 1000.0 if arb_val < 1000.0 else arb_val
-        k_phi_f = 0.5 * (k_wf + arb_nm_rad) * (track_front_m ** 2)
-        k_phi_r = 0.5 * (k_wr + rear_arb_nm_rad) * (track_rear_m ** 2)
-        lltd_pct = 100.0 * (k_phi_f / max(k_phi_f + k_phi_r, 1.0))
-
-        d_lltd = lltd_pct - target_lltd
-        dt_mech = 0.085 * (d_lltd ** 2)
-
-        d_aero = aero_val - target_aero
-        dt_aero = 0.058 * (d_aero ** 2)
-
-        d_cross = -0.015 * ((arb_val - 50.0) / 30.0) * d_aero
-        return dt_mech + dt_aero + d_cross
-
-    curr_penalty = eval_penalty(current_front_arb, current_aero_bal)
-
-    z_grid_fb: List[List[float]] = []
-    min_time_fb = float("inf")
-    opt_arb_fb = front_arb_grid[2]
-    opt_aero_fb = aero_bal_grid[2]
-
-    for aero_v in aero_bal_grid:
-        row_fb: List[float] = []
-        for arb_v in front_arb_grid:
-            p = eval_penalty(arb_v, aero_v)
-            t_val = round(base_lap_time_s + (p - curr_penalty), 3)
-            row_fb.append(t_val)
-            if t_val < min_time_fb:
-                min_time_fb = t_val
-                opt_arb_fb = arb_v
-                opt_aero_fb = aero_v
-        z_grid_fb.append(row_fb)
-
-    time_gain_fb = max(0.0, round(base_lap_time_s - min_time_fb, 3))
-
-    return {
-        "front_arb_n_mm": front_arb_grid,
-        "aero_balance_front_pct": aero_bal_grid,
-        "z_lap_time_s": z_grid_fb,
-        "current_setup": {
-            "front_arb_n_mm": round(float(current_front_arb), 1),
-            "aero_balance_front_pct": round(float(current_aero_bal), 1),
-            "lap_time_s": round(float(base_lap_time_s), 3),
-        },
-        "optimal_setup": {
-            "front_arb_n_mm": float(opt_arb_fb),
-            "aero_balance_front_pct": float(opt_aero_fb),
-            "lap_time_s": round(float(min_time_fb), 3),
-            "time_gain_s": round(float(time_gain_fb), 3),
-        },
-    }
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Closed-Loop 3-Pass QSS Lap Solver
