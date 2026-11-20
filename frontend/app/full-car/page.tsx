@@ -258,9 +258,9 @@ function FullCarDashboard() {
     setIsRunning(true);
     setSimError(null);
     try {
-      const res = await fetch(`${API_BASE}/simulate/full-car`, {
+      const res = await fetchWithAuth("/api/v1/simulate/full-car", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildPayload()),
       });
       const data = await res.json();
@@ -509,11 +509,12 @@ function FullCarDashboard() {
 
               <ComparePanel current={r as unknown as React.ComponentProps<typeof ComparePanel>["current"]} />
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 shrink-0">
+              <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-9 gap-2 shrink-0">
                 <KPICard label="Heave ƒₙ" value={r.f_n_heave} unit="Hz" status={r.f_n_heave >= 1.0 && r.f_n_heave <= 1.5 ? "good" : "warn"} />
                 <KPICard label="Roll ƒₙ" value={r.f_n_roll} unit="Hz" status={r.f_n_roll >= 1.5 && r.f_n_roll <= 2.5 ? "good" : "warn"} />
                 <KPICard label="Pitch ƒₙ" value={r.f_n_pitch} unit="Hz" status={r.f_n_pitch >= 1.2 && r.f_n_pitch <= 1.8 ? "good" : "warn"} />
-                <KPICard label="Roll Dist." value={r.roll_stiffness_dist} unit="% Front" status={r.roll_stiffness_dist >= 55 ? "good" : "warn"} />
+                <KPICard label="Elastic Roll" value={r.roll_stiffness_dist} unit="% K_φ,f" status={r.roll_stiffness_dist >= 55 ? "good" : "warn"} />
+                <KPICard label="Dynamic LLTD" value={(maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[])) > 0 ? (maxOf(r.lateral_load_transfer_f as number[]) / (maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[]))) * 100 : 50} unit="% ΔFz,f" status="neutral" />
                 <KPICard label="RMS Heave" value={r.rms_heave_accel} unit="m/s²" status={r.rms_heave_accel < 0.315 ? "good" : r.rms_heave_accel < 1.0 ? "warn" : "bad"} />
                 <KPICard label="RMS Pitch" value={r.rms_pitch_accel} unit="rad/s²" status="neutral" />
                 <KPICard label="RMS Roll" value={r.rms_roll_accel} unit="rad/s²" status="neutral" />
@@ -614,7 +615,8 @@ function FullCarDashboard() {
                       <div className="h-full p-5 flex flex-col justify-center gap-4">
                         <p className="text-[10px] font-bold tracking-widest text-gray-700 uppercase">Roll Characteristics</p>
                         <div className="space-y-3 font-mono text-xs">
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Roll Stiffness Dist</span><span className="text-[#10B981]">{r.roll_stiffness_dist.toFixed(1)}% Front</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Elastic Roll Dist. (K_φ,f / K_φ,tot)</span><span className="text-[#10B981]">{r.roll_stiffness_dist.toFixed(1)}% Front</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Dynamic LLTD (ΔFz,f / ΔFz,tot)</span><span className="text-cyan-400 font-bold">{((maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[])) > 0 ? (maxOf(r.lateral_load_transfer_f as number[]) / (maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[]))) * 100 : 50).toFixed(1)}% Front</span></div>
                           <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Front Track</span><span className="text-white">{params.tw_f} m</span></div>
                           <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Rear Track</span><span className="text-white">{params.tw_r} m</span></div>
                         </div>
@@ -640,9 +642,11 @@ function FullCarDashboard() {
                       <div className="h-full p-5 flex flex-col justify-center gap-4">
                         <p className="text-[10px] font-bold tracking-widest text-gray-700 uppercase">Load Transfer Summary</p>
                         <div className="space-y-3 font-mono text-xs">
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Max Front LLT</span><span className="text-[#06B6D4]">{maxOf(r.lateral_load_transfer_f as number[]).toFixed(0)} N</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Max Rear LLT</span><span className="text-[#F43F5E]">{maxOf(r.lateral_load_transfer_r as number[]).toFixed(0)} N</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Total Max LLT</span><span className="text-white">{(maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[])).toFixed(0)} N</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Max Front LLT (ΔFz,f)</span><span className="text-[#06B6D4]">{maxOf(r.lateral_load_transfer_f as number[]).toFixed(0)} N</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Max Rear LLT (ΔFz,r)</span><span className="text-[#F43F5E]">{maxOf(r.lateral_load_transfer_r as number[]).toFixed(0)} N</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Total Dynamic LLT (ΔFz,tot)</span><span className="text-white">{(maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[])).toFixed(0)} N</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Dynamic LLTD (ΔFz,f / ΔFz,tot)</span><span className="text-cyan-400 font-bold">{((maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[])) > 0 ? (maxOf(r.lateral_load_transfer_f as number[]) / (maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[]))) * 100 : 50).toFixed(1)}% Front</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Elastic Roll Dist. (K_φ,f / K_φ,tot)</span><span className="text-[#10B981]">{r.roll_stiffness_dist.toFixed(1)}% Front</span></div>
                         </div>
                       </div>
                     </PlotBox>

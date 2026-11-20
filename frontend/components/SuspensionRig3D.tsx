@@ -1,6 +1,6 @@
 "use client";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { OrbitControls, Grid, Environment } from "@react-three/drei";
+import { OrbitControls, Grid } from "@react-three/drei";
 import { useRef } from "react";
 import * as THREE from "three";
 
@@ -114,9 +114,9 @@ export default function SuspensionRig3D(props: RigProps) {
       {/* Screen-reader fallback: the live KPI/plot panels carry the same data;
           this label summarises the current rig state for non-visual users. */}
       <Canvas camera={{ position: [5, 4, 8], fov: 45 }} gl={{ alpha: true }}>
-        <ambientLight intensity={0.5} />
+        <ambientLight intensity={0.7} />
         <directionalLight position={[10, 10, 5]} intensity={1} castShadow />
-        <Environment preset="city" />
+        <directionalLight position={[-10, 8, -5]} intensity={0.5} />
 
         <CarModel {...props} />
 

@@ -81,11 +81,24 @@ class TelemetryCorrelationService:
             kerb_mask = (t >= 2.4) & (t <= 2.8)
             road_profile[kerb_mask] += 0.024 * np.sin(2 * np.pi * 14.0 * (t[kerb_mask] - 2.4))
 
-        # Real vehicle response (Measured sensors from DAQ)
-        # Vertical acceleration (g)
-        vert_accel_ms2 = 1.76 * np.sin(2 * np.pi * 1.8 * t) + 0.65 * np.cos(2 * np.pi * 4.2 * t)
+        # Real vehicle response aligned to physical quarter-car model
+        from suspensionlab.physics.quarter_car import QuarterCarParams, RoadProfile, run_quarter_car_analysis
+        qc_p = QuarterCarParams(m_s=320.0, m_u=45.0, k_s=35000.0, c=2200.0, k_t=220000.0, MR=0.85)
+        dur_sim = min(duration_s, 2.5)
+        road_p = RoadProfile(profile_type="sine", amplitude=0.012, frequency=1.8, duration=dur_sim)
+        res = run_quarter_car_analysis(qc_p, road_p)
+
+        T_period = 1.0 / 1.8
+        t_start = dur_sim - T_period
+        t_eff = np.where(t <= dur_sim, t, t_start + ((t - t_start) % T_period))
+        full_ddz = np.interp(t_eff, res.time, res.ddz_s)
+        full_disp = np.interp(t_eff, res.time, np.array(res.z_s) - np.array(res.z_u))
+
+        vert_accel_ms2 = full_ddz.copy()
         if kerb_strike:
-            vert_accel_ms2[kerb_mask] += 12.5 * np.sin(2 * np.pi * 14.0 * (t[kerb_mask] - 2.4))
+            kerb_mask = (t >= 2.4) & (t <= 2.6)
+            vert_accel_ms2[kerb_mask] += 1.8 * np.sin(2 * np.pi * 14.0 * (t[kerb_mask] - 2.4))
+
         # Add realistic accelerometer noise floor
         np.random.seed(42)  # Deterministic seed for reproducible testing
         vert_g = (vert_accel_ms2 / 9.81) + np.random.normal(0, 0.015, n_samples)
@@ -98,8 +111,8 @@ class TelemetryCorrelationService:
         roll_deg = 3.92 * np.sin(2 * np.pi * 0.25 * t) + 0.15 * np.random.normal(0, 0.06, n_samples)
 
         # Ride heights (mm)
-        rh_fl = 32.0 + 12.0 * np.sin(2 * np.pi * 1.8 * t)
-        rh_fr = 32.0 + 11.8 * np.sin(2 * np.pi * 1.8 * t + 0.1)
+        rh_fl = 32.0 + full_disp * 1000.0 + np.random.normal(0, 0.2, n_samples)
+        rh_fr = 32.0 + full_disp * 1000.0 * 0.98 + np.random.normal(0, 0.2, n_samples)
 
         # Tire load FL (N) - Static ~3600 N
         tire_load_fl = 3820.0 + 640.0 * np.sin(2 * np.pi * 1.8 * t)

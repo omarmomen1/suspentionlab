@@ -1465,14 +1465,10 @@ export default function LapSimPage() {
         throw new Error("Select a championship circuit or provide track coordinates.");
       }
 
-      const payload = {
+      const payload: Record<string, any> = {
         mode: currentTab,
         track: selectedCircuitId === "fsae_michigan" ? "fsae_endurance" : selectedCircuitId,
         circuit_id: selectedCircuitId,
-        distances: trackDistances,
-        curvatures: trackCurvatures,
-        track_coordinates: { x: trackX, y: trackY },
-        sector_boundaries: sectorBounds,
         vehicle: {
           total_mass: activeCfg.mass,
           wheelbase: activeCfg.wheelbase,
@@ -1495,6 +1491,28 @@ export default function LapSimPage() {
           static_rh_rear_mm: activeCfg.static_rh_rear_mm,
         },
       };
+
+      if (currentTab === "custom") {
+        payload.segments = architectSegments.map((s) => ({
+          type: s.type,
+          length_m: s.length_m,
+          radius_m: s.radius_m,
+          banking_deg: s.banking_deg,
+          grade_pct: s.grade_pct,
+        }));
+        payload.is_closed = true;
+      } else if (currentTab === "csv" && activeCsv) {
+        payload.telemetry = {
+          time_s: activeCsv.timeS,
+          speed_ms: activeCsv.speedKmh.map((v) => v / 3.6),
+          lat_g: activeCsv.latG,
+        };
+      } else {
+        payload.distances = trackDistances;
+        payload.curvatures = trackCurvatures;
+        payload.track_coordinates = { x: trackX, y: trackY };
+        payload.sector_boundaries = sectorBounds;
+      }
 
       let simData: LapSimResponse | null = null;
 
@@ -1576,63 +1594,78 @@ export default function LapSimPage() {
         );
       }
 
-      // Compute Top 3 Corner Opportunities for CSV mode
-      if (currentTab === "csv" && activeCsv && simData) {
-        const opportunities: CornerOpportunity[] = [];
-        const optSpeeds = simData.trace.speed_kmh;
-        const drvSpeeds = activeCsv.speedKmh;
-        const dists = simData.trace.s_m;
-        const nScan = Math.min(optSpeeds.length, drvSpeeds.length);
+      // Top 3 Corner Opportunities for CSV mode
+      if (currentTab === "csv" && simData) {
+        if (Array.isArray(simData.corner_opportunities) && simData.corner_opportunities.length > 0) {
+          const mappedOps: CornerOpportunity[] = simData.corner_opportunities.map((co: any, idx: number) => ({
+            corner_id: co.corner_id ?? idx + 1,
+            name: co.name ?? `Turn ${co.corner_id ?? idx + 1} (${(co.s_start_m ?? co.distance_m ?? 0).toFixed(0)}m)`,
+            distance_m: co.s_start_m ?? co.distance_m ?? 0,
+            time_loss_s: Number(co.time_loss_s ?? 0),
+            driver_speed_kmh: Number(co.v_driver_apex_kmh ?? co.driver_speed_kmh ?? 0),
+            optimal_speed_kmh: Number(co.v_sim_apex_kmh ?? co.optimal_speed_kmh ?? 0),
+            limiting_factor: co.bottleneck ?? co.limiting_factor ?? "UNDERSTEER_FRONT",
+            recommendation: co.recommendation ?? "Vehicle front axle saturated. Soften front ARB or increase front wing.",
+          }));
+          simData.corner_opportunities = mappedOps;
+          setCornerOpportunities(mappedOps);
+        } else if (activeCsv) {
+          const opportunities: CornerOpportunity[] = [];
+          const optSpeeds = simData.trace.speed_kmh;
+          const drvSpeeds = activeCsv.speedKmh;
+          const dists = simData.trace.s_m;
+          const nScan = Math.min(optSpeeds.length, drvSpeeds.length);
 
-        const candidates: Array<{ idx: number; dist: number; deficit: number; optV: number; drvV: number }> = [];
-        for (let i = 2; i < nScan - 2; i += 8) {
-          const optV = optSpeeds[i];
-          const drvV = drvSpeeds[i];
-          const deficit = optV - drvV;
-          const latGVal = Math.abs(simData.trace.lat_g[i] ?? 0);
-          if (latGVal > 0.8 && deficit > 3.5) {
-            candidates.push({ idx: i, dist: dists[i], deficit, optV, drvV });
-          }
-        }
-
-        candidates.sort((a, b) => b.deficit - a.deficit);
-        const picked: typeof candidates = [];
-        for (const cand of candidates) {
-          if (picked.every((p) => Math.abs(p.dist - cand.dist) > 220)) {
-            picked.push(cand);
-            if (picked.length >= 3) break;
-          }
-        }
-
-        picked.forEach((c, idx) => {
-          const timeLoss = ((c.deficit / 3.6) * 14) / Math.max(c.drvV / 3.6, 5);
-          const factor = simData?.trace.limiting_factor?.[c.idx] ?? "UNDERSTEER_FRONT";
-
-          let rec = "";
-          if (factor === "BRAKING") {
-            rec = `Brake 12m later; driver over-braked entry by ${(c.deficit).toFixed(1)} km/h. Shift brake bias 1% rearward.`;
-          } else if (factor === "UNDERSTEER_FRONT") {
-            rec = `Front axle saturated. Soften front ARB by 10 N/mm or add front wing to eliminate mid-corner scrub.`;
-          } else if (factor === "OVERSTEER_REAR") {
-            rec = `Rear axle loose on exit throttle. Stiffen front ARB or soften rear springs to stabilize traction.`;
-          } else {
-            rec = `Full throttle delayed by 0.25s. Commit earlier to power on corner exit.`;
+          const candidates: Array<{ idx: number; dist: number; deficit: number; optV: number; drvV: number }> = [];
+          for (let i = 2; i < nScan - 2; i += 8) {
+            const optV = optSpeeds[i];
+            const drvV = drvSpeeds[i];
+            const deficit = optV - drvV;
+            const latGVal = Math.abs(simData.trace.lat_g[i] ?? 0);
+            if (latGVal > 0.8 && deficit > 3.5) {
+              candidates.push({ idx: i, dist: dists[i], deficit, optV, drvV });
+            }
           }
 
-          opportunities.push({
-            corner_id: idx + 1,
-            name: `Turn ${idx + 1} (${c.dist.toFixed(0)}m)`,
-            distance_m: c.dist,
-            time_loss_s: parseFloat(timeLoss.toFixed(3)),
-            driver_speed_kmh: parseFloat(c.drvV.toFixed(1)),
-            optimal_speed_kmh: parseFloat(c.optV.toFixed(1)),
-            limiting_factor: factor,
-            recommendation: rec,
+          candidates.sort((a, b) => b.deficit - a.deficit);
+          const picked: typeof candidates = [];
+          for (const cand of candidates) {
+            if (picked.every((p) => Math.abs(p.dist - cand.dist) > 220)) {
+              picked.push(cand);
+              if (picked.length >= 3) break;
+            }
+          }
+
+          picked.forEach((c, idx) => {
+            const timeLoss = ((c.deficit / 3.6) * 14) / Math.max(c.drvV / 3.6, 5);
+            const factor = simData?.trace.limiting_factor?.[c.idx] ?? "UNDERSTEER_FRONT";
+
+            let rec = "";
+            if (factor === "BRAKING") {
+              rec = `Brake 12m later; driver over-braked entry by ${(c.deficit).toFixed(1)} km/h. Shift brake bias 1% rearward.`;
+            } else if (factor === "UNDERSTEER_FRONT") {
+              rec = `Front axle saturated. Soften front ARB by 10 N/mm or add front wing to eliminate mid-corner scrub.`;
+            } else if (factor === "OVERSTEER_REAR") {
+              rec = `Rear axle loose on exit throttle. Stiffen front ARB or soften rear springs to stabilize traction.`;
+            } else {
+              rec = `Full throttle delayed by 0.25s. Commit earlier to power on corner exit.`;
+            }
+
+            opportunities.push({
+              corner_id: idx + 1,
+              name: `Turn ${idx + 1} (${c.dist.toFixed(0)}m)`,
+              distance_m: c.dist,
+              time_loss_s: parseFloat(timeLoss.toFixed(3)),
+              driver_speed_kmh: parseFloat(c.drvV.toFixed(1)),
+              optimal_speed_kmh: parseFloat(c.optV.toFixed(1)),
+              limiting_factor: factor,
+              recommendation: rec,
+            });
           });
-        });
 
-        simData.corner_opportunities = opportunities;
-        setCornerOpportunities(opportunities);
+          simData.corner_opportunities = opportunities;
+          setCornerOpportunities(opportunities);
+        }
       }
 
       setResult(simData);
@@ -1643,7 +1676,12 @@ export default function LapSimPage() {
     }
   };
 
+  const tabMountedRef = useRef(false);
   useEffect(() => {
+    if (!tabMountedRef.current) {
+      tabMountedRef.current = true;
+      return;
+    }
     handleSimulate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trackInputTab]);

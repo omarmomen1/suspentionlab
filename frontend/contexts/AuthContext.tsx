@@ -243,8 +243,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const authHeader = useCallback((): Record<string, string> => {
-    return { "X-CSRF-Token": getCsrfToken() };
-  }, [getCsrfToken]);
+    const headers: Record<string, string> = { "X-CSRF-Token": getCsrfToken() };
+    const activeToken = token || tokenRef.current || (typeof window !== "undefined" ? localStorage.getItem("sl_token") : null);
+    if (activeToken) {
+      headers["Authorization"] = `Bearer ${activeToken}`;
+    }
+    return headers;
+  }, [getCsrfToken, token]);
 
   const can = useCallback((permission: string): boolean => {
     if (!user) return false;
@@ -261,8 +266,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
     const fullUrl = resolveApiUrl(url);
     const authHeaders: Record<string, string> = { "X-CSRF-Token": getCsrfToken() };
-    if (token) {
-      authHeaders["Authorization"] = `Bearer ${token}`;
+    const activeToken = token || tokenRef.current || (typeof window !== "undefined" ? localStorage.getItem("sl_token") : null);
+    if (activeToken) {
+      authHeaders["Authorization"] = `Bearer ${activeToken}`;
     }
     const headers = { ...authHeaders, ...options.headers };
     

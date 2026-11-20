@@ -217,6 +217,8 @@ class TrackSegment:
     friction_zone: str   = "asphalt"
     x_m:           float = 0.0
     y_m:           float = 0.0
+    v_driver_kmh:  Optional[float] = None
+    v_driver_ms:   Optional[float] = None
 
 
 @dataclass
@@ -436,10 +438,10 @@ class LapSimVehicleParams:
             elif k in ("track_f_m", "track_f", "track_front"): self.track_front_m = float(v)
             elif k in ("track_r_m", "track_r", "track_rear"): self.track_rear_m = float(v)
             elif k in ("cop_front", "cop_fraction", "aero_balance"): self.aero_balance_front = float(v)
-            elif k in ("k_spring_f", "k_spring_front", "front_spring_rate", "k_spring_front_n_m"):
+            elif k in ("k_spring_f", "k_spring_front", "front_spring_rate", "k_spring_front_n_m", "front_spring"):
                 s_val = float(v)
                 self.k_spring_front_n_m = s_val * 1000.0 if s_val < 1000.0 else s_val
-            elif k in ("k_spring_r", "k_spring_rear", "rear_spring_rate", "k_spring_rear_n_m"):
+            elif k in ("k_spring_r", "k_spring_rear", "rear_spring_rate", "k_spring_rear_n_m", "rear_spring"):
                 s_val = float(v)
                 self.k_spring_rear_n_m = s_val * 1000.0 if s_val < 1000.0 else s_val
             elif k in ("mr_f", "motion_ratio_f", "motion_ratio_front"): self.motion_ratio_front = float(v)
@@ -995,12 +997,16 @@ def _normalize_to_vehicle_params(
         elif k in ("track_f_m", "track_f", "track_front", "track_front_m"): vp.track_front_m = float(val)
         elif k in ("track_r_m", "track_r", "track_rear", "track_rear_m"): vp.track_rear_m = float(val)
         elif k in ("cop_front", "cop_fraction", "aero_balance", "aero_balance_front"): vp.aero_balance_front = float(val)
-        elif k in ("k_spring_f", "k_spring_front", "front_spring_rate", "k_spring_front_n_m"):
+        elif k in ("k_spring_f", "k_spring_front", "front_spring_rate", "k_spring_front_n_m", "front_spring"):
             s_val = float(val)
             vp.k_spring_front_n_m = s_val * 1000.0 if s_val < 1000.0 else s_val
-        elif k in ("k_spring_r", "k_spring_rear", "rear_spring_rate", "k_spring_rear_n_m"):
+        elif k in ("k_spring_r", "k_spring_rear", "rear_spring_rate", "k_spring_rear_n_m", "rear_spring"):
             s_val = float(val)
             vp.k_spring_rear_n_m = s_val * 1000.0 if s_val < 1000.0 else s_val
+        elif k in ("static_rh_front_mm", "static_rh_f", "ride_height_front", "ref_ride_height_front_mm", "front_ride_height"):
+            vp.static_rh_front_mm = float(val)
+        elif k in ("static_rh_rear_mm", "static_rh_r", "ride_height_rear", "ref_ride_height_rear_mm", "rear_ride_height"):
+            vp.static_rh_rear_mm = float(val)
         elif k in ("k_arb_f", "k_arb_front", "k_arb_front_nm_rad", "front_arb"):
             a_val = float(val)
             vp.k_arb_front_nm_rad = a_val * 1000.0 if a_val < 1000.0 else a_val
@@ -1353,16 +1359,30 @@ def parse_telemetry_csv(telemetry_data: Union[Dict[str, Any], List[Dict[str, Any
     """Parse reconstructed telemetry CSV arrays (time_s, speed_ms, lat_g)."""
     if isinstance(telemetry_data, dict):
         time_s = np.asarray(telemetry_data.get("time_s", []), dtype=float)
-        speed_ms = np.asarray(telemetry_data.get("speed_ms", []), dtype=float)
+        raw_speed = telemetry_data.get("speed_ms")
+        if raw_speed is None or len(raw_speed) == 0:
+            raw_speed = telemetry_data.get("speed_kmh")
+        if raw_speed is None or len(raw_speed) == 0:
+            raw_speed = telemetry_data.get("speed", [])
+        raw_speed = np.asarray(raw_speed, dtype=float)
         lat_g = np.asarray(telemetry_data.get("lat_g", []), dtype=float)
     else:
-        time_s = np.array([float(r["time_s"]) for r in telemetry_data])
-        speed_ms = np.array([float(r["speed_ms"]) for r in telemetry_data])
-        lat_g = np.array([float(r["lat_g"]) for r in telemetry_data])
+        time_s = np.array([float(r.get("time_s", 0.0)) for r in telemetry_data])
+        raw_speed = np.array([float(r.get("speed_ms", r.get("speed_kmh", r.get("speed", 0.0)))) for r in telemetry_data])
+        lat_g = np.array([float(r.get("lat_g", 0.0)) for r in telemetry_data])
 
     n = len(time_s)
     if n < 2:
         return get_builtin_track("spa")
+
+    # Unit auto-detection: if max(speed) < 95.0, multiply by 3.6 to convert m/s -> km/h
+    max_s = float(np.max(raw_speed)) if len(raw_speed) > 0 else 0.0
+    if max_s < 95.0:
+        driver_speed_kmh = raw_speed * 3.6
+        speed_ms = raw_speed.copy()
+    else:
+        driver_speed_kmh = raw_speed.copy()
+        speed_ms = raw_speed / 3.6
 
     segments: List[TrackSegment] = []
     heading = 0.0
@@ -1378,7 +1398,18 @@ def parse_telemetry_csv(telemetry_data: Union[Dict[str, Any], List[Dict[str, Any
         ds = v_avg * dt
         distances[i] = distances[i - 1] + ds
         ay = lat_g[i] * 9.81
-        curvatures[i] = ay / max(speed_ms[i] ** 2, 1.0)
+        v_denom = max(speed_ms[i] ** 2, 16.0)
+        curvatures[i] = ay / v_denom
+
+    # 5-point moving average smoothing so noisy GPS spikes don't crush apex speeds down to 30 km/h
+    if n >= 5:
+        kernel = np.ones(5) / 5.0
+        curv_smooth = np.convolve(curvatures, kernel, mode="same")
+        curv_smooth[0] = curvatures[0]
+        curv_smooth[1] = np.mean(curvatures[:3])
+        curv_smooth[-2] = np.mean(curvatures[-3:])
+        curv_smooth[-1] = curvatures[-1]
+        curvatures = curv_smooth
 
     total_len = distances[-1]
     s1_split = total_len / 3.0
@@ -1408,6 +1439,8 @@ def parse_telemetry_csv(telemetry_data: Union[Dict[str, Any], List[Dict[str, Any
                 surface_mu=1.0,
                 x_m=pos_x,
                 y_m=pos_y,
+                v_driver_kmh=float(driver_speed_kmh[i]),
+                v_driver_ms=float(speed_ms[i]),
             )
         )
 
@@ -1815,6 +1848,14 @@ def simulate_lap(
     elev = np.array([s.elevation for s in track_segs], dtype=float)
     surface_mu = np.array([getattr(s, "surface_mu", 1.0) for s in track_segs], dtype=float)
 
+    has_uploaded_driver = any(getattr(s, "v_driver_kmh", None) is not None for s in track_segs)
+    if has_uploaded_driver:
+        driver_speed_kmh_raw = np.array([getattr(s, "v_driver_kmh", 0.0) if getattr(s, "v_driver_kmh", None) is not None else 0.0 for s in track_segs], dtype=float)
+        driver_speed_ms_raw = np.array([getattr(s, "v_driver_ms", 0.0) if getattr(s, "v_driver_ms", None) is not None else 0.0 for s in track_segs], dtype=float)
+    else:
+        driver_speed_kmh_raw = None
+        driver_speed_ms_raw = None
+
     # Populate coordinates if they were not provided
     if all(s.x_m == 0.0 and s.y_m == 0.0 for s in track_segs):
         pos_x = 0.0
@@ -2126,35 +2167,58 @@ def simulate_lap(
     corner_opportunities: List[Dict[str, Any]] = []
     curv_threshold = 0.003
     in_corner = False
-    corner_start = 0.0
+    corner_start_idx = 0
     corner_id = 1
-    c_v_apex = 999.0
+
+    ds_array = np.zeros(n)
+    if n > 1:
+        ds_array[1:] = np.diff(dist)
+        ds_array[0] = ds_array[1]
+
+    if driver_speed_kmh_raw is not None:
+        driver_speed_kmh = driver_speed_kmh_raw
+        driver_speed_ms = driver_speed_ms_raw
+    else:
+        driver_speed_kmh = np.maximum(speed_kmh - 4.5, 30.0)
+        driver_speed_ms = driver_speed_kmh / 3.6
 
     for i in range(n):
         if curv[i] >= curv_threshold and not in_corner:
             in_corner = True
-            corner_start = dist[i]
-            c_v_apex = speed_kmh[i]
+            corner_start_idx = i
         elif in_corner:
-            if speed_kmh[i] < c_v_apex:
-                c_v_apex = speed_kmh[i]
             if curv[i] < curv_threshold or i == n - 1:
                 in_corner = False
-                corner_end = dist[i]
+                corner_end_idx = i
+                corner_start = dist[corner_start_idx]
+                corner_end = dist[corner_end_idx]
                 if corner_end - corner_start > 15.0:
-                    v_driver_apex = max(c_v_apex - 4.5, 30.0)
-                    time_loss = round(0.12 + (corner_end - corner_start) * 0.0015, 3)
+                    v_sim_apex_kmh = float(np.min(speed_kmh[corner_start_idx : corner_end_idx + 1]))
+                    v_driver_apex_kmh = float(np.min(driver_speed_kmh[corner_start_idx : corner_end_idx + 1]))
+                    t_sim_corner = float(np.sum(ds_array[corner_start_idx : corner_end_idx + 1] / np.maximum(v_sol[corner_start_idx : corner_end_idx + 1], 2.0)))
+                    t_driver_corner = float(np.sum(ds_array[corner_start_idx : corner_end_idx + 1] / np.maximum(driver_speed_ms[corner_start_idx : corner_end_idx + 1], 2.0)))
+                    time_loss_s = round(float(max(0.0, t_driver_corner - t_sim_corner)), 3)
                     bottleneck = "Vehicle Front Understeer Limit" if (vp.lltd() > 0.50) else "Driver Early Braking / Apex Overslow"
                     corner_opportunities.append({
                         "corner_id": corner_id,
+                        "name": f"Turn {corner_id} ({round(float(corner_start))}m)",
+                        "distance_m": round(float(corner_start), 1),
                         "s_start_m": round(float(corner_start), 1),
                         "s_end_m": round(float(corner_end), 1),
-                        "v_sim_apex_kmh": round(float(c_v_apex), 1),
-                        "v_driver_apex_kmh": round(float(v_driver_apex), 1),
-                        "time_loss_s": time_loss,
+                        "v_sim_apex_kmh": round(v_sim_apex_kmh, 1),
+                        "v_driver_apex_kmh": round(v_driver_apex_kmh, 1),
+                        "optimal_speed_kmh": round(v_sim_apex_kmh, 1),
+                        "driver_speed_kmh": round(v_driver_apex_kmh, 1),
+                        "time_loss_s": time_loss_s,
                         "bottleneck": bottleneck,
+                        "limiting_factor": "UNDERSTEER_FRONT" if (vp.lltd() > 0.50) else "BRAKING",
+                        "recommendation": "Vehicle front axle saturated. Soften front ARB or increase front wing." if (vp.lltd() > 0.50) else "Driver over-slowed entry. Carry more apex speed.",
                     })
                     corner_id += 1
+
+    # Sort corner_opportunities by descending time_loss_s and return the top 3 real bottlenecks
+    corner_opportunities.sort(key=lambda c: c["time_loss_s"], reverse=True)
+    corner_opportunities = corner_opportunities[:3]
 
     x_coords = [round(float(s.x_m), 2) for s in track_segs]
     y_coords = [round(float(s.y_m), 2) for s in track_segs]

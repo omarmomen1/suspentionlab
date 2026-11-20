@@ -105,9 +105,9 @@ function HalfCarDashboard() {
     setIsRunning(true);
     setResults(null);
     try {
-      const res = await fetch(`${API_BASE}/simulate/half-car`, {
+      const res = await fetchWithAuth("/api/v1/simulate/half-car", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(buildPayload()),
       });
       const data = await res.json();

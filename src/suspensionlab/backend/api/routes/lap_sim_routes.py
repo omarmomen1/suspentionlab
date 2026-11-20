@@ -452,10 +452,18 @@ async def simulate_lap_endpoint(
       - Vehicle & Suspension parameters
     """
     # 1. Track resolution
+    mode_arg = str(request_data.get("mode", "")).lower().strip()
     track_arg = request_data.get("track", "spa")
     segments_arg = request_data.get("segments")
     telemetry_arg = request_data.get("telemetry")
     csv_data = request_data.get("csv_data")
+
+    if mode_arg == "custom" and segments_arg:
+        track_arg = None
+    elif mode_arg == "csv" and (telemetry_arg or csv_data):
+        track_arg = None
+    elif segments_arg is not None and len(segments_arg) > 0:
+        track_arg = None
 
     if isinstance(csv_data, str) and len(csv_data.strip()) > 0:
         import io, csv
