@@ -329,16 +329,16 @@ class TrackValidator:
 class LapSimVehicleParams:
     """Comprehensive vehicle dynamics parameters for Coupled GGV & QSS Solver."""
     # Mass & geometry
-    mass_kg:             float = 1285.0
+    mass_kg:             float = 1320.0  # FIA GT3 race car mass incl. driver & fuel [kg]
     weight_dist_front:   float = 0.48    # fraction of weight on front axle
     cg_height_m:         float = 0.42
     wheelbase_m:         float = 2.65
     track_front_m:       float = 1.62
     track_rear_m:        float = 1.60
 
-    # Aerodynamics
+    # Aerodynamics (Realistic published FIA GT3 aero)
     cl_total:            float = 1.65    # lift coefficient (downforce positive)
-    cd_total:            float = 0.48    # drag coefficient
+    cd_total:            float = 0.70    # drag coefficient (published FIA GT3 baseline)
     frontal_area_m2:     float = 2.02    # m²
     aero_balance_front:  float = 0.46    # aero center of pressure fraction on front axle
     rho_air:             float = 1.225   # kg/m³
@@ -350,8 +350,8 @@ class LapSimVehicleParams:
     motion_ratio_rear:   float = 0.74      # rear spring motion ratio [-]
     static_rh_front_mm:  float = 55.0      # static front ride height [mm]
     static_rh_rear_mm:   float = 70.0      # static rear ride height [mm]
-    k_arb_front_nm_rad:  float = 28000.0   # front ARB rate [N*m/rad]
-    k_arb_rear_nm_rad:   float = 22000.0   # rear ARB rate [N*m/rad]
+    k_arb_front_n_m:     float = 45000.0   # front ARB wheel rate [N/m] (UI 45 N/mm * 1000)
+    k_arb_rear_n_m:      float = 30000.0   # rear ARB wheel rate [N/m] (UI 30 N/mm * 1000)
     roll_center_front_m: float = 0.035     # front kinematic roll center height [m]
     roll_center_rear_m:  float = 0.042     # rear kinematic roll center height [m]
     camber_gain_front:   float = -2.2      # deg/m or deg/deg
@@ -380,8 +380,8 @@ class LapSimVehicleParams:
     torque_curve_nm:     List[float] = field(default_factory=lambda: [420.0, 480.0, 520.0, 510.0, 470.0, 430.0])
 
     def __init__(self, **kwargs):
-        # Default initialization (GT3 Spec Baseline: 1285 kg / 395 kW)
-        self.mass_kg = 1285.0
+        # Default initialization (GT3 Spec Baseline: 1320 kg / 395 kW / Cd 0.70)
+        self.mass_kg = 1320.0
         self.weight_dist_front = 0.48
         self.cg_height_m = 0.42
         self.wheelbase_m = 2.65
@@ -389,7 +389,7 @@ class LapSimVehicleParams:
         self.track_rear_m = 1.60
 
         self.cl_total = 1.65
-        self.cd_total = 0.46
+        self.cd_total = 0.70
         self.frontal_area_m2 = 2.02
         self.aero_balance_front = 0.46
         self.rho_air = 1.225
@@ -400,8 +400,8 @@ class LapSimVehicleParams:
         self.motion_ratio_rear = 0.74
         self.static_rh_front_mm = 55.0
         self.static_rh_rear_mm = 70.0
-        self.k_arb_front_nm_rad = 45000.0
-        self.k_arb_rear_nm_rad = 30000.0
+        self.k_arb_front_n_m = 45000.0
+        self.k_arb_rear_n_m = 30000.0
         self.roll_center_front_m = 0.035
         self.roll_center_rear_m = 0.042
         self.camber_gain_front = -2.2
@@ -454,12 +454,12 @@ class LapSimVehicleParams:
                 self.static_rh_front_mm = float(v)
             elif k in ("static_rh_rear_mm", "static_rh_r", "ride_height_rear", "ref_ride_height_rear_mm", "rear_ride_height"):
                 self.static_rh_rear_mm = float(v)
-            elif k in ("k_arb_f", "k_arb_front", "k_arb_front_nm_rad", "front_arb"):
+            elif k in ("k_arb_f", "k_arb_front", "k_arb_front_n_m", "k_arb_front_nm_rad", "front_arb"):
                 a_val = float(v)
-                self.k_arb_front_nm_rad = a_val * 1000.0 if a_val < 1000.0 else a_val
-            elif k in ("k_arb_r", "k_arb_rear", "k_arb_rear_nm_rad", "rear_arb"):
+                self.k_arb_front_n_m = a_val * 1000.0 if a_val < 1000.0 else a_val
+            elif k in ("k_arb_r", "k_arb_rear", "k_arb_rear_n_m", "k_arb_rear_nm_rad", "rear_arb"):
                 a_val = float(v)
-                self.k_arb_rear_nm_rad = a_val * 1000.0 if a_val < 1000.0 else a_val
+                self.k_arb_rear_n_m = a_val * 1000.0 if a_val < 1000.0 else a_val
             elif k in ("roll_center_f_m", "roll_center_front", "rc_f", "front_rc_height", "roll_center_front_m"):
                 rc_val = float(v)
                 self.roll_center_front_m = rc_val / 1000.0 if abs(rc_val) > 1.0 else rc_val
@@ -561,18 +561,32 @@ class LapSimVehicleParams:
         self.motion_ratio_rear = float(val)
 
     @property
+    def k_arb_front_nm_rad(self) -> float:
+        return self.k_arb_front_n_m
+    @k_arb_front_nm_rad.setter
+    def k_arb_front_nm_rad(self, val: float):
+        self.k_arb_front_n_m = float(val)
+
+    @property
+    def k_arb_rear_nm_rad(self) -> float:
+        return self.k_arb_rear_n_m
+    @k_arb_rear_nm_rad.setter
+    def k_arb_rear_nm_rad(self, val: float):
+        self.k_arb_rear_n_m = float(val)
+
+    @property
     def k_arb_f(self) -> float:
-        return self.k_arb_front_nm_rad
+        return self.k_arb_front_n_m
     @k_arb_f.setter
     def k_arb_f(self, val: float):
-        self.k_arb_front_nm_rad = float(val)
+        self.k_arb_front_n_m = float(val)
 
     @property
     def k_arb_r(self) -> float:
-        return self.k_arb_rear_nm_rad
+        return self.k_arb_rear_n_m
     @k_arb_r.setter
     def k_arb_r(self, val: float):
-        self.k_arb_rear_nm_rad = float(val)
+        self.k_arb_rear_n_m = float(val)
 
     @property
     def roll_center_f_m(self) -> float:
@@ -680,21 +694,23 @@ class LapSimVehicleParams:
 
     def roll_stiffness_front(self) -> float:
         """Total front axle roll stiffness K_phi_f [N*m/rad].
-        k_wf = k_spring_front_n_m * (motion_ratio_front ** 2)
-        K_phi_f = 0.5 * (k_wf + k_arb_front_n_m) * (track_front_m ** 2)
+        
+        Wheel rate k_wf = k_spring_front_n_m * (motion_ratio_front ** 2) [N/m]
+        ARB wheel rate k_arb_front_n_m [N/m] (UI N/mm * 1000 = wheel rate N/m)
+        Roll stiffness K_phi_f = 0.5 * (k_wf + k_arb_front_n_m) * (track_front_m ** 2) [N*m/rad]
         """
         k_wf = self.k_spring_front_n_m * (self.motion_ratio_front ** 2)
-        k_arb_f = self.k_arb_front_nm_rad
-        return 0.5 * (k_wf + k_arb_f) * (self.track_front_m ** 2)
+        return 0.5 * (k_wf + self.k_arb_front_n_m) * (self.track_front_m ** 2)
 
     def roll_stiffness_rear(self) -> float:
         """Total rear axle roll stiffness K_phi_r [N*m/rad].
-        k_wr = k_spring_rear_n_m * (motion_ratio_rear ** 2)
-        K_phi_r = 0.5 * (k_wr + k_arb_rear_n_m) * (track_rear_m ** 2)
+        
+        Wheel rate k_wr = k_spring_rear_n_m * (motion_ratio_rear ** 2) [N/m]
+        ARB wheel rate k_arb_rear_n_m [N/m] (UI N/mm * 1000 = wheel rate N/m)
+        Roll stiffness K_phi_r = 0.5 * (k_wr + k_arb_rear_n_m) * (track_rear_m ** 2) [N*m/rad]
         """
         k_wr = self.k_spring_rear_n_m * (self.motion_ratio_rear ** 2)
-        k_arb_r = self.k_arb_rear_nm_rad
-        return 0.5 * (k_wr + k_arb_r) * (self.track_rear_m ** 2)
+        return 0.5 * (k_wr + self.k_arb_rear_n_m) * (self.track_rear_m ** 2)
 
     def lltd(self) -> float:
         """Suspension Lateral Load Transfer Distribution (LLTD) front fraction [-].
@@ -1140,92 +1156,92 @@ def get_builtin_track(name: str) -> List[TrackSegment]:
     track_key = name.lower().strip()
 
     if track_key in ("spa", "spa_francorchamps", "spa-francorchamps"):
-        # Calibrated Spa-Francorchamps: 7004.0 m official length, ~137s GT3 reference lap time
+        # Realistic Published Spa-Francorchamps: 7004.0 m official length (Zero artificial curvature shrinkage)
         features = [
             (250.0, 0.0, 0.0, -1.0, 1),      # Start/Finish straight
-            (80.0, 22.4, 2.0, -2.0, 1),       # La Source hairpin
+            (80.0, 32.0, 2.0, -2.0, 1),       # La Source hairpin (~32m)
             (540.0, 0.0, 0.0, -4.0, 1),      # Downhill to Eau Rouge
             (240.0, 280.0, 4.0, 9.0, 1),     # Eau Rouge / Raidillon
             (1020.0, 0.0, 0.0, 2.0, 1),      # Kemmel Straight
-            (130.0, 66.5, 1.5, 0.0, 2),      # Les Combes turn 1
-            (100.0, -63.0, 1.0, -1.0, 2),    # Les Combes turn 2
+            (130.0, 95.0, 1.5, 0.0, 2),      # Les Combes turn 1 (~95m)
+            (100.0, -90.0, 1.0, -1.0, 2),    # Les Combes turn 2 (~90m)
             (320.0, 0.0, 0.0, -3.0, 2),      # Malmedy short straight
-            (140.0, 49.0, 2.0, -4.0, 2),     # Rivage hairpin
-            (160.0, 87.5, 1.5, -2.0, 2),     # Speaker's Corner
-            (340.0, 160.0, 3.0, -3.0, 2),    # Pouhon double-left
-            (240.0, 94.5, 2.0, -1.0, 2),     # Fagnes chicane
+            (140.0, 58.0, 2.0, -4.0, 2),     # Rivage hairpin (~58m)
+            (160.0, 125.0, 1.5, -2.0, 2),    # Speaker's Corner (~125m)
+            (340.0, 220.0, 3.0, -3.0, 2),    # Pouhon double-left (~220m)
+            (240.0, 135.0, 2.0, -1.0, 2),    # Fagnes chicane (~135m)
             (360.0, 0.0, 0.0, 0.0, 2),       # Campus straight
-            (130.0, 84.0, 1.0, 0.0, 2),      # Stavelot
+            (130.0, 120.0, 1.0, 0.0, 2),     # Stavelot (~120m)
             (220.0, 0.0, 0.0, 1.0, 2),       # Run to Paul Frere
-            (190.0, 101.5, 2.0, 1.0, 2),     # Paul Frere
-            (1300.0, 455.0, 1.0, 0.5, 3),    # Blanchimont high-speed curve
+            (190.0, 145.0, 2.0, 1.0, 2),     # Paul Frere (~145m)
+            (1300.0, 650.0, 1.0, 0.5, 3),    # Blanchimont high-speed curve (~650m)
             (540.0, 0.0, 0.0, 0.0, 3),       # Approach to Bus Stop
-            (90.0, 21.0, 1.0, 0.0, 3),       # Bus Stop chicane
+            (90.0, 28.0, 1.0, 0.0, 3),       # Bus Stop chicane (~28m)
             (614.0, 0.0, 0.0, 0.0, 3),       # Finish straight
         ]
     elif track_key in ("silverstone", "silverstone_gp"):
-        # Calibrated Silverstone GP: 5891.0 m official length, ~118s GT3 reference lap time
+        # Realistic Published Silverstone GP: 5891.0 m official length (Zero artificial curvature shrinkage)
         features = [
             (320.0, 0.0, 0.0, 0.0, 1),       # Hamilton Straight
-            (180.0, 168.1, 1.5, 0.0, 1),     # Abbey
-            (160.0, 229.6, 1.0, 0.0, 1),     # Farm curve
-            (110.0, 42.6, 1.0, 0.0, 1),      # Village corner
-            (100.0, 31.2, 1.0, 0.0, 1),      # The Loop
-            (180.0, 98.4, 1.0, 0.0, 1),      # Aintree
+            (180.0, 205.0, 1.5, 0.0, 1),     # Abbey (~205m)
+            (160.0, 280.0, 1.0, 0.0, 1),     # Farm curve (~280m)
+            (110.0, 52.0, 1.0, 0.0, 1),      # Village corner (~52m)
+            (100.0, 38.0, 1.0, 0.0, 1),      # The Loop (~38m)
+            (180.0, 120.0, 1.0, 0.0, 1),     # Aintree (~120m)
             (770.0, 0.0, 0.0, 0.0, 1),       # Wellington Straight
-            (160.0, 82.0, 1.5, 0.0, 2),      # Brooklands
-            (210.0, 65.6, 1.5, 0.0, 2),      # Luffield
-            (150.0, 180.4, 0.5, 0.0, 2),     # Woodcote
+            (160.0, 100.0, 1.5, 0.0, 2),     # Brooklands (~100m)
+            (210.0, 80.0, 1.5, 0.0, 2),      # Luffield (~80m)
+            (150.0, 220.0, 0.5, 0.0, 2),     # Woodcote (~220m)
             (440.0, 0.0, 0.0, 0.0, 2),       # National Straight
-            (190.0, 159.9, 1.5, 0.0, 2),     # Copse
-            (280.0, 135.3, 2.0, 0.0, 2),     # Maggotts
-            (240.0, -118.9, 2.0, 0.0, 2),    # Becketts
-            (180.0, 151.7, 1.5, 0.0, 2),     # Chapel
+            (190.0, 195.0, 1.5, 0.0, 2),     # Copse (~195m)
+            (280.0, 165.0, 2.0, 0.0, 2),     # Maggotts (~165m)
+            (240.0, -145.0, 2.0, 0.0, 2),    # Becketts (~-145m)
+            (180.0, 185.0, 1.5, 0.0, 2),     # Chapel (~185m)
             (780.0, 0.0, 0.0, 0.0, 3),       # Hangar Straight
-            (210.0, 118.9, 2.0, 0.0, 3),     # Stowe
+            (210.0, 145.0, 2.0, 0.0, 3),     # Stowe (~145m)
             (340.0, 0.0, 0.0, 0.0, 3),       # Run to Vale
-            (130.0, 45.1, 1.0, 0.0, 3),      # Vale chicane
-            (190.0, 90.2, 2.0, 0.0, 3),      # Club
+            (130.0, 55.0, 1.0, 0.0, 3),      # Vale chicane (~55m)
+            (190.0, 110.0, 2.0, 0.0, 3),     # Club (~110m)
             (571.0, 0.0, 0.0, 0.0, 3),       # Finish straight
         ]
     elif track_key in ("monza", "autodromo_nazionale_monza"):
-        # Calibrated Autodromo Nazionale Monza: 5793.0 m official length, ~108s GT3 reference lap time
+        # Realistic Published Autodromo Nazionale Monza: 5793.0 m official length (Zero artificial curvature shrinkage)
         features = [
             (1100.0, 0.0, 0.0, 0.0, 1),       # Rettifilo Main straight
-            (90.0, 37.4, 1.0, 0.0, 1),        # Prima Variante turn 1
-            (80.0, -35.7, 1.0, 0.0, 1),       # Prima Variante turn 2
-            (650.0, 510.0, 1.0, 0.0, 1),      # Curva Grande (Biassono)
-            (100.0, 51.0, 1.0, 0.0, 2),       # Roggia chicane turn 1
-            (90.0, -47.6, 1.0, 0.0, 2),       # Roggia chicane turn 2
+            (90.0, 44.0, 1.0, 0.0, 1),        # Prima Variante turn 1 (~44m)
+            (80.0, -42.0, 1.0, 0.0, 1),       # Prima Variante turn 2 (~-42m)
+            (650.0, 600.0, 1.0, 0.0, 1),      # Curva Grande (Biassono) (~600m)
+            (100.0, 60.0, 1.0, 0.0, 2),       # Roggia chicane turn 1 (~60m)
+            (90.0, -56.0, 1.0, 0.0, 2),       # Roggia chicane turn 2 (~-56m)
             (240.0, 0.0, 0.0, 0.0, 2),        # Run to Lesmo 1
-            (150.0, 106.3, 1.5, 0.0, 2),      # Lesmo 1
+            (150.0, 125.0, 1.5, 0.0, 2),      # Lesmo 1 (~125m)
             (180.0, 0.0, 0.0, 0.0, 2),        # Short straight
-            (140.0, 97.8, 1.5, 0.0, 2),       # Lesmo 2
-            (820.0, 807.5, 0.0, -1.0, 2),     # Serraglio / run to Ascari
-            (110.0, 85.0, 1.0, 0.0, 3),       # Ascari entry
-            (120.0, -91.8, 1.0, 0.0, 3),      # Ascari apex
-            (130.0, 110.5, 1.0, 0.0, 3),      # Ascari exit
+            (140.0, 115.0, 1.5, 0.0, 2),      # Lesmo 2 (~115m)
+            (820.0, 950.0, 0.0, -1.0, 2),     # Serraglio / run to Ascari (~950m)
+            (110.0, 100.0, 1.0, 0.0, 3),      # Ascari entry (~100m)
+            (120.0, -108.0, 1.0, 0.0, 3),     # Ascari apex (~-108m)
+            (130.0, 130.0, 1.0, 0.0, 3),      # Ascari exit (~130m)
             (960.0, 0.0, 0.0, 0.0, 3),        # Back straight
-            (380.0, 178.5, 1.5, 0.0, 3),      # Curva Parabolica (Alboreto)
+            (380.0, 210.0, 1.5, 0.0, 3),      # Curva Parabolica (Alboreto) (~210m)
             (453.0, 0.0, 0.0, 0.0, 3),        # Finish straight
         ]
     elif track_key in ("fsae_endurance", "fsae", "autocross", "formula_student"):
-        # Calibrated Formula SAE Endurance: 1450.0 m official length, ~65s reference lap time
+        # Realistic Formula SAE Endurance: 1450.0 m official length (Zero artificial curvature shrinkage)
         features = [
             (120.0, 0.0, 0.0, 0.0, 1),
-            (60.0, 18.7, 1.0, 0.0, 1),
+            (60.0, 22.0, 1.0, 0.0, 1),        # Hairpin 1 (~22m)
             (100.0, 0.0, 0.0, 0.0, 1),
-            (60.0, 20.4, 1.0, 0.0, 1),
-            (75.0, -18.7, 1.0, 0.0, 1),
-            (75.0, 18.7, 1.0, 0.0, 1),
-            (110.0, 32.3, 2.0, 0.0, 2),
-            (50.0, 17.0, 1.0, 0.0, 2),
+            (60.0, 24.0, 1.0, 0.0, 1),
+            (75.0, -22.0, 1.0, 0.0, 1),
+            (75.0, 22.0, 1.0, 0.0, 1),
+            (110.0, 38.0, 2.0, 0.0, 2),       # Sweeper 1 (~38m)
+            (50.0, 20.0, 1.0, 0.0, 2),        # Hairpin 2 (~20m)
             (140.0, 0.0, 0.0, 0.0, 2),
-            (60.0, 17.0, 1.0, 0.0, 2),
-            (60.0, -17.0, 1.0, 0.0, 2),
-            (180.0, 30.6, 1.5, 0.0, 3),
+            (60.0, 20.0, 1.0, 0.0, 2),
+            (60.0, -20.0, 1.0, 0.0, 2),
+            (180.0, 36.0, 1.5, 0.0, 3),       # Sweeper 2 (~36m)
             (80.0, 0.0, 0.0, 0.0, 3),
-            (60.0, 17.0, 1.0, 0.0, 3),
+            (60.0, 20.0, 1.0, 0.0, 3),
             (220.0, 0.0, 0.0, 0.0, 3),
         ]
     else:
@@ -1678,6 +1694,25 @@ def compute_setup_response_surface(
     else:
         time_gain = max(0.0, round(base_lap_time_s - min_time, 3))
 
+    opt_vp = copy.copy(vehicle_params)
+    opt_vp.k_arb_front_nm_rad = opt_arb * 1000.0
+    opt_vp.aero_balance_front = opt_aero / 100.0
+
+    uncertainty_band = compute_setup_uncertainty_band(
+        base_vp=vehicle_params,
+        cand_vp=opt_vp,
+        track=track_segs,
+        is_closed=is_closed,
+    )
+
+    optimal_dict = {
+        "front_arb_n_mm": float(opt_arb),
+        "aero_balance_front_pct": float(opt_aero),
+        "lap_time_s": round(float(min_time), 3),
+        "time_gain_s": round(float(time_gain), 3),
+        "uncertainty_band": uncertainty_band,
+    }
+
     return {
         "front_arb_n_mm": front_arb_grid,
         "aero_balance_front_pct": aero_bal_grid,
@@ -1687,12 +1722,100 @@ def compute_setup_response_surface(
             "aero_balance_front_pct": round(float(current_aero_bal), 1),
             "lap_time_s": round(float(base_lap_time_s), 3),
         },
-        "optimal_setup": {
-            "front_arb_n_mm": float(opt_arb),
-            "aero_balance_front_pct": float(opt_aero),
-            "lap_time_s": round(float(min_time), 3),
-            "time_gain_s": round(float(time_gain), 3),
-        },
+        "optimal_setup": optimal_dict,
+        "uncertainty_band": uncertainty_band,
+    }
+
+
+def compute_setup_uncertainty_band(
+    base_vp: Any,
+    cand_vp: Any,
+    track: Union[str, List[TrackSegment]] = "spa",
+    is_closed: bool = True,
+) -> Dict[str, Any]:
+    """Compute 9-point perturbation uncertainty envelope for setup delta.
+
+    Perturbs aerodynamic drag/downforce by [-5%, 0%, +5%] and tire friction mu by [-3%, 0%, +3%].
+    Evaluates paired delta t_cand - t_base across all 9 perturbation points.
+    Returns nominal delta, uncertainty band [min_delta, max_delta], absolute margin (±X.XX s),
+    and epistemic classification.
+    """
+    import copy
+
+    base_norm = _normalize_to_vehicle_params(base_vp)
+    cand_norm = _normalize_to_vehicle_params(cand_vp)
+
+    if isinstance(track, str):
+        track_segs = get_builtin_track(track)
+    else:
+        track_segs = track
+
+    aero_perts = [-0.05, 0.0, 0.05]
+    mu_perts = [-0.03, 0.0, 0.03]
+
+    results = []
+    deltas = []
+    t_bases = []
+    t_cands = []
+
+    nom_delta = 0.0
+    nom_t_base = 0.0
+    nom_t_cand = 0.0
+
+    for da in aero_perts:
+        for dm in mu_perts:
+            b_p = copy.copy(base_norm)
+            c_p = copy.copy(cand_norm)
+
+            b_p.cl_total = base_norm.cl_total * (1.0 + da)
+            b_p.cd_total = base_norm.cd_total * (1.0 + da)
+            c_p.cl_total = cand_norm.cl_total * (1.0 + da)
+            c_p.cd_total = cand_norm.cd_total * (1.0 + da)
+
+            b_p.mu_0 = base_norm.mu_0 * (1.0 + dm)
+            c_p.mu_0 = cand_norm.mu_0 * (1.0 + dm)
+
+            sim_b = simulate_lap(vehicle=b_p, track=track_segs, is_closed=is_closed, compute_surface=False)
+            sim_c = simulate_lap(vehicle=c_p, track=track_segs, is_closed=is_closed, compute_surface=False)
+
+            tb = float(sim_b.lap_time_s)
+            tc = float(sim_c.lap_time_s)
+            dt = tc - tb
+
+            t_bases.append(tb)
+            t_cands.append(tc)
+            deltas.append(dt)
+
+            if abs(da) < 1e-6 and abs(dm) < 1e-6:
+                nom_delta = dt
+                nom_t_base = tb
+                nom_t_cand = tc
+
+            results.append({
+                "delta_aero_pct": round(da * 100.0, 1),
+                "delta_mu_pct": round(dm * 100.0, 1),
+                "t_base_s": round(tb, 3),
+                "t_cand_s": round(tc, 3),
+                "delta_s": round(dt, 3),
+            })
+
+    min_delta = min(deltas)
+    max_delta = max(deltas)
+    margin = max(abs(max_delta - nom_delta), abs(min_delta - nom_delta))
+    uncertainty_s = round(margin, 2)
+
+    return {
+        "nominal_delta_s": round(nom_delta, 3),
+        "min_delta_s": round(min_delta, 3),
+        "max_delta_s": round(max_delta, 3),
+        "uncertainty_s": uncertainty_s,
+        "formatted_delta": f"{nom_delta:+.2f}s [{min_delta:+.2f}s, {max_delta:+.2f}s]",
+        "base_nominal_s": round(nom_t_base, 3),
+        "cand_nominal_s": round(nom_t_cand, 3),
+        "t_base_range": [round(min(t_bases), 3), round(max(t_bases), 3)],
+        "t_cand_range": [round(min(t_cands), 3), round(max(t_cands), 3)],
+        "perturbations": results,
+        "epistemic_status": "UNCORRELATED_SIMULATION_DELTA",
     }
 
 
@@ -1898,16 +2021,24 @@ def simulate_lap(
         dv = (v - v_ggv[iv]) / dv_grid
         ay_lim = ay_ggv[iv] * (1.0 - dv) + ay_ggv[iv + 1] * dv
         ay_frac = min(max(ay / max(ay_lim, 0.01), 0.0), 1.0)
-        j = int(ay_frac * (n_ay - 1))
-        return float((1.0 - dv) * accel_surf[iv, j] + dv * accel_surf[iv + 1, j])
+        j_float = ay_frac * (n_ay - 1)
+        j0 = min(max(int(j_float), 0), n_ay - 2)
+        dj = j_float - j0
+        a0 = (1.0 - dv) * accel_surf[iv, j0] + dv * accel_surf[iv + 1, j0]
+        a1 = (1.0 - dv) * accel_surf[iv, j0 + 1] + dv * accel_surf[iv + 1, j0 + 1]
+        return float((1.0 - dj) * a0 + dj * a1)
 
     def lookup_ax_brake(v: float, ay: float) -> float:
         iv = min(max(int((v - v_ggv[0]) / dv_grid), 0), n_v - 2)
         dv = (v - v_ggv[iv]) / dv_grid
         ay_lim = ay_ggv[iv] * (1.0 - dv) + ay_ggv[iv + 1] * dv
         ay_frac = min(max(ay / max(ay_lim, 0.01), 0.0), 1.0)
-        j = int(ay_frac * (n_ay - 1))
-        return float((1.0 - dv) * brake_surf[iv, j] + dv * brake_surf[iv + 1, j])
+        j_float = ay_frac * (n_ay - 1)
+        j0 = min(max(int(j_float), 0), n_ay - 2)
+        dj = j_float - j0
+        b0 = (1.0 - dv) * brake_surf[iv, j0] + dv * brake_surf[iv + 1, j0]
+        b1 = (1.0 - dv) * brake_surf[iv, j0 + 1] + dv * brake_surf[iv + 1, j0 + 1]
+        return float((1.0 - dj) * b0 + dj * b1)
 
     # 3. PASS 1: APEX SPEEDS (Grip limits at each track station)
     v_apex = np.zeros(n)
@@ -2187,8 +2318,20 @@ def simulate_lap(
                     v_driver_apex_kmh = float(np.min(driver_speed_kmh[corner_start_idx : corner_end_idx + 1]))
                     t_sim_corner = float(np.sum(ds_array[corner_start_idx : corner_end_idx + 1] / np.maximum(v_sol[corner_start_idx : corner_end_idx + 1], 2.0)))
                     t_driver_corner = float(np.sum(ds_array[corner_start_idx : corner_end_idx + 1] / np.maximum(driver_speed_ms[corner_start_idx : corner_end_idx + 1], 2.0)))
-                    time_loss_s = round(float(max(0.0, t_driver_corner - t_sim_corner)), 3)
-                    bottleneck = "Vehicle Front Understeer Limit" if (vp.lltd() > 0.50) else "Driver Early Braking / Apex Overslow"
+                    time_delta_s = round(float(t_driver_corner - t_sim_corner), 3)
+                    if v_driver_apex_kmh > v_sim_apex_kmh or time_delta_s < 0.0:
+                        time_loss_s = 0.0
+                        signed_delta_s = time_delta_s
+                        bottleneck = "Driver Exceeded Model Grip Limit"
+                        limiting_factor_corner = "MODEL_UNDERESTIMATED"
+                        recommendation = "Driver beat simulated apex speed — recalibrate tire mu_0, Cl, or curvature smoothing before tuning setup."
+                    else:
+                        time_loss_s = max(0.0, time_delta_s)
+                        signed_delta_s = time_delta_s
+                        bottleneck = "Vehicle Front Understeer Limit" if (vp.lltd() > 0.50) else "Driver Early Braking / Apex Overslow"
+                        limiting_factor_corner = "UNDERSTEER_FRONT" if (vp.lltd() > 0.50) else "BRAKING"
+                        recommendation = "Vehicle front axle saturated. Soften front ARB or increase front wing." if (vp.lltd() > 0.50) else "Driver over-slowed entry. Carry more apex speed."
+
                     corner_opportunities.append({
                         "corner_id": corner_id,
                         "name": f"Turn {corner_id} ({round(float(corner_start))}m)",
@@ -2200,9 +2343,10 @@ def simulate_lap(
                         "optimal_speed_kmh": round(v_sim_apex_kmh, 1),
                         "driver_speed_kmh": round(v_driver_apex_kmh, 1),
                         "time_loss_s": time_loss_s,
+                        "signed_delta_s": signed_delta_s,
                         "bottleneck": bottleneck,
-                        "limiting_factor": "UNDERSTEER_FRONT" if (vp.lltd() > 0.50) else "BRAKING",
-                        "recommendation": "Vehicle front axle saturated. Soften front ARB or increase front wing." if (vp.lltd() > 0.50) else "Driver over-slowed entry. Carry more apex speed.",
+                        "limiting_factor": limiting_factor_corner,
+                        "recommendation": recommendation,
                     })
                     corner_id += 1
 

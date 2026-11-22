@@ -44,6 +44,9 @@ export default function WorkspaceStatusBar() {
         return "bg-amber-950/60 border-amber-500/40 text-amber-400";
       case "EXPERIMENTAL":
         return "bg-purple-950/60 border-purple-500/40 text-purple-400";
+      case "SIMULATION ONLY (UNCORRELATED)":
+      case "SIMULATION ONLY":
+        return "bg-sky-950/60 border-sky-500/40 text-sky-400";
       case "OUT-OF-DOMAIN":
       default:
         return "bg-rose-950/60 border-rose-500/40 text-rose-400";
@@ -128,11 +131,13 @@ export default function WorkspaceStatusBar() {
             className={`px-2 py-0.5 rounded border text-[10px] font-bold flex items-center gap-1.5 ${getValidationBadge(
               validation.status
             )}`}
-            title={`Validation Status: ${validation.status} (${Math.round(validation.score)}% confidence score)`}
+            title={`Validation Status: ${validation.status}${validation.status === "VALIDATED" && validation.score >= 85 ? ` (${Math.round(validation.score)}% confidence score)` : " (No Active Telemetry Fit)"}`}
           >
             <ShieldCheck size={11} />
             <span className="hidden sm:inline">{validation.status}</span>
-            <span className="font-mono">({Math.round(validation.score)}%)</span>
+            {validation.status === "VALIDATED" && validation.score >= 85 ? (
+              <span className="font-mono">({Math.round(validation.score)}%)</span>
+            ) : null}
           </div>
 
           {/* Expand / Collapse Button */}

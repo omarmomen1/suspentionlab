@@ -333,7 +333,7 @@ class TelemetryCorrelationService:
         })
 
         # ── 4. CORRELATION HEALTH METRICS (SECTION 3) ────────────────────
-        # Compute Pearson R² correlation on vertical acceleration
+        # Compute Pearson R² correlation on vertical acceleration and true Nash-Sutcliffe R² (NSE)
         # Synthesize time-domain model vertical acceleration
         sim_vert_arr = np.array(forward_res.ddz_s[:n_samples]) / 9.81
         if len(sim_vert_arr) < n_samples:
@@ -341,19 +341,28 @@ class TelemetryCorrelationService:
 
         valid_mask = np.isfinite(telem["vert_g"]) & np.isfinite(sim_vert_arr)
         if np.sum(valid_mask) > 10:
-            corr_val = float(np.corrcoef(telem["vert_g"][valid_mask], sim_vert_arr[valid_mask])[0, 1])
+            m_vg = telem["vert_g"][valid_mask]
+            s_vg = sim_vert_arr[valid_mask]
+            res_vg = m_vg - s_vg
+            ss_res = float(np.sum(res_vg ** 2))
+            ss_tot = float(np.sum((m_vg - np.mean(m_vg)) ** 2))
+            r2_nse = 1.0 - (ss_res / max(ss_tot, 1e-12))
+            corr_val = float(np.corrcoef(m_vg, s_vg)[0, 1]) if (np.std(m_vg) > 1e-6 and np.std(s_vg) > 1e-6) else 0.0
             r2_overall = max(0.0, corr_val**2)
+            rmse_vg = float(np.sqrt(np.mean(res_vg ** 2)))
+            mae_vg = float(np.mean(np.abs(res_vg)))
+            mean_bias_vg = float(np.mean(res_vg))
         else:
+            r2_nse = 0.0
+            corr_val = 0.0
             r2_overall = 0.0
+            rmse_vg = 0.0
+            mae_vg = 0.0
+            mean_bias_vg = 0.0
 
-        # 20% Holdout state to prevent data snooping / overfitting
-        holdout_split = int(0.8 * n_samples)
-        holdout_mask = valid_mask[holdout_split:]
-        if np.sum(holdout_mask) > 5:
-            corr_holdout = float(np.corrcoef(telem["vert_g"][holdout_split:][holdout_mask], sim_vert_arr[holdout_split:][holdout_mask])[0, 1])
-            r2_holdout = max(0.0, corr_holdout**2)
-        else:
-            r2_holdout = 0.0
+        # For direct forward evaluation (no parameters fitted), holdout splitting is not applicable
+        holdout_status = "N/A (Direct Forward Evaluation — No Parameters Fitted)"
+        holdout_r2 = None
 
         # Missingness computation
         missing_count = int(np.sum(~np.isfinite(telem["vert_g"])))
@@ -362,10 +371,9 @@ class TelemetryCorrelationService:
         # Freshness computation (mocked seconds since live telemetry packet)
         data_freshness_s = 0.05
 
-        # Strict 7-point empirical validation check
+        # Strict 7-point empirical validation check using Nash-Sutcliffe R² (NSE)
         qualifies_fit = (
-            r2_overall >= 0.85
-            and r2_holdout >= 0.80
+            r2_nse >= 0.85
             and n_samples >= 100
             and not any(c["status"] == "diverged" for c in channels_data)
         )
@@ -376,18 +384,18 @@ class TelemetryCorrelationService:
         )
         is_empirically_validated = qualifies_fit and is_empirical_telemetry
 
-        validation_tier = "VALIDATED" if qualifies_fit else ("CONDITIONAL" if r2_overall >= 0.70 else "UNVALIDATED")
+        validation_tier = "VALIDATED" if qualifies_fit else ("CONDITIONAL" if r2_nse >= 0.70 else "UNVALIDATED")
         if is_empirically_validated:
             epistemic_tier = "EMPIRICALLY_VALIDATED"
         elif qualifies_fit:
             epistemic_tier = "MODEL_SUPPORTED"
-        elif r2_overall >= 0.70:
+        elif r2_nse >= 0.70:
             epistemic_tier = "CORRELATED"
         else:
             epistemic_tier = "SIMULATION_ESTIMATE"
 
         # Any channel diverged?
-        has_divergence = any(c["status"] == "diverged" for c in channels_data) or (r2_overall < 0.75)
+        has_divergence = any(c["status"] == "diverged" for c in channels_data) or (r2_nse < 0.75)
 
         return {
             "session_id": session_id,
@@ -398,8 +406,14 @@ class TelemetryCorrelationService:
             "channels": channels_data,
             "correlation_health": {
                 "overall_correlation_r2": round(r2_overall, 3),
-                "holdout_r2": round(r2_holdout, 3),
-                "holdout_window_pct": 20,
+                "r2_nse": round(r2_nse, 3),
+                "pearson_r": round(corr_val, 3),
+                "rmse": round(rmse_vg, 4),
+                "mae": round(mae_vg, 4),
+                "mean_bias": round(mean_bias_vg, 4),
+                "holdout_r2": None,
+                "holdout_status": holdout_status,
+                "holdout_window_pct": 0,
                 "sample_count": n_samples,
                 "sample_rate_hz": round(sample_rate_hz, 1),
                 "missingness_pct": round(missingness_pct, 2),
@@ -414,7 +428,7 @@ class TelemetryCorrelationService:
                 "summary": (
                     "Residual error exceeds 15% threshold on 1 or more channels. Forward model predicts different dynamics than DAQ sensors."
                     if has_divergence else
-                    "Virtual model correlates with track measurements within acceptable tolerance envelope (R² ≥ 0.85)."
+                    "Virtual model correlates with track measurements within acceptable tolerance envelope (NSE R² ≥ 0.85)."
                 ),
             },
         }
@@ -424,10 +438,12 @@ class TelemetryCorrelationService:
         simulated_values: List[float],
         measured_values: List[float],
         holdout_ratio: float = 0.2,
+        is_fitted_model: bool = False,
     ) -> Dict[str, Any]:
         """
-        Calculates out-of-sample holdout validation correlation R² without data leakage (Section 10 & 18).
-        Ensures model correlation is confirmed on held-out samples.
+        Calculates out-of-sample holdout validation correlation (Section 10 & 18).
+        When evaluating direct forward simulation with no fitted parameters, holdout splitting is
+        not scientifically applicable; returns holdout_status = 'N/A (Direct Forward Evaluation — No Parameters Fitted)'.
         """
         s = np.asarray(simulated_values, dtype=float)
         m = np.asarray(measured_values, dtype=float)
@@ -438,21 +454,46 @@ class TelemetryCorrelationService:
         if len(s_val) < 2 or np.std(s_val) < 1e-9 or np.std(m_val) < 1e-9:
             return {
                 "overall_r2": None,
+                "r2_nse": None,
+                "pearson_r": None,
                 "holdout_r2": None,
+                "holdout_status": "N/A (Insufficient Variance)",
                 "sample_count": len(s_val),
                 "holdout_sample_count": 0,
                 "status": "UNVALIDATED",
             }
 
+        res = m_val - s_val
+        ss_res = float(np.sum(res ** 2))
+        ss_tot = float(np.sum((m_val - np.mean(m_val)) ** 2))
+        r2_nse = 1.0 - (ss_res / max(ss_tot, 1e-12))
         r_all = float(np.corrcoef(s_val, m_val)[0, 1])
         overall_r2 = max(0.0, min(1.0, r_all ** 2))
 
-        # Split holdout
+        rmse_val = float(np.sqrt(np.mean(res ** 2)))
+        mae_val = float(np.mean(np.abs(res)))
+        mean_bias_val = float(np.mean(res))
+
+        if not is_fitted_model:
+            return {
+                "overall_r2": round(overall_r2, 4),
+                "r2_nse": round(r2_nse, 4),
+                "pearson_r": round(r_all, 4),
+                "rmse": round(rmse_val, 4),
+                "mae": round(mae_val, 4),
+                "mean_bias": round(mean_bias_val, 4),
+                "holdout_r2": None,
+                "holdout_status": "N/A (Direct Forward Evaluation — No Parameters Fitted)",
+                "sample_count": len(s_val),
+                "holdout_sample_count": 0,
+                "status": "VALIDATED" if r2_nse >= 0.85 else "UNVALIDATED",
+            }
+
+        # If model was fitted on training data, evaluate holdout
         n_samples = len(s_val)
         split_idx = max(2, int(n_samples * (1.0 - holdout_ratio)))
         s_hold = s_val[split_idx:]
         m_hold = m_val[split_idx:]
-
         if len(s_hold) >= 2 and np.std(s_hold) > 1e-9 and np.std(m_hold) > 1e-9:
             r_h = float(np.corrcoef(s_hold, m_hold)[0, 1])
             holdout_r2 = max(0.0, min(1.0, r_h ** 2))
@@ -461,7 +502,13 @@ class TelemetryCorrelationService:
 
         return {
             "overall_r2": round(overall_r2, 4),
+            "r2_nse": round(r2_nse, 4),
+            "pearson_r": round(r_all, 4),
+            "rmse": round(rmse_val, 4),
+            "mae": round(mae_val, 4),
+            "mean_bias": round(mean_bias_val, 4),
             "holdout_r2": round(holdout_r2, 4),
+            "holdout_status": "VALIDATED" if holdout_r2 >= 0.85 else "DIVERGENT",
             "sample_count": n_samples,
             "holdout_sample_count": len(s_hold),
             "status": "VALIDATED" if holdout_r2 >= 0.85 else "DIVERGENT",
@@ -806,7 +853,12 @@ class TelemetryCorrelationService:
             res_v = m_v - s_v
             rmse = float(np.sqrt(np.mean(res_v ** 2)))
             mae = float(np.mean(np.abs(res_v)))
+            mean_bias = float(np.mean(res_v))
             max_res = float(np.max(np.abs(res_v)))
+
+            ss_res = float(np.sum(res_v ** 2))
+            ss_tot = float(np.sum((m_v - np.mean(m_v)) ** 2))
+            r2_nse = 1.0 - (ss_res / max(ss_tot, 1e-12))
 
             std_m, std_s = np.std(m_v), np.std(s_v)
             if std_m > 1e-6 and std_s > 1e-6:
@@ -833,14 +885,16 @@ class TelemetryCorrelationService:
                 "uncertainty_upper": [round(float(x), 3) for x in upper_band[::step]] if upper_band is not None else None,
                 "uncertainty_lower": [round(float(x), 3) for x in lower_band[::step]] if lower_band is not None else None,
                 "metrics": {
-                    "rmse": round(rmse, 4),
-                    "mae": round(mae, 4),
+                    "r2_nse": round(r2_nse, 4),
                     "pearson_r": round(pr, 4),
                     "r_squared": round(r2, 4),
+                    "rmse": round(rmse, 4),
+                    "mae": round(mae, 4),
+                    "mean_bias": round(mean_bias, 4),
                     "max_residual": round(max_res, 4),
                     "systematic_bias": {
-                        "offset": round(float(np.mean(res_v)), 4),
-                        "status": "UNBIASED" if abs(np.mean(res_v)) < (0.1 * rmse) else "BIASED",
+                        "offset": round(mean_bias, 4),
+                        "status": "UNBIASED" if abs(mean_bias) < (0.1 * rmse) else "BIASED",
                     },
                 },
             }

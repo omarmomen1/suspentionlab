@@ -86,6 +86,14 @@ interface CornerOpportunity {
   recommendation: string;
 }
 
+export interface SetupUncertaintyBand {
+  nominal_delta_s: number;
+  min_delta_s: number;
+  max_delta_s: number;
+  uncertainty_s: number;
+  formatted_delta?: string;
+}
+
 export interface SetupSurfaceResult {
   front_arb_n_mm: number[];
   aero_balance_front_pct: number[];
@@ -100,7 +108,9 @@ export interface SetupSurfaceResult {
     aero_balance_front_pct: number;
     lap_time_s: number;
     time_gain_s: number;
+    uncertainty_band?: SetupUncertaintyBand;
   };
+  uncertainty_band?: SetupUncertaintyBand;
 }
 
 interface LapSimResponse {
@@ -1118,12 +1128,12 @@ const FSAE_EV_PROFILE: CoupledVehicleConfig = {
 };
 
 const GT3_BASELINE_PROFILE: CoupledVehicleConfig = {
-  mass: 1285,
+  mass: 1320,
   power_kw: 395,
   tire_mu: 1.38,
   brake_bias_front: 58,
   cl: 1.65,
-  cd: 0.46,
+  cd: 0.70,
   aero_balance_front: 46,
   front_spring_rate: 140,
   rear_spring_rate: 160,
@@ -1214,8 +1224,8 @@ export default function LapSimPage() {
       setVehicle({
         id: "gt3-spec-baseline",
         name: "GT3 Spec Baseline",
-        version: "1285 kg / 395 kW",
-        mass_kg: 1285,
+        version: "1320 kg / 395 kW",
+        mass_kg: 1320,
         wheelbase_m: 2.65,
       });
       if (!manualOverridesLocked) {
@@ -1916,7 +1926,7 @@ export default function LapSimPage() {
                   <span className="text-white font-bold">
                     {selectedCircuitId === "fsae_michigan" || selectedCircuitId === "fsae_endurance"
                       ? "Formula Student EV (295 kg / 80 kW)"
-                      : "GT3 Spec Baseline (1285 kg / 395 kW)"}
+                      : "GT3 Spec Baseline (1320 kg / 395 kW)"}
                   </span>
                 </div>
                 <button
@@ -2342,7 +2352,16 @@ export default function LapSimPage() {
                   {/* 6. 2D Setup Response Surface: ARB vs. Aero [s] */}
                   <div className="h-[250px] bg-[#0D1017] border border-[#1f2430] rounded-xl p-2.5 flex flex-col relative">
                     {result.setup_surface && (
-                      <div className="absolute top-2.5 right-3 z-10">
+                      <div className="absolute top-2.5 right-3 z-10 flex items-center gap-2">
+                        {(result.setup_surface.optimal_setup.uncertainty_band || result.setup_surface.uncertainty_band) && (
+                          <span
+                            className="px-2 py-0.5 rounded-lg text-[10px] font-mono bg-white/[0.05] border border-white/10 text-zinc-300 shadow-sm"
+                            title="Uncertainty band evaluated across ±5% aero and ±3% tire grip perturbations"
+                          >
+                            Uncertainty: ±{(result.setup_surface.optimal_setup.uncertainty_band || result.setup_surface.uncertainty_band)!.uncertainty_s.toFixed(2)}s
+                            {" "}[{(result.setup_surface.optimal_setup.uncertainty_band || result.setup_surface.uncertainty_band)!.min_delta_s.toFixed(2)}s, {(result.setup_surface.optimal_setup.uncertainty_band || result.setup_surface.uncertainty_band)!.max_delta_s.toFixed(2)}s]
+                          </span>
+                        )}
                         <button
                           onClick={() =>
                             handleApplyOptimalSetup(

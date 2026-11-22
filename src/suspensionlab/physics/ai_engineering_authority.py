@@ -120,7 +120,7 @@ class EngineeringAnswerProvenance:
     model_version: str = "VehicleModel-7DOF-v12"
     tire_model_version: str = "Pacejka-MF52-v5"
     correlation_pct: Optional[float] = None
-    confidence_score: float = 0.87
+    confidence_score: float = 0.0
     result_hash: str = ""
     timestamp_iso: str = field(default_factory=lambda: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
 
@@ -688,7 +688,7 @@ class AIEngineeringToolRegistry:
         actual_sim_count = sim_count if sim_count is not None else (len(evidence_runs) if evidence_runs else 0)
         actual_correlation = correlation_pct
         actual_confidence = confidence_score if confidence_score is not None else (
-            0.85 if (correlation_pct is not None and correlation_pct >= 85.0) else (0.50 if evidence_runs else 0.0)
+            (correlation_pct / 100.0) if (correlation_pct is not None and correlation_pct >= 85.0) else 0.0
         )
 
         return EngineeringAnswerProvenance(

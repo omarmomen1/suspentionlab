@@ -91,7 +91,7 @@ export interface ValidationCheckItem {
 }
 
 export interface ValidationWorkspaceState {
-  status: "VALIDATED" | "CONDITIONAL" | "EXPERIMENTAL" | "OUT-OF-DOMAIN";
+  status: "VALIDATED" | "CONDITIONAL" | "EXPERIMENTAL" | "OUT-OF-DOMAIN" | "SIMULATION ONLY (UNCORRELATED)" | "SIMULATION ONLY";
   score: number;
   correlation_pct: number;
   checks: ValidationCheckItem[];
@@ -157,8 +157,8 @@ export interface WorkspaceContextType {
 const DEFAULT_VEHICLE: VehicleState = {
   id: "gt3-spec-baseline",
   name: "GT3 Spec Baseline",
-  version: "1285 kg / 395 kW",
-  mass_kg: 1285,
+  version: "1320 kg / 395 kW",
+  mass_kg: 1320,
   wheelbase_m: 2.65,
   track_width_m: 1.62,
   cg_height_m: 0.42,
@@ -235,16 +235,16 @@ const DEFAULT_OPTIMIZATION: OptimizationWorkspaceState = {
 };
 
 const DEFAULT_VALIDATION: ValidationWorkspaceState = {
-  status: "VALIDATED",
-  score: 91.0,
-  correlation_pct: 91.0,
+  status: "SIMULATION ONLY (UNCORRELATED)",
+  score: 0.0,
+  correlation_pct: 0.0,
   checks: [
-    { label: "Pacejka MF5.2 Tire Slip Envelope", status: "pass", detail: "Operating slip angles within verified test domain (α < 8°)" },
-    { label: "Damper Velocity Non-Linearity", status: "pass", detail: "Full bilinear dyno lookup table active across heave & pitch" },
-    { label: "Telemetry MoTeC Correlation", status: "pass", detail: "R² = 0.912 correlation against Spa FP1 high-speed runs" },
-    { label: "Kinematics Instant Roll Center", status: "pass", detail: "Roll center migration curve verified within FIA envelope" }
+    { label: "Pacejka MF5.2 Tire Slip Envelope", status: "pass", detail: "Operating slip angles within mathematical formulation domain" },
+    { label: "Damper Velocity Non-Linearity", status: "pass", detail: "Bilinear dyno curves active across heave & pitch" },
+    { label: "Telemetry MoTeC Correlation", status: "warn", detail: "No empirical telemetry uploaded. Forward physics simulation only." },
+    { label: "Kinematics Instant Roll Center", status: "pass", detail: "Roll center migration curve within physical boundaries" }
   ],
-  explanation: "Model validated against track telemetry. Safe to base suspension and aerodynamic setup decisions on.",
+  explanation: "Uncorrelated forward physics simulation. Epistemic status: SIMULATION ONLY. Upload physical telemetry to evaluate Nash-Sutcliffe R².",
 };
 
 const WorkspaceContext = createContext<WorkspaceContextType | null>(null);

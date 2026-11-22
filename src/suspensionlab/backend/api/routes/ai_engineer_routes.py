@@ -675,14 +675,18 @@ async def _handle_understeer_and_ride_height(
     val = AIEngineeringToolRegistry.get_model_validity(params=base_params, user_context=user)
     executed_tools.append(val)
 
+    from suspensionlab.physics.lap_sim import compute_setup_uncertainty_band
+    unc_band = compute_setup_uncertainty_band(base_vp=base_vp, cand_vp=cand_vp, track="spa", is_closed=True)
+    delta_str = unc_band.get("formatted_delta", f"{t_delta_s:+.2f}s")
+
     prov = AIEngineeringToolRegistry.create_setup_proposal(
         recommendation="Coordinated Front Spring / Ride Height & ARB Roll Couple Revision",
         target_metric="Front Lateral Grip & Dynamic Ride Height Clearance",
         evidence_runs=[t_sim.get("object_id", "RUN-QSS-SPA-01")],
         evidence_sessions=[t_tel.get("object_id", "SESS-SPA-GT3")],
         sim_count=2,
-        correlation_pct=0.98,
-        confidence_score=0.94,
+        correlation_pct=None,
+        confidence_score=None,
         constraint_status="PASS",
         user_context=user,
     )
@@ -700,11 +704,11 @@ async def _handle_understeer_and_ride_height(
         f"and stiffening Rear ARB from {k_arb_r_base:.1f} N/mm to {k_arb_r_cand:.1f} N/mm (+{((k_arb_r_cand - k_arb_r_base) / max(k_arb_r_base, 1.0)) * 100.0:.1f}%). "
         f"This shifts net Front LLTD from {lltd_base:.1f}% to {lltd_cand:.1f}% (net ΔLLTD of {lltd_delta_abs:+.1f}%), "
         f"transferring lateral load transfer rearward to restore front tire cornering reserve.\n"
-        f"Predicted lap time delta: {t_delta_s:+.3f}s on circuit simulation (baseline {t_base:.3f}s -> {t_cand:.3f}s)."
+        f"Predicted lap time delta: {t_delta_s:+.3f}s on circuit simulation (baseline {t_base:.3f}s -> {t_cand:.3f}s; uncertainty: {delta_str})."
     )
     evidence_text = (
         f"1. Telemetry Query (TELEMETRY): Front dynamic ride height compressed down to {min_rh_base:.2f} mm with front tire slip saturation in mid-corner.\n"
-        f"2. Correlation Audit (SIMULATION): Multi-body suspension model correlates with physical telemetry at R² = 0.98.\n"
+        f"2. Simulation Evidence (SIMULATED): Forward physics simulation indicates {delta_str} setup delta envelope across aero (±5%) and grip (±3%) perturbations.\n"
         f"3. Analytical Kinematics & QSS Lap Simulation: Stiffening front spring shifts fs from {fs_base:.2f} to {fs_cand:.2f} Hz (+{fs_cand - fs_base:.2f} Hz). ARB adjustments shift Front LLTD from {lltd_base:.1f}% to {lltd_cand:.1f}% ({lltd_delta_abs:+.1f}%).\n"
         f"4. Cryptographic Provenance (DATABASE_ARTIFACT): Lineage sealed with SHA-256 provenance hash."
     )
@@ -715,8 +719,9 @@ async def _handle_understeer_and_ride_height(
         f"This balances axle lateral grip without sacrificing front aerodynamic platform clearance."
     )
     uncertainty = (
-        "Epistemic Status: SIMULATED & CORRELATED. Minimum dynamic ride height and natural frequency deltas are derived from deterministic "
-        "LTI and QSS physics models verified against circuit telemetry. Track grip variations (+0.05 mu) may yield additional lap time gains."
+        f"Epistemic Status: SIMULATED_RELATIVE_DELTA (Uncorrelated Forward Physics — No Active Telemetry Fit). "
+        f"Predicted lap time delta uncertainty envelope: {delta_str} evaluated across aerodynamic (±5%) and tire grip (±3%) perturbations. "
+        f"Minimum dynamic ride height and natural frequency deltas are derived from deterministic multi-body kinematics and QSS physics models."
     )
     next_action = (
         f"Commit setup proposal: Front RH {rh_f_cand:.1f} mm (+{rh_f_cand - rh_f_base:.1f} mm), Front Spring {k_sf_cand:.1f} N/mm (+{k_sf_cand - k_sf_base:.1f} N/mm), "
@@ -752,8 +757,8 @@ async def _handle_understeer_and_ride_height(
         best_feasible=param_changes,
         predicted_effects=effects,
         constraint_violations=[],
-        confidence=0.94,
-        evidence=Evidence(description="Multi-body kinematics, QSS 3-pass lap simulation, and DAQ telemetry correlation.", simulations_run=2, feasible_found=2),
+        confidence=0.0,
+        evidence=Evidence(description="Multi-body kinematics and QSS 3-pass lap simulation delta.", simulations_run=2, feasible_found=2),
         model_validity=val.get("data", {"tier": "TRUSTED", "score": 94.0}),
         provenance=prov.to_dict(),
         recommendations=[
@@ -800,7 +805,7 @@ async def _handle_understeer_and_ride_height(
         engineering_interpretation=interpretation,
         uncertainty=uncertainty,
         next_action=next_action,
-        epistemic_classification="CORRELATED",
+        epistemic_classification="SIMULATED_RELATIVE_DELTA",
         epistemic_badges=badges,
         approval_gate={
             "required": True,
@@ -885,8 +890,8 @@ async def _handle_turn7_tire_saturation(
         evidence_runs=[t_sim.get("object_id", "SIM-T7"), t_exp.get("object_id", "EXP-T7")],
         evidence_sessions=[t_tel.get("object_id", "TEL-T7-L12")],
         sim_count=2,
-        correlation_pct=94.2,
-        confidence_score=0.88,
+        correlation_pct=None,
+        confidence_score=None,
         constraint_status="PASS",
         user_context=user,
     )
@@ -948,7 +953,8 @@ async def _handle_turn7_tire_saturation(
         best_feasible=param_changes,
         predicted_effects=effects,
         constraint_violations=[],
-        confidence=0.88,
+        confidence=0.0,
+        epistemic_classification="SIMULATED_RELATIVE_DELTA",
         evidence=Evidence(
             description="Turn 7 physical telemetry cross-correlated with multibody roll simulation and candidate experiment.",
             simulations_run=2,
@@ -976,7 +982,6 @@ async def _handle_turn7_tire_saturation(
         engineering_interpretation=interpretation,
         uncertainty=uncertainty,
         next_action=next_action,
-        epistemic_classification="HYPOTHESIZED",
         epistemic_badges=badges,
         approval_gate={
             "required": True,
@@ -1053,8 +1058,8 @@ async def _handle_lap_time_worse(
         evidence_runs=[t_exp.get("object_id", "EXP-LAP-REC")],
         evidence_sessions=[t_tel.get("object_id", "TEL-LAP-14")],
         sim_count=2,
-        correlation_pct=91.4,
-        confidence_score=0.85,
+        correlation_pct=None,
+        confidence_score=None,
         constraint_status="PASS",
         user_context=user,
     )
@@ -1109,7 +1114,8 @@ async def _handle_lap_time_worse(
         best_feasible=param_changes,
         predicted_effects=effects,
         constraint_violations=[],
-        confidence=0.85,
+        confidence=0.0,
+        epistemic_classification="UNCORRELATED_MODEL",
         evidence=Evidence(description="Telemetry delta analysis between Lap 12 and Lap 14 with damper residual tracking.", simulations_run=2, feasible_found=2),
         model_validity=val.get("data", {"tier": "TRUSTED", "score": 90.0}),
         provenance=prov.to_dict(),
@@ -1133,7 +1139,6 @@ async def _handle_lap_time_worse(
         engineering_interpretation=interpretation,
         uncertainty=uncertainty,
         next_action=next_action,
-        epistemic_classification="CORRELATED",
         epistemic_badges=badges,
         approval_gate={
             "required": True,
@@ -1215,7 +1220,7 @@ async def _handle_reduce_rear_roll(
         evidence_sessions=[],
         sim_count=2,
         correlation_pct=None,
-        confidence_score=0.91,
+        confidence_score=None,
         constraint_status="PASS",
         user_context=user,
     )
@@ -1270,7 +1275,8 @@ async def _handle_reduce_rear_roll(
         best_feasible=param_changes,
         predicted_effects=effects,
         constraint_violations=[],
-        confidence=0.91,
+        confidence=0.0,
+        epistemic_classification="SIMULATED_RELATIVE_DELTA",
         evidence=Evidence(description="Multibody kinematic roll simulation and setup differential analysis.", simulations_run=2, feasible_found=2),
         model_validity=val.get("data", {"tier": "TRUSTED", "score": 94.0}),
         provenance=prov.to_dict(),
@@ -1294,7 +1300,6 @@ async def _handle_reduce_rear_roll(
         engineering_interpretation=interpretation,
         uncertainty=uncertainty,
         next_action=next_action,
-        epistemic_classification="SIMULATED",
         epistemic_badges=badges,
         approval_gate={
             "required": True,
@@ -1359,8 +1364,8 @@ async def _handle_model_correlation_poor(
         evidence_runs=[t_cal.get("object_id", "CALIB-RUN")],
         evidence_sessions=[t_tel.get("object_id", "TEL-VAL-RUN")],
         sim_count=2,
-        correlation_pct=74.2,
-        confidence_score=0.86,
+        correlation_pct=None,
+        confidence_score=None,
         constraint_status="WARNING",
         user_context=user,
     )
@@ -1415,7 +1420,8 @@ async def _handle_model_correlation_poor(
         best_feasible=param_changes,
         predicted_effects=effects,
         constraint_violations=[],
-        confidence=0.86,
+        confidence=0.0,
+        epistemic_classification="UNCORRELATED_MODEL",
         evidence=Evidence(description="Residual tolerance analysis and parameter calibration against physical track data.", simulations_run=2, feasible_found=2),
         model_validity=t_val.get("data", {"tier": "CONDITIONAL", "score": 62.5}),
         provenance=prov.to_dict(),
@@ -1439,7 +1445,6 @@ async def _handle_model_correlation_poor(
         engineering_interpretation=interpretation,
         uncertainty=uncertainty,
         next_action=next_action,
-        epistemic_classification="ESTIMATED",
         epistemic_badges=badges,
         approval_gate={
             "required": True,
@@ -1511,7 +1516,7 @@ async def _handle_setup_diff(
         evidence_sessions=[],
         sim_count=2,
         correlation_pct=None,
-        confidence_score=0.95,
+        confidence_score=None,
         constraint_status="PASS",
         user_context=user,
     )
@@ -1569,7 +1574,8 @@ async def _handle_setup_diff(
         best_feasible=param_changes,
         predicted_effects=effects,
         constraint_violations=[],
-        confidence=0.95,
+        confidence=0.0,
+        epistemic_classification="SIMULATED_RELATIVE_DELTA",
         evidence=Evidence(description="Authoritative configuration diff, SHA-256 provenance seal, and CAE multi-body simulation artifacts.", simulations_run=2, feasible_found=2),
         model_validity=val.get("data", {"tier": "VALIDATED", "score": 96.0}),
         provenance=prov.to_dict(),
@@ -1593,7 +1599,6 @@ async def _handle_setup_diff(
         engineering_interpretation=interpretation,
         uncertainty=uncertainty,
         next_action=next_action,
-        epistemic_classification="SIMULATED",
         epistemic_badges=badges,
         approval_gate={
             "required": True,

@@ -1,15 +1,16 @@
-"""ANSYS / MSC ADAMS Grade Lap Simulator Audit Test Suite.
+"""Analytical & Physics Verification Suite.
 
 Verifies:
-1. Closed-loop work-energy balance residual <= 1.5% across Spa, Silverstone, Monza, and FSAE.
-2. Standing start 0-100 km/h acceleration time between 2.8s and 4.0s (GT3 physical benchmark).
-3. Exact analytical banked cornering physics within 2.0% of theoretical equilibrium limit.
-4. Dynamic brake bias load transfer coupling and stopping distance sensitivity.
-5. Strict physical bounding of tractive and braking forces and pedal percentages across entire laps.
-6. True physical U-shaped convexity of lap time vs. Front ARB (LLTD) across all 4 circuits.
-7. Setup response surface matches actual numerical solver within 0.02s.
-8. Monotonic decrease of chassis max_roll_deg when roll stiffness is doubled.
-9. Comprehensive chassis attitude telemetry trace (roll_deg, pitch_deg) and contract payload.
+1. Open-track non-zero work-energy theorem on 5% grade ramp within <= 1.0%.
+2. Exact GGV envelope compliance across all 4 championship circuits (Spa, Silverstone, Monza, FSAE).
+3. Standing start 0-100 km/h acceleration time between 2.8s and 4.0s (GT3 physical benchmark).
+4. Exact analytical banked cornering physics within 2.0% of theoretical equilibrium limit.
+5. Dynamic brake bias load transfer coupling and stopping distance sensitivity.
+6. Strict physical bounding of tractive and braking forces and pedal percentages across entire laps.
+7. True physical U-shaped convexity of lap time vs. Front ARB (LLTD) across all 4 circuits.
+8. Setup response surface matches actual numerical solver within 0.02s.
+9. Monotonic decrease of chassis max_roll_deg when roll stiffness is doubled.
+10. Comprehensive chassis attitude telemetry trace (roll_deg, pitch_deg) and contract payload.
 """
 
 import math
@@ -19,28 +20,106 @@ from suspensionlab.physics.lap_sim import (
     simulate_lap,
     LapSimVehicleParams,
     compute_ggv_surface,
+    get_builtin_track,
     TrackSegment,
 )
 
 
-def test_closed_loop_work_energy_balance_across_circuits():
-    """Verify that work-energy conservation error is <= 1.5% across Spa, Silverstone, Monza, and FSAE."""
+def test_open_track_work_energy_theorem():
+    """Verify independently that W_tractive - W_drag - W_roll - W_brake == Delta E_kin + Delta E_pot within <= 1.0%."""
+    vp = LapSimVehicleParams()
+    # 300m ramp at +5% grade (elevation = 0.05 * d)
+    segs = [TrackSegment(distance=float(d), curvature=0.0, elevation=0.05 * float(d), bank_angle=0.0) for d in range(0, 302, 2)]
+    res = simulate_lap(vehicle=vp, track=segs, is_closed=False, v_start=15.0, compute_surface=False)
+
+    v_start = res.speeds[0]
+    v_end = res.speeds[-1]
+    delta_ke = 0.5 * vp.mass_kg * (v_end ** 2 - v_start ** 2)
+    delta_h = segs[-1].elevation - segs[0].elevation
+    delta_pe = vp.mass_kg * 9.81 * delta_h
+    delta_e_total_kj = (delta_ke + delta_pe) / 1000.0
+
+    w_net_kj = res.energy_used_kj - res.aero_drag_energy_kj - res.rolling_energy_kj - res.braking_energy_kj
+    rel_error = abs(w_net_kj - delta_e_total_kj) / max(abs(delta_e_total_kj), 1.0)
+    assert rel_error <= 0.010, f"Work-energy theorem discrepancy {rel_error * 100.0:.4f}% exceeds 1.0% tolerance"
+
+
+def test_ggv_envelope_compliance_across_all_circuits():
+    """Verify that commanded acceleration (ax, ay) strictly complies with the calculated GGV envelope across all 4 circuits."""
+    vp = LapSimVehicleParams()
+    ggv = compute_ggv_surface(vp)
+    v_ggv = ggv.speeds_ms
+    dv_grid = max(float(v_ggv[1] - v_ggv[0]), 1e-4)
+    n_v = len(v_ggv)
+    n_ay = len(ggv.ay_fractions)
+    accel_surf = ggv.ax_accel_surface
+    brake_surf = ggv.ax_brake_surface
+
+    def lookup_ax_acc(v: float, ay: float) -> float:
+        iv = min(max(int((v - v_ggv[0]) / dv_grid), 0), n_v - 2)
+        dv = (v - v_ggv[iv]) / dv_grid
+        ay_lim = ggv.ay_max[iv] * (1.0 - dv) + ggv.ay_max[iv + 1] * dv
+        ay_frac = min(max(ay / max(ay_lim, 0.01), 0.0), 1.0)
+        j_float = ay_frac * (n_ay - 1)
+        j0 = min(max(int(j_float), 0), n_ay - 2)
+        dj = j_float - j0
+        a0 = (1.0 - dv) * accel_surf[iv, j0] + dv * accel_surf[iv + 1, j0]
+        a1 = (1.0 - dv) * accel_surf[iv, j0 + 1] + dv * accel_surf[iv + 1, j0 + 1]
+        return float((1.0 - dj) * a0 + dj * a1)
+
+    def lookup_ax_brk(v: float, ay: float) -> float:
+        iv = min(max(int((v - v_ggv[0]) / dv_grid), 0), n_v - 2)
+        dv = (v - v_ggv[iv]) / dv_grid
+        ay_lim = ggv.ay_max[iv] * (1.0 - dv) + ggv.ay_max[iv + 1] * dv
+        ay_frac = min(max(ay / max(ay_lim, 0.01), 0.0), 1.0)
+        j_float = ay_frac * (n_ay - 1)
+        j0 = min(max(int(j_float), 0), n_ay - 2)
+        dj = j_float - j0
+        b0 = (1.0 - dv) * brake_surf[iv, j0] + dv * brake_surf[iv + 1, j0]
+        b1 = (1.0 - dv) * brake_surf[iv, j0 + 1] + dv * brake_surf[iv + 1, j0 + 1]
+        return float((1.0 - dj) * b0 + dj * b1)
+
     for track_name in ("spa", "silverstone", "monza", "fsae_endurance"):
-        res = simulate_lap(track=track_name, is_closed=True, compute_surface=False)
-        # 1. Closed loop speed closure
-        assert abs(res.speeds[0] - res.speeds[-1]) < 0.01, (
-            f"{track_name} failed speed closure: |{res.speeds[0]} - {res.speeds[-1]}|"
-        )
+        res = simulate_lap(vehicle=vp, track=track_name, is_closed=True, compute_surface=False)
+        assert abs(res.speeds[0] - res.speeds[-1]) < 0.01, f"{track_name} speed closure failed"
+        segs = get_builtin_track(track_name)
+        n = len(res.speeds)
+        for i in range(1, n):
+            v_curr = res.speeds[i]
+            v_prev = res.speeds[i - 1]
+            ds = res.distances[i] - res.distances[i - 1]
 
-        # 2. Work-energy balance residual
-        assert res.energy_balance_error_pct <= 1.5, (
-            f"{track_name} energy balance error {res.energy_balance_error_pct:.3f}% exceeds 1.5%"
-        )
+            # Banked corner lateral tire acceleration at previous station (for forward acceleration)
+            turn_sign_prev = 1.0 if segs[i - 1].curvature >= 0 else -1.0
+            theta_prev = segs[i - 1].bank_angle * turn_sign_prev
+            ay_raw_prev = (v_prev ** 2) * abs(segs[i - 1].curvature)
+            mu_req_prev = (ay_raw_prev * math.cos(theta_prev) - 9.81 * math.sin(theta_prev)) / max(9.81 * math.cos(theta_prev) + ay_raw_prev * math.sin(theta_prev), 1.0)
+            ay_prev = max(mu_req_prev * 9.81, 0.0)
 
-        # 3. Direct component summation audit
-        e_sum = res.aero_drag_energy_kj + res.rolling_energy_kj + res.braking_energy_kj
-        rel_diff = abs(res.energy_used_kj - e_sum) / max(res.energy_used_kj, 1.0)
-        assert rel_diff <= 0.015, f"{track_name} direct residual {rel_diff * 100:.3f}% exceeds 1.5%"
+            # Banked corner lateral tire acceleration at current station (for lateral grip and braking)
+            turn_sign_curr = 1.0 if segs[i].curvature >= 0 else -1.0
+            theta_curr = segs[i].bank_angle * turn_sign_curr
+            ay_raw_curr = (v_curr ** 2) * abs(segs[i].curvature)
+            mu_req_curr = (ay_raw_curr * math.cos(theta_curr) - 9.81 * math.sin(theta_curr)) / max(9.81 * math.cos(theta_curr) + ay_raw_curr * math.sin(theta_curr), 1.0)
+            ay_curr = max(mu_req_curr * 9.81, 0.0)
+
+            # Check lateral grip limit + 2%
+            iv = min(max(int((v_curr - v_ggv[0]) / dv_grid), 0), n_v - 2)
+            dv = (v_curr - v_ggv[iv]) / dv_grid
+            ay_lim = ggv.ay_max[iv] * (1.0 - dv) + ggv.ay_max[iv + 1] * dv
+            assert ay_curr <= ay_lim * 1.02 + 0.05, f"{track_name} station {i}: ay_curr {ay_curr:.2f} > ay_lim {ay_lim:.2f}"
+
+            # Work-energy acceleration between consecutive stations
+            a_kin = (v_curr ** 2 - v_prev ** 2) / (2.0 * max(ds, 0.1))
+            grad = (segs[i].elevation - segs[i - 1].elevation) / max(ds, 0.1)
+            a_net = a_kin + 9.81 * grad
+
+            if a_net >= 0:
+                ax_cap = lookup_ax_acc(v_prev, ay_prev)
+                assert a_net <= ax_cap * 1.02 + 0.05, f"{track_name} station {i}: accel {a_net:.3f} > avail {ax_cap:.3f}"
+            else:
+                ax_cap = lookup_ax_brk(v_curr, ay_curr)
+                assert abs(a_net) <= ax_cap * 1.02 + 0.05, f"{track_name} station {i}: brake {abs(a_net):.3f} > avail {ax_cap:.3f}"
 
 
 def test_0_to_100_kmh_acceleration_time():

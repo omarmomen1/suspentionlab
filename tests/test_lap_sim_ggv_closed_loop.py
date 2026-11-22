@@ -434,39 +434,55 @@ def test_api_v1_simulate_with_telemetry_csv(client):
 
 
 def test_gt3_track_calibrations():
-    """Verify calibrated GT3 lap times, lengths, top speeds, lateral and braking g-forces across all 4 built-in circuits."""
-    from suspensionlab.physics.lap_sim import LapSimVehicleParams, simulate_lap
+    """Verify un-shrunk physical geometry, realistic GT3 lap times, and dynamic envelope across all 4 built-in circuits."""
+    from suspensionlab.physics.lap_sim import LapSimVehicleParams, simulate_lap, get_builtin_track
 
     vp = LapSimVehicleParams()
 
-    # 1. Spa-Francorchamps: 7004 m, 135-142 s, top speed 278-296 km/h
-    res_spa = simulate_lap(vehicle=vp, track="spa")
+    # 1. Spa-Francorchamps: 7004 m, un-shrunk physical geometry (La Source ~32m, Pouhon ~220m, Blanchimont ~650m)
+    spa_segs = get_builtin_track("spa")
+    # Verify un-shrunk corner radii
+    la_source_r = 1.0 / max(spa_segs[250].curvature, 1e-6)
+    blanchimont_r = 1.0 / max(spa_segs[6000].curvature, 1e-6)
+    assert la_source_r >= 30.0, f"La Source radius {la_source_r:.1f}m is artificially shrunk (< 30m)"
+    assert blanchimont_r >= 600.0, f"Blanchimont radius {blanchimont_r:.1f}m is artificially shrunk (< 600m)"
+
+    res_spa = simulate_lap(vehicle=vp, track="spa", compute_surface=False)
     assert 7000.0 <= res_spa.distances[-1] <= 7010.0, f"Spa length {res_spa.distances[-1]} not 7004m"
-    assert 135.0 <= res_spa.lap_time_s <= 142.0, f"Spa lap time {res_spa.lap_time_s}s outside [135, 142]s"
-    assert 275.0 <= res_spa.max_speed_kmh <= 296.0, f"Spa top speed {res_spa.max_speed_kmh} outside [278, 296] km/h"
+    assert 128.0 <= res_spa.lap_time_s <= 138.0, f"Spa lap time {res_spa.lap_time_s}s outside physical window [128, 138]s"
+    assert 255.0 <= res_spa.max_speed_kmh <= 275.0, f"Spa top speed {res_spa.max_speed_kmh} outside [255, 275] km/h"
     assert 1.65 <= res_spa.max_lat_g <= 2.35, f"Spa max lat g {res_spa.max_lat_g} outside [1.65, 2.35]g"
     assert 1.80 <= res_spa.max_braking_g <= 2.45, f"Spa max brake g {res_spa.max_braking_g} outside [1.80, 2.45]g"
 
-    # 2. Silverstone GP: 5891 m, 115-123 s
-    res_silv = simulate_lap(vehicle=vp, track="silverstone")
+    # 2. Silverstone GP: 5891 m, un-shrunk geometry (Abbey ~205m, Copse ~195m, Stowe ~145m)
+    silv_segs = get_builtin_track("silverstone")
+    copse_r = 1.0 / max(silv_segs[2900].curvature, 1e-6)
+    assert copse_r >= 190.0, f"Copse radius {copse_r:.1f}m is artificially shrunk (< 190m)"
+
+    res_silv = simulate_lap(vehicle=vp, track="silverstone", compute_surface=False)
     assert 5885.0 <= res_silv.distances[-1] <= 5895.0, f"Silverstone length {res_silv.distances[-1]} not 5891m"
-    assert 115.0 <= res_silv.lap_time_s <= 123.0, f"Silverstone lap time {res_silv.lap_time_s}s outside [115, 123]s"
-    assert 1.65 <= res_silv.max_lat_g <= 2.35, f"Silverstone max lat g {res_silv.max_lat_g} outside [1.65, 2.35]g"
+    assert 110.0 <= res_silv.lap_time_s <= 118.0, f"Silverstone lap time {res_silv.lap_time_s}s outside physical window [110, 118]s"
+    assert 250.0 <= res_silv.max_speed_kmh <= 270.0, f"Silverstone top speed {res_silv.max_speed_kmh} outside [250, 270] km/h"
+    assert 1.65 <= res_silv.max_lat_g <= 2.60, f"Silverstone max lat g {res_silv.max_lat_g} outside [1.65, 2.60]g"
     assert 1.80 <= res_silv.max_braking_g <= 2.45, f"Silverstone max brake g {res_silv.max_braking_g} outside [1.80, 2.45]g"
 
-    # 3. Monza: 5793 m, 105-112 s
-    res_monza = simulate_lap(vehicle=vp, track="monza")
+    # 3. Monza: 5793 m, un-shrunk geometry (Curva Grande ~600m, Lesmo 1 ~125m, Parabolica ~210m)
+    monza_segs = get_builtin_track("monza")
+    curva_grande_r = 1.0 / max(monza_segs[1600].curvature, 1e-6)
+    assert curva_grande_r >= 580.0, f"Curva Grande radius {curva_grande_r:.1f}m is artificially shrunk (< 580m)"
+
+    res_monza = simulate_lap(vehicle=vp, track="monza", compute_surface=False)
     assert 5790.0 <= res_monza.distances[-1] <= 5800.0, f"Monza length {res_monza.distances[-1]} not 5793m"
-    assert 105.0 <= res_monza.lap_time_s <= 112.0, f"Monza lap time {res_monza.lap_time_s}s outside [105, 112]s"
-    assert 275.0 <= res_monza.max_speed_kmh <= 296.0, f"Monza top speed {res_monza.max_speed_kmh} outside [278, 296] km/h"
-    assert 1.65 <= res_monza.max_lat_g <= 2.35, f"Monza max lat g {res_monza.max_lat_g} outside [1.65, 2.35]g"
+    assert 103.0 <= res_monza.lap_time_s <= 112.0, f"Monza lap time {res_monza.lap_time_s}s outside physical window [103, 112]s"
+    assert 255.0 <= res_monza.max_speed_kmh <= 275.0, f"Monza top speed {res_monza.max_speed_kmh} outside [255, 275] km/h"
+    assert 1.65 <= res_monza.max_lat_g <= 2.60, f"Monza max lat g {res_monza.max_lat_g} outside [1.65, 2.60]g"
     assert 1.80 <= res_monza.max_braking_g <= 2.45, f"Monza max brake g {res_monza.max_braking_g} outside [1.80, 2.45]g"
 
-    # 4. FSAE Endurance: 1450 m, 62-88 s
-    res_fsae = simulate_lap(vehicle=vp, track="fsae_endurance")
+    # 4. FSAE Endurance: 1450 m, un-shrunk geometry (Hairpins ~20-22m, Sweepers ~36-38m)
+    res_fsae = simulate_lap(vehicle=vp, track="fsae_endurance", compute_surface=False)
     assert 1445.0 <= res_fsae.distances[-1] <= 1455.0, f"FSAE length {res_fsae.distances[-1]} not 1450m"
-    assert 62.0 <= res_fsae.lap_time_s <= 88.0, f"FSAE lap time {res_fsae.lap_time_s}s outside [62, 88]s"
-    assert 1.80 <= res_fsae.max_braking_g <= 2.45, f"FSAE max brake g {res_fsae.max_braking_g} outside [1.80, 2.45]g"
+    assert 58.0 <= res_fsae.lap_time_s <= 68.0, f"FSAE lap time {res_fsae.lap_time_s}s outside physical window [58, 68]s"
+    assert 1.70 <= res_fsae.max_braking_g <= 2.45, f"FSAE max brake g {res_fsae.max_braking_g} outside [1.70, 2.45]g"
 
 
 def test_track_geometry_closure_all_presets():
