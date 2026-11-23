@@ -243,3 +243,79 @@ async def test_billing_admin_cannot_run_compute(rbac_test_environment):
 
         resp = await client.post("/optimize", json={}, headers=headers)
         assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_solo_user_privilege_escalation_defense():
+    """Ensure solo users (unassigned to team/org) receive solo permissions and are denied enterprise admin actions."""
+    from suspensionlab.backend.security.auth import UserContext
+    from suspensionlab.backend.security.permissions import get_role_permissions
+
+    solo_user = UserContext(
+        user_id=str(uuid.uuid4()),
+        email="solo_racer@example.com",
+        plan="pro",
+        name="Solo Racer",
+        onboarding_complete=True,
+        team_id=None,
+        organization_id=None,
+    )
+
+    # Solo user has engineering capabilities
+    assert solo_user.can(Permission.SIMULATION_RUN)
+    assert solo_user.can(Permission.VEHICLE_READ)
+    assert solo_user.can(Permission.VEHICLE_WRITE)
+    assert solo_user.can(Permission.SETUP_CREATE)
+
+    # Solo user CANNOT perform enterprise admin or audit actions
+    assert not solo_user.can(Permission.AUDIT_READ)
+    assert not solo_user.can(Permission.BILLING_ADMIN)
+    assert not solo_user.can(Permission.SCIM_MANAGE)
+    assert not solo_user.can(Permission.SAML_MANAGE)
+    assert not solo_user.can(Permission.TEAM_MANAGE)
+    assert not solo_user.can(Permission.ORG_ADMIN)
+
+
+@pytest.mark.asyncio
+async def test_solo_user_get_me_endpoint_defense():
+    """Verify GET /api/v1/auth/me returns SOLO_PERMISSIONS for solo users and never owner/admin permissions."""
+    from suspensionlab.backend.security.permissions import get_role_permissions
+
+    solo_id = uuid.uuid4()
+    solo_email = f"solo_{solo_id.hex[:8]}@example.com"
+    token = create_access_token({"sub": str(solo_id), "email": solo_email})
+
+    async with SessionLocal() as db:
+        user = User(
+            id=solo_id,
+            email=solo_email,
+            password_hash=hash_password("Password123!"),
+            name="Solo Test User",
+            plan="PRO",
+            team_id=None,
+            organization_id=None,
+            team_role="Viewer",
+            org_role=None,
+            is_admin=False,
+        )
+        db.add(user)
+        await db.commit()
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"})
+        assert resp.status_code == 200
+        data = resp.json()
+        perms = set(data["permissions"])
+        expected_solo_perms = set(get_role_permissions("solo"))
+        owner_perms = set(get_role_permissions("owner"))
+
+        assert perms == expected_solo_perms
+        assert "audit:read" not in perms
+        assert "billing:admin" not in perms
+        assert "scim:manage" not in perms
+        assert "saml:manage" not in perms
+        assert "team:manage" not in perms
+        assert "org:admin" not in perms
+        assert perms != owner_perms
+

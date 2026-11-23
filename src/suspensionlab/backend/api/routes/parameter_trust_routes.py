@@ -13,6 +13,7 @@ Strictly READ-ONLY. No mutation endpoints (no manual trust score assignment).
 """
 from __future__ import annotations
 
+from datetime import datetime
 import logging
 import uuid
 from typing import Any, Dict, List, Optional, Tuple

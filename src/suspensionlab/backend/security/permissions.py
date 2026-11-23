@@ -69,8 +69,25 @@ class Permission(str, Enum):
     SAML_MANAGE = "saml:manage"
 
 
+SOLO_PERMISSIONS: Set[Permission] = {
+    Permission.VEHICLE_READ,
+    Permission.SIMULATION_READ,
+    Permission.TELEMETRY_READ,
+    Permission.SIMULATION_RUN,
+    Permission.SIMULATION_CANCEL,
+    Permission.VEHICLE_WRITE,
+    Permission.SETUP_CREATE,
+    Permission.SETUP_MODIFY,
+    Permission.TELEMETRY_UPLOAD,
+    Permission.TELEMETRY_WRITE,
+    Permission.CALIBRATION_RUN,
+    Permission.REPORT_EXPORT,
+    Permission.REPORT_SHARE,
+}
+
 # Mapping from User Roles to Granted Permissions
 ROLE_PERMISSIONS_MAP: Dict[str, Set[Permission]] = {
+    "solo": SOLO_PERMISSIONS,
     "owner": set(Permission),
     "super_admin": set(Permission),
     "org_admin": set(Permission),

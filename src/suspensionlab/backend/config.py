@@ -99,6 +99,7 @@ class Settings(BaseSettings):
     environment: str = "DEV"
     api_key: Optional[str] = None
     allow_origins: str = "http://localhost:8501,http://localhost:3000,http://localhost:3001"
+    trusted_proxy_hosts: str = "127.0.0.1,::1"
     
     rate_limit_optimize: str = "10/minute"
     rate_limit_simulate: str = "300/minute"
@@ -173,6 +174,12 @@ class Settings(BaseSettings):
         return [o.strip() for o in self.allow_origins.split(",") if o.strip()]
 
     @property
+    def trusted_proxy_hosts_list(self) -> List[str]:
+        env_val = os.environ.get("TRUSTED_PROXY_HOSTS")
+        raw = env_val if env_val is not None else self.trusted_proxy_hosts
+        return [h.strip() for h in raw.split(",") if h.strip()]
+
+    @property
     def database_url_async(self) -> str:
         url = self.database_url
         if url.startswith("postgres://"):
@@ -180,7 +187,8 @@ class Settings(BaseSettings):
         elif url.startswith("postgresql://"):
             url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
         if "+asyncpg" in url and "sslmode=" in url:
-            url = url.replace("sslmode=", "ssl=")
+            if "sslmode=verify-full" not in url and "sslmode=verify-ca" not in url:
+                url = url.replace("sslmode=", "ssl=")
         return url
 
 settings = Settings()

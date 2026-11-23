@@ -93,7 +93,10 @@ from suspensionlab.backend.api.middleware import (
 )
 
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
-app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
+app.add_middleware(
+    ProxyHeadersMiddleware,
+    trusted_hosts=settings.trusted_proxy_hosts_list,
+)
 
 _frontend_url = (os.environ.get("FRONTEND_URL") or "").strip()
 _cors_origins = list(settings.allow_origins_list)
@@ -103,7 +106,7 @@ if _frontend_url and _frontend_url not in _cors_origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
-    allow_origin_regex=r"^https:\/\/.*\.vercel\.app$",
+    allow_origin_regex=r"^https:\/\/suspensionlab(-[a-z0-9-]+)?\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

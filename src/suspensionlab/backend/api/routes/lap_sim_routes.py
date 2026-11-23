@@ -22,7 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 
 from suspensionlab.backend.database.core import get_db_dependency
-from suspensionlab.backend.security.auth import verify_api_key
+from suspensionlab.backend.security.auth import verify_api_key, UserContext
+from suspensionlab.backend.security.rate_limit import RateLimiter
 from suspensionlab.physics.lap_sim import (
     LapSimVehicle, MassProperties, AeroMap, PowertrainModel,
     parse_track_from_gps, parse_track_from_curvature, solve_lap, TrackSegment,
@@ -440,11 +441,15 @@ def _extract_track_segments(request_data: Dict[str, Any]) -> List[TrackSegment]:
 # Routes
 # ─────────────────────────────────────────────────────────────────────────────
 
-@router.post("/api/v1/lap-sim/simulate", summary="Coupled 3-Pass GGV & Closed-Loop QSS Lap Simulation")
-@router.post("/lap-sim/simulate", summary="Coupled 3-Pass GGV & Closed-Loop QSS Lap Simulation")
-@router.post("/simulate", summary="Coupled 3-Pass GGV & Closed-Loop QSS Lap Simulation")
+@router.post(
+    "/lap-sim/simulate",
+    summary="Coupled 3-Pass GGV & Closed-Loop QSS Lap Simulation",
+    dependencies=[Depends(verify_api_key), Depends(RateLimiter("rate_limit_simulate"))],
+)
 async def simulate_lap_endpoint(
     request_data: Dict[str, Any],
+    user: UserContext = Depends(verify_api_key),
+    _limiter: Any = Depends(RateLimiter("rate_limit_simulate")),
 ):
     """
     Locked JSON Contract endpoint for Coupled 3-Pass GGV & Closed-Loop QSS Lap Solver.

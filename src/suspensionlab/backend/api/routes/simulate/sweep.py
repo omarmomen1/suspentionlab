@@ -67,6 +67,11 @@ async def simulate_sweep(
     user: Any = Depends(require_permission(Permission.SIMULATION_RUN)),
     db: AsyncSession = Depends(get_db_dependency)
 ):
+    if payload.grid_res > 25:
+        raise HTTPException(
+            status_code=400,
+            detail="grid_res exceeds maximum synchronous limit of 25 (max 625 evaluations to prevent timeouts)."
+        )
     from suspensionlab.backend.services.quota import assert_can_run_job
     await assert_can_run_job(user, db)
 

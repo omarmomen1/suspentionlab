@@ -196,7 +196,7 @@ async def list_jobs(
         "limit": limit,
         "jobs": [
             {
-                "job_id": j.id,
+                "job_id": str(j.id),
                 "status": j.status,
                 "started_at": j.started_at.isoformat() if j.started_at else None,
                 "result": j.result,

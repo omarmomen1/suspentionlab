@@ -82,7 +82,7 @@ class BlindEngineeringSession(Base):
     )
 
     id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
-    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
     created_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
 
@@ -173,7 +173,7 @@ class BlindComparisonResult(Base):
 
     id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
     session_id = Column(UUID_TYPE, ForeignKey("blind_engineering_sessions.id", ondelete="CASCADE"), nullable=False)
-    submission_id = Column(UUID_TYPE, ForeignKey("blind_submissions.id", ondelete="CASCADE"), nullable=False)
+    submission_id = Column(UUID_TYPE, ForeignKey("blind_submissions.id", ondelete="CASCADE"), nullable=False, index=True)
     organization_id = Column(UUID_TYPE, nullable=True)
     team_id = Column(UUID_TYPE, nullable=True)
 

@@ -4,6 +4,7 @@ tests/test_enterprise_multi_tenant_complete.py
 SuspensionLab PRO — Enterprise Multi-Tenancy, Hierarchy, RLS, and RBAC Capability Matrix Tests.
 """
 import uuid
+from unittest.mock import MagicMock, AsyncMock
 import pytest
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import select
@@ -225,8 +226,44 @@ async def test_rls_super_admin_flag_restricted_to_system_super_admin():
             role=role_name,
         )
         await set_session_tenant_context(pg_session, tenant_context=ctx)
-        executed_sql = [str(call.args[0]) for call in pg_session.execute.call_args_list]
-        assert f"SET LOCAL app.is_super_admin = '{expected_sql_flag}';" in executed_sql
+        executed_calls = pg_session.execute.call_args_list
+        assert any(
+            "set_config('app.is_super_admin'" in str(c.args[0]) and c.args[1]["val"] == expected_sql_flag
+            for c in executed_calls
+        )
+
+
+@pytest.mark.asyncio
+async def test_rls_sqli_cannot_flip_super_admin():
+    """Verify SQL injection payloads in tenant IDs are parameterized and cannot alter super_admin."""
+    pg_session = MagicMock()
+    pg_session.bind = MagicMock()
+    pg_session.bind.dialect = MagicMock()
+    pg_session.bind.dialect.name = "postgresql"
+    pg_session.execute = AsyncMock()
+
+    sqli_payload = "evil_org'; SELECT set_config('app.is_super_admin', 'true', true); --"
+    ctx = TenantContext(
+        user_id="usr-normal",
+        organization_id=sqli_payload,
+        team_id="team-normal",
+        role="engineer",
+    )
+    await set_session_tenant_context(pg_session, tenant_context=ctx)
+
+    executed_calls = pg_session.execute.call_args_list
+    assert len(executed_calls) == 4
+    # All 4 statements are parameterized set_config calls
+    for call in executed_calls:
+        sql_str = str(call.args[0])
+        assert "SELECT set_config(" in sql_str
+        assert "SET LOCAL" not in sql_str
+    # Verify the injection payload is safely stored in parameter dictionary, not in SQL string
+    org_call = [c for c in executed_calls if "app.current_organization_id" in str(c.args[0])][0]
+    assert org_call.args[1]["val"] == sqli_payload
+    # Super admin flag remains 'false'
+    admin_call = [c for c in executed_calls if "app.is_super_admin" in str(c.args[0])][0]
+    assert admin_call.args[1]["val"] == "false"
 
 
 def test_granular_rbac_capability_matrix_completeness():

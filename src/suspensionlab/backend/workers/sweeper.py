@@ -52,8 +52,14 @@ async def sweep_orphan_jobs(timeout_seconds: int = 60):
                             pass
                     if not user_id:
                         user_id = job.user_id
-                    res_data = {"job_id": job.id, "status": "FAILED", "user_id": user_id, "result": None, "error": job.error}
-                    await r_conn.setex(f"job_status:{job.id}", 300, json.dumps(res_data))
+                    res_data = {
+                        "job_id": str(job.id),
+                        "status": "FAILED",
+                        "user_id": str(user_id) if user_id else None,
+                        "result": None,
+                        "error": job.error,
+                    }
+                    await r_conn.setex(f"job_status:{job.id}", 300, json.dumps(res_data, default=str))
                 except Exception as e:
                     logger.error(f"Failed to update Redis cache for swept job {job.id}: {e}")
                 

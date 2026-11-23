@@ -4,6 +4,7 @@ Register, login, me, and logout endpoints.
 """
 from __future__ import annotations
 
+import hashlib
 import secrets
 import uuid
 import json
@@ -278,7 +279,7 @@ async def register(request: Request, req: RegisterRequest, response: Response, d
         name=req.name or req.email.split("@")[0],
         plan=PlanTier.FREE.value,
         trial_ends_at=None,
-        api_key=f"sk_{secrets.token_urlsafe(32)}",  # legacy single key
+        api_key=hashlib.sha256(f"sk_{secrets.token_urlsafe(32)}".encode()).hexdigest(),  # legacy single key hashed on write
         onboarding_complete=False,
     )
     from sqlalchemy.exc import IntegrityError
@@ -364,7 +365,7 @@ async def login(request: Request, req: LoginRequest, response: Response, db: Asy
                 name="Test User",
                 plan=PlanTier.PRO.value,
                 trial_ends_at=None,
-                api_key=f"sk_{secrets.token_urlsafe(32)}",
+                api_key=hashlib.sha256(f"sk_{secrets.token_urlsafe(32)}".encode()).hexdigest(),
                 onboarding_complete=True,
             )
             db.add(user)
@@ -510,14 +511,14 @@ async def get_me(request: Request, db: AsyncSession = Depends(get_db_dependency)
         raise HTTPException(status_code=404, detail="User not found.")
 
     perms = set()
-    if user.team_role:
+    if user.team_id and user.team_role:
         perms.update(get_role_permissions(user.team_role))
-    if user.org_role:
+    if user.organization_id and user.org_role:
         perms.update(get_role_permissions(user.org_role))
     if user.is_admin:
         perms.update([p.value for p in Permission])
-    if not user.team_id and not user.organization_id and not user.team_role and not user.org_role:
-        perms.update(get_role_permissions("owner"))
+    if not user.team_id and not user.organization_id:
+        perms.update(get_role_permissions("solo"))
 
     from suspensionlab.backend.database.models.trial import Trial
     from sqlalchemy import or_

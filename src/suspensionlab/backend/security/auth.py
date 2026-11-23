@@ -80,8 +80,8 @@ class UserContext(BaseModel):
     user_id: str
     plan: str
     email: str
-    name: str
-    onboarding_complete: bool
+    name: str = ""
+    onboarding_complete: bool = True
     organization_id: str | None = None
     org_role: str | None = None          # ORG_ADMIN | BILLING_ADMIN | MEMBER
     team_id: str | None = None
@@ -102,7 +102,7 @@ class UserContext(BaseModel):
             if self.is_admin and not self.is_trial:
                 perms.update([p.value for p in Permission])
             if not self.team_id and not self.organization_id:
-                perms.update(get_role_permissions("owner"))
+                perms.update(get_role_permissions("solo"))
             object.__setattr__(self, "permissions", sorted(list(perms)))
 
     def can(self, permission: Permission | str) -> bool:
@@ -260,7 +260,7 @@ async def verify_api_key(
             if user.is_admin:
                 perms.update([p.value for p in Permission])
             if not user.team_id and not user.organization_id:
-                perms.update(get_role_permissions("owner"))
+                perms.update(get_role_permissions("solo"))
 
             # Apply PostgreSQL session tenant context
             await set_session_tenant_context(
@@ -361,7 +361,7 @@ async def verify_api_key(
                         if user.is_admin:
                             perms.update([p.value for p in Permission])
                         if not user.team_id and not user.organization_id:
-                            perms.update(get_role_permissions("owner"))
+                            perms.update(get_role_permissions("solo"))
 
                         await set_session_tenant_context(
                             db,
@@ -405,6 +405,83 @@ async def verify_api_key(
                             trial_expires_at=trial_expires_at,
                             permissions=sorted(list(perms)),
                         )
+
+        # 2d. Fallback for legacy user.api_key verification (supports both SHA-256 hashed and plaintext)
+        import hashlib
+        hashed_api_key = hashlib.sha256(api_key.encode()).hexdigest()
+        from sqlalchemy.orm import joinedload
+        from suspensionlab.backend.database.rls import set_session_tenant_context
+        legacy_res = await db.execute(
+            select(User).options(
+                joinedload(User.team),
+                joinedload(User.organization)
+            ).where(
+                or_(User.api_key == hashed_api_key, User.api_key == api_key),
+                User.deleted_at == None
+            )
+        )
+        user = legacy_res.scalar_one_or_none()
+        if user:
+            request.state.user_id = str(user.id)
+            log_audit_event("LOGIN_SUCCESS", user_id=str(user.id), ip=ip)
+            effective_plan = user.plan
+            if user.organization and user.organization.plan:
+                effective_plan = user.organization.plan
+            elif user.team and user.team.plan:
+                effective_plan = user.team.plan
+
+            perms = set()
+            if user.team_id and user.team_role:
+                perms.update(get_role_permissions(user.team_role))
+            if user.organization_id and user.org_role:
+                perms.update(get_role_permissions(user.org_role))
+            if user.is_admin:
+                perms.update([p.value for p in Permission])
+            if not user.team_id and not user.organization_id:
+                perms.update(get_role_permissions("solo"))
+
+            await set_session_tenant_context(
+                db,
+                organization_id=str(user.organization_id) if user.organization_id else None,
+                team_id=str(user.team_id) if user.team_id else None,
+                user_id=str(user.id),
+                is_super_admin=bool(user.is_admin),
+            )
+
+            from suspensionlab.backend.database.models.trial import Trial
+            trial_check = await db.execute(
+                select(Trial).where(
+                    or_(Trial.user_id == user.id, Trial.organization_id == user.organization_id),
+                    Trial.deleted_at.is_(None)
+                )
+            )
+            trial = trial_check.scalar_one_or_none()
+            is_trial = _is_user_trial(trial, user.plan, user.organization)
+            trial_status = None
+            trial_expires_at = None
+            if trial and getattr(trial, "status", None) != "CONVERTED":
+                if trial.is_expired():
+                    trial.status = "EXPIRED"
+                trial_status = trial.status
+                trial_expires_at = _format_trial_expiry(trial)
+
+            return UserContext(
+                user_id=str(user.id),
+                plan=effective_plan,
+                email=user.email,
+                name=user.name or "",
+                onboarding_complete=user.onboarding_complete,
+                organization_id=str(user.organization_id) if user.organization_id else None,
+                org_role=user.org_role if user.organization_id else None,
+                team_id=str(user.team_id) if user.team_id else None,
+                team_role=user.team_role if user.team_id else None,
+                is_admin=False if is_trial else bool(user.is_admin),
+                is_trial=is_trial,
+                trial_status=trial_status,
+                trial_expires_at=trial_expires_at,
+                permissions=sorted(list(perms)),
+            )
+
         # API key provided but invalid
         log_audit_event("LOGIN_FAILURE", ip=ip, metadata={"reason": "Invalid API key"})
         raise AuthenticationError("Invalid API key.")

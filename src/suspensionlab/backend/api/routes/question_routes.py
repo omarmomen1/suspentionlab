@@ -143,24 +143,57 @@ async def get_command_center_kpis(
     If no valid backend result exists, reports explicit empty state:
     'AWAITING SIMULATION', 'NO VALID TELEMETRY', or 'NOT YET VALIDATED'.
     """
-    uid = user.user_id
-    team_uid = getattr(user, "team_id", None)
+    uid = getattr(user, "user_id", None) or (user.get("user_id") if isinstance(user, dict) else None)
+    team_uid = getattr(user, "team_id", None) or (user.get("team_id") if isinstance(user, dict) else None)
+    is_admin = getattr(user, "is_admin", False) or (user.get("is_admin", False) if isinstance(user, dict) else False)
+
+    import uuid as _uuid
+    from sqlalchemy import or_
+
+    u_uuid = None
+    if uid:
+        try:
+            u_uuid = _uuid.UUID(str(uid))
+        except (ValueError, TypeError):
+            u_uuid = uid
+
+    t_uuid = None
+    if team_uid:
+        try:
+            t_uuid = _uuid.UUID(str(team_uid))
+        except (ValueError, TypeError):
+            t_uuid = team_uid
+
+    def _apply_scope(query, model):
+        if is_admin:
+            return query
+        if t_uuid and u_uuid:
+            return query.where(or_(model.team_id == t_uuid, model.user_id == u_uuid))
+        elif t_uuid:
+            return query.where(model.team_id == t_uuid)
+        elif u_uuid:
+            return query.where(model.user_id == u_uuid)
+        return query.where(False)
 
     # 1. Fetch latest simulation runs
-    run_stmt = select(SimulationRun)
-    if not user.is_admin:
-        run_stmt = run_stmt.where(SimulationRun.user_id == uid)
+    run_stmt = _apply_scope(select(SimulationRun), SimulationRun)
+    if vehicle_id:
+        run_stmt = run_stmt.where(SimulationRun.vehicle_ref == vehicle_id)
+    if setup_id:
+        run_stmt = run_stmt.where(SimulationRun.setup_ref == setup_id)
     run_stmt = run_stmt.order_by(desc(SimulationRun.created_at)).limit(5)
     run_res = await db.execute(run_stmt)
     runs = run_res.scalars().all()
 
     # 2. Fetch latest active proposals
-    prop_stmt = select(SetupProposal).order_by(desc(SetupProposal.created_at)).limit(3)
+    prop_stmt = _apply_scope(select(SetupProposal), SetupProposal)
+    prop_stmt = prop_stmt.order_by(desc(SetupProposal.created_at)).limit(3)
     prop_res = await db.execute(prop_stmt)
     proposals = prop_res.scalars().all()
 
     # 3. Fetch latest approved decision
-    dec_stmt = select(EngineeringDecision).order_by(desc(EngineeringDecision.created_at)).limit(1)
+    dec_stmt = _apply_scope(select(EngineeringDecision), EngineeringDecision)
+    dec_stmt = dec_stmt.order_by(desc(EngineeringDecision.created_at)).limit(1)
     dec_res = await db.execute(dec_stmt)
     latest_decision = dec_res.scalar_one_or_none()
 

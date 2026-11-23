@@ -187,10 +187,22 @@ async def set_session_tenant_context(
 
     # Safe execution on Postgres; gracefully ignored on SQLite
     if "postgres" in dialect_name:
-        await session.execute(text(f"SET LOCAL app.current_organization_id = '{org_id}';"))
-        await session.execute(text(f"SET LOCAL app.current_tenant_id = '{t_id}';"))
-        await session.execute(text(f"SET LOCAL app.current_user_id = '{u_id}';"))
-        await session.execute(text(f"SET LOCAL app.is_super_admin = '{admin_flag}';"))
+        await session.execute(
+            text("SELECT set_config('app.current_organization_id', :val, true)"),
+            {"val": str(org_id)},
+        )
+        await session.execute(
+            text("SELECT set_config('app.current_tenant_id', :val, true)"),
+            {"val": str(t_id)},
+        )
+        await session.execute(
+            text("SELECT set_config('app.current_user_id', :val, true)"),
+            {"val": str(u_id)},
+        )
+        await session.execute(
+            text("SELECT set_config('app.is_super_admin', :val, true)"),
+            {"val": str(admin_flag)},
+        )
     else:
         # In non-Postgres (e.g. SQLite test environment), attach to session info dictionary for verification
         session.info["tenant_context"] = {

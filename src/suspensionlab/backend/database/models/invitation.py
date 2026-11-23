@@ -41,11 +41,13 @@ class OrganizationInvitation(Base):
         PG_UUID(as_uuid=True),
         ForeignKey("teams.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
     invited_by_user_id = Column(
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
     )
     invitee_email = Column(String(255), nullable=False)
     role = Column(String(32), default="MEMBER", nullable=False)  # ORG_ADMIN, BILLING_ADMIN, MEMBER
@@ -63,6 +65,7 @@ class OrganizationInvitation(Base):
         PG_UUID(as_uuid=True),
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True,
+        index=True,
     )
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

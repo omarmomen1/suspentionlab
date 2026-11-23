@@ -11,17 +11,32 @@ elif DATABASE_URL.startswith("postgresql://") and "+asyncpg" not in DATABASE_URL
 elif DATABASE_URL.startswith("postgres://") and "+asyncpg" not in DATABASE_URL:
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+asyncpg://")
 
-if "+asyncpg" in DATABASE_URL and "sslmode=" in DATABASE_URL:
-    DATABASE_URL = (
-        DATABASE_URL.replace("sslmode=require", "ssl=require")
-        .replace("sslmode=verify-full", "ssl=require")
-        .replace("sslmode=verify-ca", "ssl=require")
-        .replace("sslmode=prefer", "ssl=prefer")
-    )
-
 engine_args = {
     "pool_pre_ping": True,
 }
+_ssl_ctx = None
+
+if "+asyncpg" in DATABASE_URL:
+    import ssl
+    from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+
+    parsed = urlparse(DATABASE_URL)
+    qs = parse_qs(parsed.query)
+    ssl_mode = qs.get("sslmode", [None])[0] or qs.get("ssl", [None])[0]
+
+    if ssl_mode in ("verify-full", "verify-ca"):
+        _ssl_ctx = ssl.create_default_context()
+        if ssl_mode == "verify-ca":
+            _ssl_ctx.check_hostname = False
+        qs.pop("sslmode", None)
+        qs.pop("ssl", None)
+        new_query = urlencode(qs, doseq=True)
+        DATABASE_URL = urlunparse(parsed._replace(query=new_query))
+        if "connect_args" not in engine_args:
+            engine_args["connect_args"] = {}
+        engine_args["connect_args"]["ssl"] = _ssl_ctx
+    elif "sslmode=" in DATABASE_URL:
+        DATABASE_URL = DATABASE_URL.replace("sslmode=require", "ssl=require").replace("sslmode=prefer", "ssl=prefer")
 if "sqlite" in DATABASE_URL:
     engine_args["connect_args"] = {"check_same_thread": False, "timeout": 60}
 else:
@@ -89,6 +104,10 @@ def get_worker_session_maker():
                 "max_overflow": 20, 
                 "pool_timeout": 30,
             })
+            if _ssl_ctx is not None:
+                if "connect_args" not in worker_args:
+                    worker_args["connect_args"] = {}
+                worker_args["connect_args"]["ssl"] = _ssl_ctx
         worker_engine = create_async_engine(DATABASE_URL, **worker_args)
         _worker_session_maker = async_sessionmaker(autocommit=False, autoflush=False, expire_on_commit=False, bind=worker_engine, class_=AsyncSession)
     return _worker_session_maker

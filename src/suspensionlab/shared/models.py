@@ -66,10 +66,10 @@ class HalfCarParamsSchema(BaseModel):
     speed_mps: float = Field(default=20.0, ge=0.0, le=150.0)
     c_tf: float = Field(default=0.0, ge=0.0, le=50000.0)
     c_tr: float = Field(default=0.0, ge=0.0, le=50000.0)
-    damper_curve_v_f: Optional[List[float]] = None
-    damper_curve_f_f: Optional[List[float]] = None
-    damper_curve_v_r: Optional[List[float]] = None
-    damper_curve_f_r: Optional[List[float]] = None
+    damper_curve_v_f: Optional[List[float]] = Field(default=None, max_length=1000)
+    damper_curve_f_f: Optional[List[float]] = Field(default=None, max_length=1000)
+    damper_curve_v_r: Optional[List[float]] = Field(default=None, max_length=1000)
+    damper_curve_f_r: Optional[List[float]] = Field(default=None, max_length=1000)
     model_config = ConfigDict(allow_inf_nan=False)
 
     @model_validator(mode="after")
@@ -263,10 +263,10 @@ class FullCarParamsSchema(BaseModel):
     drive_bias_rear: float = Field(default=1.00, ge=0.0, le=1.0, description="Rear drive bias fraction (1.0 = full RWD)")
     lateral_accel_g: float = Field(default=0.0, ge=-5.0, le=5.0, description="Cornering lateral acceleration [g]")
     model_config = ConfigDict(allow_inf_nan=False)
-    damper_curve_v_f: Optional[List[float]] = None
-    damper_curve_f_f: Optional[List[float]] = None
-    damper_curve_v_r: Optional[List[float]] = None
-    damper_curve_f_r: Optional[List[float]] = None
+    damper_curve_v_f: Optional[List[float]] = Field(default=None, max_length=1000)
+    damper_curve_f_f: Optional[List[float]] = Field(default=None, max_length=1000)
+    damper_curve_v_r: Optional[List[float]] = Field(default=None, max_length=1000)
+    damper_curve_f_r: Optional[List[float]] = Field(default=None, max_length=1000)
 
     @model_validator(mode="after")
     def mass_ratio_check(self) -> "FullCarParamsSchema":
@@ -411,11 +411,11 @@ class HandlingParamsSchema(BaseModel):
     tire_coeffs: Optional[TireCoeffsSchema] = None
 
 class TelemetryDataSchema(BaseModel):
-    time: List[float]
-    speed: List[float]
-    lat_g: List[float]
-    long_g: List[float]
-    yaw_rate: List[float]
+    time: List[float] = Field(..., max_length=100_000, description="Timestamp array [s] — max 100,000 entries")
+    speed: List[float] = Field(..., max_length=100_000, description="Speed array [m/s] — max 100,000 entries")
+    lat_g: List[float] = Field(..., max_length=100_000, description="Lateral accel array [g] — max 100,000 entries")
+    long_g: List[float] = Field(..., max_length=100_000, description="Longitudinal accel array [g] — max 100,000 entries")
+    yaw_rate: List[float] = Field(..., max_length=100_000, description="Yaw rate array [rad/s] — max 100,000 entries")
 
 
 class HandlingRequest(BaseModel):
@@ -474,7 +474,7 @@ class SweepRequest(BaseModel):
     var_x: Literal["Spring Rate (ks)", "Damping (c)", "Tire Stiffness (kt)"]
     var_y: Literal["Spring Rate (ks)", "Damping (c)", "Tire Stiffness (kt)"]
     objective: str
-    grid_res: int = Field(default=20, ge=2, le=100)
+    grid_res: int = Field(default=20, ge=2, le=25, description="Grid resolution per axis (max 25, yielding up to 625 evaluations to fit within serverless timeout)")
 
 
 class SweepResultSchema(BaseModel):

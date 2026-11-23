@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field, HttpUrl
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from suspensionlab.backend.core.compute_governance import inline_compute_guard
+from suspensionlab.backend.security.auth import verify_api_key, UserContext
 from suspensionlab.backend.database.core import get_db_dependency
 from suspensionlab.backend.database.models.webhook import WebhookEndpoint
 from suspensionlab.backend.services.webhooks import dispatch_event
@@ -48,7 +48,7 @@ class CreateWebhookRequest(BaseModel):
 
 
 @router.get("")
-async def list_webhooks(user=Depends(inline_compute_guard), db: AsyncSession = Depends(get_db_dependency)):
+async def list_webhooks(user: UserContext = Depends(verify_api_key), db: AsyncSession = Depends(get_db_dependency)):
     result = await db.execute(
         select(WebhookEndpoint).where(WebhookEndpoint.user_id == _uuid.UUID(str(user.user_id)))
     )
@@ -58,7 +58,7 @@ async def list_webhooks(user=Depends(inline_compute_guard), db: AsyncSession = D
 @router.post("", status_code=201)
 async def create_webhook(
     req: CreateWebhookRequest,
-    user=Depends(inline_compute_guard),
+    user: UserContext = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db_dependency),
 ):
     events = [e for e in req.events if e in VALID_EVENTS]
@@ -99,7 +99,7 @@ async def create_webhook(
 @router.delete("/{endpoint_id}", status_code=204)
 async def delete_webhook(
     endpoint_id: str,
-    user=Depends(inline_compute_guard),
+    user: UserContext = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db_dependency),
 ):
     result = await db.execute(
@@ -118,7 +118,7 @@ async def delete_webhook(
 @router.post("/{endpoint_id}/test")
 async def test_webhook(
     endpoint_id: str,
-    user=Depends(inline_compute_guard),
+    user: UserContext = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db_dependency),
 ):
     """Send a signed webhook.ping event so customers can verify their receiver."""

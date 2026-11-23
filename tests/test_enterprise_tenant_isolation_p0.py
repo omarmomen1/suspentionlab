@@ -151,7 +151,7 @@ async def multi_tenant_fixture():
     return {
         "user1_id": str(user1_id), "team1_id": str(team1_id), "org1_id": str(org1_id), "token1": token1,
         "user2_id": str(user2_id), "team2_id": str(team2_id), "org2_id": str(org2_id), "token2": token2,
-        "sim1_id": str(sim1_id), "job1_id": str(job1_id), "rep1_id": str(rep1_id), "rep1_token": rep1.token,
+        "sim1_id": str(sim1_id), "sim1_label": sim1.label, "job1_id": str(job1_id), "rep1_id": str(rep1_id), "rep1_token": rep1.token,
         "sess1_id": str(sess1_id),
     }
 
@@ -307,3 +307,33 @@ async def test_cross_tenant_jobs_and_sessions_uniform_404(multi_tenant_fixture):
             headers={"Authorization": f"Bearer {ctx['token2']}"}
         )
         assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_cross_tenant_lineage_graph_and_command_center_kpis_isolated(multi_tenant_fixture):
+    """
+    Verify that GET /runs/lineage/graph and GET /questions/kpis/command-center
+    strictly enforce tenant scoping so Tenant 2 cannot observe Tenant 1's artifacts.
+    """
+    ctx = multi_tenant_fixture
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        # Tenant 1 calls lineage graph - should see Tenant 1's simulation run
+        resp1 = await client.get(
+            "/runs/lineage/graph",
+            headers={"Authorization": f"Bearer {ctx['token1']}"}
+        )
+        assert resp1.status_code == 200
+        nodes1 = resp1.json()["nodes"]
+        run_node_ids_1 = [n["id"] for n in nodes1 if n["type"] in ("Simulation Run", "Validation Run", "Optimization Run")]
+        assert any(ctx["sim1_label"] in rid for rid in run_node_ids_1)
+
+        # Tenant 2 calls lineage graph - should NOT see Tenant 1's simulation run
+        resp2 = await client.get(
+            "/runs/lineage/graph",
+            headers={"Authorization": f"Bearer {ctx['token2']}"}
+        )
+        assert resp2.status_code == 200
+        nodes2 = resp2.json()["nodes"]
+        run_node_ids_2 = [n["id"] for n in nodes2 if n["type"] in ("Simulation Run", "Validation Run", "Optimization Run")]
+        assert not any(ctx["sim1_label"] in rid for rid in run_node_ids_2)

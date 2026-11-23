@@ -8,9 +8,64 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.concurrency import iterate_in_threadpool
 import re
 
+import time
+from collections import OrderedDict
+
 logger = logging.getLogger(__name__)
 
-_memory_idempotency_cache: dict[str, Any] = {}
+
+class MemoryIdempotencyCache:
+    """Bounded in-memory LRU cache with TTL expiration to prevent OOM when Redis is down."""
+
+    def __init__(self, max_size: int = 1000, default_ttl: float = 300.0):
+        self._max_size = max_size
+        self._default_ttl = default_ttl
+        self._cache: OrderedDict[str, tuple[Any, float]] = OrderedDict()
+
+    def get(self, key: str, default: Any = None) -> Any:
+        if key not in self._cache:
+            return default
+        val, expire_at = self._cache[key]
+        if time.time() > expire_at:
+            del self._cache[key]
+            return default
+        self._cache.move_to_end(key)
+        return val
+
+    def set(self, key: str, val: Any, ttl: float | None = None, nx: bool = False) -> bool:
+        now = time.time()
+        if key in self._cache:
+            _, expire_at = self._cache[key]
+            if now > expire_at:
+                del self._cache[key]
+            elif nx:
+                return False
+        if nx and key in self._cache:
+            return False
+        expire_at = now + (ttl if ttl is not None else self._default_ttl)
+        self._cache[key] = (val, expire_at)
+        self._cache.move_to_end(key)
+        while len(self._cache) > self._max_size:
+            self._cache.popitem(last=False)
+        return True
+
+    def __getitem__(self, key: str) -> Any:
+        val = self.get(key)
+        if val is None:
+            raise KeyError(key)
+        return val
+
+    def __setitem__(self, key: str, val: Any) -> None:
+        self.set(key, val)
+
+    def __contains__(self, key: str) -> bool:
+        return self.get(key) is not None
+
+    def clear(self) -> None:
+        self._cache.clear()
+
+
+_memory_idempotency_cache = MemoryIdempotencyCache(max_size=1000, default_ttl=300.0)
 
 class IdempotencyMiddleware(BaseHTTPMiddleware):
     """
@@ -111,10 +166,7 @@ class IdempotencyMiddleware(BaseHTTPMiddleware):
                     return await async_redis_conn.setex(key, ttl, val)
                 except Exception:
                     pass
-            if nx and key in _memory_idempotency_cache:
-                return False
-            _memory_idempotency_cache[key] = val
-            return True
+            return _memory_idempotency_cache.set(key, val, ttl=ttl, nx=nx)
 
         # Try to read or wait for cache
         MAX_WAIT_SECONDS = 3.0

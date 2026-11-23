@@ -100,7 +100,7 @@ class SolverExecutionJob(Base):
     __tablename__ = "solver_execution_jobs"
 
     id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
-    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
     user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
 
@@ -110,7 +110,7 @@ class SolverExecutionJob(Base):
 
     state = Column(String(32), nullable=False, default=ExecutionJobState.QUEUED.value, index=True)
 
-    input_artifact_id = Column(UUID_TYPE, ForeignKey("solver_exchange_artifacts.id", ondelete="SET NULL"), nullable=True)
+    input_artifact_id = Column(UUID_TYPE, ForeignKey("solver_exchange_artifacts.id", ondelete="SET NULL"), nullable=True, index=True)
     input_artifact_hash = Column(String(64), nullable=False)
     output_artifact_ids = Column(JSON_TYPE, nullable=False, default=list)
 

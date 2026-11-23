@@ -119,7 +119,7 @@ class SolverExchangeArtifact(Base):
     __tablename__ = "solver_exchange_artifacts"
 
     id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
-    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
     user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
 
@@ -162,7 +162,7 @@ class SolverExchangeOperation(Base):
     __tablename__ = "solver_exchange_operations"
 
     id = Column(UUID_TYPE, primary_key=True, default=uuid.uuid4)
-    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
     user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
 
@@ -172,8 +172,8 @@ class SolverExchangeOperation(Base):
     solver_name = Column(String(64), nullable=False)
 
     state = Column(String(32), nullable=False, default=ExchangeOperationState.PENDING.value)
-    input_artifact_id = Column(UUID_TYPE, ForeignKey("solver_exchange_artifacts.id", ondelete="SET NULL"), nullable=True)
-    output_artifact_id = Column(UUID_TYPE, ForeignKey("solver_exchange_artifacts.id", ondelete="SET NULL"), nullable=True)
+    input_artifact_id = Column(UUID_TYPE, ForeignKey("solver_exchange_artifacts.id", ondelete="SET NULL"), nullable=True, index=True)
+    output_artifact_id = Column(UUID_TYPE, ForeignKey("solver_exchange_artifacts.id", ondelete="SET NULL"), nullable=True, index=True)
 
     canonical_manifest_version = Column(String(32), nullable=False, default="1.0.0")
     manifest_hash = Column(String(64), nullable=True)

@@ -43,7 +43,7 @@ class SCIMGroup(Base):
     external_id = Column(String(255), nullable=True)
 
     # Dynamic mapping: Map IdP group to a SuspensionLab team and/or seat role
-    team_id = Column(PG_UUID(as_uuid=True), ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
+    team_id = Column(PG_UUID(as_uuid=True), ForeignKey("teams.id", ondelete="SET NULL"), nullable=True, index=True)
     target_role = Column(String(50), default="Engineer", nullable=True)  # Admin, Engineer, Crew, Viewer
 
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -521,7 +521,7 @@ class ParameterTrustFleetReport(Base):
     parameter_name = Column(String(128), nullable=False)
     canonical_unit = Column(String(32), nullable=False, default="")
 
-    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
     user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
 
@@ -567,7 +567,7 @@ class ParameterTrustAssemblyImpactRecord(Base):
     component_name = Column(String(64), nullable=False)
     parameter_name = Column(String(128), nullable=False)
 
-    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
     user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
 
@@ -625,7 +625,7 @@ class DecisionParameterDependencyRecord(Base):
     model_version = Column(String(64), nullable=True)
     notes = Column(Text, nullable=True)
 
-    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
     user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
 
@@ -667,7 +667,7 @@ class DecisionExposureAssessmentRecord(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     superseded_by = Column(UUID_TYPE, nullable=True)
 
-    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
     user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
 
@@ -712,7 +712,7 @@ class DecisionRobustnessAnalysisRecord(Base):
     is_active = Column(Boolean, nullable=False, default=True)
     superseded_by = Column(UUID_TYPE, nullable=True)
 
-    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
     user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
 
@@ -749,10 +749,10 @@ class EngineeringValidationPlanRecord(Base):
     status = Column(String(32), nullable=False, default=ValidationPlanStatus.DRAFT.value)
 
     plan_version = Column(Integer, nullable=False, default=1)
-    parent_plan_id = Column(UUID_TYPE, ForeignKey("engineering_validation_plans.id", ondelete="SET NULL"), nullable=True)
+    parent_plan_id = Column(UUID_TYPE, ForeignKey("engineering_validation_plans.id", ondelete="SET NULL"), nullable=True, index=True)
 
-    exposure_assessment_id = Column(UUID_TYPE, ForeignKey("decision_exposure_assessments.id", ondelete="SET NULL"), nullable=True)
-    robustness_analysis_id = Column(UUID_TYPE, ForeignKey("decision_robustness_analyses.id", ondelete="SET NULL"), nullable=True)
+    exposure_assessment_id = Column(UUID_TYPE, ForeignKey("decision_exposure_assessments.id", ondelete="SET NULL"), nullable=True, index=True)
+    robustness_analysis_id = Column(UUID_TYPE, ForeignKey("decision_robustness_analyses.id", ondelete="SET NULL"), nullable=True, index=True)
     analysis_snapshot_hash = Column(String(64), nullable=True)
 
     input_artifact_requirements = Column(JSON_TYPE, nullable=False, default=list)
@@ -763,20 +763,20 @@ class EngineeringValidationPlanRecord(Base):
 
     acceptance_criteria = Column(JSON_TYPE, nullable=False, default=list)
     criteria_established_at = Column(DateTime(timezone=True), nullable=True)
-    criteria_authorized_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    criteria_authorized_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
 
     expected_outputs = Column(JSON_TYPE, nullable=False, default=list)
     required_reviewer_role = Column(String(64), nullable=False, default="VALIDATION_LEAD")
 
-    authorized_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    authorized_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     authorized_at = Column(DateTime(timezone=True), nullable=True)
 
     plan_hash = Column(String(64), nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
 
-    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
-    created_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    created_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)
@@ -821,17 +821,17 @@ class ValidationEvidenceItemRecord(Base):
 
     review_status = Column(String(32), nullable=False, default="PENDING_REVIEW")  # PENDING_REVIEW, ACCEPTED, REJECTED, INCONCLUSIVE
     review_notes = Column(Text, nullable=True)
-    reviewed_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewed_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     reviewed_at = Column(DateTime(timezone=True), nullable=True)
 
     # ── Phase 6.7 Source Verification & Integrity Tracking ───────────────────
     integrity_stage = Column(String(64), nullable=False, default="SOURCE_CLAIMED")
     source_verification_status = Column(String(32), nullable=False, default="UNVERIFIED")
-    source_verification_id = Column(UUID_TYPE, ForeignKey("source_verification_records.id", ondelete="SET NULL", use_alter=True), nullable=True)
+    source_verification_id = Column(UUID_TYPE, ForeignKey("source_verification_records.id", ondelete="SET NULL", use_alter=True), nullable=True, index=True)
 
-    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
-    submitted_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    submitted_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
@@ -880,11 +880,11 @@ class ValidationEvidenceClosureRecord(Base):
     deployment_authorization = Column(String(32), nullable=False, default="NOT_ESTABLISHED")
 
     is_active = Column(Boolean, nullable=False, default=True)
-    superseded_by = Column(UUID_TYPE, ForeignKey("validation_evidence_closures.id", ondelete="SET NULL"), nullable=True)
+    superseded_by = Column(UUID_TYPE, ForeignKey("validation_evidence_closures.id", ondelete="SET NULL"), nullable=True, index=True)
 
-    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
-    evaluated_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    evaluated_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
@@ -912,9 +912,9 @@ class ValidationDecisionReassessmentRecord(Base):
     plan_id = Column(UUID_TYPE, ForeignKey("engineering_validation_plans.id", ondelete="CASCADE"), nullable=False)
     closure_id = Column(UUID_TYPE, ForeignKey("validation_evidence_closures.id", ondelete="CASCADE"), nullable=False)
 
-    original_exposure_assessment_id = Column(UUID_TYPE, ForeignKey("decision_exposure_assessments.id", ondelete="SET NULL"), nullable=True)
-    original_robustness_analysis_id = Column(UUID_TYPE, ForeignKey("decision_robustness_analyses.id", ondelete="SET NULL"), nullable=True)
-    new_robustness_analysis_id = Column(UUID_TYPE, ForeignKey("decision_robustness_analyses.id", ondelete="SET NULL"), nullable=True)
+    original_exposure_assessment_id = Column(UUID_TYPE, ForeignKey("decision_exposure_assessments.id", ondelete="SET NULL"), nullable=True, index=True)
+    original_robustness_analysis_id = Column(UUID_TYPE, ForeignKey("decision_robustness_analyses.id", ondelete="SET NULL"), nullable=True, index=True)
+    new_robustness_analysis_id = Column(UUID_TYPE, ForeignKey("decision_robustness_analyses.id", ondelete="SET NULL"), nullable=True, index=True)
 
     reassessment_delta = Column(JSON_TYPE, nullable=False, default=dict)
     reversal_status = Column(String(64), nullable=False)  # ReversalResolutionStatus value
@@ -926,11 +926,11 @@ class ValidationDecisionReassessmentRecord(Base):
 
     reassessment_hash = Column(String(64), nullable=False)
     is_active = Column(Boolean, nullable=False, default=True)
-    superseded_by = Column(UUID_TYPE, ForeignKey("validation_decision_reassessments.id", ondelete="SET NULL"), nullable=True)
+    superseded_by = Column(UUID_TYPE, ForeignKey("validation_decision_reassessments.id", ondelete="SET NULL"), nullable=True, index=True)
 
-    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
-    reassessed_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    reassessed_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
 
@@ -1064,7 +1064,7 @@ class SourceVerificationRecord(Base):
     verification_status = Column(String(32), nullable=False, default="UNVERIFIED")
     verifier_identity = Column(String(256), nullable=False)
     verifier_role = Column(String(64), nullable=False)
-    verifier_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    verifier_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
 
     verification_timestamp = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     artifact_hash = Column(String(64), nullable=False)
@@ -1075,10 +1075,10 @@ class SourceVerificationRecord(Base):
 
     is_revoked = Column(Boolean, nullable=False, default=False)
     revocation_reason = Column(Text, nullable=True)
-    revoked_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    revoked_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
 
-    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
@@ -1113,26 +1113,26 @@ class EngineeringDecisionDossierRecord(Base):
     decision_type = Column(String(64), nullable=False, default="EngineeringDecision")
     engineering_question = Column(Text, nullable=False)
     dossier_version = Column(Integer, nullable=False, default=1)
-    parent_dossier_id = Column(UUID_TYPE, ForeignKey("engineering_decision_dossiers.id", ondelete="SET NULL"), nullable=True)
+    parent_dossier_id = Column(UUID_TYPE, ForeignKey("engineering_decision_dossiers.id", ondelete="SET NULL"), nullable=True, index=True)
 
     plan_id = Column(UUID_TYPE, ForeignKey("engineering_validation_plans.id", ondelete="CASCADE"), nullable=False)
     plan_version = Column(Integer, nullable=False, default=1)
     plan_hash = Column(String(64), nullable=False)
     sealed_acceptance_criteria = Column(JSON_TYPE, nullable=False, default=list)
 
-    exposure_assessment_id = Column(UUID_TYPE, ForeignKey("decision_exposure_assessments.id", ondelete="SET NULL"), nullable=True)
+    exposure_assessment_id = Column(UUID_TYPE, ForeignKey("decision_exposure_assessments.id", ondelete="SET NULL"), nullable=True, index=True)
     exposure_hash = Column(String(64), nullable=True)
 
-    baseline_robustness_analysis_id = Column(UUID_TYPE, ForeignKey("decision_robustness_analyses.id", ondelete="SET NULL"), nullable=True)
+    baseline_robustness_analysis_id = Column(UUID_TYPE, ForeignKey("decision_robustness_analyses.id", ondelete="SET NULL"), nullable=True, index=True)
     baseline_robustness_hash = Column(String(64), nullable=True)
 
-    closure_id = Column(UUID_TYPE, ForeignKey("validation_evidence_closures.id", ondelete="CASCADE"), nullable=False)
+    closure_id = Column(UUID_TYPE, ForeignKey("validation_evidence_closures.id", ondelete="CASCADE"), nullable=False, index=True)
     closure_hash = Column(String(64), nullable=False)
 
-    reassessment_id = Column(UUID_TYPE, ForeignKey("validation_decision_reassessments.id", ondelete="CASCADE"), nullable=False)
+    reassessment_id = Column(UUID_TYPE, ForeignKey("validation_decision_reassessments.id", ondelete="CASCADE"), nullable=False, index=True)
     reassessment_hash = Column(String(64), nullable=False)
 
-    reassessed_robustness_analysis_id = Column(UUID_TYPE, ForeignKey("decision_robustness_analyses.id", ondelete="SET NULL"), nullable=True)
+    reassessed_robustness_analysis_id = Column(UUID_TYPE, ForeignKey("decision_robustness_analyses.id", ondelete="SET NULL"), nullable=True, index=True)
     reassessed_robustness_hash = Column(String(64), nullable=True)
 
     evidence_item_ids = Column(JSON_TYPE, nullable=False, default=list)
@@ -1158,11 +1158,11 @@ class EngineeringDecisionDossierRecord(Base):
     dossier_content_hash = Column(String(64), nullable=False)
 
     is_active = Column(Boolean, nullable=False, default=True)
-    superseded_by = Column(UUID_TYPE, ForeignKey("engineering_decision_dossiers.id", ondelete="SET NULL"), nullable=True)
+    superseded_by = Column(UUID_TYPE, ForeignKey("engineering_decision_dossiers.id", ondelete="SET NULL"), nullable=True, index=True)
 
-    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True)
+    organization_id = Column(UUID_TYPE, ForeignKey("organizations.id", ondelete="SET NULL"), nullable=True, index=True)
     team_id = Column(UUID_TYPE, ForeignKey("teams.id", ondelete="SET NULL"), nullable=True)
-    compiled_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    compiled_by_user_id = Column(UUID_TYPE, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False, index=True)
 
     created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
     updated_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow)

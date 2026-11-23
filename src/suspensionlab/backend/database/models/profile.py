@@ -24,7 +24,7 @@ class VehicleProfile(Base):
     
     # Lineage tracking (Git for setups)
     version = Column(Integer, default=1, nullable=False)
-    parent_id = Column(Uuid, ForeignKey("vehicle_profiles.id", ondelete="SET NULL"), nullable=True)
+    parent_id = Column(Uuid, ForeignKey("vehicle_profiles.id", ondelete="SET NULL"), nullable=True, index=True)
     
     deleted_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

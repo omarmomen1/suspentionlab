@@ -97,10 +97,37 @@ async def get_lineage_graph(
     Queries actual database entities: simulation runs, vehicle twins, setup proposals,
     telemetry datasets, and audit logs.
     """
-    from sqlalchemy import select, desc
+    from sqlalchemy import select, desc, or_
+    import uuid as _uuid
     from suspensionlab.backend.database.models.simulation_run import SimulationRun
     from suspensionlab.backend.database.models.vehicle_twin import VehicleTwin
     from suspensionlab.backend.database.models.setup_proposal import SetupProposal
+
+    uid_str = getattr(user, "user_id", None) or (user.get("user_id") if isinstance(user, dict) else None)
+    team_str = getattr(user, "team_id", None) or (user.get("team_id") if isinstance(user, dict) else None)
+
+    u_uuid = None
+    if uid_str:
+        try:
+            u_uuid = _uuid.UUID(str(uid_str))
+        except (ValueError, TypeError):
+            u_uuid = uid_str
+
+    t_uuid = None
+    if team_str:
+        try:
+            t_uuid = _uuid.UUID(str(team_str))
+        except (ValueError, TypeError):
+            t_uuid = team_str
+
+    def _apply_scope(query, model):
+        if t_uuid and u_uuid:
+            return query.where(or_(model.team_id == t_uuid, model.user_id == u_uuid))
+        elif t_uuid:
+            return query.where(model.team_id == t_uuid)
+        elif u_uuid:
+            return query.where(model.user_id == u_uuid)
+        return query.where(False)
 
     nodes = []
     edges = []
@@ -160,7 +187,10 @@ async def get_lineage_graph(
     add_edge(telem_ds_id, session_id, "GENERATED_FROM", "GENERATED_FROM")
 
     # 2. Real VehicleTwins from DB
-    twin_stmt = select(VehicleTwin).order_by(desc(VehicleTwin.created_at)).limit(5)
+    twin_stmt = _apply_scope(select(VehicleTwin), VehicleTwin)
+    if vehicle_ref:
+        twin_stmt = twin_stmt.where(VehicleTwin.car_ref == vehicle_ref)
+    twin_stmt = twin_stmt.order_by(desc(VehicleTwin.created_at)).limit(5)
     twin_res = await db.execute(twin_stmt)
     twins = twin_res.scalars().all()
     for tw in twins:
@@ -177,7 +207,10 @@ async def get_lineage_graph(
         add_edge(tw_id, session_id, "CALIBRATED_FROM", "CALIBRATED_FROM")
 
     # 3. Real SimulationRuns from DB
-    run_stmt = select(SimulationRun).order_by(desc(SimulationRun.created_at)).limit(10)
+    run_stmt = _apply_scope(select(SimulationRun), SimulationRun)
+    if run_label:
+        run_stmt = run_stmt.where(SimulationRun.label == run_label)
+    run_stmt = run_stmt.order_by(desc(SimulationRun.created_at)).limit(10)
     run_res = await db.execute(run_stmt)
     runs = run_res.scalars().all()
     prev_run_id = None
@@ -203,7 +236,8 @@ async def get_lineage_graph(
         prev_run_id = r_id
 
     # 4. Real SetupProposals from DB
-    prop_stmt = select(SetupProposal).order_by(desc(SetupProposal.created_at)).limit(5)
+    prop_stmt = _apply_scope(select(SetupProposal), SetupProposal)
+    prop_stmt = prop_stmt.order_by(desc(SetupProposal.created_at)).limit(5)
     prop_res = await db.execute(prop_stmt)
     props = prop_res.scalars().all()
     for p in props:
