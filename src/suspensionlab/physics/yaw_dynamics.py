@@ -382,11 +382,10 @@ class TransientYawSolver:
         """
         p  = self.p
         L  = p.wheelbase
-        g  = 9.81
 
-        K_us_rad = p.mass / L * (p.b / p.C_alpha_rear - p.a / p.C_alpha_front)
-        # Required steer angle for steady-state cornering
-        delta_ss = L / radius + K_us_rad * v ** 2 / (g * radius)
+        K_us_rad = p.mass / L * (p.b / p.C_alpha_front - p.a / p.C_alpha_rear)
+        # Required steer angle for steady-state cornering: delta_ss = L/R + K_us * (v^2/R)
+        delta_ss = L / radius + K_us_rad * (v ** 2 / radius)
 
         n_steps = int(t_total / dt)
         t_arr   = np.zeros(n_steps)

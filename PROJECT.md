@@ -5,7 +5,7 @@
 - **Validation & Calibration (`src/suspensionlab/validation/`, `src/suspensionlab/physics/`)**: Signed Nash-Sutcliffe Efficiency (NSE) residual engine, telemetry parameter identification, holdout data hash sequestration, model validity.
 - **Interop & CAE Adapters (`src/suspensionlab/interop/`, `src/suspensionlab/runners/`)**: MSC Adams export & external CAE runner, MATLAB/Simulink state-space export, PAC2002 TIR tire adapter.
 - **Analytics, Optimization & AI Services (`src/suspensionlab/analytics/`, `src/suspensionlab/services/`, `src/suspensionlab/backend/`)**: Setup intelligence, COBYLA optimization honesty, transfer function Bode plots, race engineer heuristics/event metrics, Pareto front non-dominated sorting, physics-facing routes and unified background workers.
-- **Mirroring & Target Test Suite**: `backend_vercel/src/suspensionlab/` parity and comprehensive pytest suite covering all remediation items.
+- **Mirroring & Target Test Suite**: `backend_vercel/src/suspensionlab/` parity (100% byte-for-byte) and comprehensive pytest suite covering all remediation items (109 passed, 0 failures).
 
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source |
@@ -22,10 +22,10 @@
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| 1 | Squad 1 & Squad 4 Implementation | Physics Ride/Contact + Backend Routes & Workers (`damper_model.py`, `active_quarter_car.py`, `quarter_car.py`, `load_transfer_dynamics.py`, `full_car.py`, `kinematics.py`, `routes/simulate/full_car.py`, `workers/unified_worker.py`, `routes/optimize.py`, `services/ai_race_engineer_service.py`, `routes/ai_engineer_routes.py`, `routes/simulate/handling.py`) | none | COMPLETED |
-| 2 | Squad 2, 8 & Squad 3 Implementation | Physics Yaw, Tires, Lap Sim + Calibration, Validation, Interop & Honesty (`yaw_dynamics.py`, `magic_formula.py`, `tir_parser.py`, `vnv/framework.py`, `lap_sim.py`, `residual_engine.py`, `residual_analysis.py`, `parameter_identification.py`, `holdout.py`, `adams.py`, `external_cae_solver.py`, `matlab_simulink.py`, `tir_tire.py`, `setup_intelligence.py`, `optimizer.py`, `model_validity.py`, `advanced_plots.py`, `race_engineer.py`, `telemetry_events.py`, `decision_engine.py`, `monte_carlo.py`, `pareto_optimizer.py`) | none | COMPLETED |
-| 3 | Verification Wave | Reviewers (2), Challengers (2), Forensic Auditor (1) parallel evaluation | M1, M2 | COMPLETED |
-| 4 | Mirror, Test Matrix & Master Commit | Mirror to `backend_vercel/`, execute 10 pytests, master git commit | M3 | COMPLETED |
+| 1 | Squad 1 & Squad 4 Implementation | Physics Ride/Contact + Backend Routes & Workers (`damper_model.py`, `active_quarter_car.py`, `quarter_car.py`, `load_transfer_dynamics.py`, `full_car.py`, `kinematics.py`, `routes/simulate/full_car.py`, `workers/unified_worker.py`, `routes/optimize.py`, `services/ai_race_engineer_service.py`, `routes/ai_engineer_routes.py`, `routes/simulate/handling.py`) | none | DONE |
+| 2 | Squad 2, 8 & Squad 3 Implementation | Physics Yaw, Tires, Lap Sim + Calibration, Validation, Interop & Honesty (`yaw_dynamics.py`, `magic_formula.py`, `tir_parser.py`, `vnv/framework.py`, `lap_sim.py`, `residual_engine.py`, `residual_analysis.py`, `parameter_identification.py`, `holdout.py`, `adams.py`, `external_cae_solver.py`, `matlab_simulink.py`, `tir_tire.py`, `setup_intelligence.py`, `optimizer.py`, `model_validity.py`, `advanced_plots.py`, `race_engineer.py`, `telemetry_events.py`, `decision_engine.py`, `monte_carlo.py`, `pareto_optimizer.py`) | none | DONE |
+| 3 | Verification Wave | Reviewers (2), Challengers (2), Forensic Auditor (1) parallel evaluation | M1, M2 | DONE |
+| 4 | Mirror, Test Matrix & Master Commit | Mirror to `backend_vercel/`, execute 10 pytests (109 passed, 0 failures), master git commit (`c88b693`) | M3 | DONE |
 
 ## Interface Contracts
 ### Suspension Dynamics & Load Transfer
@@ -52,39 +52,13 @@
 - Telemetry holdout: hashes byte buffer `np.ascontiguousarray(arr).tobytes()`.
 
 ## Code Layout
-- Exclusive Worker 1 Files:
-  * `src/suspensionlab/physics/damper_model.py`
-  * `src/suspensionlab/physics/active_quarter_car.py`
-  * `src/suspensionlab/physics/quarter_car.py`
-  * `src/suspensionlab/physics/load_transfer_dynamics.py`
-  * `src/suspensionlab/physics/full_car.py`
-  * `src/suspensionlab/physics/kinematics.py`
-  * `src/suspensionlab/backend/api/routes/simulate/full_car.py`
-  * `src/suspensionlab/backend/workers/unified_worker.py`
-  * `src/suspensionlab/backend/api/routes/optimize.py`
-  * `src/suspensionlab/services/ai_race_engineer_service.py`
-  * `src/suspensionlab/backend/api/routes/ai_engineer_routes.py`
-  * `src/suspensionlab/backend/api/routes/simulate/handling.py`
-- Exclusive Worker 2 Files:
-  * `src/suspensionlab/physics/yaw_dynamics.py`
-  * `src/suspensionlab/physics/magic_formula.py`
-  * `src/suspensionlab/physics/tir_parser.py`
-  * `src/suspensionlab/physics/vnv/framework.py`
-  * `src/suspensionlab/physics/lap_sim.py`
-  * `src/suspensionlab/validation/residual_engine.py`
-  * `src/suspensionlab/physics/residual_analysis.py`
-  * `src/suspensionlab/physics/parameter_identification.py`
-  * `src/suspensionlab/validation/holdout.py`
-  * `src/suspensionlab/interop/adapters/adams.py`
-  * `src/suspensionlab/interop/runners/external_cae_solver.py`
-  * `src/suspensionlab/interop/adapters/matlab_simulink.py`
-  * `src/suspensionlab/interop/adapters/tir_tire.py`
-  * `src/suspensionlab/physics/setup_intelligence.py`
-  * `src/suspensionlab/physics/optimizer.py`
-  * `src/suspensionlab/physics/model_validity.py`
-  * `src/suspensionlab/visualization/advanced_plots.py`
-  * `src/suspensionlab/analytics/race_engineer.py`
-  * `src/suspensionlab/physics/telemetry_events.py`
-  * `src/suspensionlab/physics/decision_engine.py`
-  * `src/suspensionlab/physics/monte_carlo.py`
-  * `src/suspensionlab/physics/pareto_optimizer.py`
+- Physics: `src/suspensionlab/physics/`
+- Validation: `src/suspensionlab/validation/`
+- Interop: `src/suspensionlab/interop/`
+- CAE Runners: `src/suspensionlab/runners/`
+- Analytics: `src/suspensionlab/analytics/`
+- Services: `src/suspensionlab/services/`
+- Backend API Routes: `src/suspensionlab/backend/api/routes/`
+- Background Workers: `src/suspensionlab/backend/workers/`
+- Vercel Mirror: `backend_vercel/src/suspensionlab/`
+- Tests: `tests/`

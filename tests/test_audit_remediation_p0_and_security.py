@@ -225,3 +225,35 @@ async def test_ai_engineer_focus_validation_and_numeric_verification():
     assert isinstance(resp.root_cause, str)
     assert isinstance(resp.setup_summary, str)
 
+
+def test_transient_yaw_solver_simulate_corner_equilibrium():
+    """
+    Verifies that TransientYawSolver.simulate_corner uses the correct understeer gradient:
+    K_us_rad = m/L * (b/Cf - a/Cr) and delta_ss = L/radius + K_us_rad * (v^2/radius),
+    converging to the exact steady-state yaw rate r_ss = v / radius without /g scaling distortion.
+    """
+    from suspensionlab.physics.yaw_dynamics import BicycleModelParams, TransientYawSolver
+
+    # 1. Understeer vehicle
+    p_us = BicycleModelParams(
+        mass=1200.0,
+        wheelbase=2.6,
+        cog_dist_front=1.1,
+        C_alpha_front=60000.0,
+        C_alpha_rear=75000.0,
+    )
+    solver_us = TransientYawSolver(p_us)
+    v = 20.0
+    radius = 100.0
+    expected_r = v / radius  # 0.20 rad/s
+
+    res = solver_us.simulate_corner(v=v, radius=radius, t_total=4.0, dt=0.001)
+    final_r = res["r_rads"][-1]
+
+    # Verify steady-state convergence within 0.1%
+    assert abs(final_r - expected_r) / expected_r < 0.001, (
+        f"Steady-state yaw rate {final_r:.4f} did not converge to {expected_r:.4f}"
+    )
+    # Verify settling time was detected
+    assert res["settled_at_t"] < 4.0, f"Vehicle failed to settle: {res['settled_at_t']}"
+
