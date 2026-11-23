@@ -162,12 +162,19 @@ class ParetoFrontier:
 
     def dominates(self, a: ParetoPoint, b: ParetoPoint) -> bool:
         """True if point a dominates point b (on feasible objectives)."""
+        # A point with missing/None objectives can NEVER claim dominance
+        for obj in self.objectives:
+            va = a.objectives.get(obj.name)
+            if va is None or not np.isfinite(va):
+                return False
+
         at_least_as_good = True
         strictly_better  = False
         for obj in self.objectives:
             va = a.objectives.get(obj.name)
             vb = b.objectives.get(obj.name)
-            if va is None or vb is None:
+            if vb is None or not np.isfinite(vb):
+                strictly_better = True
                 continue
             if obj.minimize:
                 if va > vb + 1e-10:

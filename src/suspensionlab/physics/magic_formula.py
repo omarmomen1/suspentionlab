@@ -161,11 +161,11 @@ class TireCoeffs:
     pVx2: float = 0.0      # Load variation of Svx
 
     # ── Combined slip — Similarity Method ─────────────────────────────────
-    rBx1: float = 13.0     # Slope factor for Gxα
-    rBx2: float = 9.7      # Kappa influence on Gxα slope
+    rBx1: float = 10.0     # Slope factor for Gxα
+    rBx2: float = 8.0      # Kappa influence on Gxα slope
     rCx1: float = 1.0      # Shape factor for Gxα
-    rBy1: float = 10.6     # Slope factor for Gyκ
-    rBy2: float = 7.8      # Alpha influence on Gyκ slope
+    rBy1: float = 10.0     # Slope factor for Gyκ
+    rBy2: float = 8.0      # Alpha influence on Gyκ slope
     rCy1: float = 1.0      # Shape factor for Gyκ
     rHx1: float = 0.0      # Shift in Gxα
     rHy1: float = 0.0      # Shift in Gyκ
@@ -210,7 +210,7 @@ class TireCoeffs:
     def to_array(self) -> np.ndarray:
         """Serialize all coefficients to a contiguous float64 array for Numba JIT.
 
-        Length: 68 coefficients.
+        Length: 70 coefficients.
         """
         return np.array([
             # Nominal load & pressure [0..1]
@@ -236,9 +236,9 @@ class TireCoeffs:
             self.qDz1, self.qDz2, self.qDz3, self.qDz4,
             self.qEz1, self.qEz2, self.qEz3, self.qEz4,
             self.qHz1, self.qHz2,
-            # Residual moment (4 coefficients) [57..60]
-            self.qDz6, self.qDz7, self.qDz8, self.qBz9,
-            # Scaling & pressure factors (7 coefficients) [61..67]
+            # Residual moment (6 coefficients) [57..62]
+            self.qDz6, self.qDz7, self.qDz8, self.qDz9, self.qBz9, self.qBz10,
+            # Scaling & pressure factors (7 coefficients) [63..69]
             self.lambda_mux, self.lambda_muy, self.lambda_ky,
             self.pPx1, self.pPx2, self.pPy1, self.pPy2,
         ], dtype=np.float64)
@@ -303,7 +303,13 @@ def _calc_tire_forces_fast(
     rHx1 = coeffs[41]; rHy1 = coeffs[42]
 
     # ── Scaling & Pressure Unpack with Backward-Compatible Guard ─────────
-    if len(coeffs) >= 68:
+    if len(coeffs) >= 70:
+        lambda_mux = coeffs[63]
+        lambda_muy = coeffs[64]
+        lambda_ky  = coeffs[65]
+        pPx1 = coeffs[66]; pPx2 = coeffs[67]
+        pPy1 = coeffs[68]; pPy2 = coeffs[69]
+    elif len(coeffs) >= 68:
         lambda_mux = coeffs[61]
         lambda_muy = coeffs[62]
         lambda_ky  = coeffs[63]
@@ -437,7 +443,7 @@ def _calc_tire_forces_and_moments_fast(
 
     # Trail calculation t(alpha_t)
     alpha_t = alpha_rad + qHz1
-    Bt = (qBz1 + qBz2 * dfz + qBz3 * dfz * dfz) * (1.0 + qBz3 * abs(gamma))
+    Bt = (qBz1 + qBz2 * dfz) * (1.0 + qBz3 * abs(gamma))
     Ct = qCz1
     Dt = Fz * (qDz1 + qDz2 * dfz) * (1.0 + qDz3 * gamma + qDz4 * gamma * gamma) / Fz0
     Et = (qEz1 + qEz2 * dfz + qEz3 * dfz * dfz) * (1.0 + qEz4 * np.sign(alpha_t))
@@ -447,13 +453,18 @@ def _calc_tire_forces_and_moments_fast(
     t_trail = Dt * np.cos(Ct * np.arctan(Bt_alpha - Et * (Bt_alpha - np.arctan(Bt_alpha)))) * np.cos(alpha_rad)
 
     # Residual moment Mzr
-    if len(coeffs) >= 61:
+    if len(coeffs) >= 63:
+        qDz6 = coeffs[57]; qDz7 = coeffs[58]; qDz8 = coeffs[59]; qDz9 = coeffs[60]
+        qBz9 = coeffs[61]; qBz10 = coeffs[62]
+    elif len(coeffs) >= 61:
         qDz6 = coeffs[57]; qDz7 = coeffs[58]; qDz8 = coeffs[59]; qBz9 = coeffs[60]
+        qDz9 = 0.02; qBz10 = 0.0
     else:
-        qDz6 = 0.0; qDz7 = 0.0; qDz8 = 0.05; qBz9 = 12.0
+        qDz6 = 0.0; qDz7 = 0.0; qDz8 = 0.05; qDz9 = 0.02
+        qBz9 = 12.0; qBz10 = 0.0
 
-    Dr = Fz * (qDz6 + qDz7 * dfz + (qDz8 + 0.02 * dfz) * gamma)
-    Br = qBz9
+    Dr = Fz * (qDz6 + qDz7 * dfz + (qDz8 + qDz9 * dfz) * gamma)
+    Br = qBz9 + qBz10 * dfz
     Cr = 1.0
     Mzr = Dr * np.cos(Cr * np.arctan(Br * (alpha_rad + qHz1)))
 

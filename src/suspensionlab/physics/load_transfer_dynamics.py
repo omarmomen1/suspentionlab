@@ -222,11 +222,33 @@ class PhysicalLoadTransferEngine:
         delta_lat_f = delta_lat_u_f + delta_lat_kin_f + delta_lat_elast_f
         delta_lat_r = delta_lat_u_r + delta_lat_kin_r + delta_lat_elast_r
 
-        # 3. Corner Normal Wheel Loads
-        Fz_fl = max(Fz_f_axle / 2.0 - delta_lat_f, 10.0)
-        Fz_fr = max(Fz_f_axle / 2.0 + delta_lat_f, 10.0)
-        Fz_rl = max(Fz_r_axle / 2.0 - delta_lat_r, 10.0)
-        Fz_rr = max(Fz_r_axle / 2.0 + delta_lat_r, 10.0)
+        # 3. Corner Normal Wheel Loads with Unilateral Contact & Vertical Conservation
+        # Front axle: when an inside wheel lifts off (Fz <= 0), clamp to 0.0 and
+        # redistribute remaining axle load to the outside wheel so sum(Fz) is conserved.
+        Fz_fl_raw = Fz_f_axle / 2.0 - delta_lat_f
+        Fz_fr_raw = Fz_f_axle / 2.0 + delta_lat_f
+        if Fz_fl_raw <= 0.0:
+            Fz_fl = 0.0
+            Fz_fr = max(0.0, Fz_f_axle)
+        elif Fz_fr_raw <= 0.0:
+            Fz_fr = 0.0
+            Fz_fl = max(0.0, Fz_f_axle)
+        else:
+            Fz_fl = Fz_fl_raw
+            Fz_fr = Fz_fr_raw
+
+        # Rear axle:
+        Fz_rl_raw = Fz_r_axle / 2.0 - delta_lat_r
+        Fz_rr_raw = Fz_r_axle / 2.0 + delta_lat_r
+        if Fz_rl_raw <= 0.0:
+            Fz_rl = 0.0
+            Fz_rr = max(0.0, Fz_r_axle)
+        elif Fz_rr_raw <= 0.0:
+            Fz_rr = 0.0
+            Fz_rl = max(0.0, Fz_r_axle)
+        else:
+            Fz_rl = Fz_rl_raw
+            Fz_rr = Fz_rr_raw
 
         Fz_sum = Fz_fl + Fz_fr + Fz_rl + Fz_rr
         Fz_expected = self.m_total_kg * g + F_downforce_total_N

@@ -281,8 +281,6 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
                             pdump["lateral_accel_g"] = float(pdump.pop("lateral_accel_mps2")) / 9.81
                         else:
                             pdump.pop("lateral_accel_mps2", None)
-                        for k in ["damper_curve_v_f", "damper_curve_f_f", "damper_curve_v_r", "damper_curve_f_r"]:
-                            pdump.pop(k, None)
                         p = FullCarParams(**pdump)
                         
                         base_profile = RoadProfile(**payload["profile"])
@@ -311,11 +309,14 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
                         from suspensionlab.physics.active_quarter_car import ActiveQuarterCarParams, simulate_active_time_response
                         from suspensionlab.physics.quarter_car import simulate_time_response, compute_metrics
                         p_active = ActiveQuarterCarParams(**payload["params"])
-                        profile = RoadProfile(profile_type="step", amplitude=payload.get("bump_height", 0.1), duration=3.0)
+                        bump_height = float(payload.get("bump_height", 0.1))
+                        duration_active = float(payload.get("duration", 3.0))
+                        profile = RoadProfile(profile_type="step", amplitude=bump_height, duration=duration_active)
                         
                         active_res = await asyncio.to_thread(simulate_active_time_response, p_active, profile)
+                        passive_c = float(payload.get("passive_c", payload.get("c", payload.get("params", {}).get("c", 1500.0))))
                         p_passive = QuarterCarParams(
-                            m_s=p_active.m_s, m_u=p_active.m_u, k_s=p_active.k_s, c=1500.0, k_t=p_active.k_t, MR=p_active.MR
+                            m_s=p_active.m_s, m_u=p_active.m_u, k_s=p_active.k_s, c=passive_c, k_t=p_active.k_t, MR=p_active.MR
                         )
                         passive_res = await asyncio.to_thread(simulate_time_response, p_passive, profile)
                         passive_metrics = compute_metrics(passive_res, p_passive)
@@ -349,26 +350,39 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
                         v_init = payload.get("v_init_kph", 100.0) / 3.6
                         maneuver_type = payload.get("maneuver_type")
                         
+                        payload_steer = payload.get("steer_amplitude") or payload.get("steer_amp") or payload.get("steer_amplitude_deg")
+                        steer_val = None
+                        if payload_steer is not None:
+                            val = float(payload_steer)
+                            steer_val = np.radians(val) if val > 0.5 else val
+
+                        custom_duration = payload.get("duration") or payload.get("duration_s")
+
                         if maneuver_type == "Step Steer (J-Turn)":
-                            def steer(t): return 0.05 if t > 1.0 else 0.0
+                            amp = steer_val if steer_val is not None else 0.05
+                            duration = float(custom_duration) if custom_duration is not None else 5.0
+                            def steer(t): return amp if t > 1.0 else 0.0
                             def throttle(t): return 0.0
                             def brake(t): return 0.0
-                            duration = 5.0
                         elif maneuver_type == "Sine Sweep (Slalom)":
-                            def steer(t): return 0.04 * np.sin(2 * np.pi * 0.5 * t) if t > 1.0 else 0.0
+                            amp = steer_val if steer_val is not None else 0.04
+                            duration = float(custom_duration) if custom_duration is not None else 8.0
+                            freq = float(payload.get("frequency", payload.get("freq", 0.5)))
+                            def steer(t): return amp * np.sin(2 * np.pi * freq * t) if t > 1.0 else 0.0
                             def throttle(t): return 0.2
                             def brake(t): return 0.0
-                            duration = 8.0
                         elif maneuver_type == "Constant Radius Cornering":
-                            def steer(t): return 0.03 * (t/2.0 if t < 2.0 else 1.0)
+                            amp = steer_val if steer_val is not None else 0.03
+                            duration = float(custom_duration) if custom_duration is not None else 10.0
+                            def steer(t): return amp * (t/2.0 if t < 2.0 else 1.0)
                             def throttle(t): return 0.4
                             def brake(t): return 0.0
-                            duration = 10.0
                         else:
-                            def steer(t): return 0.03 if t > 1.0 else 0.0
+                            amp = steer_val if steer_val is not None else 0.03
+                            duration = float(custom_duration) if custom_duration is not None else 6.0
+                            def steer(t): return amp if t > 1.0 else 0.0
                             def throttle(t): return 0.0
                             def brake(t): return 0.8 if t > 3.0 else 0.0
-                            duration = 6.0
                             
                         raw_res = await asyncio.to_thread(simulate_maneuver, params, v_init, steer, throttle, brake, duration)
                         for k, v in raw_res.items():

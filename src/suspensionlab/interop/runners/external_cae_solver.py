@@ -16,6 +16,7 @@ import json
 import math
 import os
 import pathlib
+import re
 import sys
 import time
 from typing import Dict, Tuple
@@ -51,6 +52,11 @@ def solve_rk4_quarter_car(
 
         f_susp = k_w * (z_s - z_u) + c_w * (dz_s - dz_u)
         f_tire = k_t * (z_u - z_r) + c_t * (dz_u - dz_r)
+
+        # Unilateral tire contact: total normal force Fz = static_f - f_tire >= 0 N
+        static_f = (m_s + m_u) * 9.81
+        if static_f - f_tire < 0.0:
+            f_tire = static_f
 
         ddz_s = -f_susp / m_s
         ddz_u = (f_susp - f_tire) / m_u
@@ -133,19 +139,32 @@ def parse_parameters_from_file(input_path: pathlib.Path) -> Dict[str, float]:
             pass
 
     elif input_path.suffix.lower() == ".adm":
-        # Parse basic MSC Adams dataset tokens
+        # Parse MSC Adams dataset tokens
         for line in text.splitlines():
-            line = line.strip().upper()
-            if "MASS" in line and "=" in line:
-                try:
-                    parts = line.split("MASS")[-1].split("=")[-1].strip().split(",")
-                    val = float(parts[0])
-                    if "PART/101" in text or "SPRUNG" in line:
-                        params["m_s"] = val
-                    elif "PART/102" in text or "UNSPRUNG" in line:
-                        params["m_u"] = val
-                except Exception:
-                    pass
+            line_upper = line.strip().upper()
+            if "PART/2" in line_upper or "PART/101" in line_upper or ("MASS" in line_upper and "SPRUNG" in line_upper and "UNSPRUNG" not in line_upper):
+                m = re.search(r"MASS\s*=\s*([0-9\.\+eE\-]+)", line_upper)
+                if m:
+                    params["m_s"] = float(m.group(1))
+            elif "PART/3" in line_upper or "PART/102" in line_upper or ("MASS" in line_upper and "UNSPRUNG" in line_upper):
+                m = re.search(r"MASS\s*=\s*([0-9\.\+eE\-]+)", line_upper)
+                if m:
+                    params["m_u"] = float(m.group(1))
+
+            if "SPRINGDAMPER/1" in line_upper:
+                m_k = re.search(r"STIFFNESS_COEFFICIENT\s*=\s*([0-9\.\+eE\-]+)", line_upper)
+                if m_k:
+                    params["k_s"] = float(m_k.group(1))
+                m_c = re.search(r"DAMPING_COEFFICIENT\s*=\s*([0-9\.\+eE\-]+)", line_upper)
+                if m_c:
+                    params["c"] = float(m_c.group(1))
+            elif "SPRINGDAMPER/2" in line_upper:
+                m_kt = re.search(r"STIFFNESS_COEFFICIENT\s*=\s*([0-9\.\+eE\-]+)", line_upper)
+                if m_kt:
+                    params["k_t"] = float(m_kt.group(1))
+                m_ct = re.search(r"DAMPING_COEFFICIENT\s*=\s*([0-9\.\+eE\-]+)", line_upper)
+                if m_ct:
+                    params["c_t"] = float(m_ct.group(1))
 
     return params
 

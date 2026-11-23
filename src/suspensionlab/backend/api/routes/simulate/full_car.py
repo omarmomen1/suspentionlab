@@ -30,8 +30,10 @@ async def simulate_full_car(
         await assert_user_concurrency(db, str(user.user_id), getattr(user, "plan", "FREE"))
         pdump = payload.params.model_dump()
         asymmetry = pdump.pop("road_asymmetry", 0.3)
-        for k in ["damper_curve_v_f", "damper_curve_f_f", "damper_curve_v_r", "damper_curve_f_r"]:
-            pdump.pop(k, None)
+        if "lateral_accel_mps2" in pdump and "lateral_accel_g" not in pdump:
+            pdump["lateral_accel_g"] = float(pdump.pop("lateral_accel_mps2")) / 9.81
+        else:
+            pdump.pop("lateral_accel_mps2", None)
         p = FullCarParams(**pdump)
 
         base_profile = RoadProfile(**payload.profile.model_dump())

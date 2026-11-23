@@ -458,18 +458,23 @@ def identify_suspension_parameters(
             state=IdentifiabilityState.UNIDENTIFIABLE,
         )
 
-    if "rh_fl" in telem_dict and len(telem_dict["rh_fl"]) == len(time_arr):
+    if "road_input" in telem_dict and len(telem_dict["road_input"]) == len(time_arr):
+        r_arr = np.asarray(telem_dict["road_input"], dtype=np.float64)
+        road_input = np.where(np.isfinite(r_arr), r_arr, 0.0)
+    elif "z_r" in telem_dict and len(telem_dict["z_r"]) == len(time_arr):
+        r_arr = np.asarray(telem_dict["z_r"], dtype=np.float64)
+        road_input = np.where(np.isfinite(r_arr), r_arr, 0.0)
+    elif "rh_fl" in telem_dict and len(telem_dict["rh_fl"]) == len(time_arr):
         rh_arr = np.asarray(telem_dict["rh_fl"], dtype=np.float64)
         valid_rh = np.where(np.isfinite(rh_arr), rh_arr, np.nanmean(rh_arr) if np.any(np.isfinite(rh_arr)) else 30.0)
         road_input = -(valid_rh - np.mean(valid_rh)) / 1000.0  # mm -> m
     elif "damper_fl" in telem_dict and len(telem_dict["damper_fl"]) == len(time_arr):
         d_arr = np.asarray(telem_dict["damper_fl"], dtype=np.float64)
-        valid_d = np.where(np.isfinite(d_arr), d_arr, np.nanmean(d_arr) if np.any(np.isfinite(d_arr)) else 0.0)
-        road_input = (valid_d - np.mean(valid_d)) / 1000.0  # mm -> m
-    elif "susptravel_fl" in telem_dict and len(telem_dict["susptravel_fl"]) == len(time_arr):
-        d_arr = np.asarray(telem_dict["susptravel_fl"], dtype=np.float64)
-        valid_d = np.where(np.isfinite(d_arr), d_arr, np.nanmean(d_arr) if np.any(np.isfinite(d_arr)) else 0.0)
-        road_input = (valid_d - np.mean(valid_d)) / 1000.0  # mm -> m
+        valid_d = np.where(np.isfinite(d_arr), d_arr, 0.0)
+        if np.min(valid_d) >= -1e-6:
+            road_input = valid_d / 1000.0
+        else:
+            road_input = (valid_d - np.mean(valid_d)) / 1000.0
     else:
         # Dynamic road displacement estimated via double-integrated acceleration
         a_detrend = measured_target - np.mean(measured_target)

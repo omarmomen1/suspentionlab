@@ -402,7 +402,7 @@ def _compute_full_car_forces_fast(x: np.ndarray, u: np.ndarray, p: np.ndarray, d
     ddz_out[6] = dz_urr
     
     # FIXED: Sign convention correction — Newton's 3rd Law.
-    # When suspension compresses (z_sfl > z_ufl), F_susp > 0.
+    # When suspension compresses (z_ufl > z_sfl), F_susp > 0.
     # This force acts DOWNWARD on the sprung mass (-) and UPWARD on the unsprung mass (+).
     ddz_out[7] = (-F_susp_fl - F_susp_fr - F_susp_rl - F_susp_rr) / m_s
     ddz_out[8] = (a * (F_susp_fl + F_susp_fr) - b * (F_susp_rl + F_susp_rr)) / I_y

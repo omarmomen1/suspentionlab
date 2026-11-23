@@ -41,12 +41,19 @@ def _active_quarter_car_ode(t, x, p: ActiveQuarterCarParams, zr_fn, dzr_fn):
         - k_w * (z_s  - z_u)
     )
 
+    # Dynamic tire force (upward force on unsprung mass from road)
+    F_tire_dyn = p.k_t * (z_r - z_u) + p.c_t * (dz_r - dz_u)
+    if getattr(p, "enable_contact_loss", True):
+        static_tire_load = (p.m_s + p.m_u) * 9.81
+        # Unilateral tire contact: road can only push upward, never pull downward
+        F_z_total = max(0.0, static_tire_load + F_tire_dyn)
+        F_tire_dyn = F_z_total - static_tire_load
+
     # Unsprung acceleration
     ddz_u = (1.0 / p.m_u) * (
           F_d
         + k_w * (z_s   - z_u)
-        - p.k_t * (z_u - z_r)
-        - p.c_t  * (dz_u - dz_r)
+        + F_tire_dyn
     )
 
     return [dz_s, ddz_s, dz_u, ddz_u]
@@ -103,11 +110,20 @@ def simulate_active_time_response(
     F_d = F_damper * p.MR
     
     ddz_s = (1.0 / p.m_s) * (-F_d - p.k_w * (z_s - z_u))
-    ddz_u = (1.0 / p.m_u) * (F_d + p.k_w * (z_s - z_u) - p.k_t * (z_u - z_r_arr) - p.c_t * (dz_u - dz_r_arr))
+
+    static_tire_load = (p.m_s + p.m_u) * 9.81
+    F_tire_dyn = p.k_t * (z_r_arr - z_u) + p.c_t * (dz_r_arr - dz_u)
+    if getattr(p, "enable_contact_loss", True):
+        F_z_total = np.maximum(0.0, static_tire_load + F_tire_dyn)
+        F_tire_dyn = F_z_total - static_tire_load
+    else:
+        F_z_total = static_tire_load + F_tire_dyn
+
+    ddz_u = (1.0 / p.m_u) * (F_d + p.k_w * (z_s - z_u) + F_tire_dyn)
 
     susp_travel = z_s - z_u
     tire_defl = z_u - z_r_arr
-    tire_load_var = p.k_t * tire_defl
+    tire_load_var = -F_tire_dyn
 
     # Metrics
     rms_body_accel = float(np.sqrt(np.mean(ddz_s**2)))
@@ -140,5 +156,6 @@ def simulate_active_time_response(
     res.rms_susp_travel = rms_susp_travel
     res.rms_tire_load = rms_tire_load
     res.peak_susp_travel = peak_susp_travel
+    res.minimum_Fz = float(np.min(F_z_total))
 
     return res

@@ -106,8 +106,8 @@ class TirPropertyAdapter(BaseSolverAdapter):
         pcy1 = float(params.get("pCy1", ParameterValue(name="pCy1", value=1.3, unit="-")).value)
         pdy1 = float(params.get("pDy1", ParameterValue(name="pDy1", value=1.0, unit="-")).value)
         pey1 = float(params.get("pEy1", ParameterValue(name="pEy1", value=-0.8, unit="-")).value)
-        pky1 = float(params.get("pKy1", ParameterValue(name="pKy1", value=-15.0, unit="N/rad")).value)
-        pkx1 = float(params.get("pKx1", ParameterValue(name="pKx1", value=21.0, unit="N")).value)
+        pky1 = float(params.get("pKy1", ParameterValue(name="pKy1", value=-15.0, unit="-")).value)
+        pkx1 = float(params.get("pKx1", ParameterValue(name="pKx1", value=21.0, unit="-")).value)
 
         tir_content = f"""! ==============================================================================
 ! PAC2002 / Magic Formula 5.2 Tyre Property File (.tir)
@@ -174,16 +174,13 @@ PKX1                     = {pkx1:.4f}
                     elif k in ("PNOMIN", "NOMPRES"):
                         # In .tir NOMPRES is in Pa, convert to bar
                         parameters["p0_bar"] = ParameterValue(name="p0_bar", value=val / 100000.0, unit="bar", dimension="pressure")
-                    elif k == "PCY1":
-                        parameters["pCy1"] = ParameterValue(name="pCy1", value=val, unit="-", dimension="dimensionless")
-                    elif k == "PDY1":
-                        parameters["pDy1"] = ParameterValue(name="pDy1", value=val, unit="-", dimension="dimensionless")
-                    elif k == "PEY1":
-                        parameters["pEy1"] = ParameterValue(name="pEy1", value=val, unit="-", dimension="dimensionless")
-                    elif k == "PKY1":
-                        parameters["pKy1"] = ParameterValue(name="pKy1", value=val, unit="N/rad", dimension="rotational_stiffness")
-                    elif k == "PKX1":
-                        parameters["pKx1"] = ParameterValue(name="pKx1", value=val, unit="N", dimension="force")
+                    # 16 PAC2002 Pure-Slip Coefficients
+                    elif k in ("PCY1", "PDY1", "PDY2", "PDY3", "PEY1", "PEY2", "PEY3", "PEY4", "PKY1", "PKY2", "PKY3"):
+                        parameters[k.lower()] = ParameterValue(name=k.lower(), value=val, unit="-", dimension="dimensionless")
+                    elif k in ("PCX1", "PDX1", "PDX2", "PDX3", "PEX1", "PEX2", "PEX3", "PEX4", "PKX1", "PKX2", "PKX3"):
+                        parameters[k.lower()] = ParameterValue(name=k.lower(), value=val, unit="-", dimension="dimensionless")
+                    elif k in ("PHY1", "PHY2", "PHY3", "PHX1", "PHX2", "PVX1", "PVX2", "PVY1", "PVY2", "PVY3", "PVY4"):
+                        parameters[k.lower()] = ParameterValue(name=k.lower(), value=val, unit="-", dimension="dimensionless")
                 except ValueError:
                     pass
 

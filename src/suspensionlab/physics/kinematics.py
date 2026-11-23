@@ -800,6 +800,10 @@ def _solve_py(
         prev_pr = pr_new
         curves.points.append(pt)
 
+    # Parity with C++ solver: forward difference at index 0 so MR[0] != 0.0
+    if len(curves.points) > 1:
+        curves.points[0].motion_ratio = curves.points[1].motion_ratio
+
     curves.diagnostics = diagnostics_list
 
     # Evaluate Physical Validity & Decouple Model Validity

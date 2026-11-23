@@ -88,6 +88,7 @@ class InvestigateHandlingRequest(BaseModel):
     setup_b_name: str = Field("Setup B", description="Comparison setup name")
     metrics: Dict[str, Any] = Field(default_factory=dict, description="Calculated metric deltas")
     notes: Optional[str] = Field(None, description="Optional engineering notes")
+    vehicle_id: Optional[str] = Field(None, description="Vehicle ID or setup identifier")
 
 
 def _build_params_obj(pdump: Dict[str, Any]) -> HandlingParams:
@@ -329,7 +330,7 @@ async def investigate_handling_finding(
             user_name=user.name or user.email,
             title=req.title,
             question_text=question_text,
-            vehicle_id="Formula 1 2026 Spec (CAR 07)",
+            vehicle_id=req.vehicle_id or "Formula 1 2026 Spec (CAR 07)",
             setup_id=req.setup_b_name,
             severity="MEDIUM",
             source="HANDLING_ANALYSIS",

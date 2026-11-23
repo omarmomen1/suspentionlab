@@ -149,7 +149,19 @@ class YawMomentAnalyzer:
         K_us_rad = p.mass / p.wheelbase * (p.b / p.C_alpha_front - p.a / p.C_alpha_rear)
         if K_us_rad <= 1e-9:
             return math.inf
-        return math.sqrt(9.81 * p.wheelbase / K_us_rad)
+        return math.sqrt(p.wheelbase / K_us_rad)
+
+    def critical_speed(self) -> float:
+        """Critical speed [m/s] for oversteer vehicle (K_us < 0).
+
+        Above this speed, the vehicle becomes directionally unstable.
+        Returns math.inf for understeer or neutral vehicles.
+        """
+        p = self.p
+        K_us_rad = p.mass / p.wheelbase * (p.b / p.C_alpha_front - p.a / p.C_alpha_rear)
+        if K_us_rad < -1e-9:
+            return math.sqrt(p.wheelbase / (-K_us_rad))
+        return math.inf
 
 
     def compute_mmm(
@@ -202,8 +214,8 @@ class YawMomentAnalyzer:
                 delta_r = math.radians(delta_d)
 
                 # Equilibrium yaw rate (from steady-state bicycle model solution)
-                # r_eq = v * delta / (L * (1 + K_us * v²/g))
-                denom = L * (1.0 + K_us_rad * v ** 2 / g)
+                # r_eq = v * delta / (L + K_us * v²)
+                denom = L + K_us_rad * (v ** 2)
                 if abs(denom) < 1e-6:
                     r_eq = 0.0
                 else:

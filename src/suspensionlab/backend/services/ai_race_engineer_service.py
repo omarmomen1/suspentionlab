@@ -78,22 +78,20 @@ class AIRaceEngineerService:
         f_u = (1.0 / (2.0 * math.pi)) * math.sqrt(max(1.0, (kw + k_t) / m_u))  # Unsprung wheel hop (Hz)
         zeta = cw / max(1.0, c_crit)             # Damping ratio (-)
 
-        # Run true ODE simulation on baseline
+        # Run true ODE simulation on baseline (strictly fail if unstable or diverging)
         q_params = QuarterCarParams(m_s=m_s, m_u=m_u, k_s=k_s, c=c, k_t=k_t, MR=MR)
         profile = RoadProfile(profile_type="iso8608", iso_class="C", amplitude=0.04, duration=2.5, speed_mps=20.0)
         try:
-            base_sim = run_quarter_car_analysis(q_params, profile)
+            base_sim = run_quarter_car_analysis(q_params, profile, strict=True)
+            if not getattr(base_sim, "is_valid", True):
+                raise RuntimeError("Baseline ODE simulation returned invalid/divergent results")
             base_rms_wk = float(base_sim.rms_body_accel_wk)
             base_rms_accel = float(base_sim.rms_body_accel)
             base_rms_travel = float(base_sim.rms_susp_travel)
             base_rms_tire_load = float(base_sim.rms_tire_load)
             base_tx = float(base_sim.peak_transmissibility)
-        except Exception:
-            base_rms_wk = 1.25
-            base_rms_accel = 1.65
-            base_rms_travel = 0.024
-            base_rms_tire_load = 680.0
-            base_tx = 2.45
+        except Exception as e:
+            raise RuntimeError(f"Baseline quarter-car simulation failed: {str(e)}") from e
 
         # ── 3. Handling, Roll Stiffness & LLTD Calculations ───────────────────
         # Front and rear roll stiffness (Nm/rad):
@@ -111,9 +109,32 @@ class AIRaceEngineerService:
         K_us_deg_g = K_us_rad * (180.0 / math.pi)
 
         # ── 4. Kinematics Sensitivity States ──────────────────────────────────
-        d_gamma_dz = -0.045  # Camber gain: -0.045 deg/mm (-4.5 deg/100mm)
-        rc_height_f_mm = 48.0   # Front roll center height (mm)
-        rc_height_r_mm = 68.0   # Rear roll center height (mm)
+        # Pull from explicit vehicle params or kinematics solver if hardpoints provided
+        d_gamma_dz = float(p.get("d_gamma_dz") or p.get("camber_gain_deg_mm") or p.get("camber_gain") or 0.0)
+        rc_height_f_mm = float(p.get("rc_height_f_mm") or p.get("roll_center_height_f_mm") or p.get("h_rc_f_mm") or 0.0)
+        rc_height_r_mm = float(p.get("rc_height_r_mm") or p.get("roll_center_height_r_mm") or p.get("h_rc_r_mm") or 0.0)
+
+        if (d_gamma_dz == 0.0 or rc_height_f_mm == 0.0) and "hardpoints" in p:
+            try:
+                from suspensionlab.physics.kinematics import solve_double_wishbone_py
+                hp_data = p["hardpoints"]
+                curves_f = solve_double_wishbone_py(hp_data, z_min=-25.0, z_max=25.0, n=11)
+                if len(curves_f.points) > 1:
+                    dz_span = curves_f.points[-1].wheel_travel_mm - curves_f.points[0].wheel_travel_mm
+                    if abs(dz_span) > 1e-3:
+                        d_gamma_dz = (curves_f.points[-1].camber_deg - curves_f.points[0].camber_deg) / dz_span
+                    mid_idx = len(curves_f.points) // 2
+                    rc_height_f_mm = float(curves_f.points[mid_idx].roll_center_height_mm)
+            except Exception as e:
+                logger.debug(f"Could not compute kinematics from hardpoints: {e}")
+
+        # If not provided in p or solver, fallback to baseline vehicle defaults
+        if d_gamma_dz == 0.0:
+            d_gamma_dz = float(p.get("camber_gain_default", -0.045))
+        if rc_height_f_mm == 0.0:
+            rc_height_f_mm = float(p.get("rc_height_f_default", 48.0))
+        if rc_height_r_mm == 0.0:
+            rc_height_r_mm = float(p.get("rc_height_r_default", 68.0))
 
         # ── 5. Problem Classification & Pareto Optimization ───────────────────
         prob_lower = problem.lower()
@@ -211,16 +232,15 @@ class AIRaceEngineerService:
         # ── 6. Run Verified Secondary ODE Simulation for Delta Prediction ─────
         rec_q_params = QuarterCarParams(m_s=m_s, m_u=m_u, k_s=rec_k_s, c=rec_c, k_t=k_t, MR=MR)
         try:
-            tuned_sim = run_quarter_car_analysis(rec_q_params, profile)
+            tuned_sim = run_quarter_car_analysis(rec_q_params, profile, strict=True)
+            if not getattr(tuned_sim, "is_valid", True):
+                raise RuntimeError("Tuned ODE simulation returned invalid/divergent results")
             pred_rms_wk = float(tuned_sim.rms_body_accel_wk)
             pred_rms_accel = float(tuned_sim.rms_body_accel)
             pred_rms_travel = float(tuned_sim.rms_susp_travel)
             pred_rms_tire_load = float(tuned_sim.rms_tire_load)
-        except Exception:
-            pred_rms_wk = base_rms_wk * 0.82
-            pred_rms_accel = base_rms_accel * 0.85
-            pred_rms_travel = base_rms_travel * 0.94
-            pred_rms_tire_load = base_rms_tire_load * 0.89
+        except Exception as e:
+            raise RuntimeError(f"Secondary tuned quarter-car simulation failed: {str(e)}") from e
 
         # Calculated physical deltas
         def _pct(new: float, old: float) -> float:

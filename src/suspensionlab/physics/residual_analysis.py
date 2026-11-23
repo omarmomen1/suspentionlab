@@ -166,17 +166,17 @@ def compute_residuals(
         bias = float(np.mean(e))
         max_err = float(np.max(np.abs(e)))
 
-        # Pearson r and R^2
+        # Pearson r and R^2 (true signed Nash-Sutcliffe Efficiency)
         var_tel = float(np.var(y_tel[valid]))
         var_sim = float(np.var(y_sim[valid]))
         if var_tel > 1e-12 and var_sim > 1e-12:
             r_val = float(np.corrcoef(y_tel[valid], y_sim[valid])[0, 1])
             if math.isnan(r_val):
                 r_val = 0.0
-            r2 = max(0.0, float(1.0 - (np.var(e) / var_tel)))
+            r2 = float(1.0 - np.mean(e ** 2) / max(var_tel, 1e-12))
         else:
             r_val = 1.0 if rmse < 1e-6 else 0.0
-            r2 = 1.0 if rmse < 1e-6 else 0.0
+            r2 = 1.0 if rmse < 1e-6 else float(1.0 - np.mean(e ** 2) / max(var_tel, 1e-12))
         r2_scores.append(r2)
 
         # Cross-correlation for phase lag estimation

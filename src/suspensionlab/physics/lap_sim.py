@@ -322,6 +322,34 @@ class TrackValidator:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# ARB Units & ISO 8855 Coordinate Harmonization
+# ─────────────────────────────────────────────────────────────────────────────
+# ISO 8855 Coordinate System:
+#   +X = Forward (longitudinal acceleration)
+#   +Y = Leftward (lateral acceleration)
+#   +Z = Upward (jounce/vertical displacement)
+# Sign conventions:
+#   Jounce (+z) produces negative camber (tilt inward toward vehicle centerline: dgamma/dz < 0).
+
+def arb_wheel_rate_to_roll_stiffness(k_arb_n_m: float, track_width_m: float, is_differential: bool = True) -> float:
+    """Convert ARB wheel rate [N/m] to torsional roll stiffness K_phi [N·m/rad].
+    
+    For a wheel-to-wheel differential anti-roll bar:
+        K_phi = k_arb_diff * track_width^2
+    For a single-wheel anti-roll bar:
+        K_phi = 0.5 * k_arb_wheel * track_width^2
+    """
+    factor = 1.0 if is_differential else 0.5
+    return factor * float(k_arb_n_m) * (float(track_width_m) ** 2)
+
+
+def arb_roll_stiffness_to_wheel_rate(K_phi_nm_rad: float, track_width_m: float, is_differential: bool = True) -> float:
+    """Convert torsional roll stiffness K_phi [N·m/rad] to ARB wheel rate [N/m]."""
+    factor = 1.0 if is_differential else 0.5
+    return float(K_phi_nm_rad) / (factor * (float(track_width_m) ** 2))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Coupled GGV Envelope Solver (Task 1 Core)
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -487,7 +515,7 @@ class LapSimVehicleParams:
             self.aero_balance_front /= 100.0
 
         if not has_explicit_fz_nom:
-            self.fz_nom_n = 4000.0 if self.mass_kg >= 800.0 else max(self.mass_kg * 9.81 / 4.0, 500.0)
+            self.fz_nom_n = 4000.0
 
     # Backward compatibility properties & aliases
     @property
@@ -587,6 +615,16 @@ class LapSimVehicleParams:
     @k_arb_r.setter
     def k_arb_r(self, val: float):
         self.k_arb_rear_n_m = float(val)
+
+    @property
+    def roll_stiffness_arb_front(self) -> float:
+        """Front ARB torsional roll stiffness [N·m/rad]."""
+        return 0.5 * self.k_arb_front_n_m * (self.track_front_m ** 2)
+
+    @property
+    def roll_stiffness_arb_rear(self) -> float:
+        """Rear ARB torsional roll stiffness [N·m/rad]."""
+        return 0.5 * self.k_arb_rear_n_m * (self.track_rear_m ** 2)
 
     @property
     def roll_center_f_m(self) -> float:
@@ -1077,7 +1115,7 @@ def _normalize_to_vehicle_params(
         elif isinstance(v, LapSimVehicleParams) and hasattr(v, "fz_nom_n"):
             has_explicit_fz = True
     if not has_explicit_fz:
-        vp.fz_nom_n = 4000.0 if vp.mass_kg >= 800.0 else max(vp.mass_kg * 9.81 / 4.0, 500.0)
+        vp.fz_nom_n = 4000.0
 
     return vp
 
@@ -2059,7 +2097,7 @@ def simulate_lap(
                 f_net = f_thrust - f_drag - f_rolling - vp.mass_kg * 9.81 * grad[i]
                 df_dv = -(vp.rho_air * vp.cd * vp.frontal_area_m2 * v_g + c_rr * vp.rho_air * vp.cl * vp.frontal_area_m2 * v_g + f_thrust / max(v_g, 1.0))
                 dv = f_net / max(abs(df_dv), 1e-3)
-                v_g = np.clip(v_g + dv, 5.0, min(float(v_term), float(v_ggv[-1])))
+                v_g = np.clip(v_g + dv, 5.0, float(v_ggv[-1]))
             v_apex[i] = float(v_g)
         else:
             turn_sign = 1.0 if track_segs[i].curvature >= 0 else -1.0
@@ -2105,6 +2143,8 @@ def simulate_lap(
             ay_prev = max(mu_req * 9.81, 0.0)
             mu_loc = surface_mu[i - 1]
             ax_avail = lookup_ax_accel(v_prev, ay_prev) * mu_loc - 9.81 * grad[i]
+            if ay_prev <= 1e-4 and v_prev <= v_term + 1e-3 and grad[i] <= 0.0:
+                ax_avail = max(ax_avail, 0.0)
             disc = v_prev ** 2 + 2.0 * ax_avail * ds
             v_acc = math.sqrt(max(disc, 1.0))
             v_fwd[i] = min(v_fwd[i], v_acc)
@@ -2242,26 +2282,31 @@ def simulate_lap(
     lap_time_s = float(np.sum(dt))
     t_cum = np.cumsum(dt)
     explicit_sectors = sorted({s.sector for s in track_segs if s.sector in (1, 2, 3)})
-    if explicit_sectors == [1, 2] and sector_times[0] > 0 and sector_times[1] > 0:
+    if n <= 2:
+        sector_times = [float(lap_time_s)]
+    elif explicit_sectors == [1, 2] and sector_times[0] > 0 and sector_times[1] > 0:
         scale_sec = lap_time_s / (sector_times[0] + sector_times[1])
-        sector_times = [round(float(sector_times[0] * scale_sec), 3), round(float(sector_times[1] * scale_sec), 3)]
+        sector_times = [float(sector_times[0] * scale_sec), float(sector_times[1] * scale_sec)]
     elif len(sector_times) >= 3 and sector_times[0] > 0 and sector_times[1] > 0 and sector_times[2] > 0:
         scale_sec = lap_time_s / sum(sector_times)
-        sector_times = [round(float(s * scale_sec), 3) for s in sector_times]
+        sector_times = [float(s * scale_sec) for s in sector_times]
     else:
-        idx1 = max(1, n // 3)
-        idx2 = max(idx1 + 1, (2 * n) // 3)
-        s1 = round(float(t_cum[idx1]), 3)
-        s2 = round(float(t_cum[idx2] - t_cum[idx1]), 3)
-        s3 = round(float(t_cum[-1] - t_cum[idx2]), 3)
+        idx1 = min(max(1, n // 3), n - 1)
+        idx2 = min(max(idx1 + 1, (2 * n) // 3), n - 1)
+        s1 = float(t_cum[idx1])
+        s2 = float(t_cum[idx2] - t_cum[idx1])
+        s3 = float(t_cum[-1] - t_cum[idx2])
         sector_times = [s1, s2, s3]
 
     energy_used_kj = float(w_tractive_j / 1000.0)
     aero_drag_energy_kj = float(w_drag_j / 1000.0)
     rolling_energy_kj = float(w_rolling_j / 1000.0)
     braking_energy_kj = float(w_brake_j / 1000.0)
+    delta_e_pot_kj = float(vp.mass_kg * 9.81 * (elev[-1] - elev[0]) / 1000.0)
+    delta_e_kin_kj = float(0.5 * vp.mass_kg * (v_sol[-1] ** 2 - v_sol[0] ** 2) / 1000.0)
+    total_work_out_kj = aero_drag_energy_kj + rolling_energy_kj + braking_energy_kj + delta_e_pot_kj + delta_e_kin_kj
     energy_balance_error_pct = float(
-        abs(energy_used_kj - (aero_drag_energy_kj + rolling_energy_kj + braking_energy_kj))
+        abs(energy_used_kj - total_work_out_kj)
         / max(energy_used_kj, 1.0) * 100.0
     )
 
@@ -2462,10 +2507,10 @@ def simulate_lap(
         lap_time_s = float(np.sum(dt))
         if explicit_sectors == [1, 2] and sector_times[0] > 0 and sector_times[1] > 0:
             scale_sec = lap_time_s / (sector_times[0] + sector_times[1])
-            sector_times = [round(float(sector_times[0] * scale_sec), 3), round(float(sector_times[1] * scale_sec), 3)]
+            sector_times = [float(sector_times[0] * scale_sec), float(sector_times[1] * scale_sec)]
         elif len(sector_times) >= 3 and sector_times[0] > 0 and sector_times[1] > 0 and sector_times[2] > 0:
             scale_sec = lap_time_s / sum(sector_times)
-            sector_times = [round(float(s * scale_sec), 3) for s in sector_times]
+            sector_times = [float(s * scale_sec) for s in sector_times]
         speed_kmh = v_sol * 3.6
 
     # Chassis Roll Angle

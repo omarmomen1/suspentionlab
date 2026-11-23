@@ -91,12 +91,14 @@ class HoldoutManager:
                 "head": slice_data.head(5).to_dict(orient="list"),
                 "tail": slice_data.tail(5).to_dict(orient="list"),
             }, sort_keys=True).encode("utf-8")
+            return hashlib.sha256(raw).hexdigest()
         else:
-            raw = json.dumps({
-                "len": len(next(iter(slice_data.values()))) if slice_data else 0,
-                "keys": sorted(list(slice_data.keys())),
-            }, sort_keys=True).encode("utf-8")
-        return hashlib.sha256(raw).hexdigest()
+            hasher = hashlib.sha256()
+            for k in sorted(slice_data.keys()):
+                hasher.update(k.encode("utf-8"))
+                arr = np.ascontiguousarray(np.asarray(slice_data[k], dtype=np.float64))
+                hasher.update(arr.tobytes())
+            return hasher.hexdigest()
 
     def partition_by_windows(
         self,
@@ -240,35 +242,49 @@ class HoldoutManager:
 
     def verify_no_holdout_influence_on_calibration(
         self,
-        calibration_func: Callable[[List[HoldoutPartition]], Dict[str, float]],
+        calibration_func: Callable[..., Dict[str, float]],
     ) -> bool:
         """Hostile test: Verifies that perturbing holdout data has ZERO impact on calibration results."""
         # 1. Run calibration on authentic calibration data
         cal_parts = self.get_calibration_data()
-        baseline_params = calibration_func(cal_parts)
+        try:
+            baseline_params = calibration_func(cal_parts)
+        except TypeError:
+            baseline_params = calibration_func(self)
 
-        # 2. Hostile perturbation: Create copy with mutated holdout data
-        holdout_parts = copy.deepcopy(self.partitions[HoldoutSplit.BLIND_HOLDOUT])
-        for p in holdout_parts:
-            if isinstance(p.data, pd.DataFrame):
-                # Add massive artificial disturbance to holdout data
-                if "Vx_mps" in p.data:
-                    p.data["Vx_mps"] += 999.0
-            elif isinstance(p.data, dict):
-                if "Vx" in p.data:
-                    p.data["Vx"] += 999.0
+        # 2. Hostile perturbation: mutate holdout data in-place inside this container
+        orig_holdout = copy.deepcopy(self.partitions[HoldoutSplit.BLIND_HOLDOUT])
+        try:
+            for p in self.partitions[HoldoutSplit.BLIND_HOLDOUT]:
+                if isinstance(p.data, pd.DataFrame):
+                    if "Vx_mps" in p.data:
+                        p.data["Vx_mps"] = p.data["Vx_mps"] + 999.0
+                    elif "Vx" in p.data:
+                        p.data["Vx"] = p.data["Vx"] + 999.0
+                    else:
+                        for col in p.data.columns:
+                            p.data[col] = p.data[col] + 999.0
+                elif isinstance(p.data, dict):
+                    for k in p.data:
+                        p.data[k] = np.asarray(p.data[k]) + 999.0
 
-        # 3. Calibration function must NOT have accessed holdout; re-run calibration
-        retested_params = calibration_func(cal_parts)
+            # 3. Calibration function must NOT have accessed holdout; re-query and re-run calibration
+            cal_parts_retested = self.get_calibration_data()
+            try:
+                retested_params = calibration_func(cal_parts_retested)
+            except TypeError:
+                retested_params = calibration_func(self)
 
-        # 4. Assert exact mathematical invariance
-        for param_name, baseline_val in baseline_params.items():
-            retested_val = retested_params[param_name]
-            if abs(baseline_val - retested_val) > 1e-12:
-                raise HoldoutContaminationError(
-                    f"CRITICAL CONTAMINATION: Parameter '{param_name}' changed from {baseline_val} to {retested_val} "
-                    "when holdout was perturbed! Holdout influenced calibration."
-                )
+            # 4. Assert exact mathematical invariance
+            for param_name, baseline_val in baseline_params.items():
+                retested_val = retested_params[param_name]
+                if abs(baseline_val - retested_val) > 1e-12:
+                    raise HoldoutContaminationError(
+                        f"CRITICAL CONTAMINATION: Parameter '{param_name}' changed from {baseline_val} to {retested_val} "
+                        "when holdout was perturbed! Holdout influenced calibration."
+                    )
+        finally:
+            self.partitions[HoldoutSplit.BLIND_HOLDOUT] = orig_holdout
 
         return True
 

@@ -41,7 +41,7 @@ class VehicleDynamicsEvent:
     channels: List[str]
     detector: str
     threshold_config: Dict[str, Any]
-    confidence: float
+    confidence: float  # Heuristic rule certainty / detection margin [0.0, 1.0]
     source_data: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:

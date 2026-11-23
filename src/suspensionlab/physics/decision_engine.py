@@ -11,7 +11,7 @@ from typing import Dict, Any
 from suspensionlab.physics.quarter_car import QuarterCarResult
 
 def _calculate_confidence(result: QuarterCarResult, opt_success: bool, status: str, params: Any = None) -> tuple[int, str]:
-    """Computes a 0-100% confidence score based on physical compliance and heuristics."""
+    """Computes a 0-100% heuristic certainty score based on physical compliance margins and engineering penalties."""
     if not opt_success:
         return 0, "Solver Failed to Converge"
 

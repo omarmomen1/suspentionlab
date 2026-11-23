@@ -93,6 +93,7 @@ def _check_parameter_ranges(params: dict[str, float]) -> ValidityCheck:
         "m_s": (50.0, 2000.0, "sprung mass [kg]"),
         "m_u": (10.0, 300.0, "unsprung mass [kg]"),
         "k_s": (5_000.0, 500_000.0, "spring rate [N/m]"),
+        "c":   (0.0, 50_000.0, "damping coefficient [Ns/m]"),
         "k_t": (50_000.0, 1_500_000.0, "tire vertical stiffness [N/m]"),
         "MR":  (0.3, 1.5, "motion ratio [-]"),
     }

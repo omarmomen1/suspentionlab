@@ -57,21 +57,40 @@ def create_shaker_rig_heatmap(result: HalfCarResultSchema) -> go.Figure:
     """
     Creates a Virtual Shaker Rig heatmap displaying pitch/heave interaction energy.
     """
-    # Create a synthetic 2D PSD heatmap to look like advanced acoustic/vibration testing
-    freqs = np.logspace(0, 2, 50) # 1Hz to 100Hz
-    positions = np.linspace(0, 2.6, 50) # Front to rear
+    # Authentic frequency-domain transfer function magnitude across chassis length
+    freqs = np.logspace(0, 2, 50)  # 1Hz to 100Hz
+    positions = np.linspace(0, 2.6, 50)  # Front to rear [m]
     
-    # Generate an interesting resonance pattern based on f_n_heave and f_n_pitch
-    F, P = np.meshgrid(freqs, positions)
+    fn_heave = max(float(getattr(result, "f_n_heave", 1.5)), 0.1)
+    fn_pitch = max(float(getattr(result, "f_n_pitch", 1.8)), 0.1)
+    fn_uf = float(getattr(result, "f_n_uf", 11.5) or 11.5)
+    fn_ur = float(getattr(result, "f_n_ur", 11.5) or 11.5)
     
-    # Mock resonances at fn_heave and fn_pitch
-    fn_heave = result.f_n_heave
-    fn_pitch = result.f_n_pitch
+    omega = 2.0 * np.pi * freqs
+    omega_h = 2.0 * np.pi * fn_heave
+    omega_p = 2.0 * np.pi * fn_pitch
+    omega_uf = 2.0 * np.pi * fn_uf
+    omega_ur = 2.0 * np.pi * fn_ur
     
-    Z = np.exp(-0.5 * ((F - fn_heave) / 0.5)**2) * 100
-    Z += np.exp(-0.5 * ((F - fn_pitch) / 0.3)**2) * np.sin(P * np.pi) * 80
-    # Add high-freq wheel hop resonance
-    Z += np.exp(-0.5 * ((F - 12.0) / 1.5)**2) * 60
+    zeta_h = 0.25
+    zeta_p = 0.25
+    zeta_u = 0.15
+    
+    # Harmonic transfer functions: H(s) = 1 / (1 - (w/wn)^2 + 2j*zeta*(w/wn))
+    H_heave = 1.0 / (1.0 - (omega / omega_h)**2 + 2j * zeta_h * (omega / omega_h))
+    H_pitch = 1.0 / (1.0 - (omega / omega_p)**2 + 2j * zeta_p * (omega / omega_p))
+    H_uf = 1.0 / (1.0 - (omega / omega_uf)**2 + 2j * zeta_u * (omega / omega_uf))
+    H_ur = 1.0 / (1.0 - (omega / omega_ur)**2 + 2j * zeta_u * (omega / omega_ur))
+    
+    L = 2.6
+    Z = np.zeros((len(positions), len(freqs)))
+    for i, p in enumerate(positions):
+        lever_arm = p - (L / 2.0)
+        h_chassis = H_heave - lever_arm * H_pitch
+        w_f = max(0.0, 1.0 - p / (L / 2.0))
+        w_r = max(0.0, (p - L / 2.0) / (L / 2.0))
+        h_total = h_chassis + 0.3 * (w_f * H_uf + w_r * H_ur)
+        Z[i, :] = np.abs(h_total)
     
     fig = go.Figure(data=go.Contour(
         z=Z, x=freqs, y=positions,

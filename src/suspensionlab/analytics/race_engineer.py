@@ -35,7 +35,7 @@ class Recommendation:
     finding: str
     action: str
     severity: Severity
-    confidence: float  # 0.0 to 1.0
+    confidence: float  # Heuristic rule weight / diagnostic certainty [0.0 to 1.0]
 
 
 @dataclass

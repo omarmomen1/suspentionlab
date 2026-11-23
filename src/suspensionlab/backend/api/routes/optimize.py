@@ -313,10 +313,12 @@ async def auto_tune_suspension(
             )
             profile = RoadProfile(
                 profile_type=req.profile.profile_type,
+                iso_class=getattr(req.profile, "iso_class", "A"),
                 amplitude=req.profile.amplitude,
                 frequency=req.profile.frequency,
                 # Cap duration at 3 s for speed; enough to capture transient response
                 duration=min(req.profile.duration, 3.0),
+                speed_mps=getattr(req.profile, "speed_mps", 20.0),
             )
             result = run_quarter_car_analysis(p, profile)
             # Primary objective: minimise weighted RMS acceleration (ISO 2631-1 Wk)

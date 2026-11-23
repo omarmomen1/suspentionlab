@@ -353,6 +353,7 @@ class QuarterCarResult:
     minimum_Fz:     float = 0.0
     diagnostics:    Optional[PhysicsDiagnostics] = None
     provenance:     Optional[PhysicsProvenance] = None
+    is_valid:       bool = True
 
     # Enveloping Physics Diagnostics
     z_r_effective:        np.ndarray = field(default_factory=lambda: np.array([]))
@@ -783,11 +784,23 @@ def _quarter_car_ode(t, x, p: QuarterCarParams, zr_fn, dzr_fn):
         jounce_gap = abs(p.bump_stop_jounce)
         rebound_gap = abs(p.bump_stop_rebound)
         if (z_u - z_s) > jounce_gap:
-            dz = min((z_u - z_s) - jounce_gap, 0.05)
-            F_spring_w -= p.bump_stop_rate * (np.exp(p.bump_stop_exp * dz) - 1.0) * p.MR**2
+            delta_j = (z_u - z_s) - jounce_gap
+            if delta_j <= 0.05:
+                f_bs = p.bump_stop_rate * (np.exp(p.bump_stop_exp * delta_j) - 1.0)
+            else:
+                f_cap = p.bump_stop_rate * (np.exp(p.bump_stop_exp * 0.05) - 1.0)
+                df_cap = p.bump_stop_rate * p.bump_stop_exp * np.exp(p.bump_stop_exp * 0.05)
+                f_bs = f_cap + df_cap * (delta_j - 0.05)
+            F_spring_w -= f_bs * p.MR**2
         elif (z_s - z_u) > rebound_gap:
-            dz_reb = min((z_s - z_u) - rebound_gap, 0.05)
-            F_spring_w += p.bump_stop_rate * (np.exp(p.bump_stop_exp * dz_reb) - 1.0) * p.MR**2
+            delta_r = (z_s - z_u) - rebound_gap
+            if delta_r <= 0.05:
+                f_bs = p.bump_stop_rate * (np.exp(p.bump_stop_exp * delta_r) - 1.0)
+            else:
+                f_cap = p.bump_stop_rate * (np.exp(p.bump_stop_exp * 0.05) - 1.0)
+                df_cap = p.bump_stop_rate * p.bump_stop_exp * np.exp(p.bump_stop_exp * 0.05)
+                f_bs = f_cap + df_cap * (delta_r - 0.05)
+            F_spring_w += f_bs * p.MR**2
 
     # Sprung acceleration
     ddz_s = (1.0 / p.m_s) * (-F_damper_w - F_spring_w)
@@ -1002,12 +1015,27 @@ def simulate_time_response(
     if p.bump_stop_rate > 0:
         jounce_gap = abs(p.bump_stop_jounce)
         rebound_gap = abs(p.bump_stop_rebound)
+        f_cap = p.bump_stop_rate * (np.exp(p.bump_stop_exp * 0.05) - 1.0)
+        df_cap = p.bump_stop_rate * p.bump_stop_exp * np.exp(p.bump_stop_exp * 0.05)
+
         z_comp = z_u - z_s
-        dz_j = np.clip(z_comp - jounce_gap, 0.0, 0.05)
-        bump_jounce = np.where(z_comp > jounce_gap, p.bump_stop_rate * (np.exp(p.bump_stop_exp * dz_j) - 1.0) * p.MR**2, 0.0)
+        delta_j = np.maximum(0.0, z_comp - jounce_gap)
+        f_raw_j = np.where(
+            delta_j <= 0.05,
+            p.bump_stop_rate * (np.exp(p.bump_stop_exp * delta_j) - 1.0),
+            f_cap + df_cap * (delta_j - 0.05)
+        )
+        bump_jounce = np.where(z_comp > jounce_gap, f_raw_j * p.MR**2, 0.0)
+
         z_ext = z_s - z_u
-        dz_r = np.clip(z_ext - rebound_gap, 0.0, 0.05)
-        bump_rebound = np.where(z_ext > rebound_gap, p.bump_stop_rate * (np.exp(p.bump_stop_exp * dz_r) - 1.0) * p.MR**2, 0.0)
+        delta_r = np.maximum(0.0, z_ext - rebound_gap)
+        f_raw_r = np.where(
+            delta_r <= 0.05,
+            p.bump_stop_rate * (np.exp(p.bump_stop_exp * delta_r) - 1.0),
+            f_cap + df_cap * (delta_r - 0.05)
+        )
+        bump_rebound = np.where(z_ext > rebound_gap, f_raw_r * p.MR**2, 0.0)
+
         bump_stop_force = bump_jounce - bump_rebound
         F_spring_w += -bump_jounce + bump_rebound
     
@@ -1256,6 +1284,7 @@ def run_quarter_car_analysis(
     f_max: float = 50.0,
     n_freq: int = 600,
     solver_mode: SolverMode = SolverMode.BALANCED,
+    strict: bool = False,
 ) -> QuarterCarResult:
     """
     Run the complete 2-DOF quarter car analysis pipeline.
@@ -1290,6 +1319,7 @@ def run_quarter_car_analysis(
 
     time_data = None
     metrics = None
+    is_valid = True
     try:
         time_data = simulate_time_response(p, profile, t_eval_dt=t_eval_dt, solver_mode=solver_mode)
         metrics = compute_metrics(time_data, p)
@@ -1304,15 +1334,17 @@ def run_quarter_car_analysis(
         N_total = len(time_data["time"])
         step = max(1, N_total // 2000)
     except Exception as e:
+        if strict:
+            raise
         import warnings
         warnings.warn(f"Time domain simulation failed: {str(e)}")
-        # Provide fallback metrics
+        # Provide truthful failure metrics (NaN) and invalid status to prevent deceiving optimizers
         metrics = {
-            "rms_body_accel": 0.0,
-            "rms_body_accel_wk": 0.0,
-            "rms_susp_travel": 0.0,
-            "rms_tire_load": 0.0,
-            "peak_susp_travel": 0.0,
+            "rms_body_accel": float("nan"),
+            "rms_body_accel_wk": float("nan"),
+            "rms_susp_travel": float("nan"),
+            "rms_tire_load": float("nan"),
+            "peak_susp_travel": float("nan"),
             "comfort_rating": "Failed",
         }
         f_psd, p_psd = [], []
@@ -1324,6 +1356,7 @@ def run_quarter_car_analysis(
             "susp_travel": [0.0], "tire_defl": [0.0], "tire_load_var": [0.0]
         }
         step = 1
+        is_valid = False
 
     result = QuarterCarResult(
         # Modal
@@ -1380,5 +1413,6 @@ def run_quarter_car_analysis(
         minimum_Fz       = time_data.get("minimum_Fz", 0.0),
         diagnostics      = time_data.get("diagnostics", None),
         provenance       = time_data.get("provenance", None),
+        is_valid         = is_valid,
     )
     return result

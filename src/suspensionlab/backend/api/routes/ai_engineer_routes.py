@@ -613,10 +613,16 @@ async def _handle_understeer_and_ride_height(
     t_delta_s = round(t_cand - t_base, 3)
     t_delta_pct = round((t_delta_s / max(t_base, 1.0)) * 100.0, 3)
 
+    session_id = base_params.get("session_id") or base_params.get("telemetry_session_id") or "telemetry_session_spa"
+    lap_num = int(base_params.get("lap_number", 8))
+    corner_name = base_params.get("corner") or "Understeer Compression Zone"
+    run_id = base_params.get("telemetry_run_id") or base_params.get("run_id") or "run_spa_stint1"
+    base_run_id = base_params.get("baseline_run_id") or "run_spa_baseline"
+
     # 1. Real DAQ Telemetry Query
     t_tel = AIEngineeringToolRegistry.execute_tool(
         "query_telemetry",
-        {"session_id": "telemetry_session_spa", "lap_number": 8, "corner": "Understeer Compression Zone"},
+        {"session_id": session_id, "lap_number": lap_num, "corner": corner_name},
         user_context=user,
     )
     executed_tools.append(t_tel)
@@ -626,8 +632,8 @@ async def _handle_understeer_and_ride_height(
     t_corr = AIEngineeringToolRegistry.execute_tool(
         "analyze_telemetry_correlation",
         {
-            "telemetry_run_id": "run_spa_stint1",
-            "baseline_run_id": "run_spa_baseline",
+            "telemetry_run_id": run_id,
+            "baseline_run_id": base_run_id,
             "channels": ["ride_height_front", "front_lateral_accel", "front_slip_angle", "front_lltd"],
         },
         user_context=user,
@@ -759,7 +765,7 @@ async def _handle_understeer_and_ride_height(
         constraint_violations=[],
         confidence=0.0,
         evidence=Evidence(description="Multi-body kinematics and QSS 3-pass lap simulation delta.", simulations_run=2, feasible_found=2),
-        model_validity=val.get("data", {"tier": "TRUSTED", "score": 94.0}),
+        model_validity=val.get("data", {"tier": "VALIDATED", "score": 94.0}),
         provenance=prov.to_dict(),
         recommendations=[
             AIRecommendation(
@@ -805,7 +811,7 @@ async def _handle_understeer_and_ride_height(
         engineering_interpretation=interpretation,
         uncertainty=uncertainty,
         next_action=next_action,
-        epistemic_classification="SIMULATED_RELATIVE_DELTA",
+        epistemic_classification="SIMULATED",
         epistemic_badges=badges,
         approval_gate={
             "required": True,
@@ -828,10 +834,16 @@ async def _handle_turn7_tire_saturation(
     executed_tools = []
     evidence_store = GroundingEvidenceStore()
 
+    session_id = base_params.get("session_id") or base_params.get("telemetry_session_id") or "telemetry_session_turn7"
+    lap_num = int(base_params.get("lap_number", 12))
+    corner_name = base_params.get("corner") or "Turn 7"
+    run_id = base_params.get("telemetry_run_id") or base_params.get("run_id") or "run_turn7_lap12"
+    base_run_id = base_params.get("baseline_run_id") or "run_turn7_lap10"
+
     # 1. Real DAQ Telemetry Query
     t_tel = AIEngineeringToolRegistry.execute_tool(
         "query_telemetry",
-        {"session_id": "telemetry_session_turn7", "lap_number": 12, "corner": "Turn 7"},
+        {"session_id": session_id, "lap_number": lap_num, "corner": corner_name},
         user_context=user,
     )
     executed_tools.append(t_tel)
@@ -841,8 +853,8 @@ async def _handle_turn7_tire_saturation(
     t_corr = AIEngineeringToolRegistry.execute_tool(
         "analyze_telemetry_correlation",
         {
-            "telemetry_run_id": "run_turn7_lap12",
-            "baseline_run_id": "run_turn7_lap10",
+            "telemetry_run_id": run_id,
+            "baseline_run_id": base_run_id,
             "channels": ["front_slip_angle", "normal_load_fl", "normal_load_fr", "lateral_accel"],
         },
         user_context=user,
@@ -954,13 +966,13 @@ async def _handle_turn7_tire_saturation(
         predicted_effects=effects,
         constraint_violations=[],
         confidence=0.0,
-        epistemic_classification="SIMULATED_RELATIVE_DELTA",
+        epistemic_classification="HYPOTHESIZED",
         evidence=Evidence(
             description="Turn 7 physical telemetry cross-correlated with multibody roll simulation and candidate experiment.",
             simulations_run=2,
             feasible_found=2,
         ),
-        model_validity=val.get("data", {"tier": "TRUSTED", "score": 92.0}),
+        model_validity=val.get("data", {"tier": "VALIDATED", "score": 92.0}),
         provenance=prov.to_dict(),
         recommendations=[
             AIRecommendation(
@@ -1004,10 +1016,16 @@ async def _handle_lap_time_worse(
     executed_tools = []
     evidence_store = GroundingEvidenceStore()
 
+    session_id = base_params.get("session_id") or base_params.get("telemetry_session_id") or "session_lap_comparison"
+    lap_num = int(base_params.get("lap_number", 14))
+    corner_name = base_params.get("corner") or "Sector 3"
+    run_id = base_params.get("telemetry_run_id") or base_params.get("run_id") or f"run_lap_{lap_num}"
+    base_run_id = base_params.get("baseline_run_id") or f"run_lap_{lap_num - 2}"
+
     # 1. Telemetry Query
     t_tel = AIEngineeringToolRegistry.execute_tool(
         "query_telemetry",
-        {"session_id": "session_lap_comparison", "lap_number": 14, "corner": "Sector 3"},
+        {"session_id": session_id, "lap_number": lap_num, "corner": corner_name},
         user_context=user,
     )
     executed_tools.append(t_tel)
@@ -1017,8 +1035,8 @@ async def _handle_lap_time_worse(
     t_corr = AIEngineeringToolRegistry.execute_tool(
         "analyze_telemetry_correlation",
         {
-            "telemetry_run_id": "run_lap_14",
-            "baseline_run_id": "run_lap_12",
+            "telemetry_run_id": run_id,
+            "baseline_run_id": base_run_id,
             "channels": ["speed", "lateral_accel", "throttle_pos", "susp_travel_fl", "susp_travel_fr"],
         },
         user_context=user,
@@ -1029,7 +1047,7 @@ async def _handle_lap_time_worse(
     # 3. Residuals
     t_res = AIEngineeringToolRegistry.execute_tool(
         "get_residuals",
-        {"run_id": "run_lap_14", "tolerance": 0.08},
+        {"run_id": run_id, "tolerance": 0.08},
         user_context=user,
     )
     executed_tools.append(t_res)
@@ -1115,9 +1133,9 @@ async def _handle_lap_time_worse(
         predicted_effects=effects,
         constraint_violations=[],
         confidence=0.0,
-        epistemic_classification="UNCORRELATED_MODEL",
+        epistemic_classification="CORRELATED",
         evidence=Evidence(description="Telemetry delta analysis between Lap 12 and Lap 14 with damper residual tracking.", simulations_run=2, feasible_found=2),
-        model_validity=val.get("data", {"tier": "TRUSTED", "score": 90.0}),
+        model_validity=val.get("data", {"tier": "VALIDATED", "score": 90.0}),
         provenance=prov.to_dict(),
         recommendations=[
             AIRecommendation(
@@ -1276,9 +1294,9 @@ async def _handle_reduce_rear_roll(
         predicted_effects=effects,
         constraint_violations=[],
         confidence=0.0,
-        epistemic_classification="SIMULATED_RELATIVE_DELTA",
+        epistemic_classification="SIMULATED",
         evidence=Evidence(description="Multibody kinematic roll simulation and setup differential analysis.", simulations_run=2, feasible_found=2),
-        model_validity=val.get("data", {"tier": "TRUSTED", "score": 94.0}),
+        model_validity=val.get("data", {"tier": "VALIDATED", "score": 94.0}),
         provenance=prov.to_dict(),
         recommendations=[
             AIRecommendation(
@@ -1421,7 +1439,7 @@ async def _handle_model_correlation_poor(
         predicted_effects=effects,
         constraint_violations=[],
         confidence=0.0,
-        epistemic_classification="UNCORRELATED_MODEL",
+        epistemic_classification="ESTIMATED",
         evidence=Evidence(description="Residual tolerance analysis and parameter calibration against physical track data.", simulations_run=2, feasible_found=2),
         model_validity=t_val.get("data", {"tier": "CONDITIONAL", "score": 62.5}),
         provenance=prov.to_dict(),
@@ -1467,12 +1485,38 @@ async def _handle_setup_diff(
     executed_tools = []
     evidence_store = GroundingEvidenceStore()
 
+    setup_a_name = base_params.get("setup_a_name") or "Setup 17"
+    setup_b_name = base_params.get("setup_b_name") or "Setup 23"
+    setup_a = base_params.get("setup_a") or {
+        "name": setup_a_name,
+        "k_sf": float(base_params.get("k_sf_a", 32000.0)),
+        "k_sr": float(base_params.get("k_sr_a", 38000.0)),
+        "c": float(base_params.get("c_a", 2200.0)),
+        "k_arb_f": float(base_params.get("k_arb_f_a", 16000.0)),
+        "k_arb_r": float(base_params.get("k_arb_r_a", 15000.0)),
+        "ride_height_front_mm": float(base_params.get("ride_height_front_mm_a", 35.0)),
+        "ride_height_rear_mm": float(base_params.get("ride_height_rear_mm_a", 42.0)),
+    }
+    setup_b = base_params.get("setup_b") or {
+        "name": setup_b_name,
+        "k_sf": float(base_params.get("k_sf_b", 36000.0)),
+        "k_sr": float(base_params.get("k_sr_b", 38000.0)),
+        "c": float(base_params.get("c_b", 2450.0)),
+        "k_arb_f": float(base_params.get("k_arb_f_b", 16000.0)),
+        "k_arb_r": float(base_params.get("k_arb_r_b", 13500.0)),
+        "ride_height_front_mm": float(base_params.get("ride_height_front_mm_b", 33.0)),
+        "ride_height_rear_mm": float(base_params.get("ride_height_rear_mm_b", 42.0)),
+    }
+    item_id = base_params.get("item_id") or base_params.get("setup_b_id") or "setup_23"
+    cae_run_id = base_params.get("cae_run_id") or base_params.get("run_id") or f"run_{item_id}"
+    vehicle_ref = base_params.get("vehicle_ref") or base_params.get("vehicle_id") or "CAR-01"
+
     # 1. Compare setups
     t_comp = AIEngineeringToolRegistry.execute_tool(
         "compare_setups",
         {
-            "setup_a": {"name": "Setup 17", "k_sf": 32000.0, "k_sr": 38000.0, "c": 2200.0, "k_arb_f": 16000.0, "k_arb_r": 15000.0, "ride_height_front_mm": 35.0, "ride_height_rear_mm": 42.0},
-            "setup_b": {"name": "Setup 23", "k_sf": 36000.0, "k_sr": 38000.0, "c": 2450.0, "k_arb_f": 16000.0, "k_arb_r": 13500.0, "ride_height_front_mm": 33.0, "ride_height_rear_mm": 42.0},
+            "setup_a": setup_a,
+            "setup_b": setup_b,
         },
         user_context=user,
     )
@@ -1482,7 +1526,7 @@ async def _handle_setup_diff(
     # 2. Lookup provenance
     t_prov = AIEngineeringToolRegistry.execute_tool(
         "lookup_provenance",
-        {"item_id": "setup_23"},
+        {"item_id": item_id},
         user_context=user,
     )
     executed_tools.append(t_prov)
@@ -1491,7 +1535,7 @@ async def _handle_setup_diff(
     # 3. Lookup CAE artifacts
     t_cae = AIEngineeringToolRegistry.execute_tool(
         "lookup_cae_artifacts",
-        {"run_id": "run_setup_23"},
+        {"run_id": cae_run_id},
         user_context=user,
     )
     executed_tools.append(t_cae)
@@ -1500,7 +1544,7 @@ async def _handle_setup_diff(
     # 4. Lookup timeline decisions
     t_dec = AIEngineeringToolRegistry.execute_tool(
         "lookup_timeline_decisions",
-        {"vehicle_ref": "CAR-01"},
+        {"vehicle_ref": vehicle_ref},
         user_context=user,
     )
     executed_tools.append(t_dec)
@@ -1575,7 +1619,7 @@ async def _handle_setup_diff(
         predicted_effects=effects,
         constraint_violations=[],
         confidence=0.0,
-        epistemic_classification="SIMULATED_RELATIVE_DELTA",
+        epistemic_classification="SIMULATED",
         evidence=Evidence(description="Authoritative configuration diff, SHA-256 provenance seal, and CAE multi-body simulation artifacts.", simulations_run=2, feasible_found=2),
         model_validity=val.get("data", {"tier": "VALIDATED", "score": 96.0}),
         provenance=prov.to_dict(),

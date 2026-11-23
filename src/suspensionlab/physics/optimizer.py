@@ -65,13 +65,13 @@ def optimize_setup(
     if bounds and "k_s" in bounds:
         ks_min, ks_max = float(bounds["k_s"][0]), float(bounds["k_s"][1])
     else:
-        ks_min = max(2000.0, min(10000.0, base_params.k_s * 0.4))
+        ks_min = max(2000.0, base_params.k_s * 0.4)
         ks_max = max(50000.0, base_params.k_s * 2.5)
 
     if bounds and "c" in bounds:
         c_min, c_max = float(bounds["c"][0]), float(bounds["c"][1])
     else:
-        c_min = max(200.0, min(1000.0, base_params.c * 0.4))
+        c_min = max(200.0, base_params.c * 0.4)
         c_max = max(5000.0, base_params.c * 2.5)
 
     init_ks = min(max(base_params.k_s, ks_min + 1.0), ks_max - 1.0)
@@ -98,7 +98,7 @@ def optimize_setup(
         constraints=constraints,
         callback=heartbeat_callback,
         options={
-            "maxiter": 100,
+            "maxiter": 500,
             "tol": 1e-3,
         }
     )
@@ -106,5 +106,5 @@ def optimize_setup(
     return {
         "optimal_ks": float(sol.x[0]),
         "optimal_c": float(sol.x[1]),
-        "success": bool(sol.success or (getattr(sol, "status", 0) in (1, 2, 3) and sol.fun < 1e5)),
+        "success": bool(sol.success),
     }

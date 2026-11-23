@@ -254,17 +254,17 @@ class ResidualEngine:
                 nrmse_pct = (rmse / max(rms_val, 1e-4)) * 100.0
                 peak_pct = (peak_err / max(rms_val, 1e-4)) * 100.0
 
-            # Correlation metrics (Pearson r & R2)
+            # Correlation metrics (Pearson r & true signed Nash-Sutcliffe Efficiency)
             var_m = float(np.var(y_m_v))
             var_p = float(np.var(y_p_v))
             if var_m > 1e-9 and var_p > 1e-9:
                 r_val = float(np.corrcoef(y_m_v, y_p_v)[0, 1])
                 if math.isnan(r_val):
                     r_val = 0.0
-                r2 = max(0.0, float(1.0 - (np.var(e) / var_m)))
+                r2 = float(1.0 - np.mean(e ** 2) / max(var_m, 1e-12))
             else:
                 r_val = 1.0 if rmse < 1e-5 else 0.0
-                r2 = 1.0 if rmse < 1e-5 else 0.0
+                r2 = 1.0 if rmse < 1e-5 else float(1.0 - np.mean(e ** 2) / max(var_m, 1e-12))
 
             r2_list.append(r2)
             nrmse_list.append(nrmse_pct)

@@ -379,7 +379,7 @@ def linearise_damper_from_params(
 
     c_eff_spring, note = damper.linearise(v_rms=v_rms)
     # Scale: the BiDirectionalDamper force is at the damper body;
-    # refer to wheel centre by multiplying by MR
-    c_eff_wheel = c_eff_spring * p.MR
+    # refer to wheel centre by multiplying by MR**2
+    c_eff_wheel = c_eff_spring * (p.MR ** 2)
     note = note.replace(f"c_eff={c_eff_spring:.1f}", f"c_eff={c_eff_wheel:.1f}")
     return c_eff_wheel, note

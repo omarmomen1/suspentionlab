@@ -147,8 +147,15 @@ def _expected_qc_freq() -> float:
 
 def _eval_qc_static() -> float:
     from suspensionlab.physics.quarter_car import QuarterCarParams
+    from scipy.optimize import root
     p = QuarterCarParams(m_s=250.0, m_u=30.0, k_s=20000.0, c=1500.0, k_t=180000.0, MR=1.0)
-    return float((p.m_s * 9.81) / p.k_w)
+    def residuals(z):
+        zs, zu = z
+        f_s = p.k_w * (zu - zs) - p.m_s * 9.81
+        f_u = -p.k_w * (zu - zs) - p.k_t * zu - p.m_u * 9.81
+        return [f_s, f_u]
+    sol = root(residuals, [0.0, 0.0])
+    return float(abs(sol.x[0] - sol.x[1]))
 
 
 def _expected_qc_static() -> float:
@@ -257,9 +264,12 @@ def _expected_kin_elasto_deflection() -> float:
 
 
 def _eval_ers_peak_power() -> float:
-    from suspensionlab.physics.ers_model import ERSConfig
-    cfg = ERSConfig()
-    return float(cfg.mgu_k_max_power_w / 1000.0)
+    from suspensionlab.physics.ers_model import ERSConfig, ERSDeploymentController, ERSState
+    cfg = ERSConfig(mgu_k_max_power_w=350_000.0, deploy_efficiency=1.0)
+    ctrl = ERSDeploymentController(strategy="aggressive")
+    state = ERSState(soc=0.80)
+    _, new_state = ctrl.compute(state=state, config=cfg, v=50.0, ax=2.5, curvature=0.0, dt=0.01)
+    return float(new_state.deploy_power_w / 1000.0)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
