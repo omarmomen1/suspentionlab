@@ -2922,9 +2922,10 @@ def solve_lap(
     ers_config=None,
     ers_strategy: str = "optimal",
     tire_thermal_config=None,
+    compute_surface: bool = False,
 ) -> LapSimResult:
     """Quasi-Steady-State lap solver utilizing the closed-loop engine."""
-    res = simulate_lap(vehicle=vehicle, track=segments, v_start=v_start)
+    res = simulate_lap(vehicle=vehicle, track=segments, v_start=v_start, compute_surface=compute_surface)
 
     n = len(segments)
     wheel_loads = np.zeros((4, n))
