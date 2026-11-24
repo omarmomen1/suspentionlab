@@ -398,7 +398,12 @@ export default function PDFExport({
         pdf.setFontSize(8.5);
         pdf.setFont("helvetica", "bold");
         pdf.text("DRAFT / UNAPPROVED SIMULATION — NO SIGN-OFF ON RECORD", margin + 4, y + 7);
-        pdf.text(`[ ${approval?.status || "UNAPPROVED"} ]`, pageW - margin - 4, y + 7, { align: "right" });
+        const rawStatus = (approval?.status || "").replace(/[\[\]]/g, "").trim();
+        const draftStatus =
+          rawStatus && rawStatus.toUpperCase() !== "APPROVED"
+            ? rawStatus
+            : "UNAPPROVED";
+        pdf.text(`[ ${draftStatus} ]`, pageW - margin - 4, y + 7, { align: "right" });
 
         pdf.setFontSize(7);
         pdf.setFont("helvetica", "normal");

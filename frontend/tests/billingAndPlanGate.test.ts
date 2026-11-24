@@ -257,6 +257,11 @@ describe("Free Hook + Pro/Enterprise Paywalls Across Studio Tools", () => {
     };
     expect(renderWithAuth(freeUser, React.createElement(KinematicsOptimizerPanel, optProps))).toContain("PRO REQUIRED");
     expect(renderWithAuth(proUser, React.createElement(KinematicsOptimizerPanel, optProps))).toContain("Run Multi-Objective Optimization");
+
+    // Verify PDFExport unapproved draft banner never renders [ APPROVED ]
+    const pdfSrc = fs.readFileSync(path.join(FRONTEND_ROOT, "components", "PDFExport.tsx"), "utf-8");
+    expect(pdfSrc).not.toContain('pdf.text(`[ ${approval?.status || "UNAPPROVED"} ]`');
+    expect(pdfSrc).toMatch(/rawStatus\.toUpperCase\(\)\s*!==\s*"APPROVED"\s*\?\s*rawStatus\s*:\s*"UNAPPROVED"/);
   });
 
   it("gates /full-car, /handling, /correlation, /compare, /setup-sensitivity, and /optimize to PRO", () => {
