@@ -28,7 +28,7 @@ export default function PrivacyPage() {
               <li><strong className="text-white">Account data:</strong> Name, email address, and hashed password when you register.</li>
               <li><strong className="text-white">Simulation data:</strong> Vehicle parameters and configurations you submit for simulation.</li>
               <li><strong className="text-white">Usage data:</strong> IP address, browser type, pages visited, and feature usage (via anonymized analytics).</li>
-              <li><strong className="text-white">Billing data:</strong> Handled entirely by Lemon Squeezy. We never store your credit card details.</li>
+              <li><strong className="text-white">Billing data:</strong> Handled entirely by Gumroad. We never store your credit card details.</li>
             </ul>
           </section>
 
@@ -47,7 +47,7 @@ export default function PrivacyPage() {
             <h2 className="text-lg font-semibold text-white mb-3">4. Data Sharing</h2>
             <p>We share data only with the following trusted service providers, solely to operate the Service:</p>
             <ul className="list-disc list-inside space-y-2 mt-2">
-              <li><strong className="text-white">Lemon Squeezy</strong> — Payment processing.</li>
+              <li><strong className="text-white">Gumroad</strong> — Payment processing.</li>
               <li><strong className="text-white">Railway.app</strong> — Cloud infrastructure and hosting.</li>
               <li><strong className="text-white">Sentry.io</strong> — Error monitoring (data is anonymized).</li>
             </ul>

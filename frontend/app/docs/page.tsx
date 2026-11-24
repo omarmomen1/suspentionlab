@@ -52,7 +52,7 @@ export default function DocsPage() {
           </nav>
           <div className="mt-8 p-3 bg-[#111113] border border-[#1e1e1e] rounded-xl">
             <p className="text-[10px] text-gray-600 mb-2">Need more help?</p>
-            <a href="mailto:suspenlabsupp@outlook.com"
+            <a href="mailto:support@suspensionlab.io"
               className="inline-flex items-center gap-2 px-6 py-3 bg-[#1e1e20] border border-[#333] text-sm font-medium text-white rounded-xl hover:bg-[#252528] transition-colors">
               Contact Support
             </a>
@@ -212,7 +212,7 @@ export default function DocsPage() {
                 { method: "POST", path: "/auto-tune",          desc: "AI-driven L-BFGS-B optimiser. Returns optimal k_s and c for minimum weighted RMS acceleration." },
                 { method: "POST", path: "/auth/login",         desc: "Authenticate with email + password. Returns a JWT Bearer token." },
                 { method: "GET",  path: "/profiles",           desc: "List all vehicle profiles belonging to the authenticated user." },
-                { method: "POST", path: "/billing/checkout",   desc: "Create a Stripe Checkout Session. Returns a URL to redirect the user to." },
+                { method: "POST", path: "/billing/checkout",   desc: "Create a Gumroad Checkout Session. Returns a URL to redirect the user to." },
               ].map((ep) => (
                 <div key={ep.path} className="flex gap-4 items-start bg-[#111113] border border-[#1e1e1e] rounded-xl px-5 py-3">
                   <span className={`text-[10px] font-black tracking-wider px-2 py-1 rounded font-mono shrink-0 mt-0.5 ${

@@ -258,7 +258,7 @@ function SetupSensitivityContent() {
         hole: 0.62,
         marker: { colors: ["#f2a900", "#3b82f6"] },
         textinfo: "none",
-        hovertemplate: "%{label}: %{value:.0f} Nm/rad<extra></extra>",
+        hovertemplate: "%{label}: %{value:.0f} N·m/rad<extra></extra>",
       } as any)]
     : [];
 
@@ -412,10 +412,10 @@ function SetupSensitivityContent() {
               <Card>
                 <SectionTitle>Stiffness Summary</SectionTitle>
                 <div className="space-y-0">
-                  <Badge label="Front roll stiffness" value={si.roll_stiffness_front_nmrad.toFixed(0)} unit=" Nm/rad" />
-                  <Badge label="Rear roll stiffness"  value={si.roll_stiffness_rear_nmrad.toFixed(0)}  unit=" Nm/rad" />
-                  <Badge label="Total roll stiffness" value={si.roll_stiffness_total_nmrad.toFixed(0)} unit=" Nm/rad" />
-                  <Badge label="Pitch stiffness"      value={si.pitch_stiffness_nmrad.toFixed(0)}      unit=" Nm/rad" />
+                  <Badge label="Front roll stiffness" value={si.roll_stiffness_front_nmrad.toFixed(0)} unit=" N·m/rad" />
+                  <Badge label="Rear roll stiffness"  value={si.roll_stiffness_rear_nmrad.toFixed(0)}  unit=" N·m/rad" />
+                  <Badge label="Total roll stiffness" value={si.roll_stiffness_total_nmrad.toFixed(0)} unit=" N·m/rad" />
+                  <Badge label="Pitch stiffness"      value={si.pitch_stiffness_nmrad.toFixed(0)}      unit=" N·m/rad" />
                 </div>
               </Card>
             )}

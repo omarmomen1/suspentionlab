@@ -204,6 +204,17 @@ describe("PlanGate & usePlanGate Expired Trial Enforcement", () => {
     expect(renderWithAuth(proUser, React.createElement(HookProbe, { required: "ENTERPRISE" }))).toContain("BLOCKED");
     expect(renderWithAuth(entUser, React.createElement(HookProbe, { required: "ENTERPRISE" }))).toContain("ALLOWED");
   });
+
+  it("strictly gates testuser@ email addresses as FREE without hardcoded bypass", () => {
+    const testUser = makeUser({ email: "testuser@suspensionlab.com", plan: "FREE" });
+    expect(getUserPlanLevel(testUser)).toBe(0);
+    expect(renderWithAuth(testUser, React.createElement(HookProbe, { required: "PRO" }))).toContain("BLOCKED");
+    expect(renderWithAuth(testUser, React.createElement(HookProbe, { required: "FREE" }))).toContain("ALLOWED");
+
+    const testUserPrefix = makeUser({ email: "testuser999@domain.org", plan: "FREE" });
+    expect(getUserPlanLevel(testUserPrefix)).toBe(0);
+    expect(renderWithAuth(testUserPrefix, React.createElement(HookProbe, { required: "PRO" }))).toContain("BLOCKED");
+  });
 });
 
 describe("Free Hook + Pro/Enterprise Paywalls Across Studio Tools", () => {
@@ -323,7 +334,9 @@ describe("PricingPage Gumroad Studio Tiers", () => {
 describe("Landing Page, Offline Fonts, Settings #billing & Env Files", () => {
   it("renders SuspensionLab Studio landing page with hero CTAs, 6 Studio tools, and pricing preview", () => {
     const html = renderWithAuth(null, React.createElement(HomePage));
-    expect(html).toContain("Launch 3D Kinematics Studio (Free)");
+    expect(html).toContain("Launch ApexSim Lap Studio");
+    expect(html).toContain('href="/lap-sim"');
+    expect(html).toContain("Open Free 3D Kinematics Sandbox");
     expect(html).toContain('href="/kinematics"');
     expect(html).toContain("View Pro &amp; Team Passes ($79/mo)");
     expect(html).toContain('href="/pricing"');

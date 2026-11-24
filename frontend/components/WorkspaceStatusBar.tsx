@@ -60,24 +60,14 @@ export default function WorkspaceStatusBar() {
         
         {/* Left: Essential Context Summary */}
         <div className="flex items-center gap-2.5 min-w-0 overflow-hidden">
-          {/* Workspace Mode Badge */}
-          <button
-            type="button"
-            onClick={() => setMode(mode === "PRODUCTION" ? "DEMO" : "PRODUCTION")}
-            title="Click to toggle Workspace Mode"
-            className={`px-2 py-0.5 rounded border font-bold text-[10px] tracking-wider transition-all flex items-center gap-1.5 shrink-0 ${
-              mode === "PRODUCTION"
-                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20"
-                : "bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20"
-            }`}
+          {/* Read-Only Workspace Environment Indicator */}
+          <div
+            className="px-2 py-0.5 rounded border border-white/10 bg-white/[0.03] text-gray-300 font-bold text-[10px] tracking-wider flex items-center gap-1.5 shrink-0 cursor-default"
+            title="Workspace Environment (Read-only)"
           >
-            <span
-              className={`w-1.5 h-1.5 rounded-full ${
-                mode === "PRODUCTION" ? "bg-emerald-400 animate-pulse" : "bg-amber-400"
-              }`}
-            />
-            {mode}
-          </button>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span>{process.env.NODE_ENV === "production" ? "PRODUCTION" : "LOCAL / DEV"}</span>
+          </div>
 
           <span className="text-white/20 shrink-0">|</span>
 

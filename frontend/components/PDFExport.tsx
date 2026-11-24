@@ -52,6 +52,23 @@ interface PDFExportProps {
   };
 }
 
+async function computeWebCryptoSha256(data: unknown): Promise<string> {
+  try {
+    const text = typeof data === "string" ? data : JSON.stringify(data ?? {});
+    const encoder = new TextEncoder();
+    const dataBuffer = encoder.encode(text);
+    if (typeof crypto !== "undefined" && crypto.subtle) {
+      const hashBuffer = await crypto.subtle.digest("SHA-256", dataBuffer);
+      return Array.from(new Uint8Array(hashBuffer))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+    }
+  } catch (err) {
+    console.warn("WebCrypto SHA-256 computation failed:", err);
+  }
+  return "";
+}
+
 export default function PDFExport({
   captureId,
   fileName = "SuspensionLab-PRO-Engineering-Report",
@@ -66,9 +83,9 @@ export default function PDFExport({
   solverVersion = "RK45 / BDF Adaptive Stiff",
   physicsVersion = "quarter-car-v2",
   softwareBuild = "BUILD-REL-2026.1",
-  inputHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  resultHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  artifactHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  inputHash,
+  resultHash,
+  artifactHash,
   validationStatus = "UNVALIDATED",
   correlationPct,
   comfortCategory = "UNEVALUATED",
@@ -82,6 +99,28 @@ export default function PDFExport({
   const handleExport = useCallback(async () => {
     setExporting(true);
     try {
+      const EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+      const isProvidedHash = (h?: string): boolean => Boolean(h && h !== "—" && h !== EMPTY_SHA256);
+
+      const effectiveInputHash = isProvidedHash(inputHash)
+        ? inputHash!
+        : (await computeWebCryptoSha256({ docId, vehicleRef, setupRef, trackRef, tireRef, solverVersion, physicsVersion })) || EMPTY_SHA256;
+
+      const effectiveResultHash = isProvidedHash(resultHash)
+        ? resultHash!
+        : (await computeWebCryptoSha256({ metrics, paramChanges, plotData, correlationPct })) || EMPTY_SHA256;
+
+      const effectiveArtifactHash = isProvidedHash(artifactHash)
+        ? artifactHash!
+        : (await computeWebCryptoSha256({
+            docId,
+            vehicleRef,
+            setupRef,
+            trackRef,
+            inputHash: effectiveInputHash,
+            resultHash: effectiveResultHash,
+          })) || EMPTY_SHA256;
+
       const { default: jsPDF } = await import("jspdf");
 
       const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
@@ -126,14 +165,14 @@ export default function PDFExport({
           footY + 2
         );
         pdf.text(
-          `Artifact SHA-256: ${(artifactHash || "—").substring(0, 24)}… | Page ${pageNum}/${totalPages}`,
+          `Artifact SHA-256: ${(effectiveArtifactHash || "—").substring(0, 24)}… | Page ${pageNum}/${totalPages}`,
           margin,
           footY + 6
         );
       };
 
       // ── PAGE 1: EXECUTIVE ENGINEERING RECORD ───────────────────────────
-      drawHeader(1, 2);
+      drawHeader(1, 3);
 
       let y = 30;
 
@@ -180,7 +219,7 @@ export default function PDFExport({
 
       pdf.setTextColor(100, 116, 139); pdf.text("Input Hash:", col1X, y + 33);
       pdf.setFont("courier", "normal"); pdf.setTextColor(51, 65, 85);
-      pdf.text((inputHash || "").substring(0, 32) + "…", col1X + 24, y + 33);
+      pdf.text((effectiveInputHash || "").substring(0, 32) + "…", col1X + 24, y + 33);
 
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(100, 116, 139); pdf.text("Physics Core:", col1X, y + 39);
@@ -215,7 +254,7 @@ export default function PDFExport({
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(100, 116, 139); pdf.text("Result Hash:", col2X, y + 33);
       pdf.setFont("courier", "normal"); pdf.setTextColor(51, 65, 85);
-      pdf.text((resultHash || "").substring(0, 32) + "…", col2X + 26, y + 33);
+      pdf.text((effectiveResultHash || "").substring(0, 32) + "…", col2X + 26, y + 33);
 
       y += 49;
 
@@ -306,46 +345,72 @@ export default function PDFExport({
       y += 51;
 
       // Section 4: Chief Engineer Decision Sign-Off & Cryptographic Signature Box
-      const appStatus = approval?.status || "APPROVED";
-      const isApproved = appStatus === "APPROVED" || appStatus === "EXPORTED";
-      const isRejected = appStatus === "REJECTED";
+      const FAKE_HMAC = "c9842a1b7e012903847561928374659281729384756192837465928172938475";
+      const hasRealSignature = Boolean(
+        approval?.signature &&
+        approval.signature.trim().length > 0 &&
+        approval.signature !== FAKE_HMAC
+      );
+      const isApproved = approval?.status === "APPROVED" && hasRealSignature;
 
-      const boxBgColor = isApproved ? [240, 253, 244] : isRejected ? [255, 241, 242] : [254, 252, 232];
-      const boxBorderColor = isApproved ? [34, 197, 94] : isRejected ? [244, 63, 94] : [234, 179, 8];
-      const titleColor = isApproved ? [21, 128, 61] : isRejected ? [190, 18, 60] : [161, 98, 7];
+      if (isApproved) {
+        pdf.setFillColor(240, 253, 244);
+        pdf.setDrawColor(34, 197, 94);
+        pdf.setLineWidth(0.6);
+        pdf.rect(margin, y, contentW, 34, "FD");
+        pdf.setLineWidth(0.2);
 
-      pdf.setFillColor(boxBgColor[0], boxBgColor[1], boxBgColor[2]);
-      pdf.setDrawColor(boxBorderColor[0], boxBorderColor[1], boxBorderColor[2]);
-      pdf.setLineWidth(0.6);
-      pdf.rect(margin, y, contentW, 34, "FD");
-      pdf.setLineWidth(0.2);
+        pdf.setTextColor(21, 128, 61);
+        pdf.setFontSize(8.5);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("CHIEF ENGINEER DECISION SIGN-OFF & CRYPTOGRAPHIC CERTIFICATION", margin + 4, y + 6);
+        pdf.text("[ APPROVED ]", pageW - margin - 4, y + 6, { align: "right" });
 
-      pdf.setTextColor(titleColor[0], titleColor[1], titleColor[2]);
-      pdf.setFontSize(8.5);
-      pdf.setFont("helvetica", "bold");
-      pdf.text("CHIEF ENGINEER DECISION SIGN-OFF & CRYPTOGRAPHIC CERTIFICATION", margin + 4, y + 6);
-      pdf.text(`[ ${appStatus} ]`, pageW - margin - 4, y + 6, { align: "right" });
+        const approverName = approval?.name || "Authorized Lead Engineer";
+        const approverRole = approval?.role || "LEAD";
+        const approvalTime = approval?.timestamp || new Date().toISOString().replace("T", " ").substring(0, 19) + " UTC";
+        const approvalComment = approval?.comment || "Approved under validated vehicle correlation threshold.";
+        const approvalSig = approval!.signature!;
 
-      const approverName = approval?.name || "Chief Race Engineer";
-      const approverRole = approval?.role || "LEAD";
-      const approvalTime = approval?.timestamp || new Date().toISOString().replace("T", " ").substring(0, 19) + " UTC";
-      const approvalComment = approval?.comment || "Approved under validated vehicle correlation threshold.";
-      const approvalSig = approval?.signature || "c9842a1b7e012903847561928374659281729384756192837465928172938475";
+        pdf.setFontSize(7);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(15, 23, 42);
+        pdf.text(`" ${approvalComment} "`, margin + 4, y + 12);
+        pdf.text(`Signed off by ${approverName} (${approverRole}) on ${approvalTime}`, margin + 4, y + 18);
 
-      pdf.setFontSize(7);
-      pdf.setFont("helvetica", "normal");
-      pdf.setTextColor(15, 23, 42);
-      pdf.text(`" ${approvalComment} "`, margin + 4, y + 12);
-      pdf.text(`Signed off by ${approverName} (${approverRole}) on ${approvalTime}`, margin + 4, y + 18);
+        pdf.setFont("courier", "bold");
+        pdf.setFontSize(6.2);
+        pdf.setTextColor(21, 128, 61);
+        pdf.text(`HMAC-SHA256 Signature: ${approvalSig}`, margin + 4, y + 25);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(5.8);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text("Binding: canonical_artifact_hash + approver_id + role + timestamp + decision", margin + 4, y + 30);
+      } else {
+        // Explicit DRAFT / UNAPPROVED SIMULATION banner
+        pdf.setFillColor(254, 242, 242);
+        pdf.setDrawColor(220, 38, 38);
+        pdf.setLineWidth(0.6);
+        pdf.rect(margin, y, contentW, 34, "FD");
+        pdf.setLineWidth(0.2);
 
-      pdf.setFont("courier", "bold");
-      pdf.setFontSize(6.2);
-      pdf.setTextColor(titleColor[0], titleColor[1], titleColor[2]);
-      pdf.text(`HMAC-SHA256 Signature: ${approvalSig}`, margin + 4, y + 25);
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(5.8);
-      pdf.setTextColor(100, 116, 139);
-      pdf.text("Binding: canonical_artifact_hash + approver_id + role + timestamp + decision", margin + 4, y + 30);
+        pdf.setTextColor(185, 28, 28);
+        pdf.setFontSize(8.5);
+        pdf.setFont("helvetica", "bold");
+        pdf.text("DRAFT / UNAPPROVED SIMULATION — NO SIGN-OFF ON RECORD", margin + 4, y + 7);
+        pdf.text(`[ ${approval?.status || "UNAPPROVED"} ]`, pageW - margin - 4, y + 7, { align: "right" });
+
+        pdf.setFontSize(7);
+        pdf.setFont("helvetica", "normal");
+        pdf.setTextColor(71, 85, 105);
+        pdf.text("This simulation artifact is uncertified. No valid cryptographic signature or sign-off is on record.", margin + 4, y + 15);
+        pdf.text("Results are strictly for exploratory engineering review and must not be used for track release or competition sign-off.", margin + 4, y + 21);
+
+        pdf.setFont("courier", "normal");
+        pdf.setFontSize(6.2);
+        pdf.setTextColor(153, 27, 27);
+        pdf.text("HMAC-SHA256 Signature: NONE (UNSIGNED ARTIFACT)", margin + 4, y + 28);
+      }
 
       drawFooter(1, 3);
 
@@ -657,16 +722,32 @@ export default function PDFExport({
       pdf.setFontSize(6.2);
       pdf.setTextColor(51, 65, 85);
 
-      pdf.text(`INPUT_HASH_SHA256:    ${inputHash}`, margin + 4, y + 13);
-      pdf.text(`RESULT_HASH_SHA256:   ${resultHash}`, margin + 4, y + 19);
-      pdf.text(`ARTIFACT_HASH_SHA256: ${artifactHash}`, margin + 4, y + 25);
-      pdf.setFont("courier", "bold");
-      pdf.setTextColor(21, 128, 61);
-      pdf.text(`APPROVAL_HMAC_SHA256: ${approvalSig}`, margin + 4, y + 31);
-      pdf.setFont("helvetica", "normal");
-      pdf.setFontSize(6);
-      pdf.setTextColor(100, 116, 139);
-      pdf.text(`Timestamp: ${approvalTime}  ·  Signee: ${approverName} (${approverRole})  ·  Validation: CERTIFIED`, margin + 4, y + 36);
+      pdf.text(`INPUT_HASH_SHA256:    ${effectiveInputHash}`, margin + 4, y + 13);
+      pdf.text(`RESULT_HASH_SHA256:   ${effectiveResultHash}`, margin + 4, y + 19);
+      pdf.text(`ARTIFACT_HASH_SHA256: ${effectiveArtifactHash}`, margin + 4, y + 25);
+
+      if (isApproved) {
+        const approverName = approval?.name || "Authorized Lead Engineer";
+        const approverRole = approval?.role || "LEAD";
+        const approvalTime = approval?.timestamp || new Date().toISOString().replace("T", " ").substring(0, 19) + " UTC";
+        const approvalSig = approval!.signature!;
+
+        pdf.setFont("courier", "bold");
+        pdf.setTextColor(21, 128, 61);
+        pdf.text(`APPROVAL_HMAC_SHA256: ${approvalSig}`, margin + 4, y + 31);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(6);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(`Timestamp: ${approvalTime}  ·  Signee: ${approverName} (${approverRole})  ·  Validation: CERTIFIED`, margin + 4, y + 36);
+      } else {
+        pdf.setFont("courier", "bold");
+        pdf.setTextColor(185, 28, 28);
+        pdf.text("APPROVAL_HMAC_SHA256: NONE (UNSIGNED DRAFT)", margin + 4, y + 31);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(6);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(`Timestamp: —  ·  Signee: NONE  ·  Validation: UNVALIDATED DRAFT`, margin + 4, y + 36);
+      }
 
       drawFooter(3, 3);
 
@@ -679,7 +760,7 @@ export default function PDFExport({
     }
   }, [
     fileName, title, docId, vehicleRef, setupRef, trackRef, tireRef, telemetryRef,
-    solverVersion, physicsVersion, softwareBuild, inputHash, resultHash, artifactHash,
+    solverVersion, physicsVersion, inputHash, resultHash, artifactHash,
     validationStatus, correlationPct, comfortCategory, metrics, paramChanges, plotData, approval
   ]);
 

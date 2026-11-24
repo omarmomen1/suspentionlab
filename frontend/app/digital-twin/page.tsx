@@ -719,84 +719,103 @@ export default function DigitalTwinPage() {
                 </div>
 
                 {/* Telemetry Visualizations */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  {/* GG Friction Circle */}
-                  <div className="bg-slate-900/30 border border-slate-800/80 rounded-xl p-5">
-                    <h3 className="text-sm font-semibold text-slate-200 mb-3">
-                      G-G Friction Bowl & Tire Exploitation
-                    </h3>
-                    <div className="h-[280px]">
-                      <Plot
-                        data={[
-                          {
-                            x: [0, 0.6, 1.3, 1.7, 1.8, 1.4, 0.7, 0, -0.7, -1.4, -1.8, -1.7, -1.3, -0.6, 0],
-                            y: [0.6, 0.5, 0.2, -0.2, -0.9, -1.5, -1.8, -1.9, -1.8, -1.5, -0.9, -0.2, 0.2, 0.5, 0.6],
-                            type: "scatter", mode: "lines", name: "Friction Envelope",
-                            line: { color: "#f2a900", width: 1.5, dash: "dot" }
-                          },
-                          {
-                            x: [0.1, 0.5, 1.1, 1.6, 1.4, 0.8, 0.2, -0.4, -1.2, -1.65, -1.4, -0.7, -0.1, 0.3],
-                            y: [0.4, 0.2, -0.2, -0.7, -1.3, -1.7, -1.6, -1.2, -0.7, -0.2, 0.3, 0.45, 0.35, 0.1],
-                            type: "scatter", mode: "markers", name: "Logged Points",
-                            marker: { color: "#3b82f6", size: 6, opacity: 0.8 }
-                          }
-                        ]}
-                        layout={{
-                          ...DARK_PLOT_BASE,
-                          title: { text: "Lateral G vs Longitudinal G", font: { color: "#666", size: 11 } },
-                          xaxis: { ...DARK_PLOT_BASE.xaxis, title: { text: "Lateral G", font: { color: "#666" } } },
-                          yaxis: { ...DARK_PLOT_BASE.yaxis, title: { text: "Longitudinal G", font: { color: "#666" } } },
-                        } as any}
-                        config={{ displayModeBar: false, responsive: true }}
-                        style={{ width: "100%", height: "100%" }}
-                        useResizeHandler
-                      />
-                    </div>
-                  </div>
+                {(() => {
+                  const channelsPreview = analysisResult?.channels_preview || analysisResult?.channels || {};
+                  const latGData = channelsPreview.lat_g || channelsPreview.ay || [];
+                  const longGData = channelsPreview.long_g || channelsPreview.ax || [];
+                  const timeData = channelsPreview.time || channelsPreview.t || [];
+                  const speedData = channelsPreview.speed || channelsPreview.v || channelsPreview.speed_kmh || [];
+                  const throttleData = channelsPreview.throttle || channelsPreview.tps || [];
+                  const brakeData = channelsPreview.brake || channelsPreview.p_brake || [];
+                  const hasGgData = latGData.length > 0 && longGData.length > 0;
 
-                  {/* Channel Overview */}
-                  <div className="bg-slate-900/30 border border-slate-800/80 rounded-xl p-5">
-                    <h3 className="text-sm font-semibold text-slate-200 mb-3">
-                      Speed & Driver Inputs Preview
-                    </h3>
-                    <div className="h-[280px]">
-                      <Plot
-                        data={[
-                          {
-                            x: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
-                            y: [160, 220, 248, 140, 99, 185, 235, 120, 195, 245, 250],
-                            name: "Speed [km/h]",
-                            type: "scatter", mode: "lines",
-                            line: { color: "#f2a900", width: 2 }
-                          },
-                          {
-                            x: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
-                            y: [100, 80, 0, 95, 20, 75, 0, 100, 40, 90, 100],
-                            name: "Throttle [%]",
-                            type: "scatter", mode: "lines",
-                            line: { color: "#22c55e", width: 1.5, dash: "dot" }
-                          },
-                          {
-                            x: [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
-                            y: [0, 0, 85, 0, 40, 0, 90, 0, 30, 0, 0],
-                            name: "Brake [bar]",
-                            type: "scatter", mode: "lines",
-                            line: { color: "#ef4444", width: 1.5, dash: "dot" }
-                          }
-                        ]}
-                        layout={{
-                          ...DARK_PLOT_BASE,
-                          title: { text: "Time [s] vs Vehicle Dynamics Channels", font: { color: "#666", size: 11 } },
-                          xaxis: { ...DARK_PLOT_BASE.xaxis, title: { text: "Time [s]", font: { color: "#666" } } },
-                          legend: { orientation: "h", y: 1.15, font: { color: "#888", size: 9 } }
-                        } as any}
-                        config={{ displayModeBar: false, responsive: true }}
-                        style={{ width: "100%", height: "100%" }}
-                        useResizeHandler
-                      />
+                  const traceData: any[] = [
+                    {
+                      x: timeData.length > 0 ? timeData : [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50],
+                      y: speedData.length > 0 ? speedData : [0],
+                      name: "Speed [km/h]",
+                      type: "scatter", mode: "lines",
+                      line: { color: "#f2a900", width: 2 }
+                    }
+                  ];
+                  if (throttleData.length > 0) {
+                    traceData.push({
+                      x: timeData,
+                      y: throttleData,
+                      name: "Throttle [%]",
+                      type: "scatter", mode: "lines",
+                      line: { color: "#22c55e", width: 1.5, dash: "dot" }
+                    });
+                  }
+                  if (brakeData.length > 0) {
+                    traceData.push({
+                      x: timeData,
+                      y: brakeData,
+                      name: "Brake [bar]",
+                      type: "scatter", mode: "lines",
+                      line: { color: "#ef4444", width: 1.5, dash: "dot" }
+                    });
+                  }
+
+                  return (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {/* GG Friction Circle */}
+                      <div className="bg-slate-900/30 border border-slate-800/80 rounded-xl p-5">
+                        <h3 className="text-sm font-semibold text-slate-200 mb-3">
+                          G-G Friction Bowl & Tire Exploitation
+                        </h3>
+                        <div className="h-[280px]">
+                          <Plot
+                            data={[
+                              {
+                                x: [0, 0.6, 1.3, 1.7, 1.8, 1.4, 0.7, 0, -0.7, -1.4, -1.8, -1.7, -1.3, -0.6, 0],
+                                y: [0.6, 0.5, 0.2, -0.2, -0.9, -1.5, -1.8, -1.9, -1.8, -1.5, -0.9, -0.2, 0.2, 0.5, 0.6],
+                                type: "scatter", mode: "lines", name: "Friction Envelope",
+                                line: { color: "#f2a900", width: 1.5, dash: "dot" }
+                              },
+                              {
+                                x: hasGgData ? latGData : [0],
+                                y: hasGgData ? longGData : [0],
+                                type: "scatter", mode: "markers", name: "Logged Points",
+                                marker: { color: "#3b82f6", size: 5, opacity: 0.8 }
+                              }
+                            ]}
+                            layout={{
+                              ...DARK_PLOT_BASE,
+                              title: { text: "Lateral G vs Longitudinal G", font: { color: "#666", size: 11 } },
+                              xaxis: { ...DARK_PLOT_BASE.xaxis, title: { text: "Lateral G", font: { color: "#666" } } },
+                              yaxis: { ...DARK_PLOT_BASE.yaxis, title: { text: "Longitudinal G", font: { color: "#666" } } },
+                            } as any}
+                            config={{ displayModeBar: false, responsive: true }}
+                            style={{ width: "100%", height: "100%" }}
+                            useResizeHandler
+                          />
+                        </div>
+                      </div>
+
+                      {/* Channel Overview */}
+                      <div className="bg-slate-900/30 border border-slate-800/80 rounded-xl p-5">
+                        <h3 className="text-sm font-semibold text-slate-200 mb-3">
+                          Speed & Driver Inputs Preview
+                        </h3>
+                        <div className="h-[280px]">
+                          <Plot
+                            data={traceData}
+                            layout={{
+                              ...DARK_PLOT_BASE,
+                              title: { text: "Time [s] vs Vehicle Dynamics Channels", font: { color: "#666", size: 11 } },
+                              xaxis: { ...DARK_PLOT_BASE.xaxis, title: { text: "Time [s]", font: { color: "#666" } } },
+                              legend: { orientation: "h", y: 1.15, font: { color: "#888", size: 9 } }
+                            } as any}
+                            config={{ displayModeBar: false, responsive: true }}
+                            style={{ width: "100%", height: "100%" }}
+                            useResizeHandler
+                          />
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  );
+                })()}
 
                 {/* Channel Map & Dropouts */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -853,6 +872,18 @@ export default function DigitalTwinPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {!analysisResult && (
+              <div className="rounded-xl border border-dashed border-slate-800 bg-slate-900/10 p-12 text-center my-6">
+                <div className="w-12 h-12 rounded-full bg-slate-800/60 text-slate-400 mx-auto flex items-center justify-center mb-4">
+                  <Activity className="w-6 h-6" />
+                </div>
+                <h3 className="text-base font-semibold text-slate-200 mb-1">No Telemetry Session Loaded</h3>
+                <p className="text-sm text-slate-500 max-w-md mx-auto mb-4">
+                  Upload a CSV telemetry log above or load a sample dataset (Spa / Silverstone GT3) to inspect real G-G friction exploitation, speed profiles, and channel mappings.
+                </p>
               </div>
             )}
           </div>

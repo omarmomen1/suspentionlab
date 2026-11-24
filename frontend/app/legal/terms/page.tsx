@@ -34,7 +34,7 @@ export default function TermsPage() {
 
           <section>
             <h2 className="text-lg font-semibold text-white mb-3">4. Subscriptions and Billing</h2>
-            <p>Paid subscriptions are billed in advance on a monthly or annual basis. All billing is handled securely through Lemon Squeezy. You may cancel at any time; cancellations take effect at the end of the current billing period. No refunds are issued for partial months except where required by law.</p>
+            <p>Paid subscriptions are billed in advance on a monthly or annual basis. All billing is handled securely through Gumroad. You may cancel at any time; cancellations take effect at the end of the current billing period. No refunds are issued for partial months except where required by law.</p>
           </section>
 
           <section>

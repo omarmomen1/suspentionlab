@@ -42,6 +42,16 @@ export default function SettingsPage() {
   const { user, logout, fetchWithAuth, refreshSession } = useAuth();
   const [activeTab, setActiveTab]    = useState<"account" | "billing" | "api-keys" | "webhooks" | "team" | "security" | "enterprise">("account");
   const gumroadProUrl = process.env.NEXT_PUBLIC_GUMROAD_PRO_URL?.trim() || "https://gumroad.com/l/suspensionlab-pro";
+  const [appOrigin, setAppOrigin]    = useState<string>(
+    process.env.NEXT_PUBLIC_APP_URL || "https://suspensionlab.io"
+  );
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.origin) {
+      setAppOrigin(process.env.NEXT_PUBLIC_APP_URL || window.location.origin);
+    }
+  }, []);
+
   const [apiKeys,   setApiKeys]      = useState<ApiKey[]>([]);
   const [newKeyName, setNewKeyName]  = useState("");
   const [newKeyValue, setNewKeyValue] = useState<string | null>(null);
@@ -457,7 +467,7 @@ export default function SettingsPage() {
                       <p className="text-sm font-semibold text-amber-400">Password reset</p>
                       <p className="text-xs text-gray-400 max-w-sm">
                         To reset password or manage cryptographic credentials, contact{" "}
-                        <a href="mailto:suspenlabsupp@outlook.com" className="text-ansys-yellow hover:underline">suspenlabsupp@outlook.com</a>.
+                        <a href="mailto:support@suspensionlab.io" className="text-ansys-yellow hover:underline">support@suspensionlab.io</a>.
                       </p>
                     </div>
                   </div>
@@ -613,7 +623,7 @@ export default function SettingsPage() {
                         </p>
                         <div className="p-2.5 rounded-lg bg-black/60 border border-white/5 font-mono text-xs text-gray-300">
                           <span className="text-gray-500">SCIM Endpoint:</span>{" "}
-                          <code className="text-ansys-yellow">https://suspensionlab.pro/api/v1/scim/v2</code>
+                          <code className="text-ansys-yellow">{appOrigin}/api/v1/scim/v2</code>
                         </div>
                       </div>
 
@@ -634,11 +644,11 @@ export default function SettingsPage() {
                         <div className="space-y-1.5 font-mono text-xs">
                           <div className="p-2 rounded bg-black/40 border border-white/5 text-gray-400">
                             <span className="text-gray-500">ACS URL:</span>{" "}
-                            <code className="text-white">https://suspensionlab.pro/api/v1/saml/acs</code>
+                            <code className="text-white">{appOrigin}/api/v1/saml/acs</code>
                           </div>
                           <div className="p-2 rounded bg-black/40 border border-white/5 text-gray-400">
                             <span className="text-gray-500">Entity ID:</span>{" "}
-                            <code className="text-white">https://suspensionlab.pro/saml/metadata</code>
+                            <code className="text-white">{appOrigin}/saml/metadata</code>
                           </div>
                         </div>
                       </div>

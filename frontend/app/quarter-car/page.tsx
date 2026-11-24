@@ -83,12 +83,6 @@ function getDampingStatus(z: number): Status {
   if (z >= 0.1  && z <= 0.8) return "warn";
   return "bad";
 }
-// MED-01 FIX: getComfortStatus must use Wk-weighted RMS (ISO 2631-1 boundary values are for Wk)
-function getComfortStatus(rmsWk: number): Status {
-  if (rmsWk < 0.315) return "good";
-  if (rmsWk < 1.0)   return "warn";
-  return "bad";
-}
 function getTXStatus(tx: number): Status {
   if (tx < 2.0) return "good";
   if (tx < 3.5) return "warn";

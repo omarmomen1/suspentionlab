@@ -50,9 +50,5 @@ export function getUserPlanLevel(
   if (user?.is_trial && (!user.plan || user.plan === "FREE")) {
     return PLAN_LEVELS.TRIAL;
   }
-  const email = (user as any)?.email;
-  if (email && (email.toLowerCase() === "testuser@suspensionlab.com" || email.toLowerCase().startsWith("testuser@"))) {
-    return PLAN_LEVELS.PRO;
-  }
   return PLAN_LEVELS[user?.plan ?? "FREE"] ?? 0;
 }

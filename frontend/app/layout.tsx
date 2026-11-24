@@ -59,7 +59,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                 <span>© {new Date().getFullYear()} SuspensionLab. All rights reserved.</span>
                 <Link href="/legal/terms" className="hover:text-gray-300 transition-colors">Terms of Service</Link>
                 <Link href="/legal/privacy" className="hover:text-gray-300 transition-colors">Privacy Policy</Link>
-                <a href="/contact" className="hover:text-gray-300 transition-colors">Contact</a>
+                <a href="mailto:support@suspensionlab.io" className="hover:text-gray-300 transition-colors">Contact</a>
               </footer>
             </WorkspaceProvider>
           </AuthProvider>

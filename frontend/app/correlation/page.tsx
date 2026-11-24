@@ -474,38 +474,26 @@ function CorrelationCockpitContent() {
     setLoadingComp(true);
     try {
       const telemSource = overrideTelemetry ?? parsedTelemetry;
-      let sessionA: Record<string, any>;
-      let sessionB: Record<string, any>;
-      let labelA = `${activeDatasetName} (Stint 1)`;
-      let labelB = `${activeDatasetName} (Stint 2)`;
-
-      if (telemSource && telemSource.time && telemSource.time.length >= 20) {
-        const mid = Math.floor(telemSource.time.length / 2);
-        const t0B = telemSource.time[mid] ?? 0;
-        const sliceHalf = (start: number, end: number, shiftTimeZero: number) => {
-          const out: Record<string, number[]> = {};
-          for (const [k, arr] of Object.entries(telemSource)) {
-            const sl = arr.slice(start, end);
-            out[k] = k === "time" ? sl.map((t) => Number((t - shiftTimeZero).toFixed(4))) : sl;
-          }
-          return out;
-        };
-        sessionA = sliceHalf(0, mid, telemSource.time[0] ?? 0);
-        sessionB = sliceHalf(mid, telemSource.time.length, t0B);
-      } else {
-        sessionA = {
-          time: [0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
-          speed: [142, 155, 168, 175, 160, 148, 164],
-          lat_g: [0.4, 1.1, 1.75, 1.62, 0.9, -0.5, -1.4],
-        };
-        sessionB = {
-          time: [0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0],
-          speed: [145, 158, 171, 179, 163, 151, 167],
-          lat_g: [0.45, 1.18, 1.82, 1.68, 0.95, -0.55, -1.48],
-        };
-        labelA = "Baseline Trace (A)";
-        labelB = "Candidate Trace (B)";
+      if (!telemSource || !telemSource.time || telemSource.time.length < 20) {
+        setSessionCompData(null);
+        setLoadingComp(false);
+        return;
       }
+
+      const mid = Math.floor(telemSource.time.length / 2);
+      const t0B = telemSource.time[mid] ?? 0;
+      const sliceHalf = (start: number, end: number, shiftTimeZero: number) => {
+        const out: Record<string, number[]> = {};
+        for (const [k, arr] of Object.entries(telemSource)) {
+          const sl = arr.slice(start, end);
+          out[k] = k === "time" ? sl.map((t) => Number((t - shiftTimeZero).toFixed(4))) : sl;
+        }
+        return out;
+      };
+      const sessionA = sliceHalf(0, mid, telemSource.time[0] ?? 0);
+      const sessionB = sliceHalf(mid, telemSource.time.length, t0B);
+      const labelA = `${activeDatasetName} (Stint 1)`;
+      const labelB = `${activeDatasetName} (Stint 2)`;
 
       const res = await CorrelationApi.compareSessions({
         session_a: sessionA,
@@ -526,9 +514,9 @@ function CorrelationCockpitContent() {
     setInvestigatingEvent(true);
     try {
       const res = await CorrelationApi.investigateEvent({
-        session_id: "SESS-SILVERSTONE-FP2",
-        vehicle_id: vehicle?.name || "AMR24-EVO",
-        setup_id: setup?.name || "SETUP-REV-28",
+        session_id: activeDatasetName ? activeDatasetName.replace(/\.csv$/, "") : "active-session",
+        vehicle_id: vehicle?.name || "active-vehicle",
+        setup_id: setup?.name || "active-setup",
         event_type: event.event_type,
         severity: event.severity,
         start_time_s: event.start_time_s,
@@ -552,9 +540,9 @@ function CorrelationCockpitContent() {
   const handleInvestigateResidual = async (ch: any) => {
     try {
       const res = await CorrelationApi.investigateResidual({
-        session_id: "SESS-SILVERSTONE-FP2",
-        vehicle_id: vehicle?.name || "AMR24-EVO",
-        setup_id: setup?.name || "SETUP-REV-28",
+        session_id: activeDatasetName ? activeDatasetName.replace(/\.csv$/, "") : "active-session",
+        vehicle_id: vehicle?.name || "active-vehicle",
+        setup_id: setup?.name || "active-setup",
         channel_key: ch.channel_key,
         model_type: selectedModel,
         discrepancy_magnitude: ch.metrics.rmse,
@@ -1482,6 +1470,29 @@ function CorrelationCockpitContent() {
                         </div>
                       ))}
                     </div>
+                  </div>
+                </div>
+              )}
+
+              {!sessionCompData && (
+                <div className="rounded-xl border border-dashed border-neutral-800 bg-neutral-950/40 p-10 text-center space-y-3">
+                  <div className="w-10 h-10 rounded-full bg-neutral-800/80 text-purple-400 mx-auto flex items-center justify-center">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <h3 className="text-sm font-semibold text-white">No Session Comparison Data Available</h3>
+                  <p className="text-xs text-neutral-400 max-w-md mx-auto">
+                    Upload a CSV telemetry log with at least 20 samples or load one of the built-in GT3 datasets above to perform empirical stint and lap delta attribution.
+                  </p>
+                  <div className="flex flex-wrap justify-center gap-2 pt-2">
+                    {SAMPLE_TELEMETRY_DATASETS.map((ds) => (
+                      <button
+                        key={ds.id}
+                        onClick={() => handleLoadSampleDataset(ds)}
+                        className="px-2.5 py-1 text-[11px] font-mono bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded border border-neutral-700"
+                      >
+                        Load {ds.shortLabel}
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}

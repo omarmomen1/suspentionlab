@@ -65,8 +65,8 @@ interface CoupledVehicleConfig {
   // Coupled Suspension & Kinematics
   front_spring_rate: number; // N/mm (40 - 250)
   rear_spring_rate: number; // N/mm (40 - 250)
-  front_arb: number; // Nm/rad or N/mm (10 - 150)
-  rear_arb: number; // Nm/rad or N/mm (5 - 120)
+  front_arb: number; // N/mm wheel rate (10 - 150)
+  rear_arb: number; // N/mm wheel rate (5 - 120)
   static_rh_front_mm: number; // mm (20 - 100)
   static_rh_rear_mm: number; // mm (20 - 120)
   front_rc_height: number; // mm (-20 to 150)
@@ -1466,85 +1466,83 @@ export default function LapSimPage() {
         payload.sector_boundaries = sectorBounds;
       }
 
-      let simData: LapSimResponse | null = null;
+      const res = await fetchWithAuth("/api/v1/lap-sim/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
 
-      try {
-        const res = await fetchWithAuth("/api/v1/lap-sim/simulate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-
-        if (res.ok) {
-          const raw = await res.json();
-          const rawLapTime = raw.lap_time_s ?? raw.total_time_s ?? 0;
-          let parsedSectors = Array.isArray(raw.sector_times) ? raw.sector_times : (Array.isArray(raw.sector_times_s) ? raw.sector_times_s : []);
-          if (!parsedSectors || parsedSectors.length < 3 || parsedSectors[1] <= 0 || parsedSectors[2] <= 0) {
-            parsedSectors = [
-              Number((rawLapTime * 0.30).toFixed(3)),
-              Number((rawLapTime * 0.36).toFixed(3)),
-              Number((rawLapTime * 0.34).toFixed(3)),
-            ];
+      if (!res.ok) {
+        let errorDetail = `Simulation failed (${res.status})`;
+        try {
+          const errJson = await res.json();
+          if (errJson?.detail) {
+            errorDetail = typeof errJson.detail === "string" ? errJson.detail : JSON.stringify(errJson.detail);
+          } else if (errJson?.message) {
+            errorDetail = errJson.message;
           }
-
-          // Exact mechanical front LLTD fallback
-          const fallbackKwf = activeCfg.front_spring_rate * 1000 * 0.72 ** 2;
-          const fallbackKwr = activeCfg.rear_spring_rate * 1000 * 0.74 ** 2;
-          const fallbackKphif = 0.5 * (fallbackKwf + activeCfg.front_arb * 1000) * activeCfg.track_width_f ** 2;
-          const fallbackKphir = 0.5 * (fallbackKwr + activeCfg.rear_arb * 1000) * activeCfg.track_width_r ** 2;
-          const fallbackFrontLltd = Number(((fallbackKphif / Math.max(fallbackKphif + fallbackKphir, 1.0)) * 100).toFixed(1));
-
-          simData = {
-            lap_time_s: rawLapTime,
-            sector_times: parsedSectors,
-            max_speed_kmh: raw.max_speed_kmh ?? 0,
-            min_speed_kmh: raw.min_speed_kmh ?? 0,
-            avg_speed_kmh: raw.avg_speed_kmh ?? 0,
-            max_lat_g: raw.max_lat_g ?? raw.telemetry?.max_lat_g,
-            max_long_g: raw.max_long_g,
-            max_braking_g: raw.max_braking_g,
-            front_lltd_pct: raw.front_lltd_pct ?? fallbackFrontLltd,
-            min_rh_front_mm: raw.min_rh_front_mm ?? raw.telemetry?.min_rh_front_mm,
-            min_rh_rear_mm: raw.min_rh_rear_mm ?? raw.telemetry?.min_rh_rear_mm,
-            bottoming_events_count: raw.bottoming_events_count ?? 0,
-            energy_used_kj: raw.energy_used_kj ?? 0,
-            understeer_pct: raw.understeer_pct,
-            trace: {
-              s_m: Array.isArray(raw.trace?.s_m) ? raw.trace.s_m : (Array.isArray(raw.telemetry?.distances) ? raw.telemetry.distances : trackDistances),
-              x_m: Array.isArray(raw.trace?.x_m) ? raw.trace.x_m : (Array.isArray(raw.track_coordinates?.x) ? raw.track_coordinates.x : trackX),
-              y_m: Array.isArray(raw.trace?.y_m) ? raw.trace.y_m : (Array.isArray(raw.track_coordinates?.y) ? raw.track_coordinates.y : trackY),
-              speed_kmh: Array.isArray(raw.trace?.speed_kmh) ? raw.trace.speed_kmh : (Array.isArray(raw.telemetry?.speeds_kmh) ? raw.telemetry.speeds_kmh : []),
-              lat_g: Array.isArray(raw.trace?.lat_g) ? raw.trace.lat_g : (Array.isArray(raw.telemetry?.lateral_g) ? raw.telemetry.lateral_g : []),
-              long_g: Array.isArray(raw.trace?.long_g) ? raw.trace.long_g : (Array.isArray(raw.telemetry?.longitudinal_g) ? raw.telemetry.longitudinal_g : []),
-              throttle_pct: raw.trace?.throttle_pct,
-              brake_pct: raw.trace?.brake_pct,
-              gear: raw.trace?.gear ?? raw.telemetry?.gear_number,
-              downforce_n: raw.trace?.downforce_n ?? raw.telemetry?.aero_downforce_n,
-              limiting_factor: raw.trace?.limiting_factor,
-              ride_height_front_mm: raw.trace?.ride_height_front_mm ?? raw.telemetry?.ride_height_front_mm,
-              ride_height_rear_mm: raw.trace?.ride_height_rear_mm ?? raw.telemetry?.ride_height_rear_mm,
-              pitch_deg: raw.trace?.pitch_deg ?? raw.telemetry?.pitch_deg,
-            },
-            ggv_envelope: raw.ggv_envelope ?? raw.ggv,
-            corner_opportunities: raw.corner_opportunities,
-            setup_surface: raw.setup_surface ?? raw.telemetry?.setup_surface,
-            model_version: raw.model_version ?? "ApexSim-Contract",
-          };
+        } catch {
+          if (res.statusText) {
+            errorDetail = `${res.status} ${res.statusText}`;
+          }
         }
-      } catch {
-        // Fall back to local solver
+        throw new Error(errorDetail);
       }
 
-      if (!simData) {
-        simData = runLocalCoupledLapSimulation(
-          trackDistances,
-          trackCurvatures,
-          trackX,
-          trackY,
-          activeCfg,
-          sectorBounds
-        );
+      const raw = await res.json();
+      const rawLapTime = raw.lap_time_s ?? raw.total_time_s ?? 0;
+      let parsedSectors = Array.isArray(raw.sector_times) ? raw.sector_times : (Array.isArray(raw.sector_times_s) ? raw.sector_times_s : []);
+      if (!parsedSectors || parsedSectors.length < 3 || parsedSectors[1] <= 0 || parsedSectors[2] <= 0) {
+        parsedSectors = [
+          Number((rawLapTime * 0.30).toFixed(3)),
+          Number((rawLapTime * 0.36).toFixed(3)),
+          Number((rawLapTime * 0.34).toFixed(3)),
+        ];
       }
+
+      // Exact mechanical front LLTD fallback
+      const fallbackKwf = activeCfg.front_spring_rate * 1000 * 0.72 ** 2;
+      const fallbackKwr = activeCfg.rear_spring_rate * 1000 * 0.74 ** 2;
+      const fallbackKphif = 0.5 * (fallbackKwf + activeCfg.front_arb * 1000) * activeCfg.track_width_f ** 2;
+      const fallbackKphir = 0.5 * (fallbackKwr + activeCfg.rear_arb * 1000) * activeCfg.track_width_r ** 2;
+      const fallbackFrontLltd = Number(((fallbackKphif / Math.max(fallbackKphif + fallbackKphir, 1.0)) * 100).toFixed(1));
+
+      const simData: LapSimResponse = {
+        lap_time_s: rawLapTime,
+        sector_times: parsedSectors,
+        max_speed_kmh: raw.max_speed_kmh ?? 0,
+        min_speed_kmh: raw.min_speed_kmh ?? 0,
+        avg_speed_kmh: raw.avg_speed_kmh ?? 0,
+        max_lat_g: raw.max_lat_g ?? raw.telemetry?.max_lat_g,
+        max_long_g: raw.max_long_g,
+        max_braking_g: raw.max_braking_g,
+        front_lltd_pct: raw.front_lltd_pct ?? fallbackFrontLltd,
+        min_rh_front_mm: raw.min_rh_front_mm ?? raw.telemetry?.min_rh_front_mm,
+        min_rh_rear_mm: raw.min_rh_rear_mm ?? raw.telemetry?.min_rh_rear_mm,
+        bottoming_events_count: raw.bottoming_events_count ?? 0,
+        energy_used_kj: raw.energy_used_kj ?? 0,
+        understeer_pct: raw.understeer_pct,
+        trace: {
+          s_m: Array.isArray(raw.trace?.s_m) ? raw.trace.s_m : (Array.isArray(raw.telemetry?.distances) ? raw.telemetry.distances : trackDistances),
+          x_m: Array.isArray(raw.trace?.x_m) ? raw.trace.x_m : (Array.isArray(raw.track_coordinates?.x) ? raw.track_coordinates.x : trackX),
+          y_m: Array.isArray(raw.trace?.y_m) ? raw.trace.y_m : (Array.isArray(raw.track_coordinates?.y) ? raw.track_coordinates.y : trackY),
+          speed_kmh: Array.isArray(raw.trace?.speed_kmh) ? raw.trace.speed_kmh : (Array.isArray(raw.telemetry?.speeds_kmh) ? raw.telemetry.speeds_kmh : []),
+          lat_g: Array.isArray(raw.trace?.lat_g) ? raw.trace.lat_g : (Array.isArray(raw.telemetry?.lateral_g) ? raw.telemetry.lateral_g : []),
+          long_g: Array.isArray(raw.trace?.long_g) ? raw.trace.long_g : (Array.isArray(raw.telemetry?.longitudinal_g) ? raw.telemetry.longitudinal_g : []),
+          throttle_pct: raw.trace?.throttle_pct,
+          brake_pct: raw.trace?.brake_pct,
+          gear: raw.trace?.gear ?? raw.telemetry?.gear_number,
+          downforce_n: raw.trace?.downforce_n ?? raw.telemetry?.aero_downforce_n,
+          limiting_factor: raw.trace?.limiting_factor,
+          ride_height_front_mm: raw.trace?.ride_height_front_mm ?? raw.telemetry?.ride_height_front_mm,
+          ride_height_rear_mm: raw.trace?.ride_height_rear_mm ?? raw.telemetry?.ride_height_rear_mm,
+          pitch_deg: raw.trace?.pitch_deg ?? raw.telemetry?.pitch_deg,
+        },
+        ggv_envelope: raw.ggv_envelope ?? raw.ggv,
+        corner_opportunities: raw.corner_opportunities,
+        setup_surface: raw.setup_surface ?? raw.telemetry?.setup_surface,
+        model_version: raw.model_version ?? "ApexSim-Contract",
+      };
 
       // Top 3 Corner Opportunities for CSV mode
       if (currentTab === "csv" && simData) {
@@ -1795,7 +1793,7 @@ export default function LapSimPage() {
               onChange={(v) => updateCfg("rear_spring_rate", v)}
             />
             <ParamSlider
-              label="Front ARB Stiffness"
+              label="Front ARB Wheel Rate"
               unit="N/mm"
               value={cfg.front_arb}
               min={5}
@@ -1805,7 +1803,7 @@ export default function LapSimPage() {
               highlight
             />
             <ParamSlider
-              label="Rear ARB Stiffness"
+              label="Rear ARB Wheel Rate"
               unit="N/mm"
               value={cfg.rear_arb}
               min={5}
@@ -2449,7 +2447,7 @@ export default function LapSimPage() {
                               font: { size: 12, color: "#94A3B8", family: "JetBrains Mono, monospace" },
                             },
                             xaxis: {
-                              title: { text: "Front ARB [N/mm]", font: { color: "#71717a", size: 10 } },
+                              title: { text: "Front ARB Wheel Rate [N/mm]", font: { color: "#71717a", size: 10 } },
                               tickvals: result.setup_surface.front_arb_n_mm,
                             },
                             yaxis: {

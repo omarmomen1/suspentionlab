@@ -133,8 +133,13 @@ function NVHDashboard() {
   return (
     <div className="h-full flex flex-col p-5 pt-3 gap-3 min-h-0">
       <div className="flex items-center justify-between shrink-0 pb-3 border-b border-[#1e1e1e]">
-        <div className="flex flex-col">
-          <span className="text-[9px] font-bold tracking-[0.25em] text-ansys-yellow uppercase">High-Frequency Analyzer (0-250 Hz)</span>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className="text-[9px] font-bold tracking-[0.25em] text-ansys-yellow uppercase">High-Frequency Analyzer (0-250 Hz)</span>
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-amber-500/10 border border-amber-500/30 text-amber-400">
+              Client-Side Interactive Solver (Preview)
+            </span>
+          </div>
           <h1 className="text-2xl font-semibold tracking-tight text-white leading-tight">Acoustic NVH</h1>
         </div>
       </div>

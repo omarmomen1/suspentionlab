@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useUndoRedo } from "../../hooks/useUndoRedo";
 import { useAuth } from "../../contexts/AuthContext";
+import { apiFetch } from "../../lib/api";
 
 import Plot from "../../components/sim/Plot";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -71,9 +72,9 @@ function SensitivitySweepDashboard() {
     setIsRunning(true);
     setResults(null);
     try {
-      const res = await fetch(`${API_BASE}/simulate/sweep`, {
+      const res = await apiFetch("/simulate/sweep", {
         method: "POST",
-        headers: { "Content-Type": "application/json", ...authHeader() },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params)
       });
       const data = await res.json();
@@ -83,6 +84,12 @@ function SensitivitySweepDashboard() {
         return;
       }
       
+      if (data.status === "COMPLETED" && data.result) {
+        setResults(data.result);
+        setIsRunning(false);
+        return;
+      }
+
       if (data.job_id) {
         pollJob({
           jobId: data.job_id,

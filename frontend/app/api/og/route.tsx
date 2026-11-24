@@ -20,10 +20,10 @@ export async function GET(req: NextRequest) {
     }
 
     const report = await res.json();
-    const r = report.result;
+    const r = report?.result;
 
-    const comfort = r.comfort_rating || "Simulation Result";
-    const title = report.title || "Suspension Analysis";
+    const comfort = r?.comfort_rating || (r?.lapTime != null ? `Lap: ${r.lapTime.toFixed(3)}s` : "Simulation Result");
+    const title = report?.title || "Suspension Analysis";
 
     return new ImageResponse(
       (
@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
                 <span style={{ fontSize: 24, color: "#888", marginBottom: "8px" }}>Peak Body Accel</span>
                 <span style={{ fontSize: 48, color: "#fff", fontWeight: "bold" }}>
-                  {typeof r.rms_body_accel === "number" ? r.rms_body_accel.toFixed(2) : "—"} m/s²
+                  {typeof r?.rms_body_accel === "number" ? r.rms_body_accel.toFixed(2) : "—"} m/s²
                 </span>
               </div>
             </div>

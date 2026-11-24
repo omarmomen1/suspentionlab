@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { Upload, Activity, Check, X } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { apiFetch } from "../lib/api";
 
 interface TelemetryUploaderProps {
   onParsed: (data: Record<string, unknown>) => void;
@@ -20,18 +21,12 @@ export default function TelemetryUploader({ onParsed, onClear, hasData }: Teleme
     if (!file) return;
     
     setIsUploading(true);
-    const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
     const formData = new FormData();
     formData.append("file", file);
 
-    const headers = { ...authHeader() } as Record<string, string>;
-    delete headers["Content-Type"];
-
     try {
-      const res = await fetch(`${API_BASE}/parse-telemetry`, {
+      const res = await apiFetch("/parse-telemetry", {
         method: "POST",
-        credentials: "include",
-        headers,
         body: formData,
       });
       if (res.ok) {

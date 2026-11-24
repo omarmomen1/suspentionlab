@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { Upload, FileText, Check, X } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
+import { apiFetch } from "../lib/api";
 
 interface TirUploaderProps {
   onParsed: (coeffs: Record<string, unknown>) => void;
@@ -20,19 +21,12 @@ export default function TirUploader({ onParsed, onClear, hasCoeffs }: TirUploade
     if (!file) return;
     
     setIsUploading(true);
-    const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
     const formData = new FormData();
     formData.append("file", file);
 
-    // Filter out Content-Type if authHeader sets it, so fetch can set multipart boundary
-    const headers = { ...authHeader() } as Record<string, string>;
-    delete headers["Content-Type"];
-
     try {
-      const res = await fetch(`${API_BASE}/parse-tir`, {
+      const res = await apiFetch("/parse-tir", {
         method: "POST",
-        credentials: "include",
-        headers,
         body: formData,
       });
       if (res.ok) {
