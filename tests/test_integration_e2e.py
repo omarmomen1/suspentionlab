@@ -76,7 +76,11 @@ def test_e2e_flow():
                 }))
             return job_id
 
-        with patch("suspensionlab.backend.api.routes.simulate.quarter_car.SimulationService.enqueue_simulation", new=mock_enqueue):
+        async def mock_execute(user_id, plan, job_type, payload, db, team_id=None, **kwargs):
+            job_id = await mock_enqueue(user_id, plan, job_type, payload, db, team_id=team_id, **kwargs)
+            return {"job_id": job_id, "status": "PENDING", "result": None, "error": None}
+
+        with patch("suspensionlab.backend.api.routes.simulate.quarter_car.SimulationService.execute_or_enqueue", new=mock_execute):
             sim_resp = client.post(
                 "/api/v1/simulate",
                 json={

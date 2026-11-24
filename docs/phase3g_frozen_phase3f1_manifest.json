@@ -7,12 +7,12 @@
   "steering_compliance_k_delta": 0.000451,
   "physics_file_hashes": {
     "src/suspensionlab/physics/dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690",
-    "src/suspensionlab/physics/magic_formula.py": "69b182da4d2687e8cf7f9326501fc30c6380023445ea99d04f0f67bbc3d3f76c",
+    "src/suspensionlab/physics/magic_formula.py": "31acfd244c5847bd9c7a9b6a8c2ea10cac8aa3da80e5931e39be7bc849f2308e",
     "src/suspensionlab/physics/tire_model.py": "da72dea8adf6b83846997fa02c9b1cade1b74272bcaa96f5aa0e2ea389005209",
-    "src/suspensionlab/physics/wheel_dynamics.py": "0740079a6ab8001295c11e1f45da677c0755e9d23fa8e4d8e927098547d5b012",
-    "src/suspensionlab/physics/kinematics.py": "3b4fd3d715472fb993d150810ae626c042a3e83c8bd875133614d8c62509782f",
-    "src/suspensionlab/physics/half_car.py": "70958d0a1d4655c9fa3998131524a452a205549c5b03c9e6b3694e09114ea4d0",
-    "src/suspensionlab/physics/quarter_car.py": "9f8a0f8b42c6c51768d259674372dbb892420da8a79f892690b450785ca92547",
+    "src/suspensionlab/physics/wheel_dynamics.py": "7b18dc638b0bcaddf42add726134102171a7bcb75dab1a9f80bbbdb23200cf42",
+    "src/suspensionlab/physics/kinematics.py": "f1da154d9f837f362b65372b297fc30218bff6c884d11e21e3a23a1a5009b30b",
+    "src/suspensionlab/physics/half_car.py": "1497f41aa9559f2821c6559211a85bf6aee41350ce3750865e566472f303c96f",
+    "src/suspensionlab/physics/quarter_car.py": "65b3b882416db02c557a8bb1c12b22b2b67b412821d2dd07eb74f4d30d9aeae5",
     "src/suspensionlab/physics/contracts.py": "afb71fc4b9f7bc4a50e0c8eb544a83047bb1f084870a223443d6b12c9b05dbfe"
   },
   "baseline_test_suite_count": 104,

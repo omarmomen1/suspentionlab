@@ -163,7 +163,17 @@ def test_benchmark_small_session_under_5k_samples():
     total_time = time.perf_counter() - t0
 
     assert len(norm["time"]) == 2000
-    assert len(events) >= 0
+    assert len(events) == 5, f"Expected exactly 5 dynamics events on benchmark trace, got {len(events)}"
+    for ev in events:
+        assert isinstance(ev.event_id, str) and len(ev.event_id) > 0
+        assert isinstance(ev.event_type, str) and len(ev.event_type) > 0
+        assert 0.0 <= ev.start_time <= ev.end_time <= 20.0
+        assert 0.0 <= ev.confidence <= 1.0
+        assert isinstance(ev.channels, list) and len(ev.channels) > 0
+        assert isinstance(ev.detector, str)
+    assert {"WHEEL_HOP", "CORNER_ENTRY", "APEX_REGION", "CORNER_EXIT", "YAW_RATE_DEVIATION"}.issubset(
+        {e.event_type for e in events}
+    )
     assert "channels" in model_res
     assert total_time < 0.50, f"Small session took {total_time:.3f}s (threshold 0.50s)"
 
@@ -276,8 +286,17 @@ def test_memory_stability_bounded_footprint():
     Verify bounded memory footprint over repeated ingestion cycles
     without synthetic leaks.
     """
+    import tracemalloc
     gc.collect()
     raw_csv = _generate_benchmark_csv(n_samples=10000, extra_channels=False)
+
+    tracemalloc.start()
+    parsed = parse_telemetry_csv(raw_csv)
+    norm = normalize_to_100hz(parsed)
+    _ = assess_telemetry_health(norm)
+    _ = detect_all_vehicle_dynamics_events(norm)
+    gc.collect()
+    snap_start = tracemalloc.take_snapshot()
 
     for _ in range(5):
         parsed = parse_telemetry_csv(raw_csv)
@@ -286,4 +305,12 @@ def test_memory_stability_bounded_footprint():
         _ = detect_all_vehicle_dynamics_events(norm)
 
     gc.collect()
-    assert True
+    snap_end = tracemalloc.take_snapshot()
+    current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    stats = snap_end.compare_to(snap_start, "lineno")
+    net_growth_bytes = sum(stat.size_diff for stat in stats if stat.size_diff > 0)
+
+    assert peak < 35 * 1024 * 1024, f"Peak memory {peak / (1024*1024):.2f} MB exceeded 35 MB bound"
+    assert net_growth_bytes < 1 * 1024 * 1024, f"Memory growth {net_growth_bytes / 1024:.2f} KB exceeded 1 MB bound"

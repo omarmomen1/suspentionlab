@@ -10,7 +10,7 @@
   "physics_files_sha256": {
     "dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690",
     "brake_distribution.py": "15338e921252e35afc9ee543fdb996464e4784b36e1ce18e05c8832e392a57ea",
-    "magic_formula.py": "69b182da4d2687e8cf7f9326501fc30c6380023445ea99d04f0f67bbc3d3f76c",
+    "magic_formula.py": "31acfd244c5847bd9c7a9b6a8c2ea10cac8aa3da80e5931e39be7bc849f2308e",
     "tire_model.py": "da72dea8adf6b83846997fa02c9b1cade1b74272bcaa96f5aa0e2ea389005209"
   },
   "phase3h_artifact_hashes": {

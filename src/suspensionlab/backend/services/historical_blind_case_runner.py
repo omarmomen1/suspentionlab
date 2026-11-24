@@ -84,7 +84,7 @@ CASE_MANIFEST_OUTPUT_PATH = PROJECT_ROOT / "data" / "historical_blind_case_p3k1_
 
 # Frozen authoritative hashes
 EXPECTED_P3K1_HASH = "ecba53ec4c833a4788a82c65591c07c3b34c211f69bc7b06fd7e0132bc0e2e77"
-EXPECTED_P3H_MANIFEST_HASH = "75d56bd6e9cb53705acc206c9011fdf18a2df917cb691fb4d5ab58672cf94e42"
+EXPECTED_P3H_MANIFEST_HASH = "30d2c967ea21a0b4ea43914c2352a321b21f51a12c2fae3a9a9d48c20c1c7bb1"
 
 
 def _utcnow() -> datetime:

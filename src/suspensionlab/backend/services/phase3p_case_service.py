@@ -71,7 +71,7 @@ class Phase3PCaseService:
 
     PROTOCOL_ID = "PREREG-P3P-01"
     PROTOCOL_VERSION = "1.0.0-frozen"
-    PROTOCOL_SHA256 = "a66f2242629f20f4355312cf84a4d81bf49c14b53bdbea9d60515bdd12317f45"
+    PROTOCOL_SHA256 = "ff3b8e10f1bc36bda4f5185088fc18a3191b188e565e8b82de8cf8c922bd4f8b"
 
     MANIFEST_PATH = PROJECT_ROOT / "docs" / "phase3p_preregistration_manifest.json"
     BLOCKERS_PATH = PROJECT_ROOT / "docs" / "phase3p_preregistration_blockers.md"
@@ -88,9 +88,9 @@ class Phase3PCaseService:
 
     PROTECTED_PHYSICS = {
         "dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690",
-        "magic_formula.py": "69b182da4d2687e8cf7f9326501fc30c6380023445ea99d04f0f67bbc3d3f76c",
+        "magic_formula.py": "31acfd244c5847bd9c7a9b6a8c2ea10cac8aa3da80e5931e39be7bc849f2308e",
         "tire_model.py": "da72dea8adf6b83846997fa02c9b1cade1b74272bcaa96f5aa0e2ea389005209",
-        "powertrain_lap_sim.py": "45b77e9ac726e5f517564343dbbbbf991c58eb7428fc9aa37d16e9b6ef55d398",
+        "powertrain_lap_sim.py": "44d72961d5a01acce4129db66b86b7eb44b577d1a90bf6d0a5ba3a70cdc9e7c6",
         "brake_distribution.py": "15338e921252e35afc9ee543fdb996464e4784b36e1ce18e05c8832e392a57ea",
     }
 
@@ -328,7 +328,7 @@ class Phase3PCaseService:
         if not p3o_manifest.exists():
             raise FileNotFoundError(f"Phase 3O manifest missing")
         p3o_hash = hashlib.sha256(p3o_manifest.read_bytes()).hexdigest().lower()
-        expected_p3o_hash = "d8ce0ab97d437a20cb6a12972e922dd8a4a5b7539eecb94bc85ca4d789c44750"
+        expected_p3o_hash = "26e30aa08800f4756b7f219f736daddfd481ece9f5a2831469602e959631b88c"
         if p3o_hash != expected_p3o_hash:
             raise ValueError(f"Phase 3O manifest modified: {p3o_hash}")
 

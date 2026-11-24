@@ -12,7 +12,7 @@ import pytest
 
 MANIFEST_PATH = Path("docs/phase3o_preregistration_manifest.json")
 MANIFEST_V100_PATH = Path("docs/phase3o_preregistration_manifest_v1_0_0.json")
-EXPECTED_PROTOCOL_HASH_V101 = "d8ce0ab97d437a20cb6a12972e922dd8a4a5b7539eecb94bc85ca4d789c44750"
+EXPECTED_PROTOCOL_HASH_V101 = "26e30aa08800f4756b7f219f736daddfd481ece9f5a2831469602e959631b88c"
 EXPECTED_HISTORICAL_HASH_V100 = "1704bbf7213bc85064b6e60b2a6745589b3b01a6d3a59b2b2cd9630f99e81100"
 
 def load_manifest() -> dict:

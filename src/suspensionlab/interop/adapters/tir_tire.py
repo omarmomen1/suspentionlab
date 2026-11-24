@@ -175,12 +175,11 @@ PKX1                     = {pkx1:.4f}
                         # In .tir NOMPRES is in Pa, convert to bar
                         parameters["p0_bar"] = ParameterValue(name="p0_bar", value=val / 100000.0, unit="bar", dimension="pressure")
                     # 16 PAC2002 Pure-Slip Coefficients
-                    elif k in ("PCY1", "PDY1", "PDY2", "PDY3", "PEY1", "PEY2", "PEY3", "PEY4", "PKY1", "PKY2", "PKY3"):
-                        parameters[k.lower()] = ParameterValue(name=k.lower(), value=val, unit="-", dimension="dimensionless")
-                    elif k in ("PCX1", "PDX1", "PDX2", "PDX3", "PEX1", "PEX2", "PEX3", "PEX4", "PKX1", "PKX2", "PKX3"):
-                        parameters[k.lower()] = ParameterValue(name=k.lower(), value=val, unit="-", dimension="dimensionless")
-                    elif k in ("PHY1", "PHY2", "PHY3", "PHX1", "PHX2", "PVX1", "PVX2", "PVY1", "PVY2", "PVY3", "PVY4"):
-                        parameters[k.lower()] = ParameterValue(name=k.lower(), value=val, unit="-", dimension="dimensionless")
+                    elif k in ("PCY1", "PDY1", "PDY2", "PDY3", "PEY1", "PEY2", "PEY3", "PEY4", "PKY1", "PKY2", "PKY3",
+                               "PCX1", "PDX1", "PDX2", "PDX3", "PEX1", "PEX2", "PEX3", "PEX4", "PKX1", "PKX2", "PKX3",
+                               "PHY1", "PHY2", "PHY3", "PHX1", "PHX2", "PVX1", "PVX2", "PVY1", "PVY2", "PVY3", "PVY4"):
+                        canonical_k = k[0].lower() + k[1].upper() + k[2:].lower()
+                        parameters[canonical_k] = ParameterValue(name=canonical_k, value=val, unit="-", dimension="dimensionless")
                 except ValueError:
                     pass
 

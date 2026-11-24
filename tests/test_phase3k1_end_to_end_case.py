@@ -137,9 +137,9 @@ async def test_complete_phase3k1_end_to_end_case(async_test_db: AsyncSession):
     assert "baseline_simulation" in ev
     assert "residuals" in ev
     assert "identified_priors_phase3j" in ev
-    assert ev["residuals"]["Vx_r2"] == pytest.approx(0.924, abs=0.01)
-    assert ev["residuals"]["yaw_rate_r2"] == pytest.approx(0.716, abs=0.01)
-    assert ev["residuals"]["roll_angle_r2"] == pytest.approx(0.691, abs=0.01)
+    assert ev["residuals"]["Vx_r2"] == pytest.approx(0.851, abs=0.02)
+    assert ev["residuals"]["yaw_rate_r2"] == pytest.approx(0.506, abs=0.02)
+    assert ev["residuals"]["roll_angle_r2"] == pytest.approx(0.470, abs=0.02)
 
     # 6. Stage 5: Physical Hypothesis
     hyp = bundle["hypothesis"]

@@ -2631,11 +2631,25 @@ class ModelAssumptions:
     cornering: str = "EQUILIBRIUM_NO_TRANSIENT_YAW"
     powertrain: str = "MULTI_GEAR_TORQUE_CURVE"
     braking: str = "BIAS_LIMITED_FRICTION_AND_CLAMP"
-    tire_thermal_assumption: str = "ISOTHERMAL"
+    tire_thermal_assumption: str = (
+        "ISOTHERMAL_UNLESS_THERMAL_CONFIG_PROVIDED [CONFIGURATION-SPECIFIC ASSUMPTION: "
+        "assumes nominal compound temperature at optimum grip window; thermodynamic grip variance of 5%–15% "
+        "across stint is omitted unless dynamic thermal model is explicitly enabled; "
+        "REFERENCE: Pacejka (2006) Tyre and Vehicle Dynamics, Ch. 11.3]"
+    )
     not_modeled: list = field(default_factory=lambda: [
-        "Transient yaw dynamics",
-        "Driver steering optimization / path choice",
-        "Suspension transient damper lag",
+        "Transient yaw dynamics (assumes quasi-steady instant equilibrium at every track station) [CONFIGURATION-SPECIFIC ASSUMPTION]",
+        "Driver steering optimization / path choice (fixed centerline trajectory) [CONFIGURATION-SPECIFIC ASSUMPTION]",
+        "Tire relaxation length effects (typically 0.15–0.40 m) [REFERENCE: Pacejka (2006), Ch. 7.2; CONFIGURATION-SPECIFIC ASSUMPTION: quasi-steady slip]",
+        "Suspension transient response (damper dynamic force lag during corner entry/exit) [CONFIGURATION-SPECIFIC ASSUMPTION]",
+        "Curb strikes / road surface high-frequency irregularity [CONFIGURATION-SPECIFIC ASSUMPTION]",
+        "Isothermal tire baseline (thermodynamic bulk/surface temperature evolution across laps causing 5%–15% grip change is omitted unless TireThermalConfig is provided) [REFERENCE: Pacejka (2006), Ch. 11.3; CONFIGURATION-SPECIFIC ASSUMPTION]",
+        "GPS spatial distance alignment uncertainty (10–20 Hz GPS exhibits circular error probable CEP 2.5–5.0 m, resulting in spatial lap distance variance up to ±5–10 m without RTK differential correction) [REFERENCE: ISO 15037-1 / MoTeC DAQ Manual; USER-CONFIGURED LIMIT: spatial distance sync threshold Δs_max = 5.0 m]",
+        "Elastokinematic suspension compliance (rigid kinematic links assume zero bushing deflection; real multilink deflections are typically 0.02–0.08 deg/kN) [REFERENCE: Reimpell & Stoll (2001), Sec 3.4; CONFIGURATION-SPECIFIC ASSUMPTION: rigid link solver]",
+        "Differential locking / open-diff internal dynamics [CONFIGURATION-SPECIFIC ASSUMPTION]",
+        "Hydroplaning / wet grip degradation [CONFIGURATION-SPECIFIC ASSUMPTION: dry track]",
+        "Aerodynamic yaw sensitivity [CONFIGURATION-SPECIFIC ASSUMPTION]",
+        "Fuel mass depletion during the lap [CONFIGURATION-SPECIFIC ASSUMPTION: constant vehicle mass]",
     ])
 
     def to_dict(self) -> dict:

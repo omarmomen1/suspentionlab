@@ -129,12 +129,28 @@ def test_benchmark_parameter_sweep():
 
 def test_benchmark_memory_stability():
     """Verify bounded memory footprint and clean garbage collection over repeated evaluations."""
+    import tracemalloc
     gc.collect()
+    tracemalloc.start()
     p = HandlingParams()
+
+    # Baseline warm-up
+    _ = compute_handling_diagram(p, speed_kph=100.0, n_points=30)
+    _ = simulate_yaw_response_scenario(p, scenario_type="step_steer", duration_s=3.0, dt=0.02)
+    gc.collect()
+    snap_start = tracemalloc.take_snapshot()
 
     for _ in range(8):
         _ = compute_handling_diagram(p, speed_kph=100.0, n_points=30)
         _ = simulate_yaw_response_scenario(p, scenario_type="step_steer", duration_s=3.0, dt=0.02)
 
     gc.collect()
-    assert True
+    snap_end = tracemalloc.take_snapshot()
+    current, peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    stats = snap_end.compare_to(snap_start, "lineno")
+    net_growth_bytes = sum(stat.size_diff for stat in stats if stat.size_diff > 0)
+
+    assert peak < 30 * 1024 * 1024, f"Peak memory {peak / (1024*1024):.2f} MB exceeded 30 MB bound"
+    assert net_growth_bytes < 2 * 1024 * 1024, f"Memory growth {net_growth_bytes / 1024:.2f} KB exceeded 2 MB bound"

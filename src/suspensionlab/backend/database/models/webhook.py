@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import os
 import uuid
 from datetime import datetime, timezone
@@ -22,7 +23,20 @@ from suspensionlab.backend.database.core import Base
 
 
 def _get_encryption_key() -> bytes:
-    key_src = os.getenv("SECRET_KEY") or os.getenv("JWT_SECRET_KEY") or "default_secret_key_for_webhook_dev"
+    key_src = os.getenv("SECRET_KEY")
+    if not key_src:
+        key_src = os.getenv("JWT_SECRET_KEY")
+    if not key_src:
+        raw_keys = os.getenv("JWT_KEYS")
+        if raw_keys:
+            try:
+                parsed = json.loads(raw_keys)
+                if isinstance(parsed, dict) and parsed:
+                    key_src = next(iter(parsed.values()))
+            except Exception:
+                pass
+    if not key_src:
+        raise RuntimeError("CRITICAL: SECRET_KEY or JWT_SECRET_KEY is required for webhook encryption.")
     derived = hashlib.sha256(key_src.encode()).digest()
     return base64.urlsafe_b64encode(derived)
 

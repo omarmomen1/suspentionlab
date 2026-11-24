@@ -1,35 +1,42 @@
 import os
-import sys
-
-print("DATABASE_URL:", os.environ.get("DATABASE_URL"))
-print("REDIS_URL:", os.environ.get("REDIS_URL"))
-
-import socket
-import asyncio
+import pytest
 import asyncpg
 import redis.asyncio as aioredis
 
-async def test_conns():
+
+@pytest.fixture(autouse=True)
+def mock_redis():
+    """Bypass the autouse mock_redis fixture in conftest.py for live URL testing."""
+    yield
+
+
+@pytest.mark.asyncio
+async def test_database_connection():
     db_url = os.environ.get("DATABASE_URL")
-    print("Testing asyncpg connection...")
+    if not db_url:
+        pytest.skip("DATABASE_URL environment variable is not configured")
+
+    clean_url = db_url.replace("+asyncpg", "")
+    if clean_url.startswith("sqlite") or not clean_url.startswith(("postgres://", "postgresql://")):
+        pytest.skip("DATABASE_URL is not configured for PostgreSQL (skipping asyncpg live check)")
+
+    conn = await asyncpg.connect(clean_url)
     try:
-        # asyncpg takes connection string or host
-        # replace postgresql+asyncpg with postgresql
-        clean_url = db_url.replace("+asyncpg", "")
-        conn = await asyncpg.connect(clean_url)
         val = await conn.fetchval("SELECT 1")
-        print("Asyncpg SUCCESS, SELECT 1 =", val)
+        assert val == 1, f"Expected SELECT 1 to return 1, got {val}"
+    finally:
         await conn.close()
-    except Exception as e:
-        print("Asyncpg FAILED:", type(e), e)
 
-    print("Testing redis connection...")
+
+@pytest.mark.asyncio
+async def test_redis_connection():
+    redis_url = os.environ.get("REDIS_URL")
+    if not redis_url or redis_url == "redis://127.0.0.1:6379/0":
+        pytest.skip("REDIS_URL environment variable is not configured")
+
+    r = aioredis.from_url(redis_url)
     try:
-        r = aioredis.from_url(os.environ.get("REDIS_URL"))
         pong = await r.ping()
-        print("Redis SUCCESS, PING =", pong)
+        assert pong is True, f"Expected redis ping to return True, got {pong}"
+    finally:
         await r.aclose()
-    except Exception as e:
-        print("Redis FAILED:", type(e), e)
-
-asyncio.run(test_conns())

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 import logging
 
@@ -21,6 +21,7 @@ class JobResponse(BaseModel):
 @router.post("/simulate", response_model=JobResponse, status_code=status.HTTP_200_OK)
 async def simulate(
     payload: SimulateRequest,
+    response: Response,
     user: UserContext = Depends(require_permission(Permission.SIMULATION_RUN)),
     db: AsyncSession = Depends(get_db_dependency)
 ):
@@ -33,6 +34,8 @@ async def simulate(
             db=db,
             team_id=getattr(user, "team_id", None),
         )
+        if job_res.get("status") == "PENDING":
+            response.status_code = status.HTTP_202_ACCEPTED
         return JobResponse(
             job_id=job_res["job_id"],
             status=job_res.get("status", "COMPLETED"),
