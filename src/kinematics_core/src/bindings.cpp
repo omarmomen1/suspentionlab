@@ -239,6 +239,9 @@ PYBIND11_MODULE(kinematics_core, m) {
                 KinematicsCurves
              )pbdoc")
 
+        .def("with_rack_travel", &KinematicsSolver::with_rack_travel,
+             py::arg("rack_mm"),
+             "Solver with the inboard tie-rod pivot translated along Y (tie-rod length unchanged).")
         .def("solve_single", &KinematicsSolver::solve_single,
              py::arg("dz_mm"),
              R"pbdoc(

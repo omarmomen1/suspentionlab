@@ -34,12 +34,12 @@
     "src/suspensionlab/physics/handling_analysis.py": "bb2ed47844cb50e28caa60a7cde8d8e934c85e19e063cb2786618dd633712f8f",
     "src/suspensionlab/physics/handling_model.py": "619cbae5b250462012b3bd2f01ec2955f6cac636b44290d6ee117516e8912218",
     "src/suspensionlab/physics/hil_interface.py": "92d34d0ec48d78fe6771b5eaec38ed894945bb2c6ec332ac5ab9b0eb92da3c6e",
-    "src/suspensionlab/physics/kinematics.py": "019bb67fca0baae62df77ab1a6c2a947de04a067e31043554931eb27d314d0a5",
+    "src/suspensionlab/physics/kinematics.py": "665ce22771d7f8187be2e575b556fbe26eb246bcba33ccc8f462e654f92c21dc",
     "src/suspensionlab/physics/kinematics_facade.py": "d94e8a3fbd36e86892a6fd05377d795a880fcdf7c801b216012edcbbf3e8df86",
     "src/suspensionlab/physics/kinematics_sensitivity.py": "21ec2eaa13fbaca1a9336a31e328f0d52f4fc5e1b30ad8ca7232bda626921f12",
     "src/suspensionlab/physics/kinematics_tensor_lut.py": "67136ae863b4e3c70bb4c8f51cd1d04536ba808273adec22da4e889f18477a63",
     "src/suspensionlab/physics/lap_delta.py": "577b82190f658d0102540e42429dd1e88c9b2a9d1657aba53cfc938a46be1f5d",
-    "src/suspensionlab/physics/lap_sim.py": "d2cf7cdc26b580be458daf3c6d94c63520947ddc8362f3977d88ecdaa804f7f7",
+    "src/suspensionlab/physics/lap_sim.py": "4d4aa0f3049b4a97b3143b9dccad2f2a652fbbb481803f97a18f53633ba00d4a",
     "src/suspensionlab/physics/lap_sim_errors.py": "f916102db2ef7938fd4f18002ca45b0f7c4c41134800b034e4cabdf5250ff3c2",
     "src/suspensionlab/physics/load_transfer_dynamics.py": "e9fee3e4367d152bcfea25afc58f1a997a70444e472ea5e2ac3e1ca3192a1175",
     "src/suspensionlab/physics/magic_formula.py": "2be0492f1e4c483401c1cd8544381edeb364dd5380e4b8fe9796f613cc627048",
@@ -74,7 +74,7 @@
     "src/suspensionlab/physics/tire_fitting.py": "2daff2abad1eef215d5c218961584b61c5504f35a77a2af33545ac377bae4dc2",
     "src/suspensionlab/physics/tire_model.py": "da72dea8adf6b83846997fa02c9b1cade1b74272bcaa96f5aa0e2ea389005209",
     "src/suspensionlab/physics/tire_thermal.py": "e623c4a23cc8d50e7845b9542060892534afc0f17d2edada2cade3b1aa967d18",
-    "src/suspensionlab/physics/track_geometry.py": "0fa0f18a2ef77f3af0e4f7f40b546b076a378d8c42a1fb02fccaa0345869a9a4",
+    "src/suspensionlab/physics/track_geometry.py": "e2eb4d372272f3bcd58c794aa1b7e6e48da00f0d8484bb7816c6742af7c70ffe",
     "src/suspensionlab/physics/trajectory_optimization.py": "91f8bdea9a27765d7d7ed7eb07f94b3c046bb793c7707799ca9f4f9718a043fe",
     "src/suspensionlab/physics/transmission_state_machine.py": "031929048bed8248eddf047589b5d93a21a443c37d3480a6155f91c3d6965459",
     "src/suspensionlab/physics/validity.py": "64b66a018641bac9e80413588854cdef3b7247bb3385fcf7adb6a62c4d757512",
@@ -85,21 +85,21 @@
   "manifests": {
     "docs/phase3c1_frozen_baseline_manifest.json": "cae584f165174a76cf4824485380d98794ae828bf90b4a1c59a6dcf0ea271fe1",
     "docs/phase3e_frozen_phase3d_manifest.json": "d09b85e233dd6c0b1b3db1bb264487c79176b9173107dd41d7b9628374ce80b8",
-    "docs/phase3g_frozen_phase3f1_manifest.json": "836e47da987dd1ccd0d81aecfc7bf20c6c3d3514bdfdb6644537ccd4ae3d5817",
+    "docs/phase3g_frozen_phase3f1_manifest.json": "2e3c42a9d810d2c90ee84e168b947219e231d58b1d9f2b7dec7d6b76b6783a85",
     "docs/phase3h1_frozen_phase3h_manifest.json": "462b800f793acb327a161b9aa57d4f241f5878e251836637af60a84c166c4f6b",
     "docs/phase3h_frozen_phase3g1_manifest.json": "f9d6ed28e3ee6db88a1cfcad8a93c04cb6134329b5ca69e0ac0bd2702a9e47a0",
     "docs/phase3o_preregistration_manifest.json": "74cef9b8a1de6ca329e74afc7416554863142acbc0e96b7b8ffbe0a19e296831",
     "docs/phase3p_preregistration_manifest.json": "2342dc81207d544fb4ce17d64158644c9e2fd074138b3858ea64f8db1307356f"
   },
   "provenance": {
-    "recertification_cycle": "WAVE_6_ENTERPRISE_HARDENING",
-    "previous_cycle": "WAVE_5A2_KINEMATICS_LAPSIM_FULLCAR_HONESTY_REMEDIATION",
+    "recertification_cycle": "V2_PHASE_3_PHYSICS_ENGINES",
+    "previous_cycle": "WAVE_6_ENTERPRISE_HARDENING",
     "wave2_commit_hashes": [
       "c88b6939c6596103eb6ebdc671a2aae33cc3a34e",
       "543cffe47915fc4cbe50ee8077ec7d5f36ac460c",
       "d888dc7c75cf7a425faa7f249acab0be06f7b3dc"
     ],
-    "timestamp_iso": "2026-11-26T18:01:02.866377+00:00",
+    "timestamp_iso": "2026-11-26T21:03:30.988351+00:00",
     "notes": "Wave 5A-2 re-certification: six physics files modified (kinematics tire-radius derivation + static alignment inputs + coincident-joint rejection; lap_sim telemetry unit detection + no silent Spa substitution + explicit-input validation; dynamic_lap_sim incomplete-lap honesty; full_car DIVERGED flag + symmetric_input + zeta honesty; quarter_car overdamped zeta honesty; ai_engineering_authority server-side RBAC). Commit provenance: WAVE_5A2_REMEDIATION (owner-approved; committed on branch wave-5a-2). Previous hashes preserved in wave5a2_previous_hashes.",
     "wave5a2_previous_hashes": {
       "src/suspensionlab/physics/ai_engineering_authority.py": "e1f5d237ad8059cbc8a5b71bc907609804f32db870dc147e43d8fe2155c76074",
@@ -121,6 +121,12 @@
     "wave6_previous_hashes": {
       "src/suspensionlab/physics/pareto_optimizer.py": "7f3f8af02e9202f3f120e1c206d6dee31d41192fc0868d0f0c86d7d860ab2244",
       "src/suspensionlab/physics/provenance.py": "a0e5e842d86fe512e5a0e530edc57cda5236f2e5465425408ed8a5cc2fa4c58d"
+    },
+    "v2_phase3_notes": "V2 Phase 3 re-certification: three registered physics files modified (kinematics.py rack_travel_mm + steer grid; lap_sim.py TrackSegment elevation fields, vertical-curvature load and compression channels; track_geometry.py Spa elevation stations and spline helper). One manifest changed (docs/phase3g_frozen_phase3f1_manifest.json, the only one listing kinematics.py). why_chain.py is a NEW file outside the 81-file frozen set and is not registered. Commit marker: V2_PHASE_3_PHYSICS_ENGINES (owner-authorised in the 10:57 PM Phase 3 message; committed on branch v2-phase-3).",
+    "v2_phase3_previous_hashes": {
+      "src/suspensionlab/physics/kinematics.py": "019bb67fca0baae62df77ab1a6c2a947de04a067e31043554931eb27d314d0a5",
+      "src/suspensionlab/physics/lap_sim.py": "d2cf7cdc26b580be458daf3c6d94c63520947ddc8362f3977d88ecdaa804f7f7",
+      "src/suspensionlab/physics/track_geometry.py": "0fa0f18a2ef77f3af0e4f7f40b546b076a378d8c42a1fb02fccaa0345869a9a4"
     }
   }
 }

@@ -4,6 +4,7 @@ backend/api/routes/kinematics_routes.py
 SuspensionLab PRO — Kinematics API Routes
 
 POST /kinematics/solve   — Full wheel-travel sweep, returns all curves
+POST /kinematics/steer-grid — 2-D (bump, rack) grid: MR field, steer-induced camber/caster/toe, Ackermann
 GET  /kinematics/default — Default hardpoints (for UI initialisation)
 GET  /kinematics/info    — Backend info (C++ vs Python fallback)
 """
@@ -672,6 +673,38 @@ async def solve_point(
         geometry              = pt.geometry,
         metadata              = pt.metadata,
     )
+
+
+class SteerGridRequest(BaseModel):
+    """2-D (bump, rack travel) motion-ratio / steer sweep. Python 5-DOF solver, no C++ path."""
+    hardpoints: HardpointSetInput = Field(default_factory=HardpointSetInput)
+    z_min_mm: float = Field(-50.0, ge=-200.0, le=0.0)
+    z_max_mm: float = Field(50.0, ge=0.0, le=200.0)
+    n_bump: int = Field(11, ge=3, le=41)
+    rack_min_mm: float = Field(-5.0, ge=-100.0, le=0.0)
+    rack_max_mm: float = Field(5.0, ge=0.0, le=100.0)
+    n_steer: int = Field(5, ge=3, le=21)
+    tire_radius_m: Optional[float] = Field(None, gt=0.1, lt=1.0)
+    wheelbase_mm: Optional[float] = Field(None, gt=500.0, lt=6000.0,
+        description="Needed only for Ackermann. Omit and Ackermann is returned as NOT_MODELED.")
+
+
+@router.post("/mr-field", summary="Alias of /steer-grid (MR field MR(bump, steer))", include_in_schema=True)
+@router.post("/steer-grid", summary="2-D motion-ratio field MR(bump, steer) plus steer-induced camber/caster/toe and Ackermann")
+async def steer_grid(
+    req: SteerGridRequest,
+    user: UserContext = Depends(require_permission(Permission.SIMULATION_RUN)),
+) -> dict:
+    from suspensionlab.physics.kinematics import solve_steer_grid
+    try:
+        return solve_steer_grid(
+            req.hardpoints.to_dict(),
+            z_min_mm=req.z_min_mm, z_max_mm=req.z_max_mm, n_bump=req.n_bump,
+            rack_min_mm=req.rack_min_mm, rack_max_mm=req.rack_max_mm, n_steer=req.n_steer,
+            tire_radius=req.tire_radius_m, wheelbase_mm=req.wheelbase_mm,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.post("/validate", summary="CAE hardpoint admissibility check with diagnostic remediation")

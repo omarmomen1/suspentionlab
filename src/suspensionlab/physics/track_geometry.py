@@ -232,3 +232,67 @@ def normalize_to_viewport(
     }
 
     return norm_x, norm_y, bounds
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Elevation profile z(s), slope dz/ds and vertical curvature kappa_z = d2z/ds2
+# ─────────────────────────────────────────────────────────────────────────────
+
+#: Spa-Francorchamps altitude stations, (distance along the lap [m], altitude [m above sea level]).
+#: Source: the official circuit map published by the circuit operator (Circuit de
+#: Spa-Francorchamps, "plan_public_2025", PDF):
+#:   https://ser2026.racspa.be/docs/CircuitdeSpa-Francorchamps-Fulltrack.pdf
+#: which labels each station "<distance> m Alt. <altitude> m" on a 7004 m lap. Read from the
+#: PDF text layer. LIMITS: only 17 stations (0.2 to 0.7 km apart) and whole-metre altitudes. They
+#: describe the coarse relief (about 100 m total) well, but they CANNOT resolve the local
+#: compression in the Eau Rouge dip, so the kappa_z derived here understates it. Nothing between
+#: stations is measured: the profile in between is a periodic cubic-spline interpolation.
+SPA_ELEVATION_STATIONS_M: List[Tuple[float, float]] = [
+    (0.0, 418.0), (220.0, 424.0), (310.0, 419.0), (690.0, 403.0), (890.0, 391.0),
+    (1130.0, 415.0), (1490.0, 446.0), (2200.0, 463.0), (2470.0, 470.0), (2870.0, 455.0),
+    (3110.0, 438.0), (3600.0, 402.0), (4280.0, 377.0), (4740.0, 375.0), (5100.0, 373.0),
+    (5700.0, 388.0), (6000.0, 398.0), (6540.0, 408.0), (7004.0, 418.0),
+]
+SPA_ELEVATION_SOURCE = (
+    "Circuit de Spa-Francorchamps official circuit map (17 altitude stations, 7004 m lap): "
+    "https://ser2026.racspa.be/docs/CircuitdeSpa-Francorchamps-Fulltrack.pdf. "
+    "Spline-interpolated between stations; too coarse to resolve the local Eau Rouge compression."
+)
+
+
+def elevation_profile_from_stations(
+    s_eval: Union[Sequence[float], np.ndarray],
+    s_stations: Union[Sequence[float], np.ndarray],
+    z_stations: Union[Sequence[float], np.ndarray],
+    *,
+    periodic: bool = False,
+    station_span_m: Optional[float] = None,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Cubic-spline z(s), dz/ds and exact vertical curvature kappa_z at ``s_eval``.
+
+    kappa_z = z'' / (1 + z'^2)^(3/2) (curvature of the road profile; positive in a valley, where
+    the car is compressed). ``station_span_m`` rescales the station distances to the simulated
+    track length (e.g. official 7004 m onto the sim track). ``periodic`` requires the first and
+    last altitude to match and gives a continuous slope across start/finish.
+    """
+    from scipy.interpolate import CubicSpline
+
+    s_st = np.asarray(s_stations, dtype=float)
+    z_st = np.asarray(z_stations, dtype=float)
+    if s_st.ndim != 1 or len(s_st) < 3 or len(s_st) != len(z_st):
+        raise ValueError("Need at least 3 matching elevation stations.")
+    if np.any(np.diff(s_st) <= 0):
+        raise ValueError("Elevation station distances must be strictly increasing.")
+    if not (np.all(np.isfinite(s_st)) and np.all(np.isfinite(z_st))):
+        raise ValueError("Elevation stations must be finite.")
+    s_ev = np.asarray(s_eval, dtype=float)
+    if station_span_m is not None:
+        s_st = s_st * (float(station_span_m) / float(s_st[-1] - s_st[0]))
+    bc = "periodic" if periodic and abs(z_st[0] - z_st[-1]) < 1e-9 else "not-a-knot"
+    cs = CubicSpline(s_st, z_st, bc_type=bc)
+    s_clip = np.clip(s_ev, s_st[0], s_st[-1])
+    z = cs(s_clip)
+    d1 = cs(s_clip, 1)
+    d2 = cs(s_clip, 2)
+    kappa = d2 / np.power(1.0 + d1 * d1, 1.5)
+    return z, d1, kappa

@@ -61,6 +61,14 @@ public:
      */
     KinematicPoint solve_single(double dz_mm) const;
 
+    /**
+     * V2 Phase 3: rack travel. Returns a solver whose inboard tie-rod pivot (TRI) is
+     * translated by rack_mm along the lateral axis (Y). The tie-rod LENGTH (L_TRO_sq)
+     * is unchanged, so the shifted pivot forces the upright to steer. rack_mm == 0
+     * returns an identical solver. Mirrors Python `_solve_py(rack_travel_mm=...)`.
+     */
+    KinematicsSolver with_rack_travel(double rack_mm) const;
+
 private:
     HardpointSet hp_;
 
