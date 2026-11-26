@@ -1,0 +1,127 @@
+{
+  "cycle": "WAVE_5A_PHYSICS_AND_API_REMEDIATION",
+  "timestamp_iso": "2026-11-26T01:25:19.085277+00:00",
+  "base_commit": "810a4332222e5229554fd8ac9154af045667b12d",
+  "files": {
+    "docs/phase3e_frozen_phase3d_manifest.json": {
+      "old_sha256": "59e00194b10d4b606ca9c1adea4436907f39f3a6d50baf1a413aa4eb323cc508",
+      "new_sha256": "d09b85e233dd6c0b1b3db1bb264487c79176b9173107dd41d7b9628374ce80b8"
+    },
+    "docs/phase3g_frozen_phase3f1_manifest.json": {
+      "old_sha256": "d87065260f520f3a2dae29cac0156d778173c7e2f96f870475409d83ac4bf162",
+      "new_sha256": "d819f314e7e282f12b114b0c6d0d460eb498e607429953ab28869383e599cd07"
+    },
+    "docs/phase3h1_frozen_phase3h_manifest.json": {
+      "old_sha256": "deeb01c8f14d7efc434369cf8f09f834577142d9aeece131891f8d6e23975d88",
+      "new_sha256": "8538143fe9234533d5bd20e8ac27f8fdc7d177f84abaae8d16a68cd51a999c0e"
+    },
+    "docs/phase3h_frozen_phase3g1_manifest.json": {
+      "old_sha256": "e131dbfde68d96ebc8a1765ded3832a0ba09270aeda3e7ccebda5647dd374bbc",
+      "new_sha256": "e2a26e32e566f8ec15b3e3b12605fc2dec86e8d3cb6ab5a70ff306bcf3a9df62"
+    },
+    "docs/phase3o_preregistration_manifest.json": {
+      "old_sha256": "26e30aa08800f4756b7f219f736daddfd481ece9f5a2831469602e959631b88c",
+      "new_sha256": "79190cefcbf8114095e9efd81d74ce64f3810af2f7a4b10f2d116853e3983664"
+    },
+    "docs/phase3p_preregistration_manifest.json": {
+      "old_sha256": "ff3b8e10f1bc36bda4f5185088fc18a3191b188e565e8b82de8cf8c922bd4f8b",
+      "new_sha256": "c5c8d29cf9ca73c25245eeb97ef014f5de6ad49dc66bf7643f1d713490f1bef8"
+    },
+    "frontend/app/correlation/page.tsx": {
+      "old_sha256": "3b36022d61feaf027c8acdfd0d5b5629c32a5967d9923433f6ae29b9ac8bf515",
+      "new_sha256": "0eee21a7a50a199de98289a8ff0836ece2e4aac20b079da5306909dacc26a9ab"
+    },
+    "frontend/components/GGFrictionCircle.tsx": {
+      "old_sha256": "b908779f8283372feec0890aabf280e3ba75a1dbc0ce15e5efe2aa66a3a35b34",
+      "new_sha256": "bc3c6cb477344ceb54135482a9b482aae547f85d50131d3694b671437e7d614b"
+    },
+    "frontend/lib/api_client.ts": {
+      "old_sha256": "e1200865df133ec9077b594ce591ccc64de42966ca0ba45b85969bb7af4bfb7b",
+      "new_sha256": "211cc975ed0f16a9186b5a7d1ab3ac353bc6c95f401ca04f5ff11015970d61b8"
+    },
+    "pre_phase4_3_hashes.json": {
+      "old_sha256": "79af28855f8fa18c329128624d358285d22cd9409cc22dceeac53e351241bc91",
+      "new_sha256": "d98543f774eed41d8fb67244608a80aca05761d9e834cd8e0ebb739c30c8b7cb"
+    },
+    "src/suspensionlab/backend/api/main.py": {
+      "old_sha256": "4f1cd7ab00ea73e54f6f2b648af29ff4d447045771edccdaa5170507f0f5dc2b",
+      "new_sha256": "481a32178bd52ee9740b22ad28f39dbde6bd9eaafafc3e816927c30cb1142e7b"
+    },
+    "src/suspensionlab/backend/api/routes/ai_engineer_routes.py": {
+      "old_sha256": "051eb018ce4f5344dc9f730b5b1228d8878dbd88bad045a21d4d16383bcbfd0e",
+      "new_sha256": "61892a79ea2174488f9d7872b630d1e931f4c27cdb8a021980901ebabe4790ba"
+    },
+    "src/suspensionlab/backend/api/routes/correlation_routes.py": {
+      "old_sha256": "33335d35ea9650cb0f828596720d93cd9b41824877113e5922f337470b1533b5",
+      "new_sha256": "5b814996bd993edd337b1bcda8970dffbdd3259277f7a10bb05585d59691e9aa"
+    },
+    "src/suspensionlab/backend/api/routes/evidence_graph_routes.py": {
+      "old_sha256": "27b86c43443705e5bc9969e6ce14bd22ee917fc6d477a54e1c125ca0342e1740",
+      "new_sha256": "bae367838b5a9936961c658e187671b7e5b3ccda70657678c0bf4ea146f90295"
+    },
+    "src/suspensionlab/backend/api/routes/parameter_trust_routes.py": {
+      "old_sha256": "c36ce00bb1e39cc4ac8cb10154b74d1667b08add4c7f2ee189b44530467c4894",
+      "new_sha256": "44734bdfaab418adef7ee0085b3785f00efdd8e8a4daad6356fb5818f897fd6d"
+    },
+    "src/suspensionlab/backend/api/routes/profiles.py": {
+      "old_sha256": "1c589068718f25323f28a514737e0b1db9a3fd27b50a4dbf7e23c87d22e01c2a",
+      "new_sha256": "da9e70e19a09b303292cec0ee1ef30e32a2da73bfd7bddd44357ea45cfeda548"
+    },
+    "src/suspensionlab/backend/api/routes/scim_routes.py": {
+      "old_sha256": "11b834bd3c3692d049d76819c0d0b4a8e2390a5ef91d830fed73e886c568d82d",
+      "new_sha256": "e4094900b28d9a78719649786db4f923d3eeb9ec4988486f7824450f055eaf62"
+    },
+    "src/suspensionlab/backend/api/routes/setup_engineering_routes.py": {
+      "old_sha256": "4b15a29ea1e832f932a2c777afe86a57f4ec82e1b1a697cd5596b73a1276ef0f",
+      "new_sha256": "b8c595dacbe0ca2d6b69bb13a36644f3256ee4c62377d3371759cb4828e886a5"
+    },
+    "src/suspensionlab/backend/api/routes/simulate/sweep.py": {
+      "old_sha256": "6c9e99a2e34376bf5bf6ffba4669ba0f42175494e3226b72d55903429ace2d5a",
+      "new_sha256": "047531fc485b4913ae20476f449e356974e32e4e00a86b84d308aaef9dd8f724"
+    },
+    "src/suspensionlab/backend/api/routes/vehicle_intelligence_routes.py": {
+      "old_sha256": "9c86b99b64ba669ba5c90a963b481a1035c1151677e4c0e6230a9837adfc2737",
+      "new_sha256": "626a37f22c817103478a37ab748d5c96218a7851a3061fbe7e11f84e318b135f"
+    },
+    "src/suspensionlab/backend/services/ai_race_engineer_service.py": {
+      "old_sha256": "f85f9cf1ff8c19e1424d65d6a916552f5b7793525fd46e8614c5907698fcb7d6",
+      "new_sha256": "c34516167257bbfbbc18831a22c38b083aa131633ebcff176b54aa251b6595e0"
+    },
+    "src/suspensionlab/backend/services/cae_integration_service.py": {
+      "old_sha256": "173798ace1ab1d533cb2403fb34e2b10361de543478801bdfeec12d1ce8e6be6",
+      "new_sha256": "506adc997a8d9c5a8f6c6d2b51155063903ac937083e704d3896955a9e6366bd"
+    },
+    "src/suspensionlab/backend/workers/unified_worker.py": {
+      "old_sha256": "615a86aa79e3cc11d99ce0f966b4d2d6ab36dc28553fd14b06d899cc651690ee",
+      "new_sha256": "982227fe2b803eccda52d866a4dc4f2762d5a52ef2f7aa43207c0ea57a1c980c"
+    },
+    "src/suspensionlab/interop/adapters/tir_tire.py": {
+      "old_sha256": "bb7b67cb80a32fc45a4fa4c63352d70f0029cf7615e1b0cf9fa621a884361d35",
+      "new_sha256": "9df1e368979180f89fb805115626793219bc4da2c078a2a85197e5b367af1382"
+    },
+    "src/suspensionlab/physics/damper_model.py": {
+      "old_sha256": "99b61485f3e9e8008c7bd0002b08762022840fa4e6dd84d1334c70a45f03dffb",
+      "new_sha256": "0c4be9d355141f676356439b273b4ea32e32ef2fc34b7def8c9c7becfe351d0c"
+    },
+    "src/suspensionlab/physics/magic_formula.py": {
+      "old_sha256": "31acfd244c5847bd9c7a9b6a8c2ea10cac8aa3da80e5931e39be7bc849f2308e",
+      "new_sha256": "2be0492f1e4c483401c1cd8544381edeb364dd5380e4b8fe9796f613cc627048"
+    },
+    "src/suspensionlab/physics/quarter_car.py": {
+      "old_sha256": "65b3b882416db02c557a8bb1c12b22b2b67b412821d2dd07eb74f4d30d9aeae5",
+      "new_sha256": "12706a5f3289a8e9f5619b0d6db2dc0a194d919b27fd11fa870e27c6bb166503"
+    },
+    "src/suspensionlab/physics/yaw_dynamics.py": {
+      "old_sha256": "663f0a94c49e35e3b1839553f48b1a199e974b00575e34346b30777b0a1ab42e",
+      "new_sha256": "3b21e67bfacc04b67a55abe567c8adbafb95edb6f11706e674eb8b6d5021cf0f"
+    },
+    "src/suspensionlab/shared/models.py": {
+      "old_sha256": "abb53751746dd89720f4f41a89d89168c16a7d25585e0aa9486725c54f7804e2",
+      "new_sha256": "3203d05f2166895546979298dec03b2d052640472916d8c60c04a980e588d6c9"
+    },
+    "tests/test_wave5a_remediation.py": {
+      "old_sha256": null,
+      "new_sha256": "2c5180f795f1f7528163bc6f7d88a1baa24c506643f8d3485f7ad2211eb4b0a5"
+    }
+  }
+}

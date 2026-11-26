@@ -2219,7 +2219,43 @@ async def get_parameter_trust_endpoint(
             organization_id=org_id,
             user_id=user_id,
         )
-    except (EntityNotFoundError, ParameterNotFoundError, TenantIsolationError, MalformedIdentifierError) as e:
+    except (EntityNotFoundError, ParameterNotFoundError, MalformedIdentifierError) as e:
+        # Wave 5A: an unassessed parameter is a legitimate state, not a crash.
+        # Return HTTP 200 with a structured UNASSESSED baseline so the
+        # Parameter Trust Map renders an honest empty state instead of a raw
+        # 404 RFC7807 page. Tenant isolation violations remain hard errors.
+        return ParameterTrustResponseDTO(
+            parameter_identity=ParameterIdentityDTO(
+                entity_type=entity_type,
+                entity_id=entity_id,
+                parameter_name=parameter,
+                parameter_path="",
+            ),
+            value_reference=ValueReferenceDTO(
+                value=None,
+                value_identity="",
+                unit="",
+                source_entity=f"{entity_type}:{entity_id}",
+            ),
+            unit="",
+            current_trust_state="UNASSESSED",
+            policy_version="",
+            scope={},
+            supporting_evidence=[],
+            validation_coverage="NO_VALIDATION",
+            recency=RecencyMetadataDTO(),
+            conflicts=[],
+            explanation=ExplanationDTO(
+                state="UNASSESSED",
+                reasons=["No trust assessment or evidence exists yet for this parameter."],
+                supporting_evidence=[],
+                conflicts=[],
+                scope={},
+                limitations=["No evidence has been linked to this parameter."],
+            ),
+            assessment_hash="",
+        )
+    except TenantIsolationError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Parameter '{parameter}' for '{entity_type}:{entity_id}' not found.",

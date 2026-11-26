@@ -198,6 +198,11 @@ class CaeIntegrationService:
             "peak_susp_travel_mm": round(peak_travel, 2),
             "sample_count": len(times),
             "duration_s": round(times[-1] - times[0], 3) if len(times) > 1 else 0.0,
+            # Same time-grid fields the compare path reports, so a normalized
+            # ingest alone carries full temporal provenance.
+            "time_start": round(float(times[0]), 6) if times else 0.0,
+            "time_end": round(float(times[-1]), 6) if times else 0.0,
+            "dt_mean": round(float(np.mean(np.diff(times))), 9) if len(times) > 1 else 0.0,
         }
 
         identity = ExternalModelIdentity(
@@ -282,12 +287,26 @@ class CaeIntegrationService:
             "rms_body_accel": round(native_sim.rms_body_accel, 3),
         }
 
+        # Wave 5A: honour the documented CAE integration contract. The frontend
+        # consumes time_start / time_end / dt_mean at the top level and
+        # max_absolute_error / mean_percentage_error per channel; populate all
+        # of them with real computed values.
+        ext_time = np.asarray(external_dataset.time_s, dtype=float)
+        time_start = float(ext_time[0]) if len(ext_time) > 0 else 0.0
+        time_end = float(ext_time[-1]) if len(ext_time) > 0 else 0.0
+        dt_mean = float(np.mean(np.diff(ext_time))) if len(ext_time) > 1 else 0.0
+        with np.errstate(divide="ignore", invalid="ignore"):
+            pct_err = np.abs(residual) / np.maximum(np.abs(ext_a), 1e-9) * 100.0
+        mean_pct_err = float(np.mean(pct_err[np.isfinite(pct_err)])) if np.any(np.isfinite(pct_err)) else 0.0
+
         channel_metrics = {
             "ddz_s": {
                 "r_squared": round(r2, 4),
                 "r2_score": round(r2, 4),
                 "rms_residual": round(rms_err, 3),
                 "max_residual": round(max_err, 3),
+                "max_absolute_error": round(max_err, 4),
+                "mean_percentage_error": round(mean_pct_err, 2),
                 "agreement_status": agreement_status,
             }
         }
@@ -323,6 +342,9 @@ class CaeIntegrationService:
                 "agreement_status": agreement_status,
             },
             "sample_count_compared": n_pts,
+            "time_start": round(time_start, 6),
+            "time_end": round(time_end, 6),
+            "dt_mean": round(dt_mean, 9),
             "provenance_verified": True,
         }
 

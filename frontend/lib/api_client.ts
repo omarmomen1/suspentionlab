@@ -2342,7 +2342,12 @@ export class CorrelationApi {
     });
   }
 
-  static async detectEvents(telemetryData: Record<string, any>): Promise<{ events_count: number; events: any[] }> {
+  static async detectEvents(telemetryData: Record<string, any>): Promise<{
+    events_count: number;
+    events: any[];
+    gg_points?: { lat_g: number[]; long_g: number[] };
+    gg_stats?: { max_resultant_g: number | null; peak_lat_g: number | null; peak_long_g: number | null; sample_count: number };
+  }> {
     return apiJson("/api/v1/telemetry/events", {
       method: "POST",
       body: JSON.stringify({ telemetry_data: telemetryData }),

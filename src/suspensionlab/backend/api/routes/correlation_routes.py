@@ -187,10 +187,53 @@ async def detect_events_endpoint(
     """
     try:
         events = detect_all_vehicle_dynamics_events(req.telemetry_data)
+
+        # Wave 5A: return the FULL sampled (ay, ax) point cloud for the G-G
+        # friction-circle diagram, decimated to at most 2000 points, plus
+        # honest statistics computed from the uploaded channels themselves.
+        # No values are hardcoded or fabricated; if the channels are absent
+        # the fields are empty/null.
+        import numpy as np
+
+        def _channel(*names):
+            for name in names:
+                for cand in (name, name.lower(), name.upper()):
+                    arr = req.telemetry_data.get(cand)
+                    if arr is not None and len(arr) > 0:
+                        return np.asarray(arr, dtype=float)
+            return None
+
+        lat = _channel("lat_g", "g_lat", "ay", "latacc", "lateral_g")
+        lon = _channel("long_g", "g_lon", "ax", "inlineacc", "longitudinal_g")
+        gg_points = {"lat_g": [], "long_g": []}
+        gg_stats = {"max_resultant_g": None, "peak_lat_g": None, "peak_long_g": None, "sample_count": 0}
+        if lat is not None and lon is not None:
+            n = min(len(lat), len(lon))
+            lat, lon = lat[:n], lon[:n]
+            finite = np.isfinite(lat) & np.isfinite(lon)
+            lat, lon = lat[finite], lon[finite]
+            MAX_PTS = 2000
+            stride = max(1, len(lat) // MAX_PTS)
+            gg_points = {
+                "lat_g": [round(float(v), 4) for v in lat[::stride]],
+                "long_g": [round(float(v), 4) for v in lon[::stride]],
+            }
+            resultant = np.sqrt(lat ** 2 + lon ** 2)
+            gg_stats = {
+                "max_resultant_g": round(float(np.max(resultant)), 3) if len(resultant) else None,
+                "peak_lat_g": round(float(lat[np.argmax(np.abs(lat))]), 3) if len(lat) else None,
+                "peak_long_g": round(float(lon[np.argmax(np.abs(lon))]), 3) if len(lon) else None,
+                "sample_count": int(len(lat)),
+            }
+
         return {
             "events_count": len(events),
             "events": [e.to_dict() for e in events],
+            "gg_points": gg_points,
+            "gg_stats": gg_stats,
         }
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("Event detection failed: %s", exc)
         raise HTTPException(status_code=500, detail=f"Vehicle dynamics event detection failed: {exc}")

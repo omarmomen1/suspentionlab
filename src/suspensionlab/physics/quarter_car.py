@@ -231,12 +231,12 @@ class QuarterCarParams:
 class RoadProfile:
     """Road excitation profile definition.
 
-    profile_type : 'step' | 'sine' | 'pothole' | 'random' | 'impulse'
+    profile_type : 'step' | 'sine' | 'pothole' | 'random' | 'impulse' | 'bump'
     amplitude    : bump height or sine amplitude [m]
     frequency    : excitation frequency for sine input [Hz]
     duration     : total simulation time [s]
     """
-    profile_type: Literal["step", "sine", "pothole", "random", "impulse", "iso8608"] = "step"
+    profile_type: Literal["step", "sine", "pothole", "random", "impulse", "iso8608", "bump"] = "step"
     iso_class:    Literal["A", "B", "C", "D", "E", "F", "G", "H"] = "A"
     amplitude:    float = 0.05   # m
     frequency:    float = 2.0    # Hz  (used for sine / random)
@@ -244,7 +244,7 @@ class RoadProfile:
     speed_mps:    float = 20.0   # m/s (used for ISO 8608 temporal PSD scaling)
 
     def __post_init__(self) -> None:
-        valid_profiles = ("step", "sine", "pothole", "random", "impulse", "iso8608")
+        valid_profiles = ("step", "sine", "pothole", "random", "impulse", "iso8608", "bump")
         if self.profile_type not in valid_profiles:
             self.profile_type = "step"
 
@@ -627,6 +627,23 @@ def _road_profile_fn(profile: Union[RoadProfile, CanonicalRoadProfile]):
             inside = (t >= 0.30) & (t <= 0.65)
             out = np.zeros_like(t)
             out[inside] = -A * (np.pi / 0.35) * np.cos(np.pi * (t[inside] - 0.30) / 0.35)
+            return out
+
+    elif profile.profile_type == "bump":
+        # Single half-sine bump (positive, upward), t in [0.30, 0.65] s.
+        # Wave 5A: added so /half-car "Single Bump" requests validate and run
+        # (previously HTTP 422: 'bump' was not an accepted profile type).
+        def zr(t):
+            t = np.asarray(t, dtype=float)
+            inside = (t >= 0.30) & (t <= 0.65)
+            out = np.zeros_like(t)
+            out[inside] = A * np.sin(np.pi * (t[inside] - 0.30) / 0.35)
+            return out
+        def dzr(t):
+            t = np.asarray(t, dtype=float)
+            inside = (t >= 0.30) & (t <= 0.65)
+            out = np.zeros_like(t)
+            out[inside] = A * (np.pi / 0.35) * np.cos(np.pi * (t[inside] - 0.30) / 0.35)
             return out
 
     elif profile.profile_type == "random":
@@ -1047,7 +1064,11 @@ def simulate_time_response(
     
     static_tire_load = (p.m_s + p.m_u) * 9.81
     if p.enable_contact_loss:
-        tire_load_var = np.maximum(tire_load_var, -static_tire_load)
+        # tire_load_var uses the k_t*(z_u - z_r) reporting convention, opposite
+        # in sign to the ODE force F_t = k_t*(z_r - z_u). Lift-off (total tire
+        # force -> 0) maps to +static_tire_load here, so the contact-loss clamp
+        # must limit the tension side with np.minimum, not compression.
+        tire_load_var = np.minimum(tire_load_var, static_tire_load)
 
     # Dynamic tire force (upward positive in perturbation coordinates)
     F_tire_dyn = p.k_t * (z_r_arr - z_u) + p.c_t * (dz_r_arr - dz_u)

@@ -1777,11 +1777,53 @@ async def ai_race_engineer_chat(
 
     # ── Step 2: Physics-Grounded AI Race Engineer Service ─────────────────
     from suspensionlab.backend.services.ai_race_engineer_service import AIRaceEngineerService
-    physics_result = AIRaceEngineerService.calculate_physics_diagnosis_and_setup(
-        problem=req.problem,
-        params=base_params,
-        user_context=user,
-    )
+    try:
+        physics_result = AIRaceEngineerService.calculate_physics_diagnosis_and_setup(
+            problem=req.problem,
+            params=base_params,
+            user_context=user,
+        )
+    except Exception as exc:
+        # Wave 5A: never surface an unhandled HTTP 500 for a custom prompt.
+        # Fall back to a deterministic, physics-grounded honest response.
+        logger.exception("AI race engineer service failed; using deterministic fallback: %s", exc)
+        physics_result = {
+            "diagnosis": "The deterministic physics engine could not complete a full diagnosis for this custom prompt.",
+            "root_cause": f"Analysis pipeline reported an internal error ({type(exc).__name__}). No numbers were fabricated.",
+            "tested_setups": 0,
+            "best_feasible": [],
+            "predicted_effects": [],
+            "constraint_violations": [],
+            "confidence": 0.0,
+            "evidence": {"description": "Deterministic fallback: no simulations were run.", "simulations_run": 0, "feasible_found": 0},
+            "model_validity": {"tier": "OUT-OF-DOMAIN", "score": 0.0},
+            "provenance": {},
+            "recommendations": [],
+            "setup_summary": "No setup change was produced. Rephrase the problem around a measurable handling symptom (e.g. understeer, roll, ride harshness) and retry.",
+            "simulated": False,
+            "tool_calls": [],
+            "citations": [],
+            "rbac_context": {
+                "user_id": getattr(user, "user_id", "anonymous"),
+                "team_id": getattr(user, "team_id", None),
+                "role": getattr(user, "team_role", "engineer"),
+            },
+            "answer": "I could not complete a physics-grounded analysis of that prompt.",
+            "engineering_interpretation": "The request fell outside the deterministic analysis envelopes, or an internal computation failed. No estimate was invented.",
+            "uncertainty": "UNKNOWN: analysis did not complete.",
+            "next_action": "Rephrase the request as a specific vehicle-dynamics symptom or target metric.",
+            "epistemic_classification": "INFERRED",
+            "epistemic_badges": [],
+            "approval_gate": {"required": False, "status": "NOT_REQUIRED"},
+            "workflow": "deterministic_fallback",
+            "structured_response": (
+                "### ANSWER\nI could not complete a physics-grounded analysis of that prompt.\n\n"
+                "### EVIDENCE\nNo simulations were run (deterministic fallback).\n\n"
+                "### ENGINEERING INTERPRETATION\nThe request is outside the current analysis envelopes.\n\n"
+                "### UNCERTAINTY\nUNKNOWN: analysis did not complete.\n\n"
+                "### NEXT ACTION\nRephrase as a specific vehicle-dynamics symptom or target metric."
+            ),
+        }
 
     # Optional Gemini narrative enhancement if API key is configured
     if GEMINI_API_KEY:
@@ -1814,12 +1856,29 @@ Respond with ONLY JSON:
         team_id=getattr(user, "team_id", None),
         metadata={
             "problem": req.problem[:100],
-            "provenance_hash": physics_result.get("provenance", {}).get("result_hash"),
+            "provenance_hash": (physics_result.get("provenance") or {}).get("result_hash"),
             "confidence": physics_result.get("confidence", 0.92),
         },
     )
 
-    return AIChatResponse(**physics_result)
+    try:
+        return AIChatResponse(**physics_result)
+    except Exception as exc:
+        logger.exception("AIChatResponse construction failed; returning minimal valid response: %s", exc)
+        return AIChatResponse(
+            diagnosis="The analysis completed but its result could not be serialized into the standard contract.",
+            root_cause=f"Response contract mismatch ({type(exc).__name__}).",
+            tested_setups=0,
+            best_feasible=[],
+            predicted_effects=[],
+            constraint_violations=[],
+            confidence=0.0,
+            evidence=Evidence(description="Serialization fallback", simulations_run=0, feasible_found=0),
+            model_validity={"tier": "OUT-OF-DOMAIN", "score": 0.0},
+            recommendations=[],
+            setup_summary="No setup change was produced.",
+            simulated=False,
+        )
 
 
 @router.post("/approve")

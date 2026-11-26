@@ -85,6 +85,22 @@ async def yaw_analysis(
     except Exception as e:
         raise HTTPException(500, f"Yaw analysis failed: {e}")
 
+    # Wave 5A fix: sanitize non-finite values (inf / NaN) so oversteer setups
+    # (K_us <= 0) serialize to valid JSON instead of crashing with HTTP 500.
+    # characteristic speed is only defined for understeer; critical speed only
+    # for oversteer: V_crit = sqrt(g * L / |K_us|).
+    import math as _math
+
+    def _finite_or_none(x):
+        try:
+            xf = float(x)
+        except (TypeError, ValueError):
+            return None
+        return xf if _math.isfinite(xf) else None
+
+    v_char = analyzer.neutral_steer_speed()
+    v_crit = analyzer.critical_speed()
+
     return {
         "stability_metrics": metrics,
         "mmm": {
@@ -93,7 +109,9 @@ async def yaw_analysis(
             "Fy_total_n": mmm.Fy_total.tolist(),   # shape (n_beta, n_delta)
             "Mz_total_nm": mmm.Mz_total.tolist(),
             "understeer_gradient_deg_per_g": mmm.understeer_gradient,
-            "neutral_steer_speed_ms":        mmm.neutral_steer_speed,
+            "neutral_steer_speed_ms":        _finite_or_none(mmm.neutral_steer_speed),
+            "characteristic_speed_ms":       _finite_or_none(v_char) if _finite_or_none(v_char) is not None else None,
+            "critical_speed_ms":             _finite_or_none(v_crit),
         },
     }
 

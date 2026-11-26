@@ -367,7 +367,13 @@ def _calc_tire_forces_fast(
     mu_y = max(mu_y, 0.0)
     Dy = mu_y * Fz
 
-    Ky = pKy1 * Fz0 * np.sin(2.0 * np.arctan(Fz / (pKy2 * Fz0 + 1e-6))) * (1.0 - pKy3 * abs(gamma)) * lambda_k_y
+    # Wave 5A fix: standard MF 5.2 / PAC2002 .tir files store PKY1 with a
+    # NEGATIVE sign (e.g. PKY1 = -15.0) because of the tyre-axis lateral-force
+    # sign convention. Cornering stiffness magnitude must not flip sign:
+    # normalise with abs(pKy1) so standard .tir uploads yield positive Ky
+    # instead of collapsing lateral grip (measured: 0.033 G at 89.8 deg
+    # sideslip in production testing before this fix).
+    Ky = abs(pKy1) * Fz0 * np.sin(2.0 * np.arctan(Fz / (pKy2 * Fz0 + 1e-6))) * (1.0 - pKy3 * abs(gamma)) * lambda_k_y
     Cy = pCy1
     By = Ky / (Cy * Dy + 1e-6)
 

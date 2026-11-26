@@ -66,6 +66,26 @@ async def lifespan(app: FastAPI):
             from suspensionlab.backend.database.core import engine, Base
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
+                # Self-heal additive schema drift. create_all never alters a
+                # pre-existing table, so a vehicle_profiles table created by an
+                # older deploy lacks later columns (team_id/version/parent_id/
+                # deleted_at) and every /profiles query then 500s with
+                # UndefinedColumn. ADD COLUMN IF NOT EXISTS is idempotent and
+                # a no-op on a current schema.
+                if engine.dialect.name == "postgresql":
+                    from sqlalchemy import text as _text
+                    await conn.execute(_text(
+                        "ALTER TABLE vehicle_profiles ADD COLUMN IF NOT EXISTS team_id UUID"
+                    ))
+                    await conn.execute(_text(
+                        "ALTER TABLE vehicle_profiles ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1"
+                    ))
+                    await conn.execute(_text(
+                        "ALTER TABLE vehicle_profiles ADD COLUMN IF NOT EXISTS parent_id UUID"
+                    ))
+                    await conn.execute(_text(
+                        "ALTER TABLE vehicle_profiles ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ"
+                    ))
         except Exception as e:
             logging.warning("Schema table initialization notice: %s", e)
 

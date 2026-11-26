@@ -45,6 +45,7 @@ from suspensionlab.backend.database.models.team import Team
 from suspensionlab.backend.database.models.user import User
 from suspensionlab.backend.database.models.audit import AuditLog
 from suspensionlab.backend.security.jwt_utils import hash_password, verify_password
+from suspensionlab.backend.security.auth import verify_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -190,6 +191,35 @@ async def _log_scim_audit(db, action: str, details: dict, org_id: Optional[str] 
 
 
 # ── Capabilities / Config ─────────────────────────────────────────────────────
+
+@router.get("/status")
+async def scim_configuration_status(user=Depends(verify_api_key)):
+    """Wave 5A: honest SCIM configuration status for the admin dashboard.
+
+    Previously GET /api/v1/scim/v2/status returned 404. Returns HTTP 200 with
+    enabled=false when SCIM is not configured, plus live user/group counts
+    when it is. Requires a normal authenticated user, not a SCIM token.
+    """
+    enabled = bool(getattr(settings, "scim_enabled", False) and getattr(settings, "scim_bearer_token", None))
+    user_count = 0
+    group_count = 0
+    if enabled:
+        try:
+            async with SessionLocal() as db:
+                user_count = (await db.execute(
+                    select(func.count()).select_from(User).where(User.deleted_at == None)
+                )).scalar_one()
+                group_count = (await db.execute(
+                    select(func.count()).select_from(SCIMGroup)
+                )).scalar_one()
+        except Exception as exc:
+            logger.warning("SCIM status counts unavailable: %s", exc)
+    return {
+        "enabled": enabled,
+        "user_count": int(user_count),
+        "group_count": int(group_count),
+    }
+
 
 @router.get("/ServiceProviderConfig")
 async def service_provider_config(_: SCIMAuthContext = Depends(require_scim_auth)):

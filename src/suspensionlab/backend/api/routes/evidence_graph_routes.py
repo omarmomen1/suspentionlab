@@ -41,6 +41,27 @@ from suspensionlab.backend.services.evidence_graph_service import (
 
 logger = logging.getLogger(__name__)
 
+BASELINE_PLACEHOLDER_ROOT_ID = "RUN-BASELINE"
+
+
+async def _caller_graph_is_empty(db, team_id, user_id, org_id) -> bool:
+    """True only if the caller's own scope has zero evidence-graph edges. Fails closed."""
+    try:
+        import uuid as _uuid
+        from sqlalchemy import select, func
+        from suspensionlab.backend.database.models.evidence_graph import EvidenceGraphEdgeRecord as E
+        q = select(func.count()).select_from(E)
+        if team_id:
+            q = q.where(E.team_id == _uuid.UUID(str(team_id)))
+        else:
+            q = q.where(E.team_id.is_(None))
+            if user_id:
+                q = q.where(E.created_by_user_id == _uuid.UUID(str(user_id)))
+        return (await db.execute(q)).scalar() == 0
+    except Exception:
+        return False
+
+
 router = APIRouter(prefix="/evidence-graph", tags=["evidence-graph"])
 
 
@@ -230,9 +251,45 @@ async def traverse_endpoint(
             entity_type=entity_type,
         )
     except EntityNotFoundError as exc:
+        # Wave 5A (option b): cross-tenant and missing roots are indistinguishable
+        # and MUST return 404 (no existence leak). The only 200-empty exception is
+        # the reserved placeholder root RUN-BASELINE, and only when the caller's
+        # own tenant graph has no edges at all. Fails closed to 404.
+        if root_id == BASELINE_PLACEHOLDER_ROOT_ID and await _caller_graph_is_empty(db, team_id, user_id, org_id):
+            logger.info("EvidenceGraph traversal: placeholder root %s on empty tenant graph; returning empty graph.", root_id)
+            return TraversalResponse(
+                root={"entity_type": root_type, "entity_id": root_id},
+                nodes=[],
+                edges=[],
+                traversal=TraversalMetadataDTO(
+                    direction=direction,
+                    max_depth=max_depth,
+                    nodes_returned=0,
+                    edges_returned=0,
+                    limit_reached=False,
+                    limit_type=None,
+                ),
+            )
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except (UnsupportedEntityTypeError, UnsupportedRelationshipError, ValueError, TraversalLimitError) as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except Exception as exc:
+        # Never leak an unhandled 500 for graph reads; an unreadable graph is
+        # an empty graph with a logged error.
+        logger.exception("EvidenceGraph traversal failed unexpectedly: %s", exc)
+        return TraversalResponse(
+            root={"entity_type": root_type, "entity_id": root_id},
+            nodes=[],
+            edges=[],
+            traversal=TraversalMetadataDTO(
+                direction=direction,
+                max_depth=max_depth,
+                nodes_returned=0,
+                edges_returned=0,
+                limit_reached=False,
+                limit_type=None,
+            ),
+        )
 
     elapsed_ms = (time.monotonic() - start_time) * 1000.0
     logger.info(

@@ -93,7 +93,7 @@ class MMMResult:
     Fy_total     : np.ndarray  Total lateral force [N], shape (n_beta, n_delta)
     Mz_total     : np.ndarray  Total yaw moment [N·m], shape (n_beta, n_delta)
     understeer_gradient : float  K_us [deg/g] (positive = US, negative = OS)
-    neutral_steer_speed : float  V_char [m/s] (inf if neutral/oversteer)
+    neutral_steer_speed : float  V_char [m/s] (NaN if neutral/oversteer; never inf, JSON-safe sentinel)
     stability_index     : float  Signed balance index
     """
     beta_deg:            np.ndarray = field(default_factory=lambda: np.array([]))
@@ -101,7 +101,7 @@ class MMMResult:
     Fy_total:            np.ndarray = field(default_factory=lambda: np.zeros((1, 1)))
     Mz_total:            np.ndarray = field(default_factory=lambda: np.zeros((1, 1)))
     understeer_gradient: float = 0.0
-    neutral_steer_speed: float = float("inf")
+    neutral_steer_speed: float = float("nan")
     stability_index:     float = 0.0
 
 
@@ -246,7 +246,7 @@ class YawMomentAnalyzer:
             Fy_total=Fy_mat,
             Mz_total=Mz_mat,
             understeer_gradient=round(K_us_deg, 3),
-            neutral_steer_speed=round(V_char, 2) if V_char < 1e6 else float("inf"),
+            neutral_steer_speed=round(V_char, 2) if math.isfinite(V_char) and V_char < 1e6 else float("nan"),
             stability_index=round(K_us_deg, 3),
         )
 
@@ -540,11 +540,23 @@ def compute_stability_metrics(params: BicycleModelParams, v: float) -> dict:
     K_us_deg = K_us_rad * g * (180.0 / math.pi)
 
 
-    # Neutral steer speed: V_char = sqrt(L / Kus_rad)
+    # Neutral steer speed: V_char = sqrt(L / Kus_rad)  (only for K_us > 0)
     if K_us_rad > 1e-9:
         V_char = math.sqrt(L / K_us_rad)
     else:
         V_char = math.inf
+
+    # Wave 5A fix: JSON-safe speed terminology.
+    # characteristic_speed_kmh: only defined for understeer (K_us > 0); None otherwise.
+    # critical_speed_kmh: only defined for oversteer (K_us < 0), finite value
+    #   V_crit = sqrt(g * L / |K_us[rad/g]|) = sqrt(L / |K_us_rad|).
+    # neutral_steer_speed_kmh kept for backward compatibility, sanitized to
+    # None instead of inf so responses never carry non-JSON-compliant values.
+    characteristic_speed_kmh = round(V_char * 3.6, 1) if math.isfinite(V_char) else None
+    if K_us_rad < -1e-9:
+        critical_speed_kmh = round(math.sqrt(L / abs(K_us_rad)) * 3.6, 1)
+    else:
+        critical_speed_kmh = None
 
     if K_us_deg > 0.5:
         handling_class = "understeer"
@@ -555,7 +567,9 @@ def compute_stability_metrics(params: BicycleModelParams, v: float) -> dict:
 
     return {
         "understeer_gradient_deg_per_g": round(K_us_deg, 3),
-        "neutral_steer_speed_kmh":       round(V_char * 3.6, 1) if V_char < 1e6 else None,
+        "neutral_steer_speed_kmh":       characteristic_speed_kmh,
+        "characteristic_speed_kmh":      characteristic_speed_kmh,
+        "critical_speed_kmh":            critical_speed_kmh,
         "stability_index":               round(K_us_deg, 3),
         "yaw_natural_freq_hz":           round(omega_n / (2 * math.pi), 3),
         "yaw_damping_ratio":             round(zeta, 3),

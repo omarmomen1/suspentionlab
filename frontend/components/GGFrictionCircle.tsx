@@ -9,9 +9,11 @@ interface GGFrictionCircleProps {
   maxG: number;
   latG: number;
   longG: number;
+  /** Wave 5A: full sampled (lat, long) G point cloud from real telemetry. */
+  points?: { latG: number[]; longG: number[] };
 }
 
-export default function GGFrictionCircle({ maxG, latG, longG }: GGFrictionCircleProps) {
+export default function GGFrictionCircle({ maxG, latG, longG, points }: GGFrictionCircleProps) {
   const currentTotalG = Math.sqrt(latG * latG + longG * longG);
   const exploitationPct = maxG > 0 ? ((currentTotalG / maxG) * 100).toFixed(0) : "0";
   const axisBound = Math.max(3, Math.ceil(Math.max(maxG || 1.5, Math.abs(latG), Math.abs(longG)) * 1.15 * 10) / 10);
@@ -38,6 +40,17 @@ export default function GGFrictionCircle({ maxG, latG, longG }: GGFrictionCircle
       </span>
       <Plot
         data={[
+          ...(points && points.latG.length > 0
+            ? [{
+                x: points.latG,
+                y: points.longG,
+                type: "scatter" as const,
+                mode: "markers" as const,
+                marker: { color: "rgba(242, 169, 0, 0.35)", size: 3, symbol: "circle" },
+                name: "Sampled G-G points",
+                hoverinfo: "skip" as const,
+              }]
+            : []),
           {
             x: [latG],
             y: [longG],

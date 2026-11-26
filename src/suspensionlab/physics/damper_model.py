@@ -235,15 +235,27 @@ class BiDirectionalDamper:
         v_cycle = v_peak * np.sin(theta)
         F_cycle = self.force(v_cycle)
 
-        # Energy dissipated by nonlinear damper per cycle
-        # Use trapezoid (np.trapz was deprecated in NumPy 1.24, removed in 2.0)
+        # Energy dissipated by the nonlinear damper per cycle, computed by
+        # PHASE integration:  W = integral_0^2pi  F(v(theta)) * v(theta) d(theta) / omega.
+        #
+        # NOTE (Wave 5A fix): the previous implementation integrated
+        # np.trapezoid(F_cycle, v_cycle), i.e. the closed-loop integral
+        # contour F(v) dv, which is identically zero for any single-valued
+        # damper characteristic F(v). That collapsed c_eff to ~0 and spiked
+        # Quarter-Car Bode Peak TX (measured 687.24 in production testing).
+        #
+        # Energy per cycle is E = (1/omega) * integral F(v(t)) * v(t) dt-phase.
+        # Since the 1/omega factor cancels against the linear reference below,
+        # we integrate W_nl = integral_0^2pi F(v(theta)) * v(theta) d(theta):
         try:
-            W_nl = np.trapezoid(F_cycle, v_cycle)  # NumPy >= 2.0
+            W_nl = np.trapezoid(F_cycle * v_cycle, theta)  # NumPy >= 2.0
         except AttributeError:
-            W_nl = np.trapz(F_cycle, v_cycle)       # NumPy < 2.0 fallback
+            W_nl = np.trapz(F_cycle * v_cycle, theta)       # NumPy < 2.0 fallback
 
-        # c_eff such that W_linear = c_eff * pi * v_peak^2 = W_nl
-        # W_linear for c*v damper over one cycle of amplitude v_peak = c * pi * v_peak^2
+        # A linear damper F = c*v dissipates W_linear = c * pi * v_peak^2 per
+        # cycle (integral_0^2pi c*v_peak^2*sin^2(theta) d(theta) = c*pi*v_peak^2).
+        # Energy-equivalence: c_eff = W_nl / (pi * v_peak^2).
+        #   c_eff = [ integral_0^2pi F(v(theta)) v(theta) d(theta) ] / (pi * v_peak^2)
         c_eff_denom = np.pi * v_peak ** 2
         c_eff = float(W_nl / c_eff_denom) if abs(c_eff_denom) > 1e-12 else 0.0
         c_eff = max(c_eff, 0.0)  # clamp to physical range

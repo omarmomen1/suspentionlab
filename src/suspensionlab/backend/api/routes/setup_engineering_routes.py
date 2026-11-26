@@ -52,6 +52,40 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/setup-engineering", tags=["setup-engineering"])
 
 
+# ── Wave 5A: Manifest baseline state ──────────────────────────────────────────
+
+@router.get("/manifest")
+async def get_setup_engineering_manifest(
+    user: UserContext = Depends(require_permission(Permission.ENGINEERING_READ if hasattr(Permission, "ENGINEERING_READ") else Permission.SIMULATION_RUN)),
+):
+    """Return the current setup-engineering workflow manifest.
+
+    Wave 5A: previously this endpoint did not exist and the production
+    /setup-engineering page crashed on a raw 404 (RFC7807). Now returns HTTP
+    200 with a structured EMPTY baseline state; every section is null until a
+    real workflow has been run, which the frontend renders as an honest
+    empty state.
+    """
+    return {
+        "manifest_version": "3L-1.0",
+        "state": "EMPTY",
+        "message": "No setup-engineering workflow has been run yet. Define a problem to begin.",
+        "problem": None,
+        "parameter_gate": None,
+        "hypothesis": None,
+        "experiment": None,
+        "setup": None,
+        "simulation": None,
+        "comparison": None,
+        "validation": None,
+        "decision": None,
+        "approval": None,
+        "prediction": None,
+        "reconciliation": None,
+        "lineage": [],
+    }
+
+
 # ── Request Models ─────────────────────────────────────────────────────────────
 
 class ProblemDefinitionRequest(BaseModel):

@@ -150,6 +150,9 @@ class AIRaceEngineerService:
         rec_K_arb_f = K_arb_f
         rec_K_arb_r = K_arb_r
         rec_z_uca_chassis_mm = 0.0
+        # Default damping target for every intent branch; the bounce/harsh
+        # branch refines it below. Must exist for all prompt classes.
+        target_zeta = 0.35
 
         if is_bounce_or_harsh:
             # Target damping ratio zeta in optimal band [0.32, 0.38]
@@ -213,8 +216,7 @@ class AIRaceEngineerService:
             )
 
         else:
-            # General balanced tuning
-            target_zeta = 0.35
+            # General balanced tuning (target_zeta default applies)
             rec_c = round((target_zeta * c_crit) / (MR ** 2), 0)
             rec_K_arb_f = round(K_arb_f * 0.95, 1)
             rec_K_arb_r = round(K_arb_r * 1.05, 1)

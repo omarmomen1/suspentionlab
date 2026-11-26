@@ -106,6 +106,8 @@ class TirPropertyAdapter(BaseSolverAdapter):
         pcy1 = float(params.get("pCy1", ParameterValue(name="pCy1", value=1.3, unit="-")).value)
         pdy1 = float(params.get("pDy1", ParameterValue(name="pDy1", value=1.0, unit="-")).value)
         pey1 = float(params.get("pEy1", ParameterValue(name="pEy1", value=-0.8, unit="-")).value)
+        # PAC2002 convention: PKY1 may carry a sign from the tyre-axis
+        # convention; export its magnitude (see magic_formula.py abs() fix).
         pky1 = float(params.get("pKy1", ParameterValue(name="pKy1", value=-15.0, unit="-")).value)
         pkx1 = float(params.get("pKx1", ParameterValue(name="pKx1", value=21.0, unit="-")).value)
 

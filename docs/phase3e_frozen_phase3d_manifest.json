@@ -19,8 +19,8 @@
       "size_bytes": 51114
     },
     "src/suspensionlab/physics/magic_formula.py": {
-      "sha256": "69b182da4d2687e8cf7f9326501fc30c6380023445ea99d04f0f67bbc3d3f76c",
-      "size_bytes": 24403
+      "sha256": "2be0492f1e4c483401c1cd8544381edeb364dd5380e4b8fe9796f613cc627048",
+      "size_bytes": 26211
     },
     "data/external/stanford_vw_golf_thunderhill_2023_11.csv": {
       "sha256": "489adbf01d27da1c281c0fff353554dfd7d07a3f1c48e2744e9dd902546b74d3",
@@ -94,5 +94,13 @@
       "tests/test_phase3c1_validation_integrity.py",
       "tests/test_real_vehicle_dynamics_and_lap_sim.py"
     ]
+  },
+  "wave5a_recertification": {
+    "cycle": "WAVE_5A_PHYSICS_AND_API_REMEDIATION",
+    "timestamp_iso": "2026-11-26T01:24:00.813548+00:00",
+    "reason": "magic_formula.py remediated in Wave 5A (PKY1 sign). Original phase baseline hash preserved below.",
+    "previous_hashes": {
+      "src/suspensionlab/physics/magic_formula.py": "69b182da4d2687e8cf7f9326501fc30c6380023445ea99d04f0f67bbc3d3f76c"
+    }
   }
 }

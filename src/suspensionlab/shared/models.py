@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, model_validator, ConfigDict
+from pydantic import BaseModel, Field, model_validator, field_validator, ConfigDict
 from typing import Literal, List, Optional, Any, Dict
 from enum import Enum
 
@@ -39,7 +39,16 @@ class QuarterCarParamsSchema(BaseModel):
 
 class RoadProfileSchema(BaseModel):
     model_config = {"allow_inf_nan": False}
-    profile_type: Literal["step", "sine", "pothole", "random", "impulse", "iso8608"] = "step"
+    profile_type: Literal["step", "sine", "pothole", "random", "impulse", "iso8608", "bump", "single_bump"] = "step"
+
+    @field_validator("profile_type", mode="before")
+    @classmethod
+    def normalize_profile_type(cls, v):
+        # Wave 5A: accept 'single_bump' as an alias for the single half-sine
+        # 'bump' profile so /half-car Single Bump returns HTTP 200, not 422.
+        if isinstance(v, str) and v.strip().lower() in ("single_bump", "single-bump", "single bump"):
+            return "bump"
+        return v
     iso_class: Literal["A", "B", "C", "D", "E", "F", "G", "H"] = "A"
     amplitude: float = 0.05
     frequency: float = Field(2.0, gt=0.0, le=1000.0)

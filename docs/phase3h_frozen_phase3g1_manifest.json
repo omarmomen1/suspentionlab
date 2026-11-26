@@ -10,7 +10,7 @@
   "physics_files_sha256": {
     "dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690",
     "brake_distribution.py": "15338e921252e35afc9ee543fdb996464e4784b36e1ce18e05c8832e392a57ea",
-    "magic_formula.py": "31acfd244c5847bd9c7a9b6a8c2ea10cac8aa3da80e5931e39be7bc849f2308e",
+    "magic_formula.py": "2be0492f1e4c483401c1cd8544381edeb364dd5380e4b8fe9796f613cc627048",
     "tire_model.py": "da72dea8adf6b83846997fa02c9b1cade1b74272bcaa96f5aa0e2ea389005209"
   },
   "phase3g1_artifact_hashes": {
@@ -24,5 +24,13 @@
     "phase3g1_validation_status.md": "257e2e2bbf2d9658d1e04974b75137a88fc21c7a3a7b7110b16c413bc6b8ab7b"
   },
   "baseline_test_count": 155,
-  "governance_note": "Phase 3H is audit-only. Zero production physics modifications authorized."
+  "governance_note": "Phase 3H is audit-only. Zero production physics modifications authorized.",
+  "wave5a_recertification": {
+    "cycle": "WAVE_5A_PHYSICS_AND_API_REMEDIATION",
+    "timestamp_iso": "2026-11-26T01:23:53.896519+00:00",
+    "reason": "Physics files remediated in Wave 5A (PKY1 sign, damper LUT linearisation, contact-loss clamp sign). Original phase baseline hashes preserved below.",
+    "previous_hashes": {
+      "magic_formula.py": "31acfd244c5847bd9c7a9b6a8c2ea10cac8aa3da80e5931e39be7bc849f2308e"
+    }
+  }
 }

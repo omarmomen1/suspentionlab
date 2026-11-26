@@ -323,68 +323,11 @@ function CorrelationCockpitContent() {
   const [healthFilter, setHealthFilter] = useState<string>("ALL");
 
   // Events State (11 categories)
-  const [eventsList, setEventsList] = useState<any[]>([
-    {
-      event_type: "BRAKING_ONSET",
-      start_time_s: 1.42,
-      end_time_s: 1.85,
-      severity: "INFO",
-      confidence: 0.95,
-      dominant_channel: "long_g",
-      metrics: { peak_decel_g: -3.85, brake_rise_rate: 180.0 },
-      evidence: "Longitudinal deceleration crossed -0.35 G threshold with 140 bar line pressure rise rate.",
-    },
-    {
-      event_type: "CORNER_ENTRY",
-      start_time_s: 2.10,
-      end_time_s: 2.65,
-      severity: "INFO",
-      confidence: 0.92,
-      dominant_channel: "lat_g",
-      metrics: { entry_speed_kph: 195.4, lateral_g_rate: 2.4 },
-      evidence: "Lateral acceleration exceeded 0.40 G rising at 195 km/h entry speed into Turn 4.",
-    },
-    {
-      event_type: "APEX_REGION",
-      start_time_s: 2.80,
-      end_time_s: 3.15,
-      severity: "INFO",
-      confidence: 0.96,
-      dominant_channel: "lat_g",
-      metrics: { peak_lat_g: 3.82, apex_speed_kph: 142.5 },
-      evidence: "Peak lateral acceleration sustained through minimum radius apex zone.",
-    },
-    {
-      event_type: "DAMPER_SPIKE",
-      start_time_s: 3.42,
-      end_time_s: 3.58,
-      severity: "WARNING",
-      confidence: 0.98,
-      dominant_channel: "damper_fl",
-      metrics: { peak_velocity_ms: 0.86, peak_accel_g: 4.8 },
-      evidence: "Damper piston velocity exceeded 0.48 m/s threshold (0.86 m/s measured) upon Turn 4 kerb impact.",
-    },
-    {
-      event_type: "WHEEL_HOP",
-      start_time_s: 3.60,
-      end_time_s: 3.95,
-      severity: "CRITICAL",
-      confidence: 0.91,
-      dominant_channel: "vert_g",
-      metrics: { frequency_hz: 12.4, amplitude_g: 2.6, cycles: 4 },
-      evidence: "Unsprung mass oscillatory resonance detected at 12.4 Hz with 4 consecutive zero-crossings following kerb strike.",
-    },
-    {
-      event_type: "YAW_RATE_DEVIATION",
-      start_time_s: 4.10,
-      end_time_s: 4.45,
-      severity: "WARNING",
-      confidence: 0.89,
-      dominant_channel: "yaw_rate",
-      metrics: { deviation_degs: 6.8, steer_angle_deg: 42.0 },
-      evidence: "Measured yaw rate diverged from kinematic bicycle prediction by 6.8 deg/s (understeer limit).",
-    },
-  ]);
+  // Wave 5A: events are ALWAYS detected from the actually loaded telemetry via
+  // the backend deterministic detector. No hardcoded demonstration events:
+  // an 80-bar CSV must never show a hardcoded 140-bar event.
+  const [eventsList, setEventsList] = useState<any[]>([]);
+  const [ggPoints, setGGPoints] = useState<{ latG: number[]; longG: number[] }>({ latG: [], longG: [] });
 
   const [selectedEvent, setSelectedEvent] = useState<any | null>(null);
   const [investigatingEvent, setInvestigatingEvent] = useState(false);
@@ -414,6 +357,9 @@ function CorrelationCockpitContent() {
         `Estimated sampling rate ${parsed.sampleRateHz.toFixed(1)} Hz (${parsed.durationSec.toFixed(1)} s duration)`,
       ],
     }));
+
+    // Detect real vehicle-dynamics events from the uploaded channels.
+    loadDetectedEvents(parsed.channels, filename);
 
     // Recompute model comparison & session delta directly with newly parsed CSV telemetry
     loadModelComparison(selectedModel, parsed.channels);
@@ -445,6 +391,47 @@ function CorrelationCockpitContent() {
       }
     };
     reader.readAsText(uploaded);
+  };
+
+  // Map a backend-detected event into the panel display shape.
+  const mapBackendEvent = (e: any) => {
+    const anomalyTypes = ["WHEEL_HOP", "DAMPER_SPIKE", "DAMPER_VELOCITY_SPIKE", "YAW_RATE_DEVIATION", "TIRE_LOAD_VARIATION", "EXCESSIVE_BODY_MOTION"];
+    const evidence = Object.entries(e.source_data ?? {})
+      .filter(([, v]) => v !== null && v !== undefined)
+      .map(([k, v]) => `${k.replace(/_/g, " ")}: ${typeof v === "number" ? v : String(v)}`)
+      .join(" \u00b7 ");
+    return {
+      event_type: e.event_type,
+      start_time_s: e.start_time,
+      end_time_s: e.end_time,
+      severity: anomalyTypes.includes(e.event_type) ? "WARNING" : "INFO",
+      confidence: e.confidence,
+      dominant_channel: (e.channels && e.channels[0]) || "",
+      metrics: e.source_data ?? {},
+      evidence: evidence || e.detector || "Deterministic detector event",
+      event_id: e.event_id,
+      detector: e.detector,
+    };
+  };
+
+  // Real event detection from uploaded telemetry; on failure, show none (honest).
+  const loadDetectedEvents = async (channels: Record<string, number[]>, sessionName: string) => {
+    try {
+      const res = await CorrelationApi.detectEvents(channels);
+      const mapped = (res.events ?? []).map(mapBackendEvent);
+      setEventsList(mapped);
+      setSelectedEvent(mapped[0] ?? null);
+      if (res.gg_points && Array.isArray(res.gg_points.lat_g) && res.gg_points.lat_g.length > 0) {
+        setGGPoints({ latG: res.gg_points.lat_g, longG: res.gg_points.long_g });
+      } else {
+        setGGPoints({ latG: [], longG: [] });
+      }
+    } catch (err) {
+      console.error("Event detection failed; showing no events for", sessionName, err);
+      setEventsList([]);
+      setSelectedEvent(null);
+      setGGPoints({ latG: [], longG: [] });
+    }
   };
 
   // Load Model Comparison Data
@@ -559,7 +546,6 @@ function CorrelationCockpitContent() {
 
   useEffect(() => {
     loadModelComparison(selectedModel);
-    setSelectedEvent(eventsList[3]); // Default to Damper Spike
   }, [selectedModel]);
 
   const activeChannelData = modelComparisonData?.channels?.find((c: any) => c.channel_key === selectedChannelKey) || modelComparisonData?.channels?.[0];
@@ -962,6 +948,11 @@ function CorrelationCockpitContent() {
                 </div>
 
                 <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
+                  {eventsList.length === 0 && (
+                    <div className="p-3 rounded-lg border border-neutral-800 bg-neutral-950 text-xs text-neutral-400 font-mono">
+                      No events detected in the loaded telemetry. Load a CSV to run the deterministic detector.
+                    </div>
+                  )}
                   {eventsList.map((ev, idx) => {
                     const isSelected = selectedEvent?.start_time_s === ev.start_time_s;
                     return (
@@ -1253,6 +1244,7 @@ function CorrelationCockpitContent() {
                       maxG={gCircleStats.maxG}
                       latG={gCircleStats.latG}
                       longG={gCircleStats.longG}
+                      points={ggPoints}
                     />
                   </div>
                 </div>

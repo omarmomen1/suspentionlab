@@ -1,5 +1,20 @@
+import logging
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
+
+logger = logging.getLogger(__name__)
+
+
+def _db_unavailable(exc: Exception) -> HTTPException:
+    """Wave 5A: convert unexpected persistence-layer failures (serverless DB
+    session errors, RLS context errors, missing columns, serialization
+    failures) into an explicit, diagnosable 503 instead of an unhandled 500
+    with an empty body."""
+    logger.exception("Profiles persistence failure: %s", exc)
+    return HTTPException(
+        status_code=503,
+        detail="Profile storage is temporarily unavailable. The engineering database connection failed; retry shortly or contact support if it persists.",
+    )
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
@@ -80,11 +95,17 @@ async def create_profile(
     from suspensionlab.backend.services.trial_service import TrialService
     trial = await TrialService.assert_trial_access(db, user, action="vehicle", delta=1)
 
-    db.add(db_profile)
-    await db.commit()
-    await db.refresh(db_profile)
-    if trial:
-        await TrialService.record_trial_usage(db, user, action="vehicle", delta=1)
+    try:
+        db.add(db_profile)
+        await db.commit()
+        await db.refresh(db_profile)
+        if trial:
+            await TrialService.record_trial_usage(db, user, action="vehicle", delta=1)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await db.rollback()
+        raise _db_unavailable(exc)
 
     try:
         from suspensionlab.backend.security.audit import record_audit_event
@@ -129,8 +150,13 @@ async def list_profiles(
     if vehicle_type:
         query = query.where(VehicleProfile.vehicle_type == vehicle_type)
 
-    result = await db.execute(query)
-    profiles = result.scalars().all()
+    try:
+        result = await db.execute(query)
+        profiles = result.scalars().all()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _db_unavailable(exc)
     return profiles
 
 
@@ -157,8 +183,13 @@ async def get_profile(
             VehicleProfile.user_id == u_id,
             VehicleProfile.deleted_at.is_(None),
         )
-    result = await db.execute(query)
-    profile = result.scalar_one_or_none()
+    try:
+        result = await db.execute(query)
+        profile = result.scalar_one_or_none()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise _db_unavailable(exc)
     if not profile:
         raise HTTPException(status_code=404, detail="Profile not found")
     return profile

@@ -71,7 +71,10 @@ class Phase3PCaseService:
 
     PROTOCOL_ID = "PREREG-P3P-01"
     PROTOCOL_VERSION = "1.0.0-frozen"
-    PROTOCOL_SHA256 = "ff3b8e10f1bc36bda4f5185088fc18a3191b188e565e8b82de8cf8c922bd4f8b"
+    # Wave 5A re-certification: docs/phase3*_preregistration_manifest.json was
+    # re-certified after the magic_formula.py PKY1 fix (original hash preserved
+    # in the manifest's wave5a_recertification block). Previous: ff3b8e10f1bc36bda4f5185088fc18a3191b188e565e8b82de8cf8c922bd4f8b
+    PROTOCOL_SHA256 = "c5c8d29cf9ca73c25245eeb97ef014f5de6ad49dc66bf7643f1d713490f1bef8"
 
     MANIFEST_PATH = PROJECT_ROOT / "docs" / "phase3p_preregistration_manifest.json"
     BLOCKERS_PATH = PROJECT_ROOT / "docs" / "phase3p_preregistration_blockers.md"
@@ -88,7 +91,7 @@ class Phase3PCaseService:
 
     PROTECTED_PHYSICS = {
         "dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690",
-        "magic_formula.py": "31acfd244c5847bd9c7a9b6a8c2ea10cac8aa3da80e5931e39be7bc849f2308e",
+        "magic_formula.py": "2be0492f1e4c483401c1cd8544381edeb364dd5380e4b8fe9796f613cc627048",  # Wave 5A: PKY1 sign fix; previous 31acfd244c...,
         "tire_model.py": "da72dea8adf6b83846997fa02c9b1cade1b74272bcaa96f5aa0e2ea389005209",
         "powertrain_lap_sim.py": "44d72961d5a01acce4129db66b86b7eb44b577d1a90bf6d0a5ba3a70cdc9e7c6",
         "brake_distribution.py": "15338e921252e35afc9ee543fdb996464e4784b36e1ce18e05c8832e392a57ea",

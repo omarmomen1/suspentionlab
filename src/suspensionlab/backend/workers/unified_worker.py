@@ -313,12 +313,31 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
                         duration_active = float(payload.get("duration", 3.0))
                         profile = RoadProfile(profile_type="step", amplitude=bump_height, duration=duration_active)
                         
-                        active_res = await asyncio.to_thread(simulate_active_time_response, p_active, profile)
+                        # Wave 5A fix: force BOTH active and passive simulations onto
+                        # the identical output time grid. Previously the active model
+                        # defaulted to t_eval_dt=0.002 while the passive baseline
+                        # defaulted to 0.001, so the two responses had different
+                        # lengths and did not sample the step bump at the same
+                        # timestamps (onset at t = 0.5 s).
+                        shared_t_eval_dt = float(payload.get("t_eval_dt", 0.002))
+                        active_res = await asyncio.to_thread(
+                            simulate_active_time_response, p_active, profile, shared_t_eval_dt
+                        )
                         passive_c = float(payload.get("passive_c", payload.get("c", payload.get("params", {}).get("c", 1500.0))))
                         p_passive = QuarterCarParams(
                             m_s=p_active.m_s, m_u=p_active.m_u, k_s=p_active.k_s, c=passive_c, k_t=p_active.k_t, MR=p_active.MR
                         )
-                        passive_res = await asyncio.to_thread(simulate_time_response, p_passive, profile)
+                        passive_res = await asyncio.to_thread(
+                            simulate_time_response, p_passive, profile, shared_t_eval_dt
+                        )
+                        # Hard guarantee: identical grids (same duration & dt).
+                        if len(passive_res["time"]) != len(active_res.time) or not np.allclose(
+                            passive_res["time"], active_res.time, rtol=0.0, atol=1e-12
+                        ):
+                            raise ValueError(
+                                "Active/passive time-grid misalignment: "
+                                f"active n={len(active_res.time)}, passive n={len(passive_res['time'])}"
+                            )
                         passive_metrics = compute_metrics(passive_res, p_passive)
                         
                         res = {
