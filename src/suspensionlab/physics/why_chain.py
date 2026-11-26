@@ -153,7 +153,7 @@ def compute_why_chain(
     vp_b = _vehicle(base_vehicle, lb)
 
     # QSS run of A defines the corner and the apex state.
-    res_a = simulate_lap(vp_a, track=track)
+    res_a = simulate_lap(vp_a, track=track, compute_surface=False)
     dist = np.asarray(res_a.distances, dtype=float)
     spd_a = np.asarray(res_a.speeds, dtype=float)
     if corner and "s_start_m" in corner and "s_end_m" in corner:
@@ -223,7 +223,7 @@ def compute_why_chain(
 
     # Link 5/6: QSS for B with LLTD change and the camber grip scale.
     vp_b.mu_0 = vp_b.mu_0 * mu_scale
-    res_b = simulate_lap(vp_b, track=track)
+    res_b = simulate_lap(vp_b, track=track, compute_surface=False)
     spd_b = np.asarray(res_b.speeds, dtype=float)
     if len(spd_b) != len(dist):
         raise ValueError("A and B QSS runs returned different sample counts")

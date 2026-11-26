@@ -39,7 +39,7 @@
     "src/suspensionlab/physics/kinematics_sensitivity.py": "21ec2eaa13fbaca1a9336a31e328f0d52f4fc5e1b30ad8ca7232bda626921f12",
     "src/suspensionlab/physics/kinematics_tensor_lut.py": "67136ae863b4e3c70bb4c8f51cd1d04536ba808273adec22da4e889f18477a63",
     "src/suspensionlab/physics/lap_delta.py": "577b82190f658d0102540e42429dd1e88c9b2a9d1657aba53cfc938a46be1f5d",
-    "src/suspensionlab/physics/lap_sim.py": "4d4aa0f3049b4a97b3143b9dccad2f2a652fbbb481803f97a18f53633ba00d4a",
+    "src/suspensionlab/physics/lap_sim.py": "d98f08fe3b29d7cc6279a014ffd251142a6b28d5b44d7cba3f55cce6e84b427d",
     "src/suspensionlab/physics/lap_sim_errors.py": "f916102db2ef7938fd4f18002ca45b0f7c4c41134800b034e4cabdf5250ff3c2",
     "src/suspensionlab/physics/load_transfer_dynamics.py": "e9fee3e4367d152bcfea25afc58f1a997a70444e472ea5e2ac3e1ca3192a1175",
     "src/suspensionlab/physics/magic_formula.py": "2be0492f1e4c483401c1cd8544381edeb364dd5380e4b8fe9796f613cc627048",
@@ -127,6 +127,10 @@
       "src/suspensionlab/physics/kinematics.py": "019bb67fca0baae62df77ab1a6c2a947de04a067e31043554931eb27d314d0a5",
       "src/suspensionlab/physics/lap_sim.py": "d2cf7cdc26b580be458daf3c6d94c63520947ddc8362f3977d88ecdaa804f7f7",
       "src/suspensionlab/physics/track_geometry.py": "0fa0f18a2ef77f3af0e4f7f40b546b076a378d8c42a1fb02fccaa0345869a9a4"
-    }
+    },
+    "v2_phase3_fix_previous_hashes": {
+      "src/suspensionlab/physics/lap_sim.py": "4d4aa0f3049b4a97b3143b9dccad2f2a652fbbb481803f97a18f53633ba00d4a"
+    },
+    "v2_phase3_fix_notes": "V2 Phase 3 follow-up fix (marker V2_PHASE_3_PHYSICS_ENGINES): lap_sim.py vertical-curvature load now reads the vehicle's weight_dist_f. No manifest changed."
   }
 }

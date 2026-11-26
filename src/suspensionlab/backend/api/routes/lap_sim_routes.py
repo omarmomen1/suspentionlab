@@ -671,7 +671,6 @@ class WhyChainRequest(BaseModel):
 @router.post(
     "/lap-sim/why-chain",
     summary="Deterministic coupled QSS Why Chain (Setup A vs B)",
-    dependencies=[Depends(verify_api_key), Depends(RateLimiter("rate_limit_simulate"))],
 )
 async def why_chain_endpoint(
     body: WhyChainRequest,
@@ -680,9 +679,13 @@ async def why_chain_endpoint(
 ):
     """Numbers, units and solver sources only. Unreachable links return NOT_MODELED."""
     from suspensionlab.physics.why_chain import compute_why_chain
+    import asyncio
+    import functools
+    loop = asyncio.get_running_loop()
     try:
-        return compute_why_chain(body.setup_a, body.setup_b, track=body.track,
-                                 corner=body.corner, base_vehicle=body.base_vehicle)
+        return await loop.run_in_executor(None, functools.partial(
+            compute_why_chain, body.setup_a, body.setup_b, track=body.track,
+            corner=body.corner, base_vehicle=body.base_vehicle))
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
 

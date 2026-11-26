@@ -2516,7 +2516,7 @@ def simulate_lap(
     # normal load changes by dFz = m v^2 kappa_z (negative on a crest = unloading). The
     # longitudinal grade effect is already handled by the grade term of the speed solver.
     # The load acts at the CG, so each axle takes its static weight share. Flat track gives 0.
-    wdf = float(getattr(vp, "weight_dist_front", 0.48))
+    wdf = float(getattr(vp, "weight_dist_f", getattr(vp, "weight_dist_front", 0.48)))
     v_for_vert = np.asarray(v_sol, dtype=float)
     vertical_dfz_n = mass * v_for_vert ** 2 * kappa_z_arr
     vertical_g = vertical_dfz_n / (mass * 9.81)
