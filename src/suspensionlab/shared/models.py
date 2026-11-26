@@ -106,8 +106,8 @@ class QuarterCarResultSchema(BaseModel):
     omega_n_u: float
     f_n_s: float
     f_n_u: float
-    zeta_s: float
-    zeta_u: float
+    zeta_s: Optional[float] = None  # None = overdamped / real poles
+    zeta_u: Optional[float] = None
     c_crit_s: float
     c_crit_u: float
     k_w: float
@@ -169,7 +169,7 @@ class QuarterCarKPIs(BaseModel):
     """Lightweight subset of QuarterCarResult used purely for analytics."""
     f_n_s: float
     f_n_u: float
-    zeta_s: float
+    zeta_s: Optional[float] = None
     rms_body_accel: float
     peak_susp_travel: float
     peak_transmissibility: float

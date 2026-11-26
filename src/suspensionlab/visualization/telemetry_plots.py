@@ -172,6 +172,12 @@ def apply_f1_theme(
     return fig
 
 
+
+def _fmt_zeta(z, spec: str = ".3f") -> str:
+    """Format a damping ratio; overdamped systems report None (no complex poles)."""
+    return "n/a (overdamped)" if z is None else format(z, spec)
+
+
 def _vline(x: float, color: str = _AMBER, dash: str = "dot") -> go.layout.Shape:
     """Return a vertical dashed reference line shape."""
     return go.layout.Shape(
@@ -521,7 +527,7 @@ def create_bode_plot(result: QuarterCarResult) -> go.Figure:
                 f"<b>BODE DIAGRAM — BODY TRANSMISSIBILITY Hs(jω)</b>"
                 f"<span style='font-size:9px;color:{_TEXT_SEC}'>"
                 f"  |  fn,s = {f_ns:.3f} Hz  |  fn,u = {f_nu:.3f} Hz"
-                f"  |  ζ = {result.zeta_s:.4f}"
+                f"  |  ζ = {_fmt_zeta(result.zeta_s, '.4f')}"
                 f"</span>"
             ),
             font    = dict(family=_FONT_MONO, size=11, color=_TEXT_PRI),
@@ -1098,7 +1104,7 @@ def create_impulse_response_plot(result: QuarterCarResult) -> go.Figure:
                 f"<b>BODY ACCELERATION RESPONSE</b>"
                 f"<span style='font-size:9px;color:{_TEXT_SEC}'>"
                 f"  |  RMS = {rms_a:.4f} m/s²"
-                f"  |  ζ = {result.zeta_s:.4f}"
+                f"  |  ζ = {_fmt_zeta(result.zeta_s, '.4f')}"
                 f"</span>"
             ),
             font    = dict(family=_FONT_MONO, size=11, color=_TEXT_PRI),
@@ -1240,7 +1246,7 @@ def create_overview_dashboard(result: QuarterCarResult) -> go.Figure:
                 f"<b>QUARTER CAR — OVERVIEW DASHBOARD</b>"
                 f"<span style='font-size:9px;color:{_TEXT_SEC}'>"
                 f"  |  fn,s={f_ns:.2f}Hz  fn,u={f_nu:.2f}Hz"
-                f"  |  ζ={result.zeta_s:.4f}"
+                f"  |  ζ={_fmt_zeta(result.zeta_s, '.4f')}"
                 f"  |  RMS ẍ={result.rms_body_accel:.4f}m/s²"
                 f"</span>"
             ),
@@ -1418,7 +1424,7 @@ def build_report_pdf(result: Union[QuarterCarResult, HalfCarResult, FullCarResul
         kpis = [
             f"Sprung Nat. Freq (fn,s): {result.f_n_s:.2f} Hz",
             f"Unsprung Nat. Freq (fn,u): {result.f_n_u:.2f} Hz",
-            f"Damping Ratio (zeta_s): {result.zeta_s:.3f}",
+            f"Damping Ratio (zeta_s): {_fmt_zeta(result.zeta_s, '.3f')}",
             f"Peak Transmissibility: {result.peak_transmissibility:.2f}x",
             f"RMS Body Accel: {result.rms_body_accel:.3f} m/s^2",
             f"Peak Susp Travel: {result.peak_susp_travel*1000:.1f} mm"
@@ -1467,7 +1473,9 @@ def build_report_pdf(result: Union[QuarterCarResult, HalfCarResult, FullCarResul
             
         c.drawString(40, y, f"ISO 2631-1 Rating: {verdict}")
         y -= 20
-        if result.zeta_s < 0.2:
+        if result.zeta_s is None:
+            setup = "CONFLICT - Overdamped (no oscillatory mode)"
+        elif result.zeta_s < 0.2:
             setup = "CONFLICT - Critically Underdamped"
         elif result.zeta_s > 0.8:
             setup = "CONFLICT - Critically Overdamped"
@@ -1594,11 +1602,17 @@ def build_report_pdf(result: Union[QuarterCarResult, HalfCarResult, FullCarResul
         c.setFont("Courier", 10)
         y = height - 120
         for name, b_val, c_val, unit in metrics:
-            delta = c_val - b_val
             c.drawString(40, y, name)
-            c.drawString(200, y, f"{b_val:.3f}")
-            c.drawString(300, y, f"{c_val:.3f}")
-            c.drawString(400, y, f"{delta:+.3f} {unit}")
+            if b_val is None or c_val is None:
+                # e.g. overdamped damping ratio: undefined, so no delta
+                c.drawString(200, y, _fmt_zeta(b_val))
+                c.drawString(300, y, _fmt_zeta(c_val))
+                c.drawString(400, y, f"n/a {unit}".rstrip())
+            else:
+                delta = c_val - b_val
+                c.drawString(200, y, f"{b_val:.3f}")
+                c.drawString(300, y, f"{c_val:.3f}")
+                c.drawString(400, y, f"{delta:+.3f} {unit}")
             y -= 20
             
         draw_footer(c)

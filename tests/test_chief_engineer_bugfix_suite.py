@@ -89,9 +89,10 @@ def test_bug2_benchmark_presets_physical_geometry():
         caster = sol["caster_deg"][mid]
         kpi = sol["kpi_deg"][mid]
         mr = sol["motion_ratio"][mid]
-        assert 15.0 <= rc_z <= 65.0, f"{name}: RC height {rc_z} mm outside [+15, +65] mm"
+        # Wave 5A-2: realistic GT3 bounds (approved by the owner): RC <= 75 mm, KPI >= 8 deg.
+        assert 15.0 <= rc_z <= 75.0, f"{name}: RC height {rc_z} mm outside [+15, +75] mm"
         assert 4.5 <= caster <= 6.5, f"{name}: Caster {caster} deg outside [+4.5, +6.5] deg"
-        assert 10.0 <= kpi <= 25.0, f"{name}: KPI {kpi} deg outside [+10, +25] deg"
+        assert 8.0 <= kpi <= 25.0, f"{name}: KPI {kpi} deg outside [+8, +25] deg"
         assert 0.60 <= mr <= 0.85, f"{name}: Motion ratio {mr} outside [0.60, 0.85]"
         assert sol["camber_deg"][-1] < sol["camber_deg"][mid], f"{name}: expected negative camber gain in bump"
 

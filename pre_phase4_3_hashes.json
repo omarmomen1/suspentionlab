@@ -88,8 +88,8 @@
     "docs/phase3g_frozen_phase3f1_manifest.json": "836e47da987dd1ccd0d81aecfc7bf20c6c3d3514bdfdb6644537ccd4ae3d5817",
     "docs/phase3h1_frozen_phase3h_manifest.json": "462b800f793acb327a161b9aa57d4f241f5878e251836637af60a84c166c4f6b",
     "docs/phase3h_frozen_phase3g1_manifest.json": "f9d6ed28e3ee6db88a1cfcad8a93c04cb6134329b5ca69e0ac0bd2702a9e47a0",
-    "docs/phase3o_preregistration_manifest.json": "1b084961d4bd42680f4f9309ac73b7ee3efcb647230111ae1dd516714e300c53",
-    "docs/phase3p_preregistration_manifest.json": "b74ea1192f5f6edb0181eed057b7aaa0dc89c5f78b82fae21d793e6368ac0f47"
+    "docs/phase3o_preregistration_manifest.json": "74cef9b8a1de6ca329e74afc7416554863142acbc0e96b7b8ffbe0a19e296831",
+    "docs/phase3p_preregistration_manifest.json": "2342dc81207d544fb4ce17d64158644c9e2fd074138b3858ea64f8db1307356f"
   },
   "provenance": {
     "recertification_cycle": "WAVE_5A2_KINEMATICS_LAPSIM_FULLCAR_HONESTY_REMEDIATION",
@@ -100,7 +100,7 @@
       "d888dc7c75cf7a425faa7f249acab0be06f7b3dc"
     ],
     "timestamp_iso": "2026-11-26T02:27:34.399266+00:00",
-    "notes": "Wave 5A-2 re-certification: six physics files modified (kinematics tire-radius derivation + static alignment inputs + coincident-joint rejection; lap_sim telemetry unit detection + no silent Spa substitution + explicit-input validation; dynamic_lap_sim incomplete-lap honesty; full_car DIVERGED flag + symmetric_input + zeta honesty; quarter_car overdamped zeta honesty; ai_engineering_authority server-side RBAC). Commit provenance: PENDING_USER_COMMIT - tree state at re-cert time; the user reviews the diff and commits per standing order. Previous hashes preserved in wave5a2_previous_hashes.",
+    "notes": "Wave 5A-2 re-certification: six physics files modified (kinematics tire-radius derivation + static alignment inputs + coincident-joint rejection; lap_sim telemetry unit detection + no silent Spa substitution + explicit-input validation; dynamic_lap_sim incomplete-lap honesty; full_car DIVERGED flag + symmetric_input + zeta honesty; quarter_car overdamped zeta honesty; ai_engineering_authority server-side RBAC). Commit provenance: WAVE_5A2_REMEDIATION (owner-approved; committed on branch wave-5a-2). Previous hashes preserved in wave5a2_previous_hashes.",
     "wave5a2_previous_hashes": {
       "src/suspensionlab/physics/ai_engineering_authority.py": "e1f5d237ad8059cbc8a5b71bc907609804f32db870dc147e43d8fe2155c76074",
       "src/suspensionlab/physics/dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690",

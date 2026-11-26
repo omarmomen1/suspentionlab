@@ -281,7 +281,7 @@ def test_15_phase3o_historical_artifacts_untouched():
     p3o_manifest = PROJECT_ROOT / "docs/phase3o_preregistration_manifest.json"
     assert p3o_manifest.exists()
     p3o_sha = hashlib.sha256(p3o_manifest.read_bytes()).hexdigest().lower()
-    expected_p3o_sha = "26e30aa08800f4756b7f219f736daddfd481ece9f5a2831469602e959631b88c"
+    expected_p3o_sha = "74cef9b8a1de6ca329e74afc7416554863142acbc0e96b7b8ffbe0a19e296831"
     assert p3o_sha == expected_p3o_sha, f"CRITICAL: Phase 3O manifest modified: {p3o_sha} != {expected_p3o_sha}"
 
 

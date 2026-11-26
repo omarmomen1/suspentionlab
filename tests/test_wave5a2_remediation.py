@@ -575,3 +575,50 @@ def test_frontend_gt3_presets_carry_explicit_static_alignment():
         i = src.index(f"  {pid}: {{")
         block = src[i:src.index("hardpoints: {", i)]
         assert "static_camber_deg" not in block, pid
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. Overdamped (zeta = None) guards in the analytics consumers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _overdamped_result():
+    from suspensionlab.physics.quarter_car import QuarterCarParams, RoadProfile, run_quarter_car_analysis
+    r = run_quarter_car_analysis(QuarterCarParams(c=1.0e6, c_t=1.0e6), RoadProfile(profile_type="step", amplitude=0.02, duration=1.0))
+    assert r.zeta_s is None
+    return r
+
+
+def test_race_engineer_overdamped_none_does_not_crash():
+    from suspensionlab.analytics.race_engineer import _analyze_damping
+    recs = _analyze_damping(_overdamped_result())
+    assert len(recs) == 1
+    assert "Overdamped" in recs[0].diagnosis
+    assert "None" not in recs[0].finding
+
+
+def test_setup_proposal_overdamped_none_is_violation_not_crash():
+    from suspensionlab.backend.services import setup_proposal as sp
+    m = {"peak_susp_travel": 0.0, "zeta_s": None}
+    v = sp._violations(m)
+    assert any("overdamped" in s.lower() for s in v)
+
+
+def test_telemetry_plots_overdamped_none_formats_cleanly():
+    from suspensionlab.visualization import telemetry_plots as tp
+    assert tp._fmt_zeta(None) == "n/a (overdamped)"
+    assert tp._fmt_zeta(0.3456, ".3f") == "0.346"
+    from suspensionlab.shared.models import QuarterCarResultSchema
+    # response schema accepts a null damping ratio (no Pydantic ValidationError)
+    assert QuarterCarResultSchema.model_fields["zeta_s"].is_required() is False
+    # exercise the real figure/PDF code with an overdamped result (schema built from the solver output)
+    from suspensionlab.shared.models import QuarterCarResultSchema
+    from suspensionlab.backend.workers.unified_worker import _serialize_for_json
+    raw = _serialize_for_json(_overdamped_result())
+    assert raw["zeta_s"] is None
+    res = QuarterCarResultSchema(**{k: v for k, v in raw.items() if k in QuarterCarResultSchema.model_fields})
+    assert res.zeta_s is None
+    tp.create_bode_plot(res)
+    tp.create_step_response_plot(res)
+    tp.create_overview_dashboard(res)
+    pdf = tp.build_report_pdf(res, baseline=res, model_type="quarter")
+    assert pdf[:4] == b"%PDF"

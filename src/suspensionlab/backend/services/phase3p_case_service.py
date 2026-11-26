@@ -74,7 +74,7 @@ class Phase3PCaseService:
     # Wave 5A re-certification: docs/phase3*_preregistration_manifest.json was
     # re-certified after the magic_formula.py PKY1 fix (original hash preserved
     # in the manifest's wave5a_recertification block). Previous: ff3b8e10f1bc36bda4f5185088fc18a3191b188e565e8b82de8cf8c922bd4f8b
-    PROTOCOL_SHA256 = "b74ea1192f5f6edb0181eed057b7aaa0dc89c5f78b82fae21d793e6368ac0f47"  # Wave 5A-2 re-certification (dynamic_lap_sim.py); Wave 5A hash c5c8d29c... superseded
+    PROTOCOL_SHA256 = "2342dc81207d544fb4ce17d64158644c9e2fd074138b3858ea64f8db1307356f"  # Wave 5A-2 re-certification (dynamic_lap_sim.py); Wave 5A hash c5c8d29c... superseded
 
     MANIFEST_PATH = PROJECT_ROOT / "docs" / "phase3p_preregistration_manifest.json"
     BLOCKERS_PATH = PROJECT_ROOT / "docs" / "phase3p_preregistration_blockers.md"
@@ -331,7 +331,7 @@ class Phase3PCaseService:
         if not p3o_manifest.exists():
             raise FileNotFoundError(f"Phase 3O manifest missing")
         p3o_hash = hashlib.sha256(p3o_manifest.read_bytes()).hexdigest().lower()
-        expected_p3o_hash = "26e30aa08800f4756b7f219f736daddfd481ece9f5a2831469602e959631b88c"
+        expected_p3o_hash = "74cef9b8a1de6ca329e74afc7416554863142acbc0e96b7b8ffbe0a19e296831"
         if p3o_hash != expected_p3o_hash:
             raise ValueError(f"Phase 3O manifest modified: {p3o_hash}")
 

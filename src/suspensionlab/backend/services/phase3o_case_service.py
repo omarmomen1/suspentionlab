@@ -62,7 +62,7 @@ class Phase3OCaseService:
     # Wave 5A re-certification: docs/phase3*_preregistration_manifest.json was
     # re-certified after the magic_formula.py PKY1 fix (original hash preserved
     # in the manifest's wave5a_recertification block). Previous: 26e30aa08800f4756b7f219f736daddfd481ece9f5a2831469602e959631b88c
-    PROTOCOL_SHA256 = "1b084961d4bd42680f4f9309ac73b7ee3efcb647230111ae1dd516714e300c53"  # Wave 5A-2 re-certification (dynamic_lap_sim.py incomplete-lap honesty); Wave 5A hash 79190cef... superseded
+    PROTOCOL_SHA256 = "74cef9b8a1de6ca329e74afc7416554863142acbc0e96b7b8ffbe0a19e296831"  # Wave 5A-2 re-certification (dynamic_lap_sim.py incomplete-lap honesty); Wave 5A hash 79190cef... superseded
     HISTORICAL_PROTOCOL_VERSION = "1.0.0-frozen"
     HISTORICAL_PROTOCOL_SHA256 = "1704bbf7213bc85064b6e60b2a6745589b3b01a6d3a59b2b2cd9630f99e81100"
 

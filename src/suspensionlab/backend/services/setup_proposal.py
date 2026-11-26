@@ -94,7 +94,7 @@ def _run_sim(params_dict: dict) -> dict:
         "peak_susp_travel": round(r.peak_susp_travel, 5),
         "rms_tire_load": round(r.rms_tire_load, 2),
         "peak_transmissibility": round(r.peak_transmissibility, 4),
-        "zeta_s": round(r.zeta_s, 4),
+        "zeta_s": (None if r.zeta_s is None else round(r.zeta_s, 4)),
     }
 
 
@@ -104,7 +104,10 @@ def _violations(m: dict) -> list[str]:
         v.append(f"Peak suspension travel {m['peak_susp_travel']*1000:.1f} mm exceeds "
                  f"{CONSTRAINTS['peak_susp_travel_max']*1000:.0f} mm limit.")
     lo, hi = CONSTRAINTS["zeta_s_range"]
-    if not (lo <= m["zeta_s"] <= hi):
+    if m["zeta_s"] is None:
+        # Overdamped (real poles): ratio undefined and above the allowed range.
+        v.append(f"Damping ratio undefined (overdamped, real poles); outside [{lo}, {hi}].")
+    elif not (lo <= m["zeta_s"] <= hi):
         v.append(f"Damping ratio ζ={m['zeta_s']:.2f} outside [{lo}, {hi}].")
     return v
 

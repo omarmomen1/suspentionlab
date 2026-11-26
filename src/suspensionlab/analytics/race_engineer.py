@@ -71,7 +71,20 @@ class RaceEngineerReport:
 def _analyze_damping(r: QuarterCarResult) -> List[Recommendation]:
     """Diagnoses the sprung mass damping ratio (zeta_s)."""
     recs = []
-    
+
+    if r.zeta_s is None:
+        # Overdamped / real-pole system: no complex pole pair, so a damping ratio is
+        # undefined. Report that honestly instead of comparing None to a threshold.
+        recs.append(Recommendation(
+            category="DAMPING",
+            diagnosis="Overdamped Suspension (damping ratio not identifiable)",
+            finding="The sprung-mass mode has real poles (no oscillation), so a damping ratio is not defined. The system is overdamped.",
+            action="Reduce overall damping (especially compression) until the mode becomes oscillatory (zeta of about 0.4 to 0.6).",
+            severity=Severity.WARNING,
+            confidence=0.80
+        ))
+        return recs
+
     if r.zeta_s < 0.20:
         recs.append(Recommendation(
             category="DAMPING",
