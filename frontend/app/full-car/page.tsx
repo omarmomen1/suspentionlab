@@ -2,7 +2,7 @@
 // Full Car Page
 
 "use client";
-import { useState, useRef, Suspense, useMemo, useEffect } from "react";
+import { useState, useRef, Suspense, useMemo, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useJobPolling } from "../../hooks/useJobPolling";
@@ -17,14 +17,22 @@ import {
 import NextStepLink from "../../components/NextStepLink";
 import { formatApiError } from "../../lib/api_client";
 import { useUndoRedo } from "../../hooks/useUndoRedo";
-import PDFExport from "../../components/PDFExport";
+import PDFExport, { type PinnedLedgerRow } from "../../components/PDFExport";
+import type { LedgerRow } from "../../components/v2/instruments/LedgerTable";
+import { fullCarLedgerRows } from "../../lib/v2/ledgers";
+import StudioShell, { ShellLeft, ShellCenter, ShellRight } from "../../components/v2/StudioShell";
+import VerdictRail from "../../components/v2/VerdictRail";
+import LedgerDock from "../../components/v2/instruments/LedgerDock";
+import { verdictStatus } from "../../lib/v2/status";
+import { toPinnedPdfRows } from "../../lib/v2/ledgers";
+
 import DataExport from "../../components/DataExport";
 import PlanGate from "../../components/PlanGate";
 import ComparePanel from "../../components/ComparePanel";
 import SimHistory, { saveSimulationToHistory } from "../../components/SimHistory";
 import { useAuth } from "../../contexts/AuthContext";
 
-import ModelValidity, { ValidityReport } from "../../components/ModelValidity";
+import ModelValidity, { ValidityReport, resolveValidityTier } from "../../components/ModelValidity";
 import Plot from "../../components/sim/Plot";
 import KPICard from "../../components/sim/KPICard";
 import PlotBox from "../../components/sim/PlotBox";
@@ -339,6 +347,17 @@ function FullCarDashboard() {
   );
   const r = activeResult;
 
+  // V2 verdict, ledger and pinned PDF rows.
+  const verdict = verdictStatus({ isRunning, error: simError, hasResults, validityTier: validity ? resolveValidityTier(validity) : null });
+  const ledgerSource = (r as any)?.run_id ? `solver run ${(r as any).run_id}` : "this session's solver run";
+  const ledgerRows = useMemo(
+    () => (hasResults ? fullCarLedgerRows(r as any, params as any, verdict.status, ledgerSource) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hasResults, r, params, verdict.status, ledgerSource],
+  );
+  const [pinnedPdfRows, setPinnedPdfRows] = useState<PinnedLedgerRow[]>([]);
+  const handlePinned = useCallback((rows: LedgerRow[]) => setPinnedPdfRows(toPinnedPdfRows(rows)), []);
+
   return (
     <div className="h-full flex flex-col p-5 pt-3 gap-3 min-h-0">
       {toast && (
@@ -391,7 +410,7 @@ function FullCarDashboard() {
           <button onClick={saveProfile} disabled={isSaving} className="px-3 py-1.5 bg-[#141416] border border-[#252525] hover:bg-[#1e1e20] rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40">
             <Save size={13} className="text-ansys-yellow" /> Save Setup
           </button>
-          <PDFExport captureId="sim-report" fileName={`FCar_${params.m_s}`} />
+          <PDFExport captureId="sim-report" fileName={`FCar_${params.m_s}`} pinnedRows={pinnedPdfRows} />
           <DataExport results={results} fileName={`FCar_${params.m_s}`} />
 
           <button id="btn-run" onClick={runSimulation} disabled={isRunning}
@@ -410,8 +429,9 @@ function FullCarDashboard() {
           : ""}
       </div>
 
-      <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
-        <div className="w-60 shrink-0 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-y-auto custom-scrollbar">
+      <StudioShell>
+        <ShellLeft className="lg:w-60">
+        <div className="w-full lg:w-60 lg:shrink-0 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-y-auto custom-scrollbar">
           <div className="px-4 py-3 border-b border-[#1e1e1e] sticky top-0 bg-[#0d0d0f] z-10"><h2 className="text-xs font-semibold text-gray-300 flex items-center gap-2"><Settings2 size={13} className="text-ansys-yellow" /> Parameters</h2></div>
           <div className="p-4 space-y-5">
             <div className="space-y-1.5">
@@ -464,7 +484,9 @@ function FullCarDashboard() {
             </ParamSection>
           </div>
         </div>
+        </ShellLeft>
 
+        <ShellCenter>
         <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-hidden">
           {!results && !isRunning && (
             <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl flex flex-col items-center justify-center gap-4">
@@ -675,8 +697,25 @@ function FullCarDashboard() {
               </div>
             </div>
           )}
+          {hasResults && r && <LedgerDock rows={ledgerRows} caption="Full-car ledger" onPinnedChange={handlePinned} />}
         </div>
-      </div>
+        </ShellCenter>
+        <ShellRight>
+          <VerdictRail
+            status={verdict.status}
+            statusLabel={verdict.label}
+            heroes={[
+              { label: "Heave ƒₙ", value: hasResults ? (r as any)?.f_n_heave : null, unit: "Hz", decimals: 2 },
+              { label: "Roll ƒₙ", value: hasResults ? (r as any)?.f_n_roll : null, unit: "Hz", decimals: 2 },
+              { label: "Pitch ƒₙ", value: hasResults ? (r as any)?.f_n_pitch : null, unit: "Hz", decimals: 2 },
+            ]}
+            solverVersion={(r as any)?.solver_version}
+            runId={(r as any)?.run_id}
+            inputSha256={(r as any)?.input_sha256}
+            action={{ label: "Run Solver", onClick: () => runSimulation(), loading: isRunning }}
+          />
+        </ShellRight>
+      </StudioShell>
     </div>
   );
 }

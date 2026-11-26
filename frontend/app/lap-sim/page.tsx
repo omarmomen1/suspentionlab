@@ -32,6 +32,7 @@ import { useWorkspace } from "../../contexts/WorkspaceContext";
 import PlanGate from "../../components/PlanGate";
 import Plot from "../../components/sim/Plot";
 import TrackMap, { CornerInfo, GgvEnvelopeData } from "../../components/sim/TrackMap";
+import EnvelopePlot from "../../components/v2/instruments/EnvelopePlot";
 import LapDeltaView, { LapRunData, VehicleSetupParameters } from "../../components/sim/LapDeltaView";
 import { darkLayout } from "../../components/sim/theme";
 
@@ -1158,6 +1159,16 @@ const GT3_BASELINE_PROFILE: CoupledVehicleConfig = {
 
 // ─── Main ApexSim Cockpit Component ───────────────────────────────────────────
 
+/** Model limit half-axes [g] from the solver envelope. Undefined when the envelope has no data (nothing is invented). */
+function envelopeLimits(ggv?: GgvEnvelopeData): { latG?: number; accelG?: number; brakeG?: number } | null {
+  if (!ggv) return null;
+  const maxOf = (g?: number[], ms2?: number[]): number | undefined => {
+    const v = g && g.length ? g : ms2 && ms2.length ? ms2.map((a) => a / 9.81) : undefined;
+    return v ? Math.max(...v.map((x) => Math.abs(x))) : undefined;
+  };
+  return { latG: maxOf(ggv.ay_max_g, ggv.ay_max_ms2), accelG: maxOf(ggv.ax_accel_g, ggv.ax_accel_ms2), brakeG: maxOf(ggv.ax_brake_g, ggv.ax_brake_ms2) };
+}
+
 export default function LapSimPage() {
   const { fetchWithAuth } = useAuth();
 
@@ -1196,6 +1207,13 @@ export default function LapSimPage() {
   // Simulation Results & View State
   const [running, setRunning] = useState<boolean>(false);
   const [result, setResult] = useState<LapSimResponse | null>(null);
+  // Optional setup-response surface ("Compute GGV Surface"): a second, cancellable request.
+  // The core solve stays on the fast path (include_surface: false).
+  const lastPayloadRef = useRef<Record<string, any> | null>(null);
+  const runSeqRef = useRef(0);
+  const surfaceAbortRef = useRef<AbortController | null>(null);
+  const [surfaceBusy, setSurfaceBusy] = useState<boolean>(false);
+  const [surfaceMsg, setSurfaceMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hoverDist, setHoverDist] = useState<number | null>(null);
 
@@ -1471,6 +1489,13 @@ export default function LapSimPage() {
         payload.sector_boundaries = sectorBounds;
       }
 
+      // A new core solve invalidates any surface request still in flight.
+      surfaceAbortRef.current?.abort();
+      runSeqRef.current += 1;
+      lastPayloadRef.current = { ...payload, include_surface: false };
+      setSurfaceBusy(false);
+      setSurfaceMsg(null);
+
       const res = await fetchWithAuth("/api/v1/lap-sim/simulate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1630,6 +1655,52 @@ export default function LapSimPage() {
       setRunning(false);
     }
   };
+
+  const cancelSurface = () => {
+    surfaceAbortRef.current?.abort();
+  };
+
+  const computeSurface = async () => {
+    const base = lastPayloadRef.current;
+    if (!base || surfaceBusy) return;
+    const seq = runSeqRef.current;
+    const ctrl = new AbortController();
+    surfaceAbortRef.current = ctrl;
+    setSurfaceBusy(true);
+    setSurfaceMsg(null);
+    try {
+      const res = await fetchWithAuth("/api/v1/lap-sim/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...base, include_surface: true }),
+        signal: ctrl.signal,
+      });
+      if (!res.ok) {
+        let detail: unknown = null;
+        try { detail = await res.json(); } catch { /* non-JSON error body */ }
+        throw detail ?? new Error(`Surface request failed (${res.status})`);
+      }
+      const raw = await res.json();
+      if (seq !== runSeqRef.current) return; // inputs changed while the surface was computing: discard
+      const surface = raw.setup_surface ?? raw.telemetry?.setup_surface;
+      if (!surface) {
+        setSurfaceMsg("The solver returned no surface for this input.");
+        return;
+      }
+      setResult((prev) => (prev ? { ...prev, setup_surface: surface } : prev));
+    } catch (e: any) {
+      if (e?.name === "AbortError") {
+        setSurfaceMsg("Surface computation cancelled.");
+      } else {
+        setSurfaceMsg(formatApiError(e, "Surface computation failed"));
+      }
+    } finally {
+      if (seq === runSeqRef.current) setSurfaceBusy(false);
+      if (surfaceAbortRef.current === ctrl) surfaceAbortRef.current = null;
+    }
+  };
+
+  useEffect(() => () => surfaceAbortRef.current?.abort(), []);
 
   const tabMountedRef = useRef(false);
   useEffect(() => {
@@ -2511,13 +2582,31 @@ export default function LapSimPage() {
                           useResizeHandler
                         />
                       ) : (
-                        <div className="h-full flex items-center justify-center text-xs text-zinc-500 font-mono">
-                          Simulating setup response grid...
+                        <div data-testid="surface-compute" className="h-full flex flex-col items-center justify-center gap-2 px-4 text-center text-xs text-zinc-400 font-mono">
+                          <p>Setup-response surface (front ARB x aero balance) is not computed on the fast solve.</p>
+                          <p className="text-[10px] text-zinc-600">The backend notes it takes roughly 21-51 s instead of 0.5-1.5 s.</p>
+                          {surfaceBusy ? (
+                            <button type="button" onClick={cancelSurface} className="rounded border border-hairline px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/[0.06]">
+                              Cancel
+                            </button>
+                          ) : (
+                            <button type="button" onClick={computeSurface} className="rounded border border-signal bg-signal px-3 py-1.5 text-xs font-bold text-carbon hover:bg-[#d6f56e]">
+                              Compute GGV Surface
+                            </button>
+                          )}
+                          {surfaceBusy && <p className="text-[10px] text-zinc-500">Computing the surface...</p>}
+                          {surfaceMsg && <p role="status" className="text-[10px] text-warning">{surfaceMsg}</p>}
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
+
+                <EnvelopePlot
+                  latG={result.trace.lat_g}
+                  longG={result.trace.long_g}
+                  limits={envelopeLimits(result.ggv_envelope)}
+                />
 
                 {/* LapDeltaView (Setup A vs Setup B comparison) */}
                 <LapDeltaView
@@ -2534,6 +2623,7 @@ export default function LapSimPage() {
                   setupAParams={pinnedBaseline?.cfg as any}
                   setupBParams={cfg as any}
                   onPinBaseline={handlePinBaseline}
+                  corners={trackInputTab === "preset" ? activeCircuit.corners.map((c) => ({ name: c.name, distM: c.distM })) : undefined}
                   onResetToBaseline={() => {
                     if (!pinnedBaseline) return;
                     const c = { ...pinnedBaseline.cfg };

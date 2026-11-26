@@ -72,3 +72,36 @@ export function mapResultToV2(res: unknown): V2Status {
   }
   return "NOT_RUN";
 }
+
+export interface VerdictInput {
+  isRunning?: boolean;
+  /** Any error text or object for the current run. */
+  error?: unknown;
+  /** True only when real solver output is on screen. */
+  hasResults: boolean;
+  /** ModelValidity tier ("VALIDATED" | "CONDITIONAL" | "EXPERIMENTAL" | "OUT-OF-DOMAIN"), or the handling model status ("VALIDATED" | "PROVISIONAL" | "UNVALIDATED") when a report exists. */
+  validityTier?: string | null;
+  /** Backend overall status ("PASS" | "WARN" | "FAIL") when the endpoint reports one. */
+  backendStatus?: string | null;
+}
+
+/**
+ * One verdict for a studio: running, failed, not run, or the validity-derived state.
+ * A solved run with no validity report is WARNING with an explicit label, never VERIFIED.
+ */
+export function verdictStatus(v: VerdictInput): { status: V2Status; label?: string } {
+  if (v.isRunning) return { status: "RUNNING" };
+  if (v.error) return { status: "FAILED" };
+  if (!v.hasResults) return { status: "NOT_RUN" };
+  if (v.backendStatus) return { status: mapBackendStatusToV2(v.backendStatus) };
+  switch ((v.validityTier ?? "").toUpperCase()) {
+    case "VALIDATED": return { status: "VERIFIED" };
+    case "CONDITIONAL":
+    case "EXPERIMENTAL":
+    case "PROVISIONAL": return { status: "WARNING" };
+    case "UNVALIDATED": return { status: "WARNING", label: "Unvalidated model" };
+    case "OUT-OF-DOMAIN":
+    case "OUT_OF_DOMAIN": return { status: "OUT_OF_DOMAIN" };
+    default: return { status: "WARNING", label: "No validity report" };
+  }
+}

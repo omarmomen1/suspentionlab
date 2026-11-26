@@ -5,6 +5,13 @@ import Plot from "../../components/sim/Plot";
 import { useAuth } from "../../contexts/AuthContext";
 import KinematicsModelValidity from "../../components/kinematics/KinematicsModelValidity";
 import TrustBadge from "../../components/TrustBadge";
+import { GT3_MOTION_RATIO_BAND } from "../../lib/v2/instruments";
+import BlueprintSVG from "../../components/v2/instruments/BlueprintSVG";
+import { kinematicsLedgerRows } from "../../lib/v2/ledgers";
+import StudioShell, { ShellLeft, ShellCenter, ShellRight } from "../../components/v2/StudioShell";
+import VerdictRail from "../../components/v2/VerdictRail";
+import LedgerDock from "../../components/v2/instruments/LedgerDock";
+import { verdictStatus } from "../../lib/v2/status";
 import SuspensionKinematics3D, { KinematicsGeometryMap } from "../../components/kinematics/SuspensionKinematics3D";
 import KinematicsComparisonPanel from "../../components/kinematics/KinematicsComparisonPanel";
 import KinematicsTargetBandsModal, { DEFAULT_TARGET_BANDS } from "../../components/kinematics/KinematicsTargetBandsModal";
@@ -543,6 +550,7 @@ export default function KinematicsPage() {
     | "sensitivity"
     | "optimizer";
   const [activeTab, setActiveTab] = useState<ViewTab>("workspace");
+  const [workspaceView, setWorkspaceView] = useState<"2d" | "3d">("2d");
 
   // Sensitivity Matrix State
   const [sensitivityData, setSensitivityData] = useState<HardpointSensitivityMatrixResponse | null>(null);
@@ -906,6 +914,15 @@ export default function KinematicsPage() {
     [failedPoints]
   );
 
+  // V2 verdict and ledger.
+  const verdict = verdictStatus({ isRunning: loading, error, hasResults: Boolean(result), backendStatus: result?.overall_model_status });
+  const kinLedgerSource = result?.run_id ? `solver run ${result.run_id}` : "this session's solver run";
+  const kinLedgerRows = useMemo(
+    () => kinematicsLedgerRows(result as any, travelIdx, verdict.status, kinLedgerSource),
+    [result, travelIdx, verdict.status, kinLedgerSource],
+  );
+  const atIdx = (a: number[] | undefined | null): number | null => (a && Number.isFinite(a[travelIdx]) ? a[travelIdx] : null);
+
   return (
     <div className="min-h-screen bg-[#07080c] text-gray-200 font-['Inter',sans-serif]">
       {/* ── Top Header Navigation Bar ───────────────────────────────────────── */}
@@ -1014,8 +1031,9 @@ export default function KinematicsPage() {
       </header>
 
       {/* ── Main Workspace Grid ─────────────────────────────────────────────── */}
-      <div className="flex flex-col lg:flex-row min-h-[calc(100vh-57px)]">
+      <StudioShell className="lg:min-h-[calc(100vh-57px)] lg:gap-0 p-0">
         {/* ── LEFT SIDEBAR: Hardpoint Controls & Travel Config ──────────────── */}
+        <ShellLeft className="lg:w-80">
         <aside className="w-full lg:w-80 flex-shrink-0 border-r border-[#171924] bg-[#090a0f] flex flex-col lg:max-h-[calc(100vh-57px)] lg:sticky lg:top-[57px] overflow-y-auto">
           <div className="p-3.5 border-b border-[#181a24] bg-[#0d0e16]">
             <h2 className="text-[11px] font-bold text-gray-300 uppercase tracking-wider flex items-center justify-between">
@@ -1153,8 +1171,10 @@ export default function KinematicsPage() {
             </div>
           )}
         </aside>
+        </ShellLeft>
 
         {/* ── MAIN VIEWPORT AREA ────────────────────────────────────────────── */}
+        <ShellCenter>
         <main className="flex-1 flex flex-col overflow-y-auto bg-[#07080c] p-4 space-y-4">
           {/* Decoupled Model Validity Component */}
           <KinematicsModelValidity
@@ -1409,6 +1429,37 @@ export default function KinematicsPage() {
             {/* Tab 1: 3D Suspension Workspace */}
             {activeTab === "workspace" && (
               <div className="space-y-3">
+                <div role="tablist" aria-label="Workspace view" className="flex gap-px self-start rounded border border-hairline bg-hairline w-fit">
+                  {([["2d", "2D Blueprint"], ["3d", "3D Rig"]] as const).map(([id, label]) => (
+                    <button
+                      key={id}
+                      role="tab"
+                      type="button"
+                      data-testid={`view-${id}`}
+                      aria-selected={workspaceView === id}
+                      onClick={() => setWorkspaceView(id)}
+                      className={`px-3 py-1.5 text-xs font-semibold ${workspaceView === id ? "bg-signal text-carbon" : "bg-panel text-gray-300"}`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                {workspaceView === "2d" ? (
+                  <BlueprintSVG
+                    geometry={current3DGeometry as any}
+                    staticGeometry={hp as any}
+                    travelMm={currentTravel}
+                    rollCenterHeightMm={atIdx(result?.roll_center_height_mm)}
+                    rollCenterLateralMm={atIdx(result?.roll_center_lateral_mm)}
+                    icYMm={atIdx(result?.ic_y_mm)}
+                    icZMm={atIdx(result?.ic_z_mm)}
+                    motionRatio={atIdx(result?.motion_ratio)}
+                    motionRatioBand={GT3_MOTION_RATIO_BAND}
+                    travelValues={result?.wheel_travel_mm}
+                    travelIdx={travelIdx}
+                    onTravelIdxChange={setTravelIdx}
+                  />
+                ) : (
                 <SuspensionKinematics3D
                   geometry={current3DGeometry}
                   camberDeg={currentCamber}
@@ -1419,6 +1470,7 @@ export default function KinematicsPage() {
                   hoveredNode={hoveredHP}
                   onHoverNode={setHoveredHP}
                 />
+                )}
 
                 <div className="p-3 bg-[#0a0c12] border border-[#1c1f2e] rounded-xl flex flex-wrap items-center justify-between gap-4 text-xs">
                   <div className="flex items-center gap-2 text-gray-400">
@@ -1855,8 +1907,26 @@ export default function KinematicsPage() {
               />
             )}
           </div>
+          {result && <LedgerDock rows={kinLedgerRows} pinnable={false} caption="Kinematics ledger (at current travel)" />}
         </main>
-      </div>
+        </ShellCenter>
+        <ShellRight className="lg:p-3">
+          <VerdictRail
+            status={verdict.status}
+            statusLabel={verdict.label}
+            heroes={[
+              { label: "Camber", value: atIdx(result?.camber_deg), unit: "deg", decimals: 3 },
+              { label: "Roll-centre height", value: atIdx(result?.roll_center_height_mm), unit: "mm", decimals: 1 },
+              { label: "Motion ratio", value: atIdx(result?.motion_ratio), decimals: 3 },
+              { label: "Scrub radius", value: atIdx(result?.scrub_radius_mm), unit: "mm", decimals: 1 },
+            ]}
+            solverVersion={result?.solver_version ?? backendInfo.solver_version}
+            runId={result?.run_id}
+            inputSha256={result?.input_sha256}
+            action={{ label: "Recompute Sweep", onClick: () => solve(), loading }}
+          />
+        </ShellRight>
+      </StudioShell>
 
       {/* ── Modals ──────────────────────────────────────────────────────────── */}
       <EngineeringQuestionModal

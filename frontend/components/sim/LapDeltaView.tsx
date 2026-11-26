@@ -15,6 +15,8 @@ import {
 } from "lucide-react";
 import Plot from "./Plot";
 import { darkLayout } from "./theme";
+import DifferenceRibbon from "../v2/instruments/DifferenceRibbon";
+import { cornerDeltasFromCumulative } from "../../lib/v2/instruments";
 
 export interface SectorDeltaItem {
   sector_id: number;
@@ -85,6 +87,22 @@ export interface LapDeltaViewProps {
   setupBName?: string;
   onPinBaseline?: () => void;
   onResetToBaseline?: () => void;
+  /** Corner apex positions [m] for the difference ribbon. Omit when the track has no corner list. */
+  corners?: { name: string; distM: number }[];
+}
+
+
+/** Corner zones: from the midpoint to the previous apex to the midpoint to the next. First starts at the first sample, last ends at the last. */
+function cornerZones(corners: { name: string; distM: number }[] | undefined, sM: number[]) {
+  if (!corners || corners.length === 0 || sM.length < 2) return [];
+  const sorted = [...corners].sort((a, b) => a.distM - b.distM);
+  const start = sM[0];
+  const end = sM[sM.length - 1];
+  return sorted.map((c, i) => ({
+    corner: c.name,
+    start_m: i === 0 ? start : (sorted[i - 1].distM + c.distM) / 2,
+    end_m: i === sorted.length - 1 ? end : (c.distM + sorted[i + 1].distM) / 2,
+  }));
 }
 
 export default function LapDeltaView({
@@ -99,6 +117,7 @@ export default function LapDeltaView({
   setupBName = "Setup B (Candidate)",
   onPinBaseline,
   onResetToBaseline,
+  corners,
 }: LapDeltaViewProps) {
   // Normalize runs safely
   const runA = baselineRun ?? lapA ?? null;
@@ -399,6 +418,13 @@ export default function LapDeltaView({
             </span>
           </div>
         </div>
+      )}
+
+      {/* V2 Difference Ribbon: per-corner-zone time delta (only when a corner list exists and the guard passed) */}
+      {comparison && !("incompatible" in comparison) && (
+        <DifferenceRibbon
+          deltas={cornerDeltasFromCumulative(comparison.sM, comparison.cumulativeDeltaTime, cornerZones(corners, comparison.sM))}
+        />
       )}
 
       {/* Synchronized Plotly Distance-Domain Trace: Speed A (#06B6D4) vs Speed B (#F43F5E) & Δt(s) (#F59E0B) */}
