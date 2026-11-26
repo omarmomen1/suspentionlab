@@ -9,6 +9,69 @@
 
 import { apiJson, apiFetch } from "./api";
 
+/**
+ * formatApiError - single shared error formatter.
+ * Always surfaces the real backend/client message; never emits "[object Object]".
+ * `context` is a short human phrase describing what failed.
+ */
+function formatDetail(detail: unknown): string | null {
+  if (typeof detail === "string") return detail || null;
+  if (Array.isArray(detail)) {
+    const parts = detail
+      .map((d) => {
+        if (typeof d === "string") return d;
+        if (d && typeof d === "object") {
+          const o = d as Record<string, unknown>;
+          const m = typeof o.msg === "string" ? o.msg : typeof o.message === "string" ? o.message : null;
+          if (!m) return null;
+          const loc = Array.isArray(o.loc)
+            ? o.loc.filter((x) => x !== "body" && x !== "query").join(".")
+            : "";
+          return loc ? `${loc}: ${m}` : m;
+        }
+        return null;
+      })
+      .filter((x): x is string => !!x);
+    return parts.length ? parts.join("; ") : null;
+  }
+  if (detail && typeof detail === "object") {
+    const o = detail as Record<string, unknown>;
+    if (typeof o.message === "string" && o.message) {
+      return typeof o.code === "string" && o.code ? `${o.message} (${o.code})` : o.message;
+    }
+    if (typeof o.msg === "string" && o.msg) return o.msg;
+    if (typeof o.code === "string" && o.code) return o.code;
+  }
+  return null;
+}
+
+export function formatApiError(err: unknown, context: string): string {
+  let msg: string;
+  if (err instanceof Error) {
+    msg = err.message || err.name;
+    const t = msg.trim();
+    if (t.startsWith("{") && t.includes("detail")) {
+      try {
+        const parsed = JSON.parse(t) as Record<string, unknown>;
+        const f = formatDetail(parsed.detail);
+        if (f) msg = f;
+      } catch { /* keep raw message */ }
+    }
+  } else if (typeof err === "string") {
+    msg = err;
+  } else if (err && typeof err === "object") {
+    const o = err as Record<string, unknown>;
+    const fd = formatDetail(o.detail);
+    if (fd) msg = fd;
+    else if (typeof o.message === "string") msg = o.message;
+    else if (typeof o.error === "string") msg = o.error;
+    else msg = "Unknown error (server returned no message)";
+  } else {
+    msg = "Unknown error";
+  }
+  return context ? `${context}: ${msg}` : msg;
+}
+
 // ── Types & Interfaces ────────────────────────────────────────────────────────
 
 export interface QuarterCarRequest {
@@ -1343,23 +1406,27 @@ export class AiEngineerApi {
     });
   }
 
+  /**
+   * Human governance approval gate. Sends only the real approval payload -
+   * the backend derives the approver's role from the authenticated session
+   * and signs server-side. Never send client-fabricated roles or signatures.
+   */
   static async approveDecision(
     decisionId: string,
-    actionType: string,
-    signoffNotes: string,
-    userRole: string,
-    signature: string,
+    decisionType: string,
+    rationale: string,
+    approverName?: string,
     teamId?: string
-  ): Promise<{ status: string; approved_by: string; timestamp: string; hmac_signature: string }> {
+  ): Promise<{ status: string; approved_by?: string; timestamp?: string; [key: string]: unknown }> {
     return apiJson("/api/v1/ai/approve", {
       method: "POST",
       body: JSON.stringify({
         decision_id: decisionId,
-        action_type: actionType,
-        signoff_notes: signoffNotes,
-        user_role: userRole,
-        signature: signature,
+        decision_type: decisionType,
+        rationale,
+        approver_name: approverName,
         team_id: teamId,
+        autonomous_request: false,
       }),
     });
   }

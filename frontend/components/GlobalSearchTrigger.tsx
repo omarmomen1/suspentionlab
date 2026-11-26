@@ -21,7 +21,9 @@ export default function GlobalSearchTrigger() {
       type="button"
       aria-label={`Open global search (${key})`}
       className="flex items-center space-x-1 hover:text-white cursor-pointer transition-colors"
-      onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true }))}
+      // Dispatch with BOTH metaKey and ctrlKey so the command palette opens on
+      // Windows, Linux and macOS regardless of which modifier its listener checks.
+      onClick={() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true }))}
     >
       <Search size={14} />
       <span className="hidden md:inline-flex items-center justify-center rounded border border-gray-700 bg-[rgba(255,255,255,0.05)] px-1.5 py-0.5 font-mono text-[10px] text-gray-400 cursor-pointer hover:text-white transition-colors">

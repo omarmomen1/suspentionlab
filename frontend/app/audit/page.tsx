@@ -89,6 +89,7 @@ export default function AuditPage() {
   const [loading, setLoading] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const [verification, setVerification] = useState<VerificationResult | null>(null);
+  const [verifyError, setVerifyError] = useState<string | null>(null);
   const [selectedEntry, setSelectedEntry] = useState<AuditEntry | null>(null);
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
 
@@ -115,14 +116,21 @@ export default function AuditPage() {
 
   const runVerification = async () => {
     setVerifying(true);
+    setVerifyError(null);
     try {
       const res = await fetchWithAuth("/api/v1/audit/verify");
       if (res.ok) {
         const result = await res.json();
         setVerification(result);
+      } else if (res.status === 403) {
+        // Permission failure is NOT evidence of ledger tampering.
+        setVerifyError("Insufficient permissions to verify the audit ledger (HTTP 403).");
+      } else {
+        setVerifyError(`Ledger verification unavailable (HTTP ${res.status}).`);
       }
     } catch (e) {
       console.error("Failed to verify audit chain:", e);
+      setVerifyError("Ledger verification request failed (network or server error).");
     } finally {
       setVerifying(false);
     }
@@ -259,23 +267,35 @@ export default function AuditPage() {
           
           {/* Card 1: Chain Integrity Banner */}
           <div className={`p-5 rounded-2xl border ${
-            verification?.is_valid
+            verifyError
+              ? "bg-amber-950/20 border-amber-800/40"
+              : verification === null
+              ? "bg-zinc-900/40 border-zinc-700/40"
+              : verification.is_valid
               ? "bg-emerald-950/20 border-emerald-800/40"
               : "bg-red-950/20 border-red-800/40"
           }`}>
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Chain Integrity</span>
-              {verification?.is_valid ? (
+              {verifyError ? (
+                <AlertTriangle size={18} className="text-amber-400" />
+              ) : verification === null ? (
+                <RefreshCw size={18} className="text-zinc-400 animate-spin" />
+              ) : verification.is_valid ? (
                 <ShieldCheck size={18} className="text-emerald-400" />
               ) : (
                 <AlertTriangle size={18} className="text-red-400 animate-pulse" />
               )}
             </div>
-            <div className={`text-xl font-bold mt-2 ${verification?.is_valid ? "text-emerald-400" : "text-red-400"}`}>
-              {verification?.chain_integrity || "VERIFYING..."}
+            <div className={`text-xl font-bold mt-2 ${verifyError ? "text-amber-400" : verification === null ? "text-zinc-400" : verification.is_valid ? "text-emerald-400" : "text-red-400"}`}>
+              {verifyError ? "UNVERIFIED" : verification === null ? "VERIFYING..." : verification.chain_integrity || (verification.is_valid ? "VALID" : "BROKEN")}
             </div>
             <p className="text-[11px] text-gray-400 mt-1">
-              {verification?.is_valid
+              {verifyError
+                ? verifyError
+                : verification === null
+                ? "Checking sequential SHA-256 blocks..."
+                : verification.is_valid
                 ? "All sequential SHA-256 blocks cryptographically valid."
                 : "Tamper or sequence break detected in ledger."}
             </p>

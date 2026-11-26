@@ -88,13 +88,16 @@ export default function MobileNav({ defaultOpen = false }: { defaultOpen?: boole
         <Menu size={18} />
       </button>
 
-      {/* Drawer */}
-      {open && (
-        <div
+      {/* Drawer - kept mounted and visibility-toggled so the first open paints
+          links immediately (no empty first paint while a fresh tree mounts) */}
+      <div
           ref={drawerRef}
-          className="fixed inset-0 z-[60] lg:hidden"
+          className={`fixed inset-0 z-[60] lg:hidden transition-opacity duration-150 ${
+            open ? "opacity-100" : "opacity-0 pointer-events-none invisible"
+          }`}
           role="dialog"
-          aria-modal="true"
+          aria-modal={open ? "true" : undefined}
+          aria-hidden={!open}
           aria-label="Navigation"
         >
           {/* Backdrop */}
@@ -227,7 +230,6 @@ export default function MobileNav({ defaultOpen = false }: { defaultOpen?: boole
             </nav>
           </div>
         </div>
-      )}
     </>
   );
 }

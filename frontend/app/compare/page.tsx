@@ -423,7 +423,9 @@ function CompareContent() {
                   />
 
                   <span className="text-[10px] text-gray-500 font-mono">
-                    Rig R²: {comparisonResult.evidence.correlation_r2.toFixed(2)}
+                    Rig R²: {comparisonResult.evidence.correlation_r2 != null
+                      ? comparisonResult.evidence.correlation_r2.toFixed(2)
+                      : "N/A"}
                   </span>
                 </div>
 

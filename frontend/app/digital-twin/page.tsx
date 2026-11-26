@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "../../contexts/AuthContext";
+import { useWorkspace } from "../../contexts/WorkspaceContext";
 import DynoDayReport from "../../components/DynoDayReport";
 import Plot from "../../components/sim/Plot";
 import {
@@ -69,6 +70,7 @@ const DARK_PLOT_BASE = {
 
 export default function DigitalTwinPage() {
   const { user, token, login, fetchWithAuth } = useAuth();
+  const { vehicle: sharedVehicle } = useWorkspace();
   const [activeTab, setActiveTab] = useState<"operational" | "analysis" | "sync" | "live">("operational");
 
   // Operational State & Belief
@@ -352,7 +354,7 @@ export default function DigitalTwinPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-                  <span>Car: <strong className="text-slate-200">{operationalState?.car_ref || "AMR24-EVO"}</strong></span>
+                  <span>Car: <strong className="text-slate-200">{operationalState?.car_ref || sharedVehicle?.name || "No active twin vehicle"}</strong></span>
                   <span>&bull;</span>
                   <span>Setup: <strong className="text-slate-200">{operationalState?.setup_ref || "SETUP-BASE"}</strong></span>
                 </div>

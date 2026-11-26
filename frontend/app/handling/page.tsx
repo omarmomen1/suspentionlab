@@ -28,6 +28,7 @@ import {
   Car,
 } from "lucide-react";
 import { useUndoRedo } from "../../hooks/useUndoRedo";
+import { useWorkspace } from "../../contexts/WorkspaceContext";
 import PDFExport from "../../components/PDFExport";
 import DataExport from "../../components/DataExport";
 import PlanGate from "../../components/PlanGate";
@@ -105,6 +106,23 @@ function HandlingDashboard() {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 3500);
   };
+
+  // Seed mass/CoG/track from the shared Workspace vehicle when it changes, so
+  // handling analysis never runs against a split-brain hardcoded car.
+  const { vehicle: workspaceVehicle } = useWorkspace();
+  const handlingSeededFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (workspaceVehicle && workspaceVehicle.id !== handlingSeededFor.current) {
+      handlingSeededFor.current = workspaceVehicle.id;
+      setParams((p: any) => ({
+        ...p,
+        m: workspaceVehicle.mass_kg ?? p.m,
+        h_cg: workspaceVehicle.cg_height_m ?? p.h_cg,
+        tw_f: workspaceVehicle.track_width_m ?? p.tw_f,
+        tw_r: workspaceVehicle.track_width_m ?? p.tw_r,
+      }));
+    }
+  }, [workspaceVehicle]);
 
   // Live front roll stiffness distribution derived from front/rear springs, track widths & ARBs
   const kRollFront = 0.5 * params.K_spring_f * params.tw_f * params.tw_f + params.K_arb_f;

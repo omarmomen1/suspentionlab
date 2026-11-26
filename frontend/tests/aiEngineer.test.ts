@@ -157,8 +157,7 @@ describe("Canonical AI Race Engineer API Client", () => {
       "decision-setup-v24",
       "SETUP_PARAMETER_MODIFICATION",
       "Sign-off verified with track conditions",
-      "CHIEF_RACE_ENGINEER",
-      "hmac-sig-12345",
+      "Chief Engineer",
       "team-squad-1"
     );
 
@@ -168,11 +167,11 @@ describe("Canonical AI Race Engineer API Client", () => {
         method: "POST",
         body: JSON.stringify({
           decision_id: "decision-setup-v24",
-          action_type: "SETUP_PARAMETER_MODIFICATION",
-          signoff_notes: "Sign-off verified with track conditions",
-          user_role: "CHIEF_RACE_ENGINEER",
-          signature: "hmac-sig-12345",
+          decision_type: "SETUP_PARAMETER_MODIFICATION",
+          rationale: "Sign-off verified with track conditions",
+          approver_name: "Chief Engineer",
           team_id: "team-squad-1",
+          autonomous_request: false,
         }),
       })
     );

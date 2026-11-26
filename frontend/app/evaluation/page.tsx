@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "../../contexts/AuthContext";
+import { useWorkspace } from "../../contexts/WorkspaceContext";
 import { useRouter } from "next/navigation";
 import {
   Clock,
@@ -184,6 +185,7 @@ interface WorkspaceData {
 
 export default function EvaluationPage() {
   const { user, loading: authLoading, logout, fetchWithAuth } = useAuth();
+  const { vehicle: sharedVehicle } = useWorkspace();
   const router = useRouter();
 
   const [workspace, setWorkspace] = useState<WorkspaceData | null>(null);
@@ -673,7 +675,7 @@ export default function EvaluationPage() {
               </span>
               <span className="text-xs text-gray-500">|</span>
               <span className="text-xs text-gray-400 font-mono">
-                Vehicle: {workspace?.vehicle?.car_ref || "SLP-FS-EV-01"}
+                Vehicle: {workspace?.vehicle?.car_ref || sharedVehicle?.name || "No active vehicle"}
               </span>
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight text-white">
@@ -695,7 +697,9 @@ export default function EvaluationPage() {
               <div>
                 <div className="text-[10px] uppercase font-bold tracking-wider text-gray-500">Trial Status</div>
                 <div className="text-xs font-mono font-bold text-white">
-                  {workspace?.trial?.day_label || `Day ${Math.max(1, 8 - Math.ceil(daysLeft))} of 7`} ({daysLeft} days left)
+                  {daysLeft <= 0
+                    ? "Trial expired"
+                    : workspace?.trial?.day_label || `Day ${Math.min(7, Math.max(1, 8 - Math.ceil(daysLeft)))} of 7`}{daysLeft > 0 ? ` (${daysLeft} days left)` : ""}
                 </div>
               </div>
             </div>
@@ -716,7 +720,7 @@ export default function EvaluationPage() {
               <Car size={16} className="text-blue-400" />
               <div>
                 <div className="text-[10px] uppercase font-bold tracking-wider text-gray-500">Active Vehicle</div>
-                <div className="text-xs font-mono font-bold text-white">{workspace?.vehicle?.car_ref || "SLP-FS-EV-01"}</div>
+                <div className="text-xs font-mono font-bold text-white">{workspace?.vehicle?.car_ref || sharedVehicle?.name || "No active vehicle"}</div>
               </div>
             </div>
 

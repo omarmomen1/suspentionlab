@@ -14,6 +14,8 @@ import {
   Activity, Save, X, TrendingUp, BarChart3,
   GitBranch, Crosshair, Undo2, Redo2, RotateCcw
 } from "lucide-react";
+import NextStepLink from "../../components/NextStepLink";
+import { formatApiError } from "../../lib/api_client";
 import { useUndoRedo } from "../../hooks/useUndoRedo";
 import PDFExport from "../../components/PDFExport";
 import DataExport from "../../components/DataExport";
@@ -296,7 +298,7 @@ function FullCarDashboard() {
         onCompleted(data);
       }
     } catch (err) {
-      const msg = String(err);
+      const msg = formatApiError(err, "Full-car simulation failed");
       setSimError(msg);
       showToast(msg, "error");
       setIsRunning(false);
@@ -330,7 +332,11 @@ function FullCarDashboard() {
   }, [results]);
 
   const activeResult = ((results && !results.error) ? results : lastValidResults) as FullCarResults | null;
-  const hasResults = Boolean(activeResult);
+  // Zero-lie gate: verdict requires a payload with a real solved value, not
+  // an error shell or an empty object.
+  const hasResults = Boolean(
+    activeResult && !activeResult.error && typeof activeResult.f_n_heave === "number"
+  );
   const r = activeResult;
 
   return (
@@ -345,6 +351,7 @@ function FullCarDashboard() {
         <div className="flex flex-col">
           <span className="text-[9px] font-bold tracking-[0.25em] text-ansys-yellow uppercase">7-DOF Pitch, Roll, Heave</span>
           <h1 className="text-2xl font-semibold tracking-tight text-white leading-tight">Full Car</h1>
+          <NextStepLink />
         </div>
 
         <div className="flex items-center gap-2">

@@ -167,7 +167,7 @@ describe("NEXT_PUBLIC_STUDIO_MODE Navigation Feature Flag", () => {
 
     // Legacy drawer links must be omitted in Studio Mode
     expect(html).not.toContain('href="/garage"');
-    expect(html).not.toContain('href="/cae"');
+    // /cae is intentionally present: Wave 5B adds CAE Interop to the memory-reports studio group
     expect(html).not.toContain('href="/nvh"');
     expect(html).not.toContain('href="/durability"');
   });

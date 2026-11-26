@@ -19,6 +19,14 @@ import {
   Database,
   ExternalLink,
 } from "lucide-react";
+
+/** Safe finite-number formatting: renders "N/A" for null/NaN/Infinity so
+    ingestion and comparison metrics can never crash the ErrorBoundary. */
+function fmt(v: unknown, digits: number, suffix = ""): string {
+  if (v == null || v === "" || typeof v === "boolean") return "N/A";
+  const n = typeof v === "number" ? v : Number(v);
+  return Number.isFinite(n) ? `${n.toFixed(digits)}${suffix}` : "N/A";
+}
 import {
   CaeApi,
   CaeImportRequest,
@@ -406,13 +414,13 @@ export default function CaeInteroperabilityPage() {
                     <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800">
                       <span className="text-[10px] text-zinc-500 font-mono uppercase block">Time Window</span>
                       <span className="text-base font-bold text-white font-mono">
-                        {normalizedData.time_start.toFixed(2)}s - {normalizedData.time_end.toFixed(2)}s
+                        {fmt(normalizedData.time_start, 2, "s")} - {fmt(normalizedData.time_end, 2, "s")}
                       </span>
                     </div>
                     <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800">
                       <span className="text-[10px] text-zinc-500 font-mono uppercase block">Mean Timestep</span>
                       <span className="text-base font-bold text-emerald-400 font-mono">
-                        {(normalizedData.dt_mean * 1000).toFixed(1)} ms
+                        {fmt(normalizedData.dt_mean != null ? normalizedData.dt_mean * 1000 : null, 1, " ms")}
                       </span>
                     </div>
                     <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800">
@@ -554,19 +562,19 @@ export default function CaeInteroperabilityPage() {
                           <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                             <div className="bg-zinc-900/60 p-2 rounded border border-zinc-800">
                               <span className="text-[10px] text-zinc-500 block">R² Correlation</span>
-                              <span className="font-bold text-white">{metric.r_squared.toFixed(3)}</span>
+                              <span className="font-bold text-white">{fmt(metric.r_squared, 3)}</span>
                             </div>
                             <div className="bg-zinc-900/60 p-2 rounded border border-zinc-800">
                               <span className="text-[10px] text-zinc-500 block">RMS Residual</span>
-                              <span className="font-bold text-white">{metric.rms_residual.toFixed(4)}</span>
+                              <span className="font-bold text-white">{fmt(metric.rms_residual, 4)}</span>
                             </div>
                             <div className="bg-zinc-900/60 p-2 rounded border border-zinc-800">
                               <span className="text-[10px] text-zinc-500 block">Max Abs Error</span>
-                              <span className="font-bold text-zinc-300">{metric.max_absolute_error.toFixed(4)}</span>
+                              <span className="font-bold text-zinc-300">{fmt(metric.max_absolute_error, 4)}</span>
                             </div>
                             <div className="bg-zinc-900/60 p-2 rounded border border-zinc-800">
                               <span className="text-[10px] text-zinc-500 block">Mean Error %</span>
-                              <span className="font-bold text-zinc-300">{metric.mean_percentage_error.toFixed(1)}%</span>
+                              <span className="font-bold text-zinc-300">{fmt(metric.mean_percentage_error, 1, "%")}</span>
                             </div>
                           </div>
                         </div>

@@ -108,6 +108,18 @@ export default function LapDeltaView({
   const comparison = useMemo(() => {
     if (!runA || !runB) return null;
 
+    // Track-length compatibility guard: comparing laps from different-length
+    // tracks produces nonsense deltas (e.g. "-80.676s FASTER"). Bail honestly.
+    const lenOf = (run: any): number | null => {
+      const s = run?.trace?.s_m ?? run?.telemetry?.distances;
+      return Array.isArray(s) && s.length > 0 ? s[s.length - 1] : null;
+    };
+    const lenA = lenOf(runA);
+    const lenB = lenOf(runB);
+    if (lenA && lenB && Math.abs(lenA - lenB) / Math.max(lenA, lenB) > 0.10) {
+      return { incompatible: true as const, lenA, lenB };
+    }
+
     const timeA = runA.lap_time_s ?? 0;
     const timeB = runB.lap_time_s ?? 0;
     const totalDeltaS = timeB - timeA;
@@ -203,6 +215,19 @@ export default function LapDeltaView({
             Pin Current Setup as Baseline A
           </button>
         )}
+      </div>
+    );
+  }
+
+  if (comparison && "incompatible" in comparison) {
+    return (
+      <div className="w-full p-8 text-center bg-[#0D1017] border border-[#1f2430] rounded-xl flex flex-col items-center justify-center space-y-3">
+        <div className="text-sm font-bold text-amber-400">Incompatible Track Lengths - Delta N/A</div>
+        <p className="text-xs text-zinc-500 max-w-md">
+          Baseline A ran {((comparison.lenA ?? 0) / 1000).toFixed(2)} km but Candidate B ran {((comparison.lenB ?? 0) / 1000).toFixed(2)} km
+          (&gt;10% length mismatch). Lap-time deltas across different tracks are meaningless.
+          Re-pin a baseline on the same track to compare setups.
+        </p>
       </div>
     );
   }

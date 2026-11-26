@@ -21,6 +21,7 @@ import {
   KinematicPointResponse,
   HardpointSensitivityMatrixResponse,
   SolverPointDiagnostic,
+  formatApiError,
 } from "../../lib/api_client";
 import {
   Play,
@@ -49,6 +50,7 @@ import {
   AlertOctagon,
   Award,
 } from "lucide-react";
+import NextStepLink from "../../components/NextStepLink";
 
 // ─── Coordinate Types ─────────────────────────────────────────────────────────
 type HP3 = [number, number, number];
@@ -639,7 +641,7 @@ export default function KinematicsPage() {
       const zeroIdx = data.wheel_travel_mm.findIndex((z) => Math.abs(z) < 1.0);
       setTravelIdx(zeroIdx >= 0 ? zeroIdx : Math.floor(data.n_points / 2));
     } catch (err: any) {
-      setError(err.message || "Failed to solve suspension kinematics");
+      setError(formatApiError(err, "Failed to solve suspension kinematics"));
     } finally {
       setLoading(false);
     }
@@ -919,6 +921,7 @@ export default function KinematicsPage() {
               <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-950/60 text-cyan-300 border border-cyan-800/40">
                 PRO
               </span>
+              <NextStepLink />
             </div>
             <p className="text-[10px] text-gray-500">
               Multibody kinematics · C++ Newton–Raphson solver · Derivatives & Setup Causal Attribution

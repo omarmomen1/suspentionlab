@@ -141,6 +141,11 @@ export const STUDIO_TOOLS: StudioToolGroup[] = [
         label: "Setup Compare (A vs B)",
         desc: "Side-by-side setup delta & physical tradeoff verification",
       },
+      {
+        href: "/investigate",
+        label: "Investigation Room",
+        desc: "Guided stage-by-stage telemetry investigation workflow",
+      },
     ],
   },
   {
@@ -180,6 +185,11 @@ export const STUDIO_TOOLS: StudioToolGroup[] = [
         label: "Engineering Reports",
         desc: "Executive simulation & compliance report export",
       },
+      {
+        href: "/cae",
+        label: "CAE Interop (Adams / MATLAB)",
+        desc: "MSC Adams, MATLAB & CarMaker import/export decks",
+      },
     ],
   },
   {
@@ -211,6 +221,24 @@ export const STUDIO_TOOLS: StudioToolGroup[] = [
     ],
   },
 ];
+
+/**
+ * Contextual "Next Step" workflow chain across the core studio pages:
+ * 3D Kinematics -> Quarter-Car -> Full-Car / Lap Sim -> Investigate -> Memory & PDF.
+ * Consumed by components/NextStepLink.tsx on each core studio page.
+ */
+export const STUDIO_WORKFLOW_CHAIN: { href: string; label: string; next?: { href: string; label: string } }[] = [
+  { href: "/kinematics", label: "3D Kinematics", next: { href: "/quarter-car", label: "Quarter-Car & Damper Studio" } },
+  { href: "/quarter-car", label: "Quarter-Car", next: { href: "/full-car", label: "Full-Car / Lap Sim" } },
+  { href: "/full-car", label: "Full-Car", next: { href: "/lap-sim", label: "Lap Simulator" } },
+  { href: "/lap-sim", label: "Lap Sim", next: { href: "/investigate", label: "Investigation Room" } },
+  { href: "/investigate", label: "Investigate", next: { href: "/engineering-memory", label: "Memory & PDF" } },
+];
+
+export function nextStepFor(pathname: string): { href: string; label: string } | null {
+  const entry = STUDIO_WORKFLOW_CHAIN.find((e) => e.href === pathname);
+  return entry?.next ?? null;
+}
 
 export const ALL_SOLVER_ITEMS: NavDropdownItem[] = [
   { href: "/quarter-car", label: "Quarter Car (2-DOF)", desc: "Corner bounce, damping & ISO 2631 ride comfort" },

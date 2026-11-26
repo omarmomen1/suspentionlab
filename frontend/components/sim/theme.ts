@@ -117,9 +117,10 @@ export const DARK_BASE = {
     font: { ...AXIS_FONT },
     bgcolor: "rgba(0,0,0,0)",
     orientation: "h" as const,
-    y: -0.15,
+    y: -0.18,
   },
-  margin: { l: 58, r: 18, t: 32, b: 55 },
+  // Extra top margin keeps the modebar clear of chart titles
+  margin: { l: 58, r: 18, t: 44, b: 55 },
   autosize: true,
   hoverlabel: {
     bgcolor: "#11151F",

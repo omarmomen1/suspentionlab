@@ -137,7 +137,8 @@ export default function UserMenu() {
           {/* Menu items */}
           <div className="py-1">
             {[
-              { href: "/settings",          icon: Settings,    label: "Settings"       },
+              /* "My Profile" resolves to the settings page for signed-in users - never to sign-in */
+              { href: "/settings",          icon: Settings,    label: "My Profile"     },
               { href: "/settings#billing",  icon: CreditCard,  label: "Billing & Plan" },
               { href: "/settings#api-keys", icon: Key,         label: "API Keys"       },
               { href: "/audit",             icon: ShieldCheck, label: "Audit Ledger"   },

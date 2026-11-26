@@ -99,6 +99,13 @@ export default function PDFExport({
   const handleExport = useCallback(async () => {
     setExporting(true);
     try {
+      // jsPDF throws on undefined/null text args - coerce provenance strings once.
+      const S = (v: unknown): string => (typeof v === "string" && v.trim() ? v : "\u2014");
+      const vehicleRef_ = S(vehicleRef), setupRef_ = S(setupRef), tireRef_ = S(tireRef),
+            trackRef_ = S(trackRef), telemetryRef_ = S(telemetryRef),
+            solverVersion_ = S(solverVersion), physicsVersion_ = S(physicsVersion),
+            validationStatus_ = S(validationStatus), title_ = S(title), docId_ = S(docId);
+
       const EMPTY_SHA256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
       const isProvidedHash = (h?: string): boolean => Boolean(h && h !== "—" && h !== EMPTY_SHA256);
 
@@ -180,7 +187,7 @@ export default function PDFExport({
       pdf.setTextColor(15, 23, 42); // Slate 900
       pdf.setFontSize(14);
       pdf.setFont("helvetica", "bold");
-      pdf.text(title, margin, y);
+      pdf.text(title_, margin, y);
 
       pdf.setFontSize(7.5);
       pdf.setFont("helvetica", "normal");
@@ -206,16 +213,16 @@ export default function PDFExport({
 
       // Column 1
       pdf.setTextColor(100, 116, 139); pdf.text("Vehicle Model:", col1X, y + 12);
-      pdf.setTextColor(15, 23, 42); pdf.text(vehicleRef, col1X + 24, y + 12);
+      pdf.setTextColor(15, 23, 42); pdf.text(vehicleRef_, col1X + 24, y + 12);
 
       pdf.setTextColor(100, 116, 139); pdf.text("Setup Revision:", col1X, y + 17);
-      pdf.setTextColor(15, 23, 42); pdf.text(setupRef, col1X + 24, y + 17);
+      pdf.setTextColor(15, 23, 42); pdf.text(setupRef_, col1X + 24, y + 17);
 
       pdf.setTextColor(100, 116, 139); pdf.text("Tire Model / Spec:", col1X, y + 22);
-      pdf.setTextColor(15, 23, 42); pdf.text(tireRef, col1X + 24, y + 22);
+      pdf.setTextColor(15, 23, 42); pdf.text(tireRef_, col1X + 24, y + 22);
 
       pdf.setTextColor(100, 116, 139); pdf.text("Track / Event:", col1X, y + 27);
-      pdf.setTextColor(15, 23, 42); pdf.text(trackRef, col1X + 24, y + 27);
+      pdf.setTextColor(15, 23, 42); pdf.text(trackRef_, col1X + 24, y + 27);
 
       pdf.setTextColor(100, 116, 139); pdf.text("Input Hash:", col1X, y + 33);
       pdf.setFont("courier", "normal"); pdf.setTextColor(51, 65, 85);
@@ -223,7 +230,7 @@ export default function PDFExport({
 
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(100, 116, 139); pdf.text("Physics Core:", col1X, y + 39);
-      pdf.setTextColor(15, 23, 42); pdf.text(physicsVersion, col1X + 24, y + 39);
+      pdf.setTextColor(15, 23, 42); pdf.text(physicsVersion_, col1X + 24, y + 39);
 
       // Column 2
       pdf.setTextColor(100, 116, 139); pdf.text("Validation Status:", col2X, y + 12);
@@ -233,14 +240,14 @@ export default function PDFExport({
       } else {
         pdf.setTextColor(180, 83, 9); pdf.setFont("helvetica", "bold");
       }
-      pdf.text(validationStatus, col2X + 26, y + 12);
+      pdf.text(validationStatus_, col2X + 26, y + 12);
 
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(100, 116, 139); pdf.text("Solver Algorithm:", col2X, y + 17);
-      pdf.setTextColor(15, 23, 42); pdf.text(solverVersion, col2X + 26, y + 17);
+      pdf.setTextColor(15, 23, 42); pdf.text(solverVersion_, col2X + 26, y + 17);
 
       pdf.setTextColor(100, 116, 139); pdf.text("Telemetry Ref:", col2X, y + 22);
-      pdf.setTextColor(15, 23, 42); pdf.text(telemetryRef, col2X + 26, y + 22);
+      pdf.setTextColor(15, 23, 42); pdf.text(telemetryRef_, col2X + 26, y + 22);
 
       pdf.setTextColor(100, 116, 139); pdf.text("Correlation Score:", col2X, y + 27);
       if (typeof correlationPct === "number") {

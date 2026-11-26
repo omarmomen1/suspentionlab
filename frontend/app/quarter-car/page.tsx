@@ -10,6 +10,7 @@ import {
   Zap, GitBranch, Crosshair, RefreshCw,
 } from "lucide-react";
 import PDFExport from "../../components/PDFExport";
+import NextStepLink from "../../components/NextStepLink";
 import DataExport from "../../components/DataExport";
 import VehiclePresets from "../../components/VehiclePresets";
 import TraceManager, { Trace } from "../../components/TraceManager";
@@ -289,7 +290,11 @@ function QuarterCarDashboard() {
     return { F_spring, F_damper, F_total, relVel };
   }, [results, simParams, params]); // NOT dependent on live `params`
 
-  const hasResults = results && !results.error;
+  // Zero-lie gate: a verdict requires real, non-empty simulation data -
+  // never render "results" for an error payload or an empty time vector.
+  const hasResults = Boolean(
+    results && !results.error && Array.isArray(results.time) && results.time.length > 0
+  );
 
   const r = results as Record<string, unknown> & {
     time: number[]; z_s: number[]; z_u: number[]; z_r: number[];
@@ -346,6 +351,7 @@ function QuarterCarDashboard() {
             2-DOF Vertical Dynamics · BDF Stiff ODE
           </span>
           <h1 className="text-2xl font-semibold tracking-tight text-white leading-tight">Quarter Car</h1>
+          <NextStepLink />
         </div>
 
         <div className="flex items-center gap-2">

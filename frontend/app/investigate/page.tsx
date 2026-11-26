@@ -23,6 +23,7 @@ import {
   Clock,
   RefreshCw,
 } from "lucide-react";
+import NextStepLink from "../../components/NextStepLink";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
 import {
   EvidenceBadge,
@@ -44,7 +45,42 @@ import {
   SetupProposalResponse,
   QuestionsApi,
   EngineeringQuestionRecord,
+  formatApiError,
 } from "../../lib/api_client";
+
+/**
+ * POST /api/v1/simulate returns a JobResponse wrapper ({job_id, status, result, error}),
+ * not a bare QuarterCarResponse. Resolve it: unwrap a completed job's result, poll a
+ * queued job to completion, and throw the backend error on failure - so the page never
+ * reads physics fields off the job envelope (silent undefined) or fabricates values.
+ */
+async function runQuarterCarResolved(params: {
+  m_s?: number; k_s?: number; c?: number; k_t?: number; duration?: number; dt?: number;
+}): Promise<any> {
+  const res: any = await SimulationApi.runQuarterCar(params);
+  if (res && typeof res === "object" && "job_id" in res && ("status" in res || "result" in res)) {
+    const failed = (s?: string) => !!s && (s.startsWith("FAILED") || s === "CANCELED");
+    const done = (s?: string) => !!s && s.startsWith("COMPLETED");
+    if (done(res.status)) {
+      if (!res.result) throw new Error(res.error || "Simulation completed without a result payload");
+      return res.result;
+    }
+    if (failed(res.status)) throw new Error(res.error || `Simulation job ${res.status}`);
+    // PENDING / RUNNING: poll the job to completion (max ~45 s)
+    const deadline = Date.now() + 45000;
+    while (Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 1200));
+      const st = await SimulationApi.getJobStatus(res.job_id);
+      if (done(st.status)) {
+        if (!st.result) throw new Error(st.error || "Simulation completed without a result payload");
+        return st.result;
+      }
+      if (failed(st.status)) throw new Error(st.error || `Simulation job ${st.status}`);
+    }
+    throw new Error("Simulation job did not complete within 45 s");
+  }
+  return res;
+}
 
 function InvestigateContent() {
   const searchParams = useSearchParams();
@@ -160,7 +196,7 @@ function InvestigateContent() {
         }
       }
     } catch (err: any) {
-      alert(`Proposal generation failed: ${err?.message || err}`);
+      setSimError(formatApiError(err, "Proposal generation failed"));
     } finally {
       setIsGeneratingProposal(false);
     }
@@ -170,7 +206,7 @@ function InvestigateContent() {
   useEffect(() => {
     async function runBaselineSim() {
       try {
-        const res = await SimulationApi.runQuarterCar({
+        const res = await runQuarterCarResolved({
           m_s: vehicle.mass_kg ? vehicle.mass_kg / 4 : 200,
           k_s: rearSpring,
           c: rearLsc,
@@ -180,7 +216,7 @@ function InvestigateContent() {
         });
         setSimResult(res);
       } catch (e: any) {
-        setSimError(e?.message || "Failed running initial ODE experiment");
+        setSimError(formatApiError(e, "Failed running initial ODE experiment"));
       }
     }
     runBaselineSim();
@@ -188,16 +224,21 @@ function InvestigateContent() {
 
   const handleRunExperiment = async () => {
     setSimError(null);
-    const res = await SimulationApi.runQuarterCar({
-      m_s: vehicle.mass_kg ? vehicle.mass_kg / 4 : 200,
-      k_s: rearSpring,
-      c: rearLsc,
-      k_t: 280000,
-      duration: 3.0,
-      dt: 0.005,
-    });
-    setSimResult(res);
-    return res;
+    try {
+      const res = await runQuarterCarResolved({
+        m_s: vehicle.mass_kg ? vehicle.mass_kg / 4 : 200,
+        k_s: rearSpring,
+        c: rearLsc,
+        k_t: 280000,
+        duration: 3.0,
+        dt: 0.005,
+      });
+      setSimResult(res);
+      return res;
+    } catch (e: any) {
+      setSimError(formatApiError(e, "Verification run failed"));
+      throw e;
+    }
   };
 
   // Domain detection for dynamic causal reasoning
@@ -205,6 +246,12 @@ function InvestigateContent() {
   const qIdLower = qId.toLowerCase();
   const isTire = qIdLower.includes("tire") || qTitle.includes("tire") || qTitle.includes("grip");
   const isAero = qIdLower.includes("aero") || qTitle.includes("aero") || qTitle.includes("downforce") || qTitle.includes("balance");
+
+  // Derived from the live quarter-car result; null until a run completes.
+  const peakTravelMm: number | null =
+    simResult && Array.isArray(simResult.susp_travel) && simResult.susp_travel.length > 0
+      ? Math.max(...simResult.susp_travel.map((v: number) => Math.abs(v))) * 1000
+      : null;
 
   if (questionLoading) {
     return (
@@ -296,6 +343,7 @@ function InvestigateContent() {
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
                 {question.title}
               </h1>
+              <NextStepLink />
               <p className="text-xs text-gray-300 mt-1 max-w-2xl leading-relaxed font-sans">
                 {question.question_text}
               </p>
@@ -333,6 +381,31 @@ function InvestigateContent() {
               </button>
             ))}
           </div>
+
+          {/* Previous / Next Stage navigation */}
+          {(() => {
+            const order = ["WHAT", "WHY", "EVIDENCE", "TEST"] as const;
+            const idx = order.indexOf(activeStage);
+            return (
+              <div className="flex items-center justify-between mt-3">
+                <button
+                  onClick={() => idx > 0 && setActiveStage(order[idx - 1])}
+                  disabled={idx === 0}
+                  className="px-3 py-1.5 rounded-lg border border-white/10 text-xs font-mono text-gray-300 hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  &larr; Previous Stage
+                </button>
+                <span className="text-[10px] font-mono text-gray-500">Stage {idx + 1} of {order.length}</span>
+                <button
+                  onClick={() => idx < order.length - 1 && setActiveStage(order[idx + 1])}
+                  disabled={idx === order.length - 1}
+                  className="px-3 py-1.5 rounded-lg border border-white/10 text-xs font-mono text-gray-300 hover:bg-white/5 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  Next Stage &rarr;
+                </button>
+              </div>
+            );
+          })()}
         </div>
 
         {/* ── STAGE 1: WHAT IS HAPPENING? ───────────────────────────────── */}
@@ -704,7 +777,8 @@ function InvestigateContent() {
                   lastRunLabel={simulation.activeRunId || (simResult ? "RUN-CANDIDATE" : "AWAITING")}
                 />
 
-                {/* Predicted Effects Card */}
+                {/* Predicted Effects Card - values derived from the live quarter-car result;
+                    nothing hardcoded: unavailable quantities are labelled N/A honestly */}
                 <div className="p-5 rounded-2xl bg-[#111116] border border-white/[0.08] space-y-3 font-mono text-xs">
                   <div className="text-xs font-bold text-ansys-yellow uppercase tracking-wider">
                     Predicted Physical Consequences:
@@ -713,44 +787,58 @@ function InvestigateContent() {
                   <div className="space-y-2">
                     <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
                       <span className="text-gray-300">Predicted Lap Time Delta:</span>
-                      <span className="text-emerald-400 font-bold flex items-center gap-1 text-sm">
-                        <TrendingDown size={14} /> -0.087 s
-                      </span>
+                      <span className="text-gray-500 font-bold text-sm">N/A - requires lap simulation</span>
                     </div>
 
                     <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
                       <span className="text-gray-300">Rear Turn-In Yaw Damping:</span>
-                      <span className="text-emerald-400 font-bold flex items-center gap-1">
-                        <TrendingUp size={14} /> +3.1%
+                      <span className="text-gray-500 font-bold">N/A - not a quarter-car output</span>
+                    </div>
+
+                    <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
+                      <span className="text-gray-300">Sprung Damping Ratio ζ:</span>
+                      <span className="text-blue-300 font-semibold">
+                        {simResult?.zeta_s != null ? simResult.zeta_s.toFixed(3) : "AWAITING EXPERIMENT"}
                       </span>
                     </div>
 
                     <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
-                      <span className="text-gray-300">Residual Rear RH Divergence:</span>
-                      <span className="text-emerald-400 font-bold">
-                        Reduced from +3.4 mm to 0.2 mm (PASS)
+                      <span className="text-gray-300">Heave Natural Freq:</span>
+                      <span className="text-blue-300 font-semibold">
+                        {simResult?.f_n_s != null ? `${simResult.f_n_s.toFixed(2)} Hz` : "AWAITING EXPERIMENT"}
                       </span>
                     </div>
 
                     <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
                       <span className="text-gray-300">Peak Suspension Travel:</span>
                       <span className="text-blue-300 font-semibold">
-                        46.2 mm (Target &lt; 50.0 mm)
+                        {peakTravelMm != null ? `${peakTravelMm.toFixed(1)} mm (Target < 50.0 mm)` : "AWAITING EXPERIMENT"}
                       </span>
                     </div>
                   </div>
                 </div>
 
-                {/* Constraint Validation */}
-                <ConstraintWarning
-                  constraintName="Suspension Travel & Bump-Stop Envelope"
-                  currentValue={46.2}
-                  limitValue={50.0}
-                  unit="mm"
-                  severity="WARNING"
-                  subsystem="Rear Damper Assembly"
-                  recommendation="Candidate travel remains within verified 50mm FIA linear damper envelope."
-                />
+                {/* Constraint Validation - WARNING only at/over 90% of the envelope;
+                    a compliant value renders PASS, never a false warning */}
+                {peakTravelMm != null && (
+                  peakTravelMm >= 45.0 ? (
+                    <ConstraintWarning
+                      constraintName="Suspension Travel & Bump-Stop Envelope"
+                      currentValue={Number(peakTravelMm.toFixed(1))}
+                      limitValue={50.0}
+                      unit="mm"
+                      severity={peakTravelMm >= 50.0 ? "CRITICAL" : "WARNING"}
+                      subsystem="Rear Damper Assembly"
+                      recommendation={peakTravelMm >= 50.0
+                        ? "Candidate travel EXCEEDS the verified 50mm linear damper envelope - increase bump-stop engagement or spring rate."
+                        : "Candidate travel is within 90% of the verified 50mm linear damper envelope."}
+                    />
+                  ) : (
+                    <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/30 font-mono text-xs text-emerald-300">
+                      PASS - peak suspension travel {peakTravelMm.toFixed(1)} mm is inside the 50.0 mm envelope.
+                    </div>
+                  )
+                )}
 
                 {/* Formal Governance Sign-Off */}
                 {proposalLoading ? (
@@ -789,7 +877,7 @@ function InvestigateContent() {
                     key={activeProposal.id}
                     proposalId={activeProposal.id}
                     status={proposalStatus}
-                    approvedByRole={activeProposal.approved_by_role || "Chief Race Engineer"}
+                    approvedByRole={activeProposal.approved_by_role || "Role not recorded"}
                     approvedAt={activeProposal.approved_at}
                     approvalSignature={activeProposal.approval_signature}
                     proposalHash={activeProposal.proposal_hash}

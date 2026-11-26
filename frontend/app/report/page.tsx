@@ -511,21 +511,22 @@ function ReportContent() {
                 <div>
                   <h3 className="text-sm font-bold text-white print:text-black mb-3">Setup Parameter Changes</h3>
                   <div className="space-y-2.5">
-                    {(report.param_changes || [
-                      { parameter: "Sprung Mass (m_s)", baseline: "294.0 kg", simulated: `${p.m_s || 300} kg`, delta: "+2.0%" },
-                      { parameter: "Suspension Stiffness (k_s)", baseline: "33,250 N/m", simulated: `${p.k_s || 35000} N/m`, delta: "+5.3%" },
-                      { parameter: "Suspension Damping (c)", baseline: "1,980 Ns/m", simulated: `${p.c || 2200} Ns/m`, delta: "+11.1%" },
-                      { parameter: "Tire Stiffness (k_t)", baseline: "200,000 N/m", simulated: `${p.k_t || 200000} N/m`, delta: "0.0%" },
-                      { parameter: "Motion Ratio (MR)", baseline: "1.00", simulated: `${p.MR || 1.0}`, delta: "0.0%" },
-                    ]).map((item: any, idx: number) => (
+                    {report.param_changes && report.param_changes.length > 0 ? (
+                      report.param_changes.map((item: any, idx: number) => (
                       <div key={idx} className="flex items-center justify-between text-xs p-2 rounded-lg bg-black/30 print:bg-gray-100 border border-[#1a1a20] print:border-gray-200">
                         <div>
                           <p className="font-semibold text-gray-200 print:text-black">{item.parameter}</p>
-                          <p className="text-[10px] text-gray-500 print:text-gray-600">{item.baseline} &rarr; {item.simulated}</p>
+                          <p className="text-[10px] text-gray-500 print:text-gray-600">{item.baseline ?? "\u2014"} &rarr; {item.simulated ?? "\u2014"}</p>
                         </div>
-                        <span className="font-mono text-emerald-400 print:text-emerald-700 font-bold">{item.delta}</span>
+                        <span className="font-mono text-emerald-400 print:text-emerald-700 font-bold">{item.delta ?? "N/A"}</span>
                       </div>
-                    ))}
+                      ))
+                    ) : (
+                      <p className="text-xs text-gray-500 print:text-gray-600 font-mono">
+                        No baseline comparison run for this report - parameter deltas N/A.
+                        Run a baseline simulation first to compute real deltas.
+                      </p>
+                    )}
                   </div>
                 </div>
 
