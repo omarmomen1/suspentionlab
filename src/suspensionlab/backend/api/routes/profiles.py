@@ -70,6 +70,37 @@ def _to_uuid(val: Any) -> Optional[uuid.UUID]:
         return None
 
 
+async def _save_revision(db, profile, u_id, user, old_params: Optional[dict]):
+    """Wave 6 §2: save a versioned revision (parent ID, params snapshot, diff,
+    author/timestamp) for every profile create/update/rollback."""
+    from sqlalchemy import select as _select, func as _func
+    from suspensionlab.backend.database.models.profile import ProfileRevision, compute_params_diff
+
+    res = await db.execute(
+        _select(ProfileRevision)
+        .where(ProfileRevision.profile_id == profile.id)
+        .order_by(ProfileRevision.revision_number.desc())
+        .limit(1)
+    )
+    parent = res.scalar_one_or_none()
+    rev = ProfileRevision(
+        profile_id=profile.id,
+        revision_number=(parent.revision_number + 1) if parent else 1,
+        parent_revision_id=parent.id if parent else None,
+        params=profile.params,
+        param_diff=compute_params_diff(old_params, profile.params),
+        author_user_id=u_id,
+        author_name=getattr(user, "name", None) or getattr(user, "email", None),
+    )
+    db.add(rev)
+    await db.commit()
+    await db.refresh(rev)
+    # The commit expired the profile instance; refresh so response
+    # serialization does not trigger lazy IO outside a greenlet.
+    await db.refresh(profile)
+    return rev
+
+
 @router.post("", response_model=ProfileResponse)
 @router.post("/", response_model=ProfileResponse)
 async def create_profile(
@@ -101,6 +132,8 @@ async def create_profile(
         await db.refresh(db_profile)
         if trial:
             await TrialService.record_trial_usage(db, user, action="vehicle", delta=1)
+        # Wave 6: revision #1 for every new profile
+        await _save_revision(db, db_profile, u_id, user, old_params=None)
     except HTTPException:
         raise
     except Exception as exc:
@@ -126,6 +159,8 @@ async def create_profile(
         import logging
         logging.getLogger("security_audit").warning("Audit logging warning for vehicle creation: %s", e)
 
+    # Wave 6: later audit/outbox commits may expire the instance; refresh before return
+    await db.refresh(db_profile)
     return db_profile
 
 
@@ -241,6 +276,10 @@ async def update_profile(
     await db.commit()
     await db.refresh(profile)
 
+    # Wave 6: every params change saves a new revision with parent + diff
+    if update_data.params is not None:
+        await _save_revision(db, profile, u_id, user, old_params=old_params)
+
     try:
         from suspensionlab.backend.security.audit import record_audit_event
         if update_data.params is not None:
@@ -272,6 +311,8 @@ async def update_profile(
         import logging
         logging.getLogger("security_audit").warning("Audit logging warning for vehicle update: %s", e)
 
+    # Wave 6: later audit/outbox commits may expire the instance; refresh before return
+    await db.refresh(profile)
     return profile
 
 
@@ -325,3 +366,125 @@ async def delete_profile(
         logging.getLogger("security_audit").warning("Audit logging warning for vehicle deletion: %s", e)
 
     return {"message": "Profile deleted"}
+
+
+# ── Wave 6 §2: versioned revision history, diff and rollback ────────────────
+
+async def _load_owned_profile(db, profile_id: str, user: Any) -> VehicleProfile:
+    t_id = _to_uuid(getattr(user, "team_id", None))
+    p_id = _to_uuid(profile_id)
+    u_id = _to_uuid(getattr(user, "user_id", None) or getattr(user, "id", None))
+    from sqlalchemy import or_
+    if t_id:
+        query = select(VehicleProfile).where(
+            VehicleProfile.id == p_id,
+            or_(VehicleProfile.team_id == t_id, VehicleProfile.user_id == u_id),
+            VehicleProfile.deleted_at.is_(None),
+        )
+    else:
+        query = select(VehicleProfile).where(
+            VehicleProfile.id == p_id,
+            VehicleProfile.user_id == u_id,
+            VehicleProfile.deleted_at.is_(None),
+        )
+    result = await db.execute(query)
+    profile = result.scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Profile not found")
+    return profile
+
+
+@router.get("/{profile_id}/revisions")
+async def list_profile_revisions(
+    profile_id: str,
+    db: AsyncSession = Depends(get_db_dependency),
+    user: Any = Depends(require_permission(Permission.VEHICLE_READ)),
+):
+    """List all saved revisions for a profile (newest first)."""
+    from suspensionlab.backend.database.models.profile import ProfileRevision
+    profile = await _load_owned_profile(db, profile_id, user)
+    res = await db.execute(
+        select(ProfileRevision)
+        .where(ProfileRevision.profile_id == profile.id)
+        .order_by(ProfileRevision.revision_number.desc())
+    )
+    revs = res.scalars().all()
+    return {
+        "profile_id": str(profile.id),
+        "revisions": [
+            {
+                "id": str(r.id),
+                "revision_number": r.revision_number,
+                "parent_revision_id": str(r.parent_revision_id) if r.parent_revision_id else None,
+                "params": r.params,
+                "param_diff": r.param_diff,
+                "author_user_id": str(r.author_user_id) if r.author_user_id else None,
+                "author_name": r.author_name,
+                "created_at": r.created_at.isoformat() if r.created_at else None,
+            }
+            for r in revs
+        ],
+    }
+
+
+@router.get("/{profile_id}/diff")
+async def diff_profile_revisions(
+    profile_id: str,
+    from_revision: int,
+    to_revision: int,
+    db: AsyncSession = Depends(get_db_dependency),
+    user: Any = Depends(require_permission(Permission.VEHICLE_READ)),
+):
+    """Parameter diff between any two saved revisions of a profile."""
+    from suspensionlab.backend.database.models.profile import ProfileRevision, compute_params_diff
+    profile = await _load_owned_profile(db, profile_id, user)
+    res = await db.execute(
+        select(ProfileRevision).where(ProfileRevision.profile_id == profile.id)
+    )
+    by_num = {r.revision_number: r for r in res.scalars().all()}
+    a = by_num.get(from_revision)
+    b = by_num.get(to_revision)
+    if not a or not b:
+        raise HTTPException(status_code=404, detail="Revision not found for this profile")
+    return {
+        "profile_id": str(profile.id),
+        "from_revision": from_revision,
+        "to_revision": to_revision,
+        "diff": compute_params_diff(a.params, b.params),
+    }
+
+
+@router.post("/{profile_id}/rollback/{revision_number}")
+async def rollback_profile_revision(
+    profile_id: str,
+    revision_number: int,
+    db: AsyncSession = Depends(get_db_dependency),
+    user: Any = Depends(require_permission(Permission.VEHICLE_WRITE)),
+):
+    """Roll the profile back to a saved revision. The rollback itself is saved
+    as a NEW revision (append-only history; nothing is rewritten)."""
+    from suspensionlab.backend.database.models.profile import ProfileRevision
+    profile = await _load_owned_profile(db, profile_id, user)
+    res = await db.execute(
+        select(ProfileRevision).where(
+            ProfileRevision.profile_id == profile.id,
+            ProfileRevision.revision_number == revision_number,
+        )
+    )
+    target = res.scalar_one_or_none()
+    if not target:
+        raise HTTPException(status_code=404, detail="Revision not found for this profile")
+
+    u_id = _to_uuid(getattr(user, "user_id", None) or getattr(user, "id", None))
+    old_params = profile.params
+    profile.params = target.params
+    await db.commit()
+    await db.refresh(profile)
+    new_rev = await _save_revision(db, profile, u_id, user, old_params=old_params)
+
+    return {
+        "profile_id": str(profile.id),
+        "rolled_back_to": revision_number,
+        "new_revision": new_rev.revision_number,
+        "params": profile.params,
+    }

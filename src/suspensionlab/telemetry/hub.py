@@ -39,6 +39,13 @@ class TelemetrySubscriber:
     frames_sent: int = 0
     frames_dropped: int = 0
     is_alive: bool = True
+    # Wave 6: structured DAQ rejection counters (never silently swallowed)
+    rejections: Dict[str, int] = field(default_factory=dict)
+
+    def count_rejection(self, reason: str) -> int:
+        """Increment and return the rejection count for a structured reason."""
+        self.rejections[reason] = self.rejections.get(reason, 0) + 1
+        return self.rejections[reason]
 
 
 class TenantIsolationError(Exception):
@@ -192,9 +199,16 @@ class TelemetryHub:
 
     def get_stats(self) -> Dict[str, Any]:
         total_subs = sum(len(s) for s in self._subscribers.values())
+        # Wave 6: aggregate per-subscriber structured rejection counts
+        rejection_totals: Dict[str, int] = {}
+        for subs in self._subscribers.values():
+            for s in subs:
+                for reason, count in getattr(s, "rejections", {}).items():
+                    rejection_totals[reason] = rejection_totals.get(reason, 0) + count
         return {
             "active_sessions": len(self._subscribers),
             "total_subscribers": total_subs,
+            "rejections": rejection_totals,
             **self._stats,
         }
 

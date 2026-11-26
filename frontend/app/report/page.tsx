@@ -10,6 +10,7 @@ import {
   FileDown, Eye, Loader2, RefreshCw, XCircle, ShieldAlert
 } from "lucide-react";
 import Plot from "../../components/sim/Plot";
+import TrustBadge from "../../components/TrustBadge";
 import PDFExport from "../../components/PDFExport";
 import { ReportsApi, SimulationApi } from "../../lib/api_client";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
@@ -726,6 +727,14 @@ function ReportContent() {
                 <p className="col-span-full"><strong className="text-gray-500 print:text-gray-600">RESULT_HASH:</strong> <span className="break-all">{report.result_hash}</span></p>
                 <p className="col-span-full"><strong className="text-gray-500 print:text-gray-600">ARTIFACT_HASH:</strong> <span className="break-all text-emerald-400">{report.artifact_hash}</span></p>
               </div>
+
+              {/* Wave 6: solver provenance Trust Badge */}
+              <TrustBadge
+                solverVersion={report.solver_version}
+                runId={report.run_id}
+                inputSha256={report.input_hash}
+                className="mt-3"
+              />
 
               {/* Approval Box */}
               <div className={`mt-6 p-4 rounded-xl border ${

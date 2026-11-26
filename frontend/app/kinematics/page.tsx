@@ -4,6 +4,7 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from "react"
 import Plot from "../../components/sim/Plot";
 import { useAuth } from "../../contexts/AuthContext";
 import KinematicsModelValidity from "../../components/kinematics/KinematicsModelValidity";
+import TrustBadge from "../../components/TrustBadge";
 import SuspensionKinematics3D, { KinematicsGeometryMap } from "../../components/kinematics/SuspensionKinematics3D";
 import KinematicsComparisonPanel from "../../components/kinematics/KinematicsComparisonPanel";
 import KinematicsTargetBandsModal, { DEFAULT_TARGET_BANDS } from "../../components/kinematics/KinematicsTargetBandsModal";
@@ -1169,6 +1170,13 @@ export default function KinematicsPage() {
             backendInfo={backendInfo}
             allConverged={result?.all_converged ?? true}
             travelMm={currentTravel}
+          />
+
+          {/* Wave 6: solver provenance Trust Badge */}
+          <TrustBadge
+            solverVersion={result?.solver_version ?? backendInfo.solver_version}
+            runId={result?.run_id}
+            inputSha256={result?.input_sha256}
           />
 
           {/* ── 9 Real-Time Engineering KPI Cards (with Target Band Highlights) ── */}

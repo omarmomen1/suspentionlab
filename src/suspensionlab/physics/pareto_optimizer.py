@@ -115,6 +115,30 @@ class ParetoPoint:
     constraints: Dict
     feasible:    bool
     pareto_rank: int = 0
+    crowding_distance: float = 0.0  # NSGA-II crowding distance within its front
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Canonical feasibility contract (Wave 6 §2)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Default quarter-car feasibility bounds, shared so /optimize, /experiment and
+# /compare enforce IDENTICAL feasibility unless the caller explicitly overrides.
+DEFAULT_MIN_SUSP_TRAVEL_MM = 0.0
+DEFAULT_MAX_SUSP_TRAVEL_MM = 150.0
+
+
+def quarter_car_feasibility_constraints(
+    max_travel_mm: float = DEFAULT_MAX_SUSP_TRAVEL_MM,
+    min_travel_mm: float = DEFAULT_MIN_SUSP_TRAVEL_MM,
+) -> List["OptimizationConstraint"]:
+    """The canonical suspension-travel feasibility constraint set."""
+    return [
+        OptimizationConstraint(
+            "peak_susp_travel", lower=min_travel_mm, upper=max_travel_mm,
+            unit="mm", description="Suspension Travel (canonical feasibility contract)",
+        )
+    ]
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -133,9 +157,13 @@ class ParetoFrontier:
     objectives : list[OptimizationObjective]  Defines which values to compare
     """
 
-    def __init__(self, objectives: List[OptimizationObjective]):
+    def __init__(self, objectives: List[OptimizationObjective], param_bounds: Optional[Dict] = None):
         self.objectives: List[OptimizationObjective] = objectives
         self._points:    List[ParetoPoint]            = []
+        # Optional {param_name: (lo, hi)} bounds for corner-solution warnings
+        self.param_bounds: Optional[Dict] = param_bounds
+        # Per-objective normalized dominance tolerances (recomputed per sort)
+        self._obj_eps: Dict[str, float] = {}
 
     # ── Public interface ──────────────────────────────────────────────────────
 
@@ -161,7 +189,13 @@ class ParetoFrontier:
         return sorted(feasible, key=lambda p: (p.pareto_rank, sign * p.objectives.get(first_obj, 0.0)))
 
     def dominates(self, a: ParetoPoint, b: ParetoPoint) -> bool:
-        """True if point a dominates point b (on feasible objectives)."""
+        """True if point a dominates point b (on feasible objectives).
+
+        Wave 6 (NSGA-II): comparisons use per-objective NORMALIZED tolerances
+        (eps = 1e-9 x observed objective range) instead of a scale-blind
+        absolute 1e-10, so objectives measured in millimetres and objectives
+        measured in m/s^2 are compared at equivalent relative precision.
+        """
         # A point with missing/None objectives can NEVER claim dominance
         for obj in self.objectives:
             va = a.objectives.get(obj.name)
@@ -176,17 +210,18 @@ class ParetoFrontier:
             if vb is None or not np.isfinite(vb):
                 strictly_better = True
                 continue
+            eps = self._obj_eps.get(obj.name, 1e-10)
             if obj.minimize:
-                if va > vb + 1e-10:
+                if va > vb + eps:
                     at_least_as_good = False
                     break
-                if va < vb - 1e-10:
+                if va < vb - eps:
                     strictly_better = True
             else:  # maximize
-                if va < vb - 1e-10:
+                if va < vb - eps:
                     at_least_as_good = False
                     break
-                if va > vb + 1e-10:
+                if va > vb + eps:
                     strictly_better = True
         return at_least_as_good and strictly_better
 
@@ -251,28 +286,127 @@ class ParetoFrontier:
             "frontier":         [_pt(p, i) for i, p in enumerate(frontier)],
             "all_feasible":     [_pt(p, i) for i, p in enumerate(all_pts[:50])],  # cap for API
             "best_compromise":  _pt(best, 0) if best else None,
+            "corner_warnings":  self.corner_warnings(),
         }
+
+    def corner_warnings(self) -> List[str]:
+        """Warn when Pareto-optimal points pin parameters to their bounds.
+
+        A frontier point sitting on a parameter bound means the true optimum
+        likely lies OUTSIDE the searched range (corner solution); reporting
+        it silently would overstate confidence in the recommendation.
+        """
+        if not self.param_bounds:
+            return []
+        warnings: List[str] = []
+        for p in self.get_frontier():
+            pinned = []
+            for name, bounds in self.param_bounds.items():
+                if name not in p.params:
+                    continue
+                lo, hi = bounds[0], bounds[1]
+                v = float(p.params[name])
+                span = abs(hi - lo) or 1.0
+                if abs(v - lo) <= 1e-6 * span:
+                    pinned.append(f"{name}=LOWER({lo})")
+                elif abs(v - hi) <= 1e-6 * span:
+                    pinned.append(f"{name}=UPPER({hi})")
+            if pinned:
+                warnings.append(
+                    "Corner solution: Pareto-optimal point pins "
+                    + ", ".join(pinned)
+                    + " — the true optimum may lie outside the searched range; widen the bounds."
+                )
+        return warnings
 
     # ── Private ───────────────────────────────────────────────────────────────
 
+    def _compute_normalized_eps(self, feasible: List[ParetoPoint]) -> None:
+        """Per-objective dominance tolerance = 1e-9 x observed objective range."""
+        for obj in self.objectives:
+            vals = [p.objectives.get(obj.name) for p in feasible]
+            vals = [v for v in vals if v is not None and np.isfinite(v)]
+            if len(vals) >= 2:
+                rng = max(vals) - min(vals)
+                self._obj_eps[obj.name] = max(1e-9 * rng, 1e-12)
+            else:
+                self._obj_eps[obj.name] = 1e-10
+
     def _recompute_ranks(self) -> None:
-        """Recompute Pareto dominance ranks for all points."""
+        """NSGA-II (Deb) fast non-dominated sort with crowding distance.
+
+        Produces true multi-level fronts (rank 0 = non-dominated, rank 1 =
+        dominated only by rank-0 points, ...) rather than a binary
+        frontier/not-frontier split, and assigns each point its crowding
+        distance within its front for diversity-aware selection.
+        """
         feasible = [p for p in self._points if p.feasible]
         n = len(feasible)
+        if n == 0:
+            return
 
-        # Reset
+        self._compute_normalized_eps(feasible)
+
         for p in feasible:
             p.pareto_rank = 0
+            p.crowding_distance = 0.0
 
-        # Simple O(n²) dominance check (fine for n < 5000)
-        dominated = [False] * n
+        # Fast non-dominated sort: S[i] = points dominated by i, cnt[i] = domination count
+        S: List[List[int]] = [[] for _ in range(n)]
+        cnt = [0] * n
+        fronts: List[List[int]] = [[]]
         for i in range(n):
             for j in range(n):
-                if i != j and self.dominates(feasible[j], feasible[i]):
-                    dominated[i] = True
-                    break
-        for i, p in enumerate(feasible):
-            p.pareto_rank = 0 if not dominated[i] else 1
+                if i == j:
+                    continue
+                if self.dominates(feasible[i], feasible[j]):
+                    S[i].append(j)
+                elif self.dominates(feasible[j], feasible[i]):
+                    cnt[i] += 1
+            if cnt[i] == 0:
+                fronts[0].append(i)
+
+        rank = 0
+        while fronts[rank]:
+            nxt: List[int] = []
+            for i in fronts[rank]:
+                feasible[i].pareto_rank = rank
+                for j in S[i]:
+                    cnt[j] -= 1
+                    if cnt[j] == 0:
+                        nxt.append(j)
+            rank += 1
+            fronts.append(nxt)
+
+        # Crowding distance per front (boundary points get inf)
+        for front in fronts:
+            if not front:
+                continue
+            self._assign_crowding([feasible[i] for i in front])
+
+    def _assign_crowding(self, front: List[ParetoPoint]) -> None:
+        """NSGA-II crowding distance within one front."""
+        m = len(front)
+        if m <= 2:
+            for p in front:
+                p.crowding_distance = float("inf")
+            return
+        for p in front:
+            p.crowding_distance = 0.0
+        for obj in self.objectives:
+            sign = 1.0 if obj.minimize else -1.0
+            ordered = sorted(front, key=lambda p: sign * p.objectives.get(obj.name, 0.0))
+            ordered[0].crowding_distance = float("inf")
+            ordered[-1].crowding_distance = float("inf")
+            lo = ordered[0].objectives.get(obj.name, 0.0)
+            hi = ordered[-1].objectives.get(obj.name, 0.0)
+            span = abs(hi - lo)
+            if span < 1e-12:
+                continue
+            for k in range(1, m - 1):
+                prev_v = ordered[k - 1].objectives.get(obj.name, 0.0)
+                next_v = ordered[k + 1].objectives.get(obj.name, 0.0)
+                ordered[k].crowding_distance += abs(next_v - prev_v) / span
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -352,7 +486,8 @@ class SuspensionParetoOptimizer:
         """
         from suspensionlab.physics.quarter_car import QuarterCarParams, run_quarter_car_analysis
 
-        frontier = ParetoFrontier(objectives)
+        bounds = {name: (lo, hi) for name, (lo, hi, _n) in param_ranges.items()}
+        frontier = ParetoFrontier(objectives, param_bounds=bounds)
 
         # Build parameter grid
         param_arrays = {}

@@ -35,6 +35,15 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/kinematics", tags=["kinematics"])
 
 
+def _stamped_solver_version(base: str | None) -> str:
+    """Wave 6: attach the real git-commit build stamp to the solver version."""
+    try:
+        from suspensionlab.physics.provenance import build_solver_version
+        return build_solver_version(base)
+    except Exception:
+        return base or "unknown"
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Pydantic models
 # ─────────────────────────────────────────────────────────────────────────────
@@ -190,6 +199,7 @@ class KinematicsResponse(BaseModel):
     convergence_summary:   str = Field(default="")
     physical_issues:       list[str] = Field(default_factory=list)
     run_id:                str = Field(default="")
+    input_sha256:          str = Field(default="")
     geometry_hash:         str = Field(default="")
     timestamp:             str = Field(default="")
     metadata:              dict = Field(default_factory=dict)
@@ -491,6 +501,19 @@ async def solve(
     derivatives = compute_kinematic_derivatives(d)
     geom_hash = compute_geometry_hash(hp_dict)
     run_id = f"swp-{uuid.uuid4().hex[:12]}"
+    # Wave 6: provenance input hash over the exact solver inputs.
+    try:
+        from suspensionlab.physics.provenance import compute_input_sha256
+        input_sha256 = compute_input_sha256({
+            "hardpoints": hp_dict,
+            "z_min_mm": req.z_min_mm,
+            "z_max_mm": req.z_max_mm,
+            "n_steps": req.n_steps,
+            "static_camber_deg": req.static_camber_deg,
+            "static_toe_deg": req.static_toe_deg,
+        })
+    except Exception:
+        input_sha256 = ""
     now_iso = datetime.now(timezone.utc).isoformat()
 
     n_conv = sum(1 for c in d["converged"] if c)
@@ -545,7 +568,7 @@ async def solve(
         selected_backend      = curves.selected_backend,
         active_backend        = curves.active_backend,
         fallback_reason       = curves.fallback_reason,
-        solver_version        = curves.solver_version,
+        solver_version        = _stamped_solver_version(curves.solver_version),
         native_library_version = curves.native_library_version,
         build_identifier      = curves.build_identifier,
         all_converged         = all_conv,
@@ -574,6 +597,7 @@ async def solve(
         convergence_summary   = conv_summary,
         physical_issues       = phys_issues,
         run_id                = run_id,
+        input_sha256          = input_sha256,
         geometry_hash         = geom_hash,
         timestamp             = now_iso,
         metadata              = curves.metadata,

@@ -187,16 +187,8 @@ export default function SettingsPage() {
       const data = await r.json();
       if (r.ok) {
         const activatedPlan = data.plan || "PRO";
-        if (typeof window !== "undefined") {
-          try {
-            const rawUser = localStorage.getItem("sl_user");
-            if (rawUser) {
-              const u = JSON.parse(rawUser);
-              u.plan = activatedPlan;
-              localStorage.setItem("sl_user", JSON.stringify(u));
-            }
-          } catch {}
-        }
+        // Wave 6: profile state is hydrated from /auth/me (cookie-only session);
+        // refreshSession below re-reads the updated plan from the server.
         await refreshSession(true);
         setLicenseMessage({ type: "success", text: `${activatedPlan} unlocked successfully! Refreshing...` });
         setTimeout(() => window.location.reload(), 1500);

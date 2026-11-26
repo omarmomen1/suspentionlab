@@ -53,8 +53,10 @@ export interface AuthUser {
 
 interface AuthContextValue {
   user:     AuthUser | null;
+  /** Always null: tokens live exclusively in HttpOnly cookies (Wave 6). Kept for API compatibility. */
   token:    string | null;
   loading:  boolean;
+  sessionExpired: boolean;
   login:    (email: string, password: string) => Promise<AuthUser>;
   register: (email: string, password: string, name: string) => Promise<void>;
   logout:   () => void;
@@ -62,25 +64,36 @@ interface AuthContextValue {
   fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
   can:      (permission: string) => boolean;
   refreshSession: (force?: boolean) => Promise<AuthUser | null>;
+  dismissReAuth: () => void;
 }
 
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
-let refreshPromise: Promise<string | null> | null = null;
+let refreshPromise: Promise<boolean> | null = null;
 let mePromise: Promise<AuthUser | null> | null = null;
 let cachedUser: AuthUser | null = null;
 let lastFetchTime = 0;
 const CACHE_TTL_MS = 10000; // 10s session cache prevents repeated navigation hits
 
+/** Wave 6: purge any legacy token material left in web storage by older builds. */
+function purgeLegacyStorage() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem("sl_token");
+    localStorage.removeItem("sl_refresh_token");
+    localStorage.removeItem("sl_user");
+    sessionStorage.removeItem("sl_token");
+    sessionStorage.removeItem("sl_refresh_token");
+  } catch {}
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user,    setUser]    = useState<AuthUser | null>(null);
-  const [token,   setToken]   = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const tokenRef = useRef<string | null>(null);
-  tokenRef.current = token;
+  const [sessionExpired, setSessionExpired] = useState(false);
   const didInitRef = useRef(false);
 
-  const fetchMe = useCallback(async (force = false, overrideToken?: string): Promise<AuthUser | null> => {
+  const fetchMe = useCallback(async (force = false): Promise<AuthUser | null> => {
     if (!force && cachedUser && Date.now() - lastFetchTime < CACHE_TTL_MS) {
       return cachedUser;
     }
@@ -90,14 +103,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     mePromise = (async () => {
       try {
-        const headers: Record<string, string> = {};
-        const activeToken = overrideToken || tokenRef.current;
-        if (activeToken) {
-          headers["Authorization"] = `Bearer ${activeToken}`;
-        }
+        // Cookie-only auth: the HttpOnly sl_token cookie is sent automatically.
         const res = await fetch(resolveApiUrl("/auth/me"), {
           credentials: "include",
-          headers,
         });
         if (res.ok) {
           const data = await res.json();
@@ -108,15 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return userObj;
         } else {
           cachedUser = null;
-          setToken(null);
           setUser(null);
-          if (typeof window !== "undefined") {
-            try {
-              localStorage.removeItem("sl_token");
-              localStorage.removeItem("sl_refresh_token");
-              localStorage.removeItem("sl_user");
-            } catch {}
-          }
           return null;
         }
       } catch (err) {
@@ -130,28 +130,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return mePromise;
   }, []);
 
-  // Restore session from localStorage or cookie on mount (once)
+  // Restore session from cookies on mount (once) and purge legacy localStorage tokens
   useEffect(() => {
     if (didInitRef.current) return;
     didInitRef.current = true;
-    let savedToken: string | null = null;
-    if (typeof window !== "undefined") {
-      try {
-        savedToken = localStorage.getItem("sl_token");
-        const savedUserStr = localStorage.getItem("sl_user");
-        if (savedToken) {
-          setToken(savedToken);
-          tokenRef.current = savedToken;
-        }
-        if (savedUserStr) {
-          const parsed = JSON.parse(savedUserStr);
-          setUser(parsed);
-          cachedUser = parsed;
-        }
-      } catch {}
-    }
-    fetchMe(false, savedToken || undefined).finally(() => setLoading(false));
-  }, [fetchMe]);  
+    purgeLegacyStorage();
+    fetchMe(false).finally(() => setLoading(false));
+  }, [fetchMe]);
 
   const login = useCallback(async (email: string, password: string): Promise<AuthUser> => {
     const res = await fetch(resolveApiUrl("/auth/login"), {
@@ -164,8 +149,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail ?? "Login failed");
     }
+    // Server sets HttpOnly sl_token / sl_refresh_token cookies; the token in the
+    // JSON body is intentionally NOT stored anywhere client-side.
     const data = await res.json();
-    setToken(data.token);
     const userObj: AuthUser = {
       user_id: data.user_id,
       email: data.email,
@@ -177,18 +163,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       trial_expires_at: data.trial_expires_at,
       redirect_url: data.redirect_url,
     };
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem("sl_token", data.token);
-        if (data.refresh_token) {
-          localStorage.setItem("sl_refresh_token", data.refresh_token);
-        }
-        localStorage.setItem("sl_user", JSON.stringify(userObj));
-      } catch {}
-    }
     cachedUser = userObj;
     lastFetchTime = Date.now();
     setUser(userObj);
+    setSessionExpired(false);
     return userObj;
   }, []);
 
@@ -203,37 +181,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail ?? "Registration failed");
     }
-    const data = await res.json();
-    setToken(data.token);
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.setItem("sl_token", data.token);
-        if (data.refresh_token) {
-          localStorage.setItem("sl_refresh_token", data.refresh_token);
-        }
-      } catch {}
-    }
+    // Cookies set by server; hydrate the profile via /auth/me.
     cachedUser = null;
-    await fetchMe(true, data.token);
+    setSessionExpired(false);
+    await fetchMe(true);
   }, [fetchMe]);
 
   const logout = useCallback(async () => {
     cachedUser = null;
     lastFetchTime = 0;
+    setSessionExpired(false);
     try {
       await fetch(resolveApiUrl("/auth/clear-cookie"), { method: "POST", credentials: "include" });
     } catch {
       // ignore network errors on logout
     }
-    setToken(null);
     setUser(null);
-    if (typeof window !== "undefined") {
-      try {
-        localStorage.removeItem("sl_token");
-        localStorage.removeItem("sl_refresh_token");
-        localStorage.removeItem("sl_user");
-      } catch {}
-    }
+    purgeLegacyStorage();
   }, []);
 
   const getCsrfToken = useCallback((): string => {
@@ -243,13 +207,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const authHeader = useCallback((): Record<string, string> => {
-    const headers: Record<string, string> = { "X-CSRF-Token": getCsrfToken() };
-    const activeToken = token || tokenRef.current || (typeof window !== "undefined" ? localStorage.getItem("sl_token") : null);
-    if (activeToken) {
-      headers["Authorization"] = `Bearer ${activeToken}`;
-    }
-    return headers;
-  }, [getCsrfToken, token]);
+    // Cookie-only auth: no Authorization bearer. The session cookie travels with
+    // credentials: "include"; only the CSRF double-submit header is needed.
+    return { "X-CSRF-Token": getCsrfToken() };
+  }, [getCsrfToken]);
 
   const can = useCallback((permission: string): boolean => {
     if (!user) return false;
@@ -263,71 +224,152 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return user.permissions?.includes(permission) ?? false;
   }, [user]);
 
+  /** Attempt a cookie-based session refresh; resolves true when the session was renewed. */
+  const tryRefresh = useCallback((): Promise<boolean> => {
+    if (!refreshPromise) {
+      refreshPromise = fetch(resolveApiUrl("/auth/refresh"), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({}),
+      }).then(async refreshRes => {
+        // Rotated cookies are set by the server on success.
+        return refreshRes.ok;
+      }).catch(err => {
+        console.error("Token refresh request failed:", err);
+        return false;
+      }).finally(() => {
+        refreshPromise = null;
+      });
+    }
+    return refreshPromise;
+  }, []);
+
   const fetchWithAuth = useCallback(async (url: string, options: RequestInit = {}) => {
     const fullUrl = resolveApiUrl(url);
-    const authHeaders: Record<string, string> = { "X-CSRF-Token": getCsrfToken() };
-    const activeToken = token || tokenRef.current || (typeof window !== "undefined" ? localStorage.getItem("sl_token") : null);
-    if (activeToken) {
-      authHeaders["Authorization"] = `Bearer ${activeToken}`;
-    }
-    const headers = { ...authHeaders, ...options.headers };
-    
+    const headers = { "X-CSRF-Token": getCsrfToken(), ...options.headers };
+
     // Prevent recursive refresh loops on authentication endpoints
     const isAuthRoute = fullUrl.includes("/auth/login") || fullUrl.includes("/auth/refresh") || fullUrl.includes("/auth/clear-cookie");
 
     const res = await fetch(fullUrl, { ...options, credentials: "include", headers });
     if (res.status === 401 && !isAuthRoute) {
-        const storedRefreshToken =
-          typeof window !== "undefined"
-            ? (localStorage.getItem("sl_refresh_token") || "").trim()
-            : "";
-
-        if (!storedRefreshToken) {
-            logout();
-            return res;
-        }
-
-        if (!refreshPromise) {
-            refreshPromise = fetch(resolveApiUrl("/auth/refresh"), {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                credentials: "include",
-                body: JSON.stringify({ refresh_token: storedRefreshToken }),
-            }).then(async refreshRes => {
-                if (refreshRes.ok) {
-                    const data = await refreshRes.json();
-                    if (typeof window !== "undefined") {
-                      try {
-                        if (data.token) localStorage.setItem("sl_token", data.token);
-                        if (data.refresh_token) localStorage.setItem("sl_refresh_token", data.refresh_token);
-                      } catch {}
-                    }
-                    return (data.token as string) || null;
-                }
-                return null;
-            }).catch(err => {
-                console.error("Token refresh request failed:", err);
-                return null;
-            }).finally(() => {
-                refreshPromise = null;
-            });
-        }
-        
-        const newToken = await refreshPromise;
-        if (newToken) {
-            setToken(newToken);
-            return fetch(fullUrl, { ...options, credentials: "include", headers: { ...headers, Authorization: `Bearer ${newToken}` } });
-        } else {
-            logout();
-        }
+      const refreshed = await tryRefresh();
+      if (refreshed) {
+        return fetch(fullUrl, { ...options, credentials: "include", headers });
+      }
+      // Refresh failed: the session is gone. Open the re-auth gate instead of a
+      // hard logout so in-progress page state (unsaved inputs) stays mounted.
+      setSessionExpired(true);
     }
     return res;
-  }, [logout, getCsrfToken]);
+  }, [tryRefresh, getCsrfToken]);
+
+  const dismissReAuth = useCallback(() => {
+    // User chose to browse signed-out areas; clear the stale profile locally.
+    cachedUser = null;
+    lastFetchTime = 0;
+    setUser(null);
+    setSessionExpired(false);
+  }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout, authHeader, fetchWithAuth, can, refreshSession: fetchMe }}>
+    <AuthContext.Provider value={{ user, token: null, loading, sessionExpired, login, register, logout, authHeader, fetchWithAuth, can, refreshSession: fetchMe, dismissReAuth }}>
       {children}
+      {sessionExpired && <ReAuthModal />}
     </AuthContext.Provider>
+  );
+}
+
+/**
+ * Wave 6: clean re-auth gate. Rendered alongside (not instead of) the page tree,
+ * so unsaved workspace inputs stay mounted while the user signs back in.
+ */
+function ReAuthModal() {
+  const { user, login, logout } = useAuth();
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user?.email || !password) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await login(user.email, password);
+      // login() clears sessionExpired; page state below the modal is preserved.
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign-in failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Session expired"
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,0.6)", display: "flex",
+        alignItems: "center", justifyContent: "center",
+      }}
+    >
+      <form
+        onSubmit={submit}
+        style={{
+          background: "#111827", color: "#e5e7eb", borderRadius: 12,
+          padding: 24, width: 360, maxWidth: "90vw",
+          boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
+        }}
+      >
+        <h2 style={{ margin: "0 0 8px", fontSize: 18 }}>Session expired</h2>
+        <p style={{ margin: "0 0 16px", fontSize: 14, color: "#9ca3af" }}>
+          Your work is still here. Re-enter your password to continue where you left off.
+        </p>
+        <label style={{ display: "block", fontSize: 13, marginBottom: 12 }}>
+          <span style={{ display: "block", marginBottom: 4 }}>Email</span>
+          <input
+            id="reauth-email"
+            type="email"
+            value={user?.email ?? ""}
+            readOnly
+            style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #374151", background: "#1f2937", color: "#9ca3af" }}
+          />
+        </label>
+        <label style={{ display: "block", fontSize: 13, marginBottom: 12 }}>
+          <span style={{ display: "block", marginBottom: 4 }}>Password</span>
+          <input
+            id="reauth-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoFocus
+            required
+            style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #374151", background: "#1f2937", color: "#e5e7eb" }}
+          />
+        </label>
+        {error && <p role="alert" style={{ color: "#f87171", fontSize: 13, margin: "0 0 12px" }}>{error}</p>}
+        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+          <button
+            type="button"
+            onClick={() => logout()}
+            style={{ padding: "8px 14px", borderRadius: 6, border: "1px solid #374151", background: "transparent", color: "#9ca3af", cursor: "pointer" }}
+          >
+            Sign out
+          </button>
+          <button
+            type="submit"
+            disabled={busy || !password}
+            style={{ padding: "8px 14px", borderRadius: 6, border: "none", background: "#2563eb", color: "#fff", cursor: "pointer", opacity: busy ? 0.6 : 1 }}
+          >
+            {busy ? "Signing in..." : "Continue"}
+          </button>
+        </div>
+      </form>
+    </div>
   );
 }
 

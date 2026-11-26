@@ -62,3 +62,6 @@ backend_vercel/
 *.tmp
 _audit_export/
 
+
+# Root-level FMU build artifacts
+/*.fmu

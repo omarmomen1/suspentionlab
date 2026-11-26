@@ -167,3 +167,92 @@ class PhysicsObservability:
             },
         }
 
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Wave 6: Real build-stamped solver provenance (Trust Badges & Solver Provenance)
+# ─────────────────────────────────────────────────────────────────────────────
+
+import logging
+import os
+import subprocess
+import uuid
+from functools import lru_cache
+
+_logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=1)
+def get_build_stamp() -> dict[str, Any]:
+    """Resolve the real build identity of the running solver code."""
+    commit = (
+        os.getenv("GIT_COMMIT")
+        or os.getenv("VERCEL_GIT_COMMIT_SHA")
+        or os.getenv("SOURCE_COMMIT")
+        or os.getenv("COMMIT_SHA")
+    )
+    git_ref = (
+        os.getenv("GIT_REF")
+        or os.getenv("VERCEL_GIT_COMMIT_REF")
+        or os.getenv("GITHUB_REF_NAME")
+    )
+    if not commit:
+        try:
+            commit = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                capture_output=True, text=True, timeout=3,
+            ).stdout.strip() or None
+        except Exception:
+            commit = None
+    if not commit:
+        commit = "nogit"
+        _logger.info("Provenance: no git commit available from env or repo; stamped as 'nogit'.")
+
+    build_time = os.getenv("BUILD_TIMESTAMP") or os.getenv("VERCEL_DEPLOYMENT_CREATED_AT")
+
+    try:
+        from importlib.metadata import version as _pkg_version
+        pkg_ver = _pkg_version("suspensionlab")
+    except Exception:
+        pkg_ver = None
+
+    return {
+        "git_commit": commit,
+        "git_ref": git_ref,
+        "build_time": build_time,
+        "package_version": pkg_ver,
+    }
+
+
+def build_solver_version(base_version: Optional[str] = None) -> str:
+    """Compose the real solver version: base solver string + git commit short SHA."""
+    stamp = get_build_stamp()
+    commit = stamp["git_commit"] or "nogit"
+    short = commit[:12]
+    if base_version:
+        return f"{base_version}+{short}"
+    return f"build-{short}"
+
+
+def compute_input_sha256(inputs: Any) -> str:
+    """SHA-256 over the canonical JSON serialization of the solver inputs."""
+    def _default(o: Any) -> str:
+        return repr(o)
+    canonical = json.dumps(inputs, sort_keys=True, separators=(",", ":"), default=_default)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def stamp_solver_result(result: Any, *, inputs: Any, base_version: Optional[str] = None,
+                        run_id: Optional[str] = None) -> Any:
+    """Attach real provenance to a solver result dict (in place and returned).
+
+    Non-dict results are returned unchanged (caller decides the envelope).
+    """
+    if not isinstance(result, dict):
+        return result
+    stamp = get_build_stamp()
+    result["solver_version"] = build_solver_version(base_version or result.get("solver_version"))
+    result["run_id"] = run_id or str(uuid.uuid4())
+    result["input_sha256"] = compute_input_sha256(inputs)
+    result["build"] = stamp
+    return result

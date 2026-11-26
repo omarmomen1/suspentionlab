@@ -782,9 +782,9 @@ class ExperimentService:
             OptimizationObjective("tire_load_variation", minimize=True, unit="N", description="Tire Load Variation (Grip Consistency)"),
         ]
 
-        constraints = [
-            OptimizationConstraint("peak_susp_travel", lower=0.0, upper=150.0, unit="mm", description="Suspension Travel"),
-        ]
+        # Wave 6 §2: canonical feasibility contract, identical to /optimize and /compare
+        from suspensionlab.physics.pareto_optimizer import quarter_car_feasibility_constraints
+        constraints = quarter_car_feasibility_constraints()
 
         ranges = param_ranges or {
             "k_s": [20000.0, 50000.0, 5],

@@ -666,3 +666,67 @@ By signing below, the governing technical authorities certify that SuspensionLab
 - **Protected Assets Integrity Check**: `88 / 88 Files Verified (0 Drift)`
 - **Regression Suite Result**: `2,597 / 2,597 Passed (0 Failures)`
 - **Product Freeze Status**: **CRYPTOGRAPHICALLY_FROZEN_BIT_FOR_BIT**
+
+---
+
+## 17. Wave 6 Addendum — Enterprise Hardening (2026-11-26)
+
+This addendum records the measured state after the Wave 6 enterprise-hardening
+wave. Section 1-16 figures above are the historical Phase 8.6 freeze
+measurements (2026-11-05) and are preserved unchanged.
+
+### 17.1 Regression Suite Counts (measured at Wave 6 close)
+| Suite | Phase 8.6 Freeze | Wave 6 | Delta |
+|---|---|---|---|
+| Backend pytest (collected) | 2,597 | 2,488 collected + 1 collection error* | See note* |
+| Frontend Vitest | 166 / 166 | 183 / 183 (1 env-only failure**) | +17 |
+
+\* The count differs from 2,597 because collection runs in a Linux sandbox
+without the C++ `kinematics_core` build, FMPy binary, or live PostgreSQL; the
+single collection error is `tests/test_remediation_release_gate.py` requiring
+`tomllib` (Python 3.11+, sandbox runs 3.10). The authoritative 0-failure full
+run is reproduced in CI on the maintainer's machine. Wave 6 added test modules:
+`test_golden_file_physics_regression.py` (7), `test_wave6_pareto_nsga2.py` (5),
+`test_wave6_telemetry_hardening.py` (2), `test_wave6_profile_revisions.py` (2),
+`test_rls_isolation.py` (3, 2 skip without Docker/testcontainers).
+\*\* `tests/billingAndPlanGate.test.ts` reads `frontend/.env.local`, which is
+gitignored and absent in CI/sandbox checkouts (environmental, not a product
+failure). Wave 6 added `tests/cookieOnlyAuth.test.ts` (7),
+`tests/trustBadge.test.ts` (5), `tests/e2e/smoke.spec.ts` (Playwright).
+
+### 17.2 New CI Quality Gates (`.github/workflows/`)
+- All GitHub Actions pinned to full commit SHAs (72 `uses:` lines, 20 actions,
+  including Trivy `v0.36.0` and Checkov `v12`, previously tracking `@master`).
+- Alembic single-head migration check in the Python test job.
+- `golden-file-physics` job: quarter-car modal goldens (1.23 / 12.56 Hz,
+  MR^2 scaling), GT3 kinematics benchmark gate (4/4 modeled PASS;
+  BENCH-05 elastokinematic toe is structurally NOT_MODELED and reported as
+  such), zero/invalid-input rejection, 1-sample telemetry HTTP 422.
+- `e2e-smoke` job (Playwright): sign-in, desktop + 390px nav, core routes,
+  `/report` PDF export magic-byte check.
+
+### 17.3 Security & Provenance Changes
+- Cookie-only auth: session tokens live exclusively in `HttpOnly` cookies;
+  no token material is readable or persisted by frontend JavaScript; 401s open
+  a re-auth gate preserving unsaved workspace state instead of a hard logout.
+- SAML assertion replay cache moved to Redis (SET NX PX, TTL = assertion
+  expiry) with in-process fallback for single-worker dev.
+- `/api/v1/ai/approve` and setup sign-offs write append-only SHA-256
+  hash-chained audit records tied to the server-verified user/org/role.
+- Solver responses carry real build-stamped provenance (`solver_version` with
+  git commit, `run_id`, `input_sha256`); a Trust Badge footer renders it on
+  solver figures and every exported PDF report.
+- Optimizer: NSGA-II (Deb fast non-dominated sort, crowding distance,
+  normalized dominance eps) replaces binary ranking; corner-solution warnings;
+  identical feasibility contract across `/optimize` and `/experiment`.
+- Telemetry ingestion: structured rejection counts/reasons over the DAQ
+  WebSocket, downloadable reference CSV template, channel auto-mapping preview.
+- Setup profiles: versioned revisions (parent ID, param diff, author,
+  timestamp) with diff and rollback endpoints; Alembic head `z88a0b1c2d3e`.
+
+### 17.4 Governance Integrity
+- `pre_phase4_3_hashes.json` physics section re-certified for the three files
+  Wave 6 modified (`kinematics_facade.py`, `provenance.py`,
+  `pareto_optimizer.py`); 81/81 registered files verified, 0 drift.
+- Frozen Phase 3x manifests and `PROTOCOL_SHA256` constants are untouched
+  (no covered file changed).

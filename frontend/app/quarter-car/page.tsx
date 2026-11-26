@@ -10,6 +10,7 @@ import {
   Zap, GitBranch, Crosshair, RefreshCw,
 } from "lucide-react";
 import PDFExport from "../../components/PDFExport";
+import TrustBadge from "../../components/TrustBadge";
 import NextStepLink from "../../components/NextStepLink";
 import DataExport from "../../components/DataExport";
 import VehiclePresets from "../../components/VehiclePresets";
@@ -1217,6 +1218,14 @@ function QuarterCarDashboard() {
                 )}
 
               </div>
+
+              {/* Wave 6: solver provenance Trust Badge (footer of the results view) */}
+              <TrustBadge
+                solverVersion={(results as any)?.solver_version}
+                runId={(results as any)?.run_id}
+                inputSha256={(results as any)?.input_sha256}
+                className="px-1 pb-1"
+              />
             </div>
           )}
 

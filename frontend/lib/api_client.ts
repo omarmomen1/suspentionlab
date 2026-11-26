@@ -466,6 +466,7 @@ export interface KinematicsSolveResponse {
   convergence_summary?: string;
   physical_issues?: string[];
   run_id?: string;
+  input_sha256?: string;
   geometry_hash?: string;
   timestamp?: string;
   metadata?: Record<string, any>;

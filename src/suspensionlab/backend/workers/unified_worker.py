@@ -555,6 +555,16 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
                     except asyncio.CancelledError:
                         pass
 
+            # Wave 6: stamp real solver provenance (git-commit build stamp,
+            # run_id, input_sha256) onto every successful solver response.
+            if isinstance(res, dict):
+                try:
+                    from suspensionlab.physics.provenance import stamp_solver_result
+                    prov_inputs = {k: v for k, v in payload.items() if not k.startswith("_")}
+                    stamp_solver_result(res, inputs=prov_inputs, run_id=job_id)
+                except Exception as prov_exc:
+                    logger.warning("Provenance stamping failed for job %s: %s", job_id, prov_exc)
+
             job_record.status = final_status
             if final_status.startswith("FAILED"):
                 job_record.error = "Numerical failure: NaN or Inf detected in solver output" if nan_inf else "Solver divergence"

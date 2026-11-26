@@ -56,8 +56,41 @@ NAMESPACES = {
     "ds": "http://www.w3.org/2000/09/xmldsig#",
 }
 
-# Cache for replay attack prevention: records assertion IDs and expiration timestamps
+# Cache for replay attack prevention: records assertion IDs and expiration timestamps.
+# Wave 6: primary store is a DISTRIBUTED Redis cache (SET NX PX, atomic check-and-set)
+# so multi-worker / serverless deployments reject replayed assertions consistently.
+# The in-process dict remains as a graceful fallback when Redis is unavailable
+# (single-worker correctness preserved; a warning is logged once).
 _seen_assertion_ids: Dict[str, float] = {}
+
+_REPLAY_KEY_PREFIX = "saml:replay:"
+_sync_redis_client = None
+_sync_redis_unavailable = False
+
+
+def _get_replay_redis():
+    """Lazily connect a synchronous Redis client for the replay cache."""
+    global _sync_redis_client, _sync_redis_unavailable
+    if _sync_redis_client is not None or _sync_redis_unavailable:
+        return _sync_redis_client
+    import os
+    redis_url = os.getenv("REDIS_URL", "")
+    if not redis_url:
+        _sync_redis_unavailable = True
+        return None
+    try:
+        import redis as sync_redis
+        client = sync_redis.from_url(redis_url, socket_timeout=2, socket_connect_timeout=2)
+        client.ping()
+        _sync_redis_client = client
+    except Exception as exc:
+        logger.warning(
+            "SAML replay cache: Redis unavailable (%s); falling back to in-process cache "
+            "(replay protection is per-worker only until Redis recovers).", exc,
+        )
+        _sync_redis_unavailable = True
+        _sync_redis_client = None
+    return _sync_redis_client
 
 
 def _cleanup_seen_assertions():
@@ -65,6 +98,43 @@ def _cleanup_seen_assertions():
     expired = [k for k, exp in _seen_assertion_ids.items() if exp < now]
     for k in expired:
         _seen_assertion_ids.pop(k, None)
+
+
+def _replay_lookup(assertion_id: str) -> bool:
+    """Return True if this assertion ID was already consumed (read-only check)."""
+    client = _get_replay_redis()
+    if client is not None:
+        try:
+            return bool(client.exists(_REPLAY_KEY_PREFIX + assertion_id))
+        except Exception as exc:
+            logger.warning("SAML replay cache Redis read error (%s); in-process fallback", exc)
+    _cleanup_seen_assertions()
+    return assertion_id in _seen_assertion_ids
+
+
+def _replay_mark(assertion_id: str, expires_at_epoch: float) -> None:
+    """Atomically mark an assertion ID as consumed until its expiry.
+
+    Raises ValueError on a replay race (another worker consumed it between the
+    lookup and the mark). TTL is the assertion's own expiry (plus skew), so
+    entries expire gracefully instead of growing unboundedly.
+    """
+    ttl_ms = max(int((expires_at_epoch - time.time()) * 1000), 60_000)
+    client = _get_replay_redis()
+    if client is not None:
+        try:
+            was_set = client.set(_REPLAY_KEY_PREFIX + assertion_id, "1", nx=True, px=ttl_ms)
+            if not was_set:
+                raise ValueError(f"SAML Assertion replay detected (ID: {assertion_id})")
+            return
+        except ValueError:
+            raise
+        except Exception as exc:
+            logger.warning("SAML replay cache Redis write error (%s); in-process fallback", exc)
+    _cleanup_seen_assertions()
+    if assertion_id in _seen_assertion_ids:
+        raise ValueError(f"SAML Assertion replay detected (ID: {assertion_id})")
+    _seen_assertion_ids[assertion_id] = expires_at_epoch
 
 
 def generate_sp_metadata_xml(
@@ -386,8 +456,8 @@ def parse_and_validate_saml_response(
     if not assertion_id:
         raise ValueError("Assertion is missing ID attribute")
 
-    # 5. Replay Attack Prevention
-    if assertion_id in _seen_assertion_ids:
+    # 5. Replay Attack Prevention (distributed Redis cache + in-process fallback)
+    if _replay_lookup(assertion_id):
         raise ValueError(f"SAML Assertion replay detected (ID: {assertion_id})")
 
     # 6. Validate Issuer
@@ -416,10 +486,10 @@ def parse_and_validate_saml_response(
             not_on_or_after = datetime.fromisoformat(not_on_or_after_str.replace("Z", "+00:00"))
             if now - skew >= not_on_or_after:
                 raise ValueError("SAML Assertion has expired (NotOnOrAfter violation)")
-            # Record assertion ID expiry for replay prevention
-            _seen_assertion_ids[assertion_id] = not_on_or_after.timestamp() + clock_skew_seconds
+            # Record assertion ID expiry for replay prevention (atomic check-and-set)
+            _replay_mark(assertion_id, not_on_or_after.timestamp() + clock_skew_seconds)
         else:
-            _seen_assertion_ids[assertion_id] = time.time() + 3600
+            _replay_mark(assertion_id, time.time() + 3600)
 
         # Audience check
         audience_elems = conditions.findall(".//{urn:oasis:names:tc:SAML:2.0:assertion}Audience")

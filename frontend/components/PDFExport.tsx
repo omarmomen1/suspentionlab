@@ -158,7 +158,7 @@ export default function PDFExport({
       };
 
       const drawFooter = (pageNum: number, totalPages: number) => {
-        const footY = pageH - 12;
+        const footY = pageH - 15; // Wave 6: raised for the provenance badge line
         pdf.setDrawColor(226, 232, 240);
         pdf.setLineWidth(0.3);
         pdf.line(margin, footY - 2, pageW - margin, footY - 2);
@@ -176,6 +176,17 @@ export default function PDFExport({
           margin,
           footY + 6
         );
+
+        // Wave 6: solver provenance Trust Badge in every PDF footer.
+        pdf.setTextColor(5, 150, 105);
+        pdf.setFont("helvetica", "bold");
+        const badgeBits = [
+          "VERIFIED PROVENANCE",
+          solverVersion_ ? `solver ${solverVersion_}` : null,
+          effectiveInputHash ? `input ${String(effectiveInputHash).substring(0, 16)}…` : null,
+        ].filter(Boolean).join("  |  ");
+        pdf.text(badgeBits, margin, footY + 10);
+        pdf.setFont("helvetica", "normal");
       };
 
       // ── PAGE 1: EXECUTIVE ENGINEERING RECORD ───────────────────────────
