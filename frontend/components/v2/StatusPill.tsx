@@ -26,7 +26,7 @@ export default function StatusPill({ status, label, detail, className = "" }: St
   const isV2 = typeof status === "string" && (V2_STATES as readonly string[]).includes(status);
   const state: V2Status = isV2 ? (status as V2Status) : mapBackendStatusToV2(status);
   const s = STYLE[state];
-  const title = [detail, !isV2 && status ? `Backend status: ${status}` : null].filter(Boolean).join("\n");
+  const title = [detail, !isV2 && typeof status === "string" && status.trim() ? `Backend status: ${status}` : null].filter(Boolean).join("\n");
   return (
     <span
       data-testid="status-pill"

@@ -104,6 +104,93 @@ describe("v2 primitives", () => {
   });
 });
 
+describe("status mapping edge cases (behavioral)", () => {
+  it("every BACKEND_STATUS_MAP key round-trips to its mapped state in any case/separator form", () => {
+    for (const [k, v] of Object.entries(BACKEND_STATUS_MAP)) {
+      expect(mapBackendStatusToV2(k)).toBe(v);
+      expect(mapBackendStatusToV2(k.toLowerCase())).toBe(v);
+      expect(mapBackendStatusToV2(k.replace(/_/g, " "))).toBe(v);
+    }
+  });
+  it("garbage, wrong-type and nested inputs never reach VERIFIED", () => {
+    for (const v of [NaN, true, false, [], ["PASS"], { status: "PASS" }, "PASSX", "pass!", Symbol.iterator.toString()]) {
+      expect(mapBackendStatusToV2(v as unknown), String(v)).not.toBe("VERIFIED");
+    }
+  });
+  it("mapResultToV2 handles missing, partial and contradictory results", () => {
+    for (const v of [undefined, null, {}, [], "x", 3]) expect(mapResultToV2(v as unknown)).not.toBe("VERIFIED");
+    expect(mapResultToV2({ lap_completed: false, status: "PASS" })).toBe("FAILED");
+    expect(mapResultToV2({ status: "WARN" })).toBe("WARNING");
+    expect(mapResultToV2({ status: "FAIL" })).toBe("FAILED");
+  });
+});
+
+describe("primitive edge cases (behavioral)", () => {
+  it("StatusPill with no/unknown/object status falls back to Not run, never throws or VERIFIED", () => {
+    for (const st of [undefined, null, "", "BOGUS", { a: 1 }]) {
+      const html = renderToStaticMarkup(React.createElement(StatusPill, { status: st as any }));
+      expect(html, String(st)).toContain('data-status="NOT_RUN"');
+      expect(html).not.toContain("[object Object]");
+    }
+  });
+  it("StatusPill honours an explicit label", () => {
+    expect(renderToStaticMarkup(React.createElement(StatusPill, { status: "PASS", label: "Custom label" }))).toContain("Custom label");
+  });
+  it("ErrorCard formats strings, Errors, nested detail arrays and null without [object Object]", () => {
+    const inputs: unknown[] = [
+      "plain failure", new Error("boom"), { detail: [{ msg: "field required", loc: ["body", "k"] }] },
+      { message: "m" }, { detail: { code: "X", message: "y" } }, null, undefined, 42,
+    ];
+    for (const e of inputs) {
+      const html = renderToStaticMarkup(React.createElement(ErrorCard, { error: e as any, context: "Run" }));
+      expect(html, JSON.stringify(e)).not.toContain("[object Object]");
+      expect(html.length).toBeGreaterThan(20);
+    }
+  });
+  it("ErrorCard hides the raw trace in production", () => {
+    const prev = process.env.NODE_ENV;
+    (process.env as any).NODE_ENV = "production";
+    const prod = renderToStaticMarkup(React.createElement(ErrorCard, { error: { detail: { secret_trace: "TRACE-123" } } as any, context: "Run" }));
+    (process.env as any).NODE_ENV = prev;
+    expect(prod).not.toContain("TRACE-123");
+  });
+  it("RunBadge returns empty markup for blank/whitespace props", () => {
+    expect(renderToStaticMarkup(React.createElement(RunBadge, { solverVersion: "", runId: "  " }))).toBe("");
+    expect(renderToStaticMarkup(React.createElement(RunBadge, { solverVersion: null as any, runId: null as any }))).toBe("");
+  });
+});
+
+describe("benchmark-status.json internal consistency (behavioral)", () => {
+  const st = JSON.parse(read("public/benchmark-status.json"));
+  const walk = (o: unknown, f: (n: number, p: string) => void, p = "") => {
+    if (typeof o === "number") f(o, p);
+    else if (Array.isArray(o)) o.forEach((x, i) => walk(x, f, `${p}[${i}]`));
+    else if (o && typeof o === "object") for (const [k, v] of Object.entries(o)) walk(v, f, `${p}.${k}`);
+  };
+  it("every tile verdict equals the AND of its check verdicts", () => {
+    for (const b of st.benchmarks) {
+      const expected = b.checks.length > 0 && b.checks.every((c: any) => c.verdict === "PASS") ? "PASS" : "FAIL";
+      expect(b.verdict, b.id).toBe(expected);
+    }
+  });
+  it("every measured field is a finite number, every tolerance is a finite non-negative number", () => {
+    for (const b of st.benchmarks) for (const c of b.checks) {
+      for (const [k, v] of Object.entries(c.measured)) {
+        expect(typeof v, `${b.id}.${k}`).toBe("number");
+        expect(Number.isFinite(v as number), `${b.id}.${k}`).toBe(true);
+      }
+      walk(c.tolerance, (n, p) => { expect(Number.isFinite(n) && n >= 0, `${b.id}${p}`).toBe(true); });
+    }
+  });
+  it("no non-finite number anywhere in the file", () => {
+    walk(st, (n, p) => expect(Number.isFinite(n), p).toBe(true));
+  });
+  it("pytest exit code agrees with tile verdicts", () => {
+    const anyFail = st.benchmarks.some((b: any) => b.verdict !== "PASS");
+    expect(st.pytest_exit_code === 0).toBe(!anyFail);
+  });
+});
+
 describe("benchmark-status.json", () => {
   const status = JSON.parse(read("public/benchmark-status.json"));
   it("has B-01..B-04 with verdicts, measured values, tolerances, sha and timestamp", () => {

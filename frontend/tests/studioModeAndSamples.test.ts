@@ -182,3 +182,34 @@ describe("Sample Telemetry Renames, Badge & Legacy Route Cleanup", () => {
     );
   });
 });
+
+describe("NAV_V2 route integrity (data, not markup)", () => {
+  const all = NAV_V2.flatMap((g) => g.routes.map((r) => ({ group: g.id, ...r })));
+  it("every group and route has a non-empty label and an absolute href", () => {
+    for (const g of NAV_V2) {
+      expect(g.label.trim().length, g.id).toBeGreaterThan(0);
+      expect(g.href.startsWith("/"), g.id).toBe(true);
+    }
+    for (const r of all) {
+      expect(r.label.trim().length, r.href).toBeGreaterThan(0);
+      expect(r.href.startsWith("/"), r.label).toBe(true);
+    }
+  });
+  it("has no duplicate route hrefs and no duplicate group ids", () => {
+    const hrefs = all.map((r) => r.href);
+    expect(new Set(hrefs).size).toBe(hrefs.length);
+    const ids = NAV_V2.map((g) => g.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+  it("/investigate sits under Telemetry and /cae under Reports, with real page files", () => {
+    const inv = all.find((r) => r.href === "/investigate");
+    const cae = all.find((r) => r.href === "/cae");
+    expect(inv?.group).toBe("telemetry");
+    expect(cae?.group).toBe("reports");
+    for (const r of all) {
+      if (r.href === "/") continue;
+      const page = path.join(FRONTEND_ROOT, "app", ...r.href.split("/").filter(Boolean), "page.tsx");
+      expect(fs.existsSync(page), `${r.href} has no app page`).toBe(true);
+    }
+  });
+});

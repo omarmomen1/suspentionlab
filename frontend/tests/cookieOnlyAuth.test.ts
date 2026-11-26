@@ -111,3 +111,72 @@ describe("Wave 6 review fixes: session-expired signalling and re-auth email", ()
     expect(ctx).not.toMatch(/^\s*setSessionExpired\(true\);/m);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Behavioral tests (run the real apiFetch against a stubbed fetch and window).
+// ---------------------------------------------------------------------------
+import { vi, beforeEach, afterEach } from "vitest";
+import { apiFetch, getCsrfToken, getAuthToken, SESSION_EXPIRED_EVENT } from "../lib/api";
+
+describe("apiFetch cookie-only behaviour (executed, not grepped)", () => {
+  const calls: { url: string; init: any }[] = [];
+  let responses: { status: number }[] = [];
+  let events: string[] = [];
+
+  beforeEach(() => {
+    calls.length = 0;
+    events = [];
+    (globalThis as any).document = { cookie: "a=1; csrf_token=tok123; b=2" };
+    (globalThis as any).window = { dispatchEvent: (e: Event) => { events.push(e.type); return true; } };
+    vi.stubGlobal("fetch", async (url: string, init: any) => {
+      calls.push({ url, init });
+      const r = responses.shift() ?? { status: 200 };
+      return { status: r.status, ok: r.status >= 200 && r.status < 300 } as Response;
+    });
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    delete (globalThis as any).document;
+    delete (globalThis as any).window;
+  });
+
+  it("sends cookies and the CSRF header, and never an Authorization bearer", async () => {
+    responses = [{ status: 200 }];
+    await apiFetch("/api/v1/x", { method: "POST" });
+    expect(calls[0].init.credentials).toBe("include");
+    expect(calls[0].init.headers["X-CSRF-Token"]).toBe("tok123");
+    expect(calls[0].init.headers.Authorization).toBeUndefined();
+    expect(getCsrfToken()).toBe("tok123");
+    expect(getAuthToken()).toBe("");
+  });
+
+  it("a 401 triggers a cookie refresh with an empty body, then retries", async () => {
+    responses = [{ status: 401 }, { status: 200 }, { status: 200 }];
+    const res = await apiFetch("/api/v1/x");
+    expect(calls.map((c) => c.url)).toEqual(["/api/v1/x", "/api/v1/auth/refresh", "/api/v1/x"]);
+    expect(calls[1].init.body).toBe("{}");
+    expect(calls[1].init.credentials).toBe("include");
+    expect(res.status).toBe(200);
+    expect(events).toEqual([]);
+  });
+
+  it("a failed refresh fires sl:session-expired and does not retry", async () => {
+    responses = [{ status: 401 }, { status: 401 }];
+    const res = await apiFetch("/api/v1/x");
+    expect(calls.length).toBe(2);
+    expect(res.status).toBe(401);
+    expect(events).toEqual([SESSION_EXPIRED_EVENT]);
+  });
+
+  it("a 401 from an auth endpoint never loops into refresh", async () => {
+    responses = [{ status: 401 }];
+    await apiFetch("/api/v1/auth/login", { method: "POST" });
+    expect(calls.length).toBe(1);
+    expect(events).toEqual([]);
+  });
+
+  it("getCsrfToken is empty with no cookie", () => {
+    (globalThis as any).document = { cookie: "a=1" };
+    expect(getCsrfToken()).toBe("");
+  });
+});
