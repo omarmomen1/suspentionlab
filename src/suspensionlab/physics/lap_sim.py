@@ -1435,16 +1435,47 @@ def parse_segments_array(segment_list: List[Dict[str, Any]]) -> List[TrackSegmen
     return segments
 
 
-def parse_telemetry_csv(telemetry_data: Union[Dict[str, Any], List[Dict[str, Any]]]) -> List[TrackSegment]:
-    """Parse reconstructed telemetry CSV arrays (time_s, speed_ms, lat_g)."""
+def _normalize_speed_units(units: Optional[str]) -> Optional[str]:
+    """Normalize a declared speed-unit string to 'm/s', 'km/h' or 'mph'."""
+    if not units:
+        return None
+    u = str(units).strip().lower().replace(" ", "")
+    if u in ("m/s", "ms", "mps", "m.s-1", "meterspersecond", "metrespersecond"):
+        return "m/s"
+    if u in ("km/h", "kmh", "kph", "kmph", "km.h-1", "kilometersperhour", "kilometresperhour"):
+        return "km/h"
+    if u in ("mph", "mi/h"):
+        return "mph"
+    return None
+
+
+def parse_telemetry_csv(
+    telemetry_data: Union[Dict[str, Any], List[Dict[str, Any]]],
+    return_units: bool = False,
+) -> Union[List[TrackSegment], tuple]:
+    """Parse reconstructed telemetry CSV arrays (time_s, speed_ms, lat_g).
+
+    Speed units are resolved explicitly: a declared units header
+    ("speed_units"/"units": "m/s" | "km/h" | "kph" | "mph") wins, then the
+    key name itself (speed_ms / speed_kmh), and only for an ambiguous bare
+    "speed" key the max(speed) < 95 heuristic is applied. When return_units
+    is True, returns (segments, detected_speed_units).
+    """
+    speed_key_used = None
+    declared_units = None
     if isinstance(telemetry_data, dict):
+        declared_units = telemetry_data.get("speed_units") or telemetry_data.get("units")
         time_s = telemetry_data.get("time_s")
         if time_s is None or len(time_s) == 0:
             time_s = telemetry_data.get("time", [])
         time_s = np.asarray(time_s, dtype=float)
         raw_speed = telemetry_data.get("speed_ms")
-        if raw_speed is None or len(raw_speed) == 0:
+        if raw_speed is not None and len(raw_speed) > 0:
+            speed_key_used = "m/s"
+        else:
             raw_speed = telemetry_data.get("speed_kmh")
+            if raw_speed is not None and len(raw_speed) > 0:
+                speed_key_used = "km/h"
         if raw_speed is None or len(raw_speed) == 0:
             raw_speed = telemetry_data.get("speed", [])
         raw_speed = np.asarray(raw_speed, dtype=float)
@@ -1453,17 +1484,33 @@ def parse_telemetry_csv(telemetry_data: Union[Dict[str, Any], List[Dict[str, Any
         time_s = np.array([float(r.get("time_s", 0.0)) for r in telemetry_data])
         raw_speed = np.array([float(r.get("speed_ms", r.get("speed_kmh", r.get("speed", 0.0)))) for r in telemetry_data])
         lat_g = np.array([float(r.get("lat_g", 0.0)) for r in telemetry_data])
+        if any("speed_units" in r or "units" in r for r in telemetry_data):
+            declared_units = next(
+                (r.get("speed_units") or r.get("units") for r in telemetry_data if r.get("speed_units") or r.get("units")),
+                None,
+            )
 
     n = len(time_s)
     if n < 2:
-        return get_builtin_track("spa")
+        # Never silently substitute a built-in circuit for unusable uploads.
+        raise ValueError(
+            f"Telemetry upload contains {n} usable sample(s); at least 2 are required "
+            "to reconstruct a track. Provide a longer log or select a built-in track explicitly."
+        )
 
-    # Unit auto-detection: if max(speed) < 95.0, multiply by 3.6 to convert m/s -> km/h
+    # Explicit unit resolution: declared header > key name > magnitude heuristic.
+    detected_units = _normalize_speed_units(declared_units) or speed_key_used
     max_s = float(np.max(raw_speed)) if len(raw_speed) > 0 else 0.0
-    if max_s < 95.0:
-        driver_speed_kmh = raw_speed * 3.6
+    if detected_units is None:
+        detected_units = "m/s" if max_s < 95.0 else "km/h"
+
+    if detected_units == "m/s":
         speed_ms = raw_speed.copy()
-    else:
+        driver_speed_kmh = raw_speed * 3.6
+    elif detected_units == "mph":
+        speed_ms = raw_speed * 0.44704
+        driver_speed_kmh = speed_ms * 3.6
+    else:  # km/h
         driver_speed_kmh = raw_speed.copy()
         speed_ms = raw_speed / 3.6
 
@@ -1540,6 +1587,8 @@ def parse_telemetry_csv(telemetry_data: Union[Dict[str, Any], List[Dict[str, Any
         segments[-1].x_m = segments[0].x_m
         segments[-1].y_m = segments[0].y_m
 
+    if return_units:
+        return segments, detected_units
     return segments
 
 
@@ -1919,6 +1968,8 @@ class ClosedLoopSimResult:
     solver_warnings:      List[str] = field(default_factory=list)
     model_version:        str = "QSS-3PASS-CLOSED-LOOP-v5"
 
+    detected_speed_units: Optional[str] = None
+
     def to_contract_dict(self) -> Dict[str, Any]:
         """Return the exact locked JSON contract dictionary."""
         sec_times = [round(float(t), 4) for t in self.sector_times]
@@ -1973,10 +2024,11 @@ def simulate_lap(
     vp = _normalize_to_vehicle_params(vehicle, **kwargs)
 
     # 1. Resolve Track Segments
+    detected_speed_units: Optional[str] = None
     if segments is not None and len(segments) > 0:
         track_segs = parse_segments_array(segments)
     elif telemetry is not None:
-        track_segs = parse_telemetry_csv(telemetry)
+        track_segs, detected_speed_units = parse_telemetry_csv(telemetry, return_units=True)
     elif isinstance(track, str):
         track_segs = get_builtin_track(track)
     elif isinstance(track, list) and len(track) > 0:
@@ -1986,6 +2038,13 @@ def simulate_lap(
 
     n = len(track_segs)
     if n < 2:
+        if segments is not None or telemetry is not None or (isinstance(track, list) and len(track) > 0):
+            # Explicit custom input that produced an unusable track: fail
+            # loudly instead of silently substituting Spa-Francorchamps.
+            raise ValueError(
+                f"Supplied track input produced {n} segment(s); at least 2 are required. "
+                "No built-in circuit was substituted."
+            )
         track_segs = get_builtin_track("spa")
         n = len(track_segs)
 
@@ -2569,6 +2628,7 @@ def simulate_lap(
     return ClosedLoopSimResult(
         lap_time_s=lap_time_s,
         total_time=lap_time_s,
+        detected_speed_units=detected_speed_units,
         sector_times=sector_times,
         max_speed_kmh=float(np.max(speed_kmh)),
         min_speed_kmh=float(np.min(speed_kmh)),

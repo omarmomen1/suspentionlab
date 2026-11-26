@@ -1275,13 +1275,33 @@ Eigenfrequency and damping ratio verify within recommended vehicle dynamics oper
                 "or modifying authoritative parameters. Explicit HMAC-SHA256 human approval is required."
             )
 
-        # Verify caller role has setup:approve capability
-        user_role = getattr(user_context, "team_role", None) or getattr(user_context, "org_role", None) or approver_role or "engineer"
-        allowed_roles = {"engineer", "lead_engineer", "chief_engineer", "admin", "team_admin", "owner", "super_admin"}
+        # Verify caller role has setup:approve capability. Identity and role
+        # come EXCLUSIVELY from the verified server-side auth session;
+        # client-supplied approver_role/user_role/signature fields are ignored
+        # (a Viewer cannot self-promote by posting a role string).
+        if user_context is None:
+            raise RBACPermissionDenied(
+                "Approval requires an authenticated server-side session."
+            )
+        user_role = getattr(user_context, "team_role", None) or getattr(user_context, "org_role", None)
+        if not user_role and getattr(user_context, "is_admin", False):
+            user_role = "admin"
+        if not user_role:
+            raise RBACPermissionDenied(
+                "Approval denied: the authenticated session carries no team/org role; "
+                "client-supplied role claims are not accepted."
+            )
+        allowed_roles = {"engineer", "lead_engineer", "chief_engineer", "admin", "team_admin", "owner", "super_admin", "org_admin", "chief_race_engineer"}
         if str(user_role).lower() not in allowed_roles:
             raise RBACPermissionDenied(
                 f"Role '{user_role}' lacks permission 'setup:approve' required to sign off engineering decisions."
             )
+        # Server-side identity for the signature record, not client text.
+        approver_name = (
+            getattr(user_context, "name", None)
+            or getattr(user_context, "email", None)
+            or approver_name
+        )
 
         sign_secret = os.getenv("DECISION_HMAC_SECRET")
         if not sign_secret or len(sign_secret) < 32:

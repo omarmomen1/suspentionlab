@@ -300,8 +300,10 @@ class QuarterCarResult:
     omega_n_u:          float = 0.0
     f_n_s:              float = 0.0
     f_n_u:              float = 0.0
-    zeta_s:             float = 0.0
-    zeta_u:             float = 0.0
+    zeta_s:             Optional[float] = 0.0
+    zeta_u:             Optional[float] = 0.0
+    mode_status_s:      Optional[str] = None
+    mode_status_u:      Optional[str] = None
     c_crit_s:           float = 0.0
     c_crit_u:           float = 0.0
     k_w:                float = 0.0
@@ -438,13 +440,16 @@ def compute_modal_properties(p: QuarterCarParams) -> dict:
         wn2  = abs(lam2)
         z2   = -lam2.real / wn2
     else:
-        # Fallback: undamped analytical solution
+        # Real-pole (overdamped) or unidentified system: no conjugate pair
+        # exists, so NO modal damping ratio is identifiable. Keep the
+        # analytical frequency estimates (validated outputs) but report
+        # zeta as None with an explicit status instead of a fabricated value.
         wn1 = np.sqrt(p.k_w / p.m_s)
-        wn1_denom = 2.0 * np.sqrt(p.k_w * p.m_s)
-        z1  = p.c_w / wn1_denom if wn1_denom > 1e-9 else 0.0
+        z1  = None
         wn2 = np.sqrt((p.k_w + p.k_t) / p.m_u)
-        wn2_denom = 2.0 * np.sqrt((p.k_w + p.k_t) * p.m_u)
-        z2  = (p.c_w + p.c_t) / wn2_denom if wn2_denom > 1e-9 else 0.0
+        z2  = None
+        results["mode_status_s"] = "OVERDAMPED_OR_UNIDENTIFIED"
+        results["mode_status_u"] = "OVERDAMPED_OR_UNIDENTIFIED"
 
     # Critical damping coefficients
     c_crit_s = 2.0 * np.sqrt(p.k_w * p.m_s)
@@ -453,11 +458,11 @@ def compute_modal_properties(p: QuarterCarParams) -> dict:
     results.update({
         "omega_n_s":  float(wn1),
         "f_n_s":      float(wn1 / (2.0 * np.pi)),
-        "zeta_s":     float(np.clip(z1, 0.0, 5.0)),
+        "zeta_s":     (None if z1 is None else float(np.clip(z1, 0.0, 5.0))),
         "c_crit_s":   float(c_crit_s),
         "omega_n_u":  float(wn2),
         "f_n_u":      float(wn2 / (2.0 * np.pi)),
-        "zeta_u":     float(np.clip(z2, 0.0, 5.0)),
+        "zeta_u":     (None if z2 is None else float(np.clip(z2, 0.0, 5.0))),
         "c_crit_u":   float(c_crit_u),
         "k_w":        float(p.k_w),
     })
@@ -1387,6 +1392,8 @@ def run_quarter_car_analysis(
         f_n_u       = modal["f_n_u"],
         zeta_s      = modal["zeta_s"],
         zeta_u      = modal["zeta_u"],
+        mode_status_s = modal.get("mode_status_s"),
+        mode_status_u = modal.get("mode_status_u"),
         c_crit_s    = modal["c_crit_s"],
         c_crit_u    = modal["c_crit_u"],
         k_w         = modal["k_w"],

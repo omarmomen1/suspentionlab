@@ -276,10 +276,11 @@ def _get_tire_force_inner(k_t: float, z_u: float, z_r: float, c_t: float, dz_u: 
 
 @njit(fastmath=False, cache=True)
 def _get_tire_force(k_t: float, z_u: float, z_r: float, c_t: float, dz_u: float, dz_r: float) -> float:
-    force = _get_tire_force_inner(k_t, z_u, z_r, c_t, dz_u, dz_r)
-    if np.isnan(force) or np.isinf(force):
-        return 0.0
-    return force
+    # NaN/Inf tire forces are NOT masked to 0.0: they propagate into the
+    # integration state, and run_full_car_analysis flags the run as
+    # DIVERGED_NUMERICAL_INSTABILITY instead of reporting a plausible-but-
+    # wrong result built on silently zeroed forces.
+    return _get_tire_force_inner(k_t, z_u, z_r, c_t, dz_u, dz_r)
 
 @njit(fastmath=_FASTMATH, cache=True)
 def _compute_full_car_forces_fast(x: np.ndarray, u: np.ndarray, p: np.ndarray, ddz_out: np.ndarray):
@@ -560,7 +561,10 @@ def calculate_full_car_kpis(params: FullCarParams, res: dict) -> dict:
             d_idx = _dominant_dof(u_eig_vecs[:, k_i])
             undamped_by_dof[d_idx] = max(undamped_by_dof.get(d_idx, 0.0), f_u)
 
-    def _overdamped_freq_and_zeta(d_idx: int) -> Tuple[float, float, Optional[np.ndarray]]:
+    def _overdamped_freq_and_zeta(d_idx: int) -> Tuple[float, Optional[float], Optional[np.ndarray]]:
+        # zeta is Optional: where a damping ratio is not identifiable from a
+        # real pole pair it is None (OVERDAMPED_OR_UNIDENTIFIED), never a
+        # silently forced 1.0.
         poles = sorted(real_by_dof.get(d_idx, []), key=lambda t: t[0])
         f_undamped = float(undamped_by_dof.get(d_idx, 0.0))
         if f_undamped > 1e-4:
@@ -568,17 +572,17 @@ def calculate_full_car_kpis(params: FullCarParams, res: dict) -> dict:
             if len(poles) >= 2:
                 zeta = (poles[0][0] + poles[-1][0]) / (2.0 * omega_u)
             else:
-                zeta = 1.0
+                zeta = None
             m_vec = poles[0][1] if poles else None
-            return f_undamped, float(max(zeta, 1.0)), m_vec
+            return f_undamped, (None if zeta is None else float(max(zeta, 1.0))), m_vec
         if len(poles) >= 2:
             l1, l2 = poles[0][0], poles[-1][0]
             omega_n = math.sqrt(l1 * l2)
-            zeta = (l1 + l2) / (2.0 * omega_n) if omega_n > 0 else 1.0
-            return float(omega_n / (2.0 * np.pi)), float(zeta), poles[0][1]
+            zeta = (l1 + l2) / (2.0 * omega_n) if omega_n > 0 else None
+            return float(omega_n / (2.0 * np.pi)), (None if zeta is None else float(zeta)), poles[0][1]
         if len(poles) == 1:
-            return float(poles[0][0] / (2.0 * np.pi)), 1.0, poles[0][1]
-        return 0.0, 1.0, None
+            return float(poles[0][0] / (2.0 * np.pi)), None, poles[0][1]
+        return 0.0, None, None
 
     dof_mode_map = [(0, "heave"), (1, "pitch"), (2, "roll"), (3, "uf"), (4, "uf"), (5, "ur"), (6, "ur")]
     for d_idx, mode_key in dof_mode_map:
@@ -590,6 +594,7 @@ def calculate_full_car_kpis(params: FullCarParams, res: dict) -> dict:
                     modes_list.append({
                         "frequency": f_od,
                         "damping_ratio": z_od,
+                        "mode_status": ("OVERDAMPED_OR_UNIDENTIFIED" if z_od is None else "IDENTIFIED"),
                         "mode_shape": [{"real": float(np.real(c)), "imag": float(np.imag(c))} for c in m_vec.tolist()],
                     })
             
@@ -610,6 +615,11 @@ def calculate_full_car_kpis(params: FullCarParams, res: dict) -> dict:
     res["rms_tire_load_rr"] = float(np.sqrt(np.mean(np.square(np.array(res["z_rrr"]) - np.array(res["z_urr"]))))) * params.k_tr
     
     return res
+
+class FullCarDivergedError(RuntimeError):
+    """Raised when the 7-DOF integration reaches a non-finite state."""
+    status = "DIVERGED_NUMERICAL_INSTABILITY"
+
 
 def run_full_car_analysis(params: FullCarParams, profile: FourCornerRoadProfile) -> FullCarResultSchema:
     U = np.column_stack([profile.z_rfl, profile.z_rfr, profile.z_rrl, profile.z_rrr])
@@ -646,7 +656,14 @@ def run_full_car_analysis(params: FullCarParams, profile: FourCornerRoadProfile)
     
     if not sol.success:
         raise RuntimeError(f"ODE Solver failed: {sol.message}")
-        
+
+    if not np.all(np.isfinite(sol.y)):
+        raise FullCarDivergedError(
+            "DIVERGED_NUMERICAL_INSTABILITY: non-finite state (NaN/Inf) reached "
+            "during 7-DOF integration; tire/damper forces became non-physical "
+            "for this parameter set and road profile."
+        )
+
     time_out = sol.t
     yout = sol.y.T
     
@@ -740,6 +757,15 @@ def run_full_car_analysis(params: FullCarParams, profile: FourCornerRoadProfile)
     res = {k: v.tolist() if isinstance(v, np.ndarray) else v for k, v in res_arrays.items()}
     
     res["roll_stiffness_dist"] = roll_dist_frac * 100.0 if (K_roll_f + K_roll_r) > 0 else 50.0
+
+    # Roll-excitation honesty: a symmetric road profile cannot excite roll.
+    # Mark such runs explicitly instead of implying roll-excitation coverage.
+    symmetric_input = bool(
+        np.allclose(profile.z_rfl, profile.z_rfr, rtol=0.0, atol=1e-12)
+        and np.allclose(profile.z_rrl, profile.z_rrr, rtol=0.0, atol=1e-12)
+    )
+    res["symmetric_input"] = symmetric_input
+    res["status"] = "CONVERGED"
 
     # 4-wheel contact state determination
     def _wheel_contact_states(f_arr):

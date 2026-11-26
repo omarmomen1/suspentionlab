@@ -57,40 +57,55 @@ def _hp3(x: float, y: float, z: float) -> HardpointInput:
 
 
 class HardpointSetInput(BaseModel):
-    """All hardpoints defining one suspension corner."""
+    """All hardpoints defining one suspension corner.
+
+    Defaults are a physically realistic GT3 front double-wishbone corner
+    (tuned against the module's own benchmarks, Wave 5A-2):
+    caster 5.7 deg, KPI 9.6 deg, motion ratio 0.78, static RC height
+    +70 mm, scrub radius 26 mm, camber gain -0.045 deg/mm, bump steer
+    0.028 deg/10mm, static camber -1.2 deg, static toe 0.0 deg.
+    WC.z=330 with CP.z=0 derives a 0.330 m tire radius.
+    """
     # Upper wishbone
-    UWI_fwd: list[float] = Field(default=[-50.0,  80.0, 300.0],
+    UWI_fwd: list[float] = Field(default=[-50.0, 300.0, 340.0],
         description="Upper wishbone inboard pivot — forward [x, y, z] mm")
-    UWI_aft: list[float] = Field(default=[ 50.0,  80.0, 300.0],
+    UWI_aft: list[float] = Field(default=[ 50.0, 300.0, 340.0],
         description="Upper wishbone inboard pivot — aft    [x, y, z] mm")
-    UWO:     list[float] = Field(default=[  0.0, 650.0, 295.0],
+    UWO:     list[float] = Field(default=[-19.0, 660.0, 425.0],
         description="Upper wishbone outboard (upper ball joint) [x, y, z] mm")
 
     # Lower wishbone
-    LWI_fwd: list[float] = Field(default=[-80.0,  80.0, 155.0],
+    LWI_fwd: list[float] = Field(default=[-80.0, 300.0, 202.0],
         description="Lower wishbone inboard pivot — forward [x, y, z] mm")
-    LWI_aft: list[float] = Field(default=[ 80.0,  80.0, 155.0],
+    LWI_aft: list[float] = Field(default=[ 80.0, 300.0, 202.0],
         description="Lower wishbone inboard pivot — aft    [x, y, z] mm")
-    LWO:     list[float] = Field(default=[  0.0, 720.0, 145.0],
+    LWO:     list[float] = Field(default=[  0.0, 692.0, 235.0],
         description="Lower wishbone outboard (lower ball joint) [x, y, z] mm")
 
     # Tierod
-    TRI: list[float] = Field(default=[  0.0, 150.0, 220.0],
+    TRI: list[float] = Field(default=[  0.0, 200.0, 190.0],
         description="Tierod inboard (rack end) [x, y, z] mm")
-    TRO: list[float] = Field(default=[-15.0, 710.0, 205.0],
+    TRO: list[float] = Field(default=[-15.0, 710.0, 230.0],
         description="Tierod outboard (steering arm) [x, y, z] mm")
 
     # Wheel
-    WC:  list[float] = Field(default=[  0.0, 760.0, 220.0],
+    WC:  list[float] = Field(default=[ -7.05, 758.0, 330.0],
         description="Wheel centre (neutral) [x, y, z] mm")
-    CP:  list[float] = Field(default=[  0.0, 760.0,   0.0],
+    CP:  list[float] = Field(default=[ -7.05, 758.0,   0.0],
         description="Contact patch (ground plane) [x, y, z] mm")
 
     # Pushrod / rocker
-    PRI: list[float] = Field(default=[-20.0, 300.0, 390.0],
+    PRI: list[float] = Field(default=[-20.0, 350.0, 620.0],
         description="Pushrod inboard / rocker pivot [x, y, z] mm")
-    PRO: list[float] = Field(default=[-15.0, 690.0, 250.0],
+    PRO: list[float] = Field(default=[-15.0, 610.0, 268.0],
         description="Pushrod outboard on upright [x, y, z] mm")
+
+    # Static alignment (upright's built-in spindle angles; not recoverable
+    # from hardpoint coordinates alone, so they are explicit inputs).
+    static_camber_deg: float = Field(default=-1.2,
+        description="Static camber built into the upright spindle [deg]")
+    static_toe_deg: float = Field(default=0.0,
+        description="Static toe (shim/alignment setting) [deg, + = toe-out]")
 
     @field_validator("UWI_fwd", "UWI_aft", "UWO",
                      "LWI_fwd", "LWI_aft", "LWO",
@@ -109,6 +124,8 @@ class HardpointSetInput(BaseModel):
             "TRI": self.TRI, "TRO": self.TRO,
             "WC": self.WC, "CP": self.CP,
             "PRI": self.PRI, "PRO": self.PRO,
+            "static_camber_deg": self.static_camber_deg,
+            "static_toe_deg": self.static_toe_deg,
         }
 
 
@@ -126,6 +143,8 @@ class KinematicsSolveRequest(BaseModel):
         description="Requested backend solver: auto, cpp, or python")
     strict_mode: bool = Field(default=False,
         description="Strict mode: require requested backend, forbid silent fallbacks")
+    tire_radius_m: Optional[float] = Field(default=None, gt=0.1, le=1.0,
+        description="Dynamic rolling tire radius [m]. Omit (null) to derive it from the hardpoints as (WC.z - CP.z)/1000; an explicit value that disagrees with the hardpoints by >15 mm is rejected with a warning (error in strict mode).")
 
 
 class KinematicsResponse(BaseModel):
@@ -348,18 +367,20 @@ BENCHMARK_PRESETS = {
         "tire_radius_m": 0.330,
         "half_track_mm": 760.0,
         "hardpoints": {
-            "UWI_fwd": [-50.0,  80.0, 365.0],
-            "UWI_aft": [ 50.0,  80.0, 365.0],
-            "UWO":     [ -9.0, 625.0, 435.0],
-            "LWI_fwd": [-80.0,  80.0, 215.0],
-            "LWI_aft": [ 80.0,  80.0, 215.0],
-            "LWO":     [  9.0, 675.0, 245.0],
-            "TRI":     [-15.0,  80.0, 267.5],
-            "TRO":     [-20.0, 647.5, 311.5],
-            "WC":      [  0.0, 760.0, 330.0],
-            "CP":      [  0.0, 760.0,   0.0],
-            "PRI":     [-20.0, 380.0, 560.0],
-            "PRO":     [-15.0, 650.0, 275.0],
+            "UWI_fwd": [-50.0, 300.0, 340.0],
+            "UWI_aft": [ 50.0, 300.0, 340.0],
+            "UWO":     [-19.0, 660.0, 425.0],
+            "LWI_fwd": [-80.0, 300.0, 202.0],
+            "LWI_aft": [ 80.0, 300.0, 202.0],
+            "LWO":     [  0.0, 692.0, 235.0],
+            "TRI":     [  0.0, 200.0, 190.0],
+            "TRO":     [-15.0, 710.0, 230.0],
+            "WC":      [ -7.05, 758.0, 330.0],
+            "CP":      [ -7.05, 758.0,   0.0],
+            "PRI":     [-20.0, 350.0, 620.0],
+            "PRO":     [-15.0, 610.0, 268.0],
+            "static_camber_deg": -1.2,
+            "static_toe_deg": 0.0,
         },
     },
     "gt3_camber_shim_5mm": {
@@ -371,18 +392,20 @@ BENCHMARK_PRESETS = {
         "tire_radius_m": 0.330,
         "half_track_mm": 760.0,
         "hardpoints": {
-            "UWI_fwd": [-50.0,  80.0, 365.0],
-            "UWI_aft": [ 50.0,  80.0, 365.0],
-            "UWO":     [ -9.0, 625.0, 435.0],
-            "LWI_fwd": [-80.0,  80.0, 215.0],
-            "LWI_aft": [ 80.0,  80.0, 215.0],
-            "LWO":     [  9.0, 680.0, 245.0],
-            "TRI":     [-15.0,  80.0, 267.5],
-            "TRO":     [-20.0, 647.5, 311.5],
-            "WC":      [  0.0, 760.0, 330.0],
-            "CP":      [  0.0, 760.0,   0.0],
-            "PRI":     [-20.0, 380.0, 560.0],
-            "PRO":     [-15.0, 650.0, 275.0],
+            "UWI_fwd": [-50.0, 300.0, 340.0],
+            "UWI_aft": [ 50.0, 300.0, 340.0],
+            "UWO":     [-19.0, 660.0, 425.0],
+            "LWI_fwd": [-80.0, 300.0, 202.0],
+            "LWI_aft": [ 80.0, 300.0, 202.0],
+            "LWO":     [  0.0, 697.0, 235.0],
+            "TRI":     [  0.0, 200.0, 190.0],
+            "TRO":     [-15.0, 710.0, 230.0],
+            "WC":      [ -7.05, 758.0, 330.0],
+            "CP":      [ -7.05, 758.0,   0.0],
+            "PRI":     [-20.0, 350.0, 620.0],
+            "PRO":     [-15.0, 610.0, 268.0],
+            "static_camber_deg": -1.2,
+            "static_toe_deg": 0.0,
         },
     },
     "lmp_prototype": {
@@ -442,12 +465,16 @@ async def solve(
             z_min_mm=req.z_min_mm,
             z_max_mm=req.z_max_mm,
             n_steps=req.n_steps,
+            tire_radius=req.tire_radius_m,
             mode=req.backend,
             strict_mode=req.strict_mode,
         )
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.exception("Kinematics solver error")
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        # Do not leak raw exception strings (internal paths, solver state) to clients.
+        raise HTTPException(status_code=422, detail="Kinematics solve failed for the supplied hardpoints; check geometry plausibility (see server logs for detail).") from exc
 
     d = curves.to_dict()
     all_conv = all(d["converged"])
@@ -470,10 +497,33 @@ async def solve(
     n_total = len(d["converged"])
     conv_summary = f"{n_conv} / {n_total} converged" if n_conv == n_total else f"{n_conv} / {n_total} converged, {n_total - n_conv} failed"
 
+    # Single verdict source: validate_hardpoints_py and model_validity are
+    # reconciled into one status ladder {NOT_EVALUATED, PASS, WARN, FAIL}.
+    # A missing model_validity NEVER defaults to PASS.
     val_eval = d.get("model_validity") or {}
-    num_status = val_eval.get("numerical_status", "PASS" if all_conv else "FAIL")
-    phys_status = val_eval.get("physical_status", "PASS")
-    overall_status = val_eval.get("overall_status", "PASS" if all_conv else "FAIL")
+    _status_rank = {"NOT_EVALUATED": 0, "PASS": 1, "VALID": 1, "WARN": 2, "OUT_OF_BOUNDS": 3, "FAIL": 3, "ERROR": 3}
+    _status_norm = {"VALID": "PASS", "OUT_OF_BOUNDS": "FAIL", "ERROR": "FAIL"}
+
+    def _norm(s: object) -> str:
+        s2 = str(s or "NOT_EVALUATED").upper()
+        return _status_norm.get(s2, s2 if s2 in _status_rank else "NOT_EVALUATED")
+
+    def _worst(*statuses: str) -> str:
+        return max(statuses, key=lambda s: _status_rank.get(s, 0))
+
+    geom_status = _norm((val_report or {}).get("status"))
+    conv_status = "PASS" if all_conv else "FAIL"
+    if val_eval:
+        num_status = _worst(_norm(val_eval.get("numerical_status")), conv_status)
+        phys_status = _norm(val_eval.get("physical_status"))
+        overall_status = _worst(_norm(val_eval.get("overall_status")), geom_status, num_status, phys_status)
+    else:
+        # model_validity absent: NEVER report PASS — the physical validity of
+        # the solve was not evaluated.
+        num_status = conv_status
+        phys_status = "NOT_EVALUATED"
+        overall_status = "FAIL" if (geom_status == "FAIL" or not all_conv) else (
+            "WARN" if geom_status == "WARN" else "NOT_EVALUATED")
     phys_issues = val_eval.get("issues", [])
 
     return KinematicsResponse(

@@ -104,12 +104,12 @@ def _build_gumroad_verify_candidates(license_key: str) -> list[tuple[PlanTier, d
 
     candidates: list[tuple[PlanTier, dict[str, str]]] = []
     if pro_id:
-        candidates.append((PlanTier.PRO, {"product_id": pro_id, "license_key": license_key}))
+        candidates.append((PlanTier.PRO, {"product_id": pro_id, "license_key": license_key, "increment_uses_count": "false"}))
     elif permalink:
-        candidates.append((PlanTier.PRO, {"product_permalink": permalink, "license_key": license_key}))
+        candidates.append((PlanTier.PRO, {"product_permalink": permalink, "license_key": license_key, "increment_uses_count": "false"}))
 
     if team_id and team_id != pro_id:
-        candidates.append((PlanTier.ENTERPRISE, {"product_id": team_id, "license_key": license_key}))
+        candidates.append((PlanTier.ENTERPRISE, {"product_id": team_id, "license_key": license_key, "increment_uses_count": "false"}))
 
     return candidates
 

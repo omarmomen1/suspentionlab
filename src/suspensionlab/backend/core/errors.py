@@ -20,8 +20,11 @@ class DatabaseUnavailableError(AppError):
 
 # -- Security / Auth --
 class AuthenticationError(AppError):
-    def __init__(self, message="Invalid API key"):
-        super().__init__("invalid_api_key", message, 401)
+    def __init__(self, message="Invalid API key", code="invalid_api_key"):
+        # code "auth_required": no credentials were presented at all (the
+        # structured 401 AUTH_REQUIRED the Free Sandbox policy requires);
+        # code "invalid_api_key": credentials were presented but rejected.
+        super().__init__(code, message, 401)
 
 class RateLimitExceededError(AppError):
     def __init__(self, message="Too many requests"):

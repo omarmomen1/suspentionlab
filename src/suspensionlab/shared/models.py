@@ -294,6 +294,11 @@ class FullCarResultSchema(BaseModel):
     f_n_ur: float
     eigenmodes: Optional[List[Dict[str, Any]]] = None
 
+    # Run honesty (Wave 5A-2): CONVERGED or DIVERGED_NUMERICAL_INSTABILITY;
+    # symmetric_input=True marks runs whose road profile cannot excite roll.
+    status: str = "CONVERGED"
+    symmetric_input: bool = False
+
     time: List[float]
 
     # Body States

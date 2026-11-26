@@ -488,7 +488,7 @@ async def verify_api_key(
 
     # ── 3. No credentials found ───────────────────────────────────────────
     log_audit_event("LOGIN_FAILURE", ip=ip, metadata={"reason": "No credentials provided"})
-    raise AuthenticationError("Authentication required. Provide a Bearer token or X-API-Key header.")
+    raise AuthenticationError("Authentication required. Provide a Bearer token or X-API-Key header.", code="auth_required")
 
 
 async def optional_verify_api_key(

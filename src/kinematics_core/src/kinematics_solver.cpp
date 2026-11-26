@@ -43,7 +43,16 @@ static constexpr double H_ANG     = 1e-6;
 
 KinematicsSolver::KinematicsSolver(const HardpointSet& hp)
     : hp_(hp)
-{}
+{
+    // Reject degenerate geometry explicitly: coincident (or near-coincident)
+    // ball joints give a zero-length kingpin axis, which makes KPI/caster
+    // undefined and the Newton solve ill-posed. 1 mm is far below any real
+    // upright's ball-joint spacing (~150-250 mm).
+    if ((hp.d_UWO - hp.d_LWO).norm() < 1.0) {
+        throw std::invalid_argument(
+            "Coincident ball joints: |UWO - LWO| < 1 mm; kingpin axis is undefined");
+    }
+}
 
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -146,7 +155,13 @@ bool KinematicsSolver::newton_solve(Eigen::Matrix<double,5,1>& x, double z_WC) c
         const auto dx = J.colPivHouseholderQr().solve(-F);
         x += dx;
 
-        if (dx.norm() < 1e-12) return true;  // step vanishingly small
+        if (dx.norm() < 1e-12) {
+            // Stalled Newton step: a vanishing step only counts as converged
+            // when the residual is ALSO within tolerance. Previously this
+            // returned true unconditionally, reporting converged on
+            // infeasible/coincident geometry.
+            return residual(x, z_WC).norm() < NR_TOL;
+        }
     }
     // Final check — may have converged on last iteration
     return residual(x, z_WC).norm() < NR_TOL;
@@ -300,10 +315,12 @@ KinematicPoint KinematicsSolver::extract(
     const Eigen::Vector3d lwo = r_WC + R * hp_.d_LWO;
     const Eigen::Vector3d kp  = (uwo - lwo).normalized();
 
-    // KPI: angle of kingpin from vertical (Z) in front view (Y–Z plane)
-    //   kpi_deg = atan2(kp_y, kp_z) in the Y–Z plane
-    //   (front-view inclination from Z-axis)
-    const double kpi_deg = std::atan2(kp(1), kp(2)) * RAD_TO_DEG;
+    // KPI: angle of kingpin from vertical (Z) in front view (Y–Z plane).
+    // SAE J670: positive when the TOP of the axis leans INBOARD (toward the
+    // car centreline, i.e. -Y on the right-hand corner), so the sign is
+    // atan2(-kp_y, kp_z). This matches kinematics.py exactly; the previous
+    // atan2(kp_y, kp_z) had the opposite sign from the Python backend.
+    const double kpi_deg = std::atan2(-kp(1), kp(2)) * RAD_TO_DEG;
 
     // Caster: angle of kingpin from vertical in side view (X–Z plane)
     //   positive caster = kingpin tilts rearward at top (+X negative at top)

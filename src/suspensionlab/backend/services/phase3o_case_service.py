@@ -62,12 +62,12 @@ class Phase3OCaseService:
     # Wave 5A re-certification: docs/phase3*_preregistration_manifest.json was
     # re-certified after the magic_formula.py PKY1 fix (original hash preserved
     # in the manifest's wave5a_recertification block). Previous: 26e30aa08800f4756b7f219f736daddfd481ece9f5a2831469602e959631b88c
-    PROTOCOL_SHA256 = "79190cefcbf8114095e9efd81d74ce64f3810af2f7a4b10f2d116853e3983664"
+    PROTOCOL_SHA256 = "1b084961d4bd42680f4f9309ac73b7ee3efcb647230111ae1dd516714e300c53"  # Wave 5A-2 re-certification (dynamic_lap_sim.py incomplete-lap honesty); Wave 5A hash 79190cef... superseded
     HISTORICAL_PROTOCOL_VERSION = "1.0.0-frozen"
     HISTORICAL_PROTOCOL_SHA256 = "1704bbf7213bc85064b6e60b2a6745589b3b01a6d3a59b2b2cd9630f99e81100"
 
     PROTECTED_PHYSICS = {
-        "dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690",
+        "dynamic_lap_sim.py": "bc409d2a228ca20adf5119502d6c227c5723cb8e998263fbdcccdb4b53e09d90",  # Wave 5A-2: lap_completed/solver_converged/lap_time_s honesty; previous 4a7e3de081ba...,
         "magic_formula.py": "2be0492f1e4c483401c1cd8544381edeb364dd5380e4b8fe9796f613cc627048",  # Wave 5A: PKY1 sign fix; previous 31acfd244c...,
         "tire_model.py": "da72dea8adf6b83846997fa02c9b1cade1b74272bcaa96f5aa0e2ea389005209",
         "powertrain_lap_sim.py": "44d72961d5a01acce4129db66b86b7eb44b577d1a90bf6d0a5ba3a70cdc9e7c6",

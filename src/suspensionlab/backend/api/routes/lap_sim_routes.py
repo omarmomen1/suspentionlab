@@ -249,6 +249,18 @@ def _get_track_coordinates(distances, curvatures) -> Dict[str, Any]:
 
 def _result_to_dict(result) -> Dict:
     """Serialise LapSimResult to JSON-safe dict."""
+    # Dynamic 14-DOF results carry their own honest serialiser: always expose
+    # lap_completed / outcome, and never let an aborted run surface as a
+    # converged lap with a lap time (Wave 5A-2).
+    from suspensionlab.physics.dynamic_lap_sim import DynamicLapResult
+    if isinstance(result, DynamicLapResult):
+        d = result.to_dict()
+        if not result.lap_completed:
+            d["solver_converged"] = False
+            d["lap_time_s"] = None
+            d["total_time_s"] = None
+            d["status"] = "terminated"
+        return d
     d = {
         "status": "success",
         "model_version": result.model_version,
@@ -556,6 +568,10 @@ async def simulate_lap_endpoint(
     import asyncio
     loop = asyncio.get_running_loop()
 
+    # Interactive solves skip the ~25-lap setup-response surface unless the
+    # caller explicitly asks for it (include_surface=true): ~0.5-1.5 s instead
+    # of 21-51 s.
+    include_surface = bool(request_data.get("include_surface", False))
     try:
         sim_res = await loop.run_in_executor(
             None,
@@ -565,10 +581,15 @@ async def simulate_lap_endpoint(
                 segments=segments_arg,
                 telemetry=telemetry_arg,
                 is_closed=is_closed,
+                compute_surface=include_surface,
             )
         )
     except HTTPException:
         raise
+    except ValueError as e:
+        # Structured 422 for unusable telemetry/segment input (never a silent
+        # built-in-track substitution).
+        raise HTTPException(422, f"Invalid track or telemetry input: {e}")
     except Exception as e:
         logger.error(f"Lap simulation failed: {e}")
         raise HTTPException(500, "Simulation failed due to numerical convergence or invalid input parameters.")
@@ -579,6 +600,7 @@ async def simulate_lap_endpoint(
     # Add backward-compatible fields
     response_payload.update({
         "status": "success",
+        "detected_speed_units": getattr(sim_res, "detected_speed_units", None),
         "total_time_s": sim_res.lap_time_s,
         "front_lltd_pct": round(float(sim_res.front_lltd_pct), 1),
         "min_rh_front_mm": sim_res.min_rh_front_mm,
@@ -678,6 +700,8 @@ async def run_lap_sim(
             result = await loop.run_in_executor(None, solve_lap, vehicle, segments)
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(422, f"Invalid track or telemetry input: {e}")
     except Exception as e:
         logger.error(f"Lap simulation failed: {e}")
         raise HTTPException(500, "Simulation failed due to numerical convergence or invalid input parameters.")

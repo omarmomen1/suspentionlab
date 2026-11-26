@@ -12,7 +12,7 @@ import pytest
 
 MANIFEST_PATH = Path("docs/phase3o_preregistration_manifest.json")
 MANIFEST_V100_PATH = Path("docs/phase3o_preregistration_manifest_v1_0_0.json")
-EXPECTED_PROTOCOL_HASH_V101 = "79190cefcbf8114095e9efd81d74ce64f3810af2f7a4b10f2d116853e3983664"  # Wave 5A re-certification of docs/phase3o_preregistration_manifest.json (magic_formula.py PKY1 fix; original hash preserved in the manifest wave5a_recertification block)
+EXPECTED_PROTOCOL_HASH_V101 = "1b084961d4bd42680f4f9309ac73b7ee3efcb647230111ae1dd516714e300c53"  # Wave 5A-2 re-certification of docs/phase3o_preregistration_manifest.json (dynamic_lap_sim.py incomplete-lap honesty; prior hashes preserved in the manifest wave5a_recertification / wave5a2_recertification blocks)
 EXPECTED_HISTORICAL_HASH_V100 = "1704bbf7213bc85064b6e60b2a6745589b3b01a6d3a59b2b2cd9630f99e81100"
 
 def load_manifest() -> dict:

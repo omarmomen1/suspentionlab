@@ -489,8 +489,8 @@ def _extract_py(
     r = np.array([x_WC, y_WC, z_WC], dtype=np.float64)
 
     spin = R[:, 1]
-    camber_deg = math.degrees(math.atan2(-spin[2], spin[1]))
-    toe_deg    = math.degrees(math.atan2(spin[0], spin[1]))
+    camber_deg = math.degrees(math.atan2(-spin[2], spin[1])) + hp.get("static_camber_deg", 0.0)
+    toe_deg    = math.degrees(math.atan2(spin[0], spin[1])) + hp.get("static_toe_deg", 0.0)
 
     uwo = r + R @ hp["d_UWO"]
     lwo = r + R @ hp["d_LWO"]
@@ -661,6 +661,13 @@ def _solve_py(
 
     hp = {
         "WC0":        WC0,
+        # Static alignment of the upright's built-in spindle: not recoverable
+        # from the 12 hardpoints (a point set fixes the kingpin, but the
+        # spindle's manufactured inclination in the upright is separate), so
+        # it is an explicit optional input. Added to the rotation-induced
+        # camber/toe at every step.
+        "static_camber_deg": float(hp_raw.get("static_camber_deg", 0.0)),
+        "static_toe_deg": float(hp_raw.get("static_toe_deg", 0.0)),
         "UWI_fwd":    np.array(hp_raw["UWI_fwd"], dtype=np.float64),
         "UWI_aft":    np.array(hp_raw["UWI_aft"], dtype=np.float64),
         "LWI_fwd":    np.array(hp_raw["LWI_fwd"], dtype=np.float64),
@@ -1058,13 +1065,20 @@ def get_kinematics_benchmarks(
     })
 
     # 2. Static Deflection
+    # Gillespie Ch. 5 gives the exact relation f_n = (1/2pi)*sqrt(g/delta_stat),
+    # i.e. delta_stat and BENCH-01's ride frequency are the same quantity.
+    # The previous hardcoded reference (29.5 mm, a ~2.9 Hz race-car value) was
+    # mathematically incompatible with BENCH-01's 1.85 Hz reference (which
+    # implies 72.6 mm): no geometry could pass both. The reference is now
+    # derived from the BENCH-01 target frequency via Gillespie's relation, so
+    # the pair is internally consistent by construction.
     delta_stat = (9.81 * 1000.0) / ((2.0 * math.pi * f_n) ** 2) if f_n > 0.1 else 30.0
-    delta_ref = 29.5
+    delta_ref = round((9.81 * 1000.0) / ((2.0 * math.pi * f_n_ref) ** 2), 1)
     delta_err = abs(delta_stat - delta_ref) / delta_ref * 100.0
     benchmarks.append({
         "id": "BENCH-02-STAT-DEFL",
         "name": "Static Wheel Deflection",
-        "reference_source": "Gillespie Fundamentals of Vehicle Dynamics (1992), Ch. 5",
+        "reference_source": "Gillespie Fundamentals of Vehicle Dynamics (1992), Ch. 5 (delta = g/(2*pi*f_n)^2 at the BENCH-01 reference frequency)",
         "reference_value": delta_ref,
         "production_value": round(delta_stat, 1),
         "unit": "mm",
@@ -1757,12 +1771,43 @@ def compute_sweep_geometry(
 # Public API Entry Points
 # ─────────────────────────────────────────────────────────────────────────────
 
+def _resolve_tire_radius(hardpoints: dict, tire_radius: Optional[float]) -> tuple[float, Optional[str]]:
+    """Resolve the effective tire radius against the hardpoints.
+
+    The contact patch is placed at WC.z - tire_radius, so when the caller does
+    not explicitly override the radius it must be derived from the hardpoints
+    (WC.z - CP.z, converted to meters) instead of silently applying 0.33 m
+    (which, for WC.z=220 mm / CP.z=0 mm, moved the contact patch to -110 mm
+    and the static roll centre to -89 mm). An explicit radius that disagrees
+    with WC.z - CP.z is a hardpoint inconsistency and surfaces a warning.
+    """
+    wc = hardpoints.get("WC")
+    cp = hardpoints.get("CP")
+    derived: Optional[float] = None
+    if wc is not None and cp is not None:
+        try:
+            derived = (float(wc[2]) - float(cp[2])) / 1000.0
+        except (TypeError, IndexError, ValueError):
+            derived = None
+    if tire_radius is None:
+        if derived is not None and 0.1 <= derived <= 1.0:
+            return derived, None
+        return 0.33, None
+    if derived is not None and abs(float(tire_radius) - derived) > 0.015:
+        return float(tire_radius), (
+            f"Explicit tire_radius ({float(tire_radius):.3f} m) disagrees with the hardpoints "
+            f"(WC.z - CP.z = {derived * 1000.0:.1f} mm). The contact patch is solved at "
+            f"WC.z - tire_radius, so the supplied CP hardpoint is ignored. Align the two."
+        )
+    return float(tire_radius), None
+
+
 def solve_kinematics(
     hardpoints: dict,
     z_min_mm: float = -80.0,
     z_max_mm: float =  80.0,
     n_steps:  int   = 33,
-    tire_radius: float = 0.33,
+    tire_radius: Optional[float] = None,
     compliance_mode: bool = False,
     forces: Optional[dict] = None,
     mode: str = "auto",
@@ -1777,6 +1822,20 @@ def solve_kinematics(
         raise ValueError(f"Invalid sweep bounds: z_min_mm ({z_min_mm}) must be strictly less than z_max_mm ({z_max_mm})")
     if n_steps < 3:
         raise ValueError(f"Invalid step count: n_steps ({n_steps}) must be at least 3")
+
+    tire_radius, _tr_warning = _resolve_tire_radius(hardpoints, tire_radius)
+    if _tr_warning is not None and strict_mode:
+        raise ValueError(_tr_warning)
+
+    # Reject degenerate geometry explicitly (parity with the C++ backend):
+    # coincident ball joints make the kingpin axis undefined and the Newton
+    # solve ill-posed.
+    _uwo = np.array(hardpoints["UWO"], dtype=np.float64)
+    _lwo = np.array(hardpoints["LWO"], dtype=np.float64)
+    if float(np.linalg.norm(_uwo - _lwo)) < 1.0:
+        raise ValueError(
+            "Coincident ball joints: |UWO - LWO| < 1 mm; kingpin axis is undefined")
+    del _uwo, _lwo
 
     from suspensionlab.physics.kinematics_facade import CppKinematicsBackend
 
@@ -1822,6 +1881,9 @@ def solve_kinematics(
         curves.model_validity = getattr(res, "model_validity", None)
         curves.benchmarks = getattr(res, "benchmarks", [])
         curves.reproducibility = getattr(res, "reproducibility", None)
+        if _tr_warning is not None:
+            curves.metadata = dict(curves.metadata or {})
+            curves.metadata.setdefault("warnings", []).append(_tr_warning)
         return curves
     else:
         if strict_mode and mode == "cpp" and not _HAVE_CPP:
@@ -1837,6 +1899,9 @@ def solve_kinematics(
         py_curves.solver_version = "2.1.0-simd"
         py_curves.native_library_version = None
         py_curves.build_identifier = "eigen-3.4.0-simd-x86_64"
+        if _tr_warning is not None:
+            py_curves.metadata = dict(py_curves.metadata or {})
+            py_curves.metadata.setdefault("warnings", []).append(_tr_warning)
         return py_curves
 
 

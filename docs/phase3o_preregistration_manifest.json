@@ -227,7 +227,7 @@
   ],
   "protected_physics_manifest": {
     "brake_distribution.py": "15338e921252e35afc9ee543fdb996464e4784b36e1ce18e05c8832e392a57ea",
-    "dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690",
+    "dynamic_lap_sim.py": "bc409d2a228ca20adf5119502d6c227c5723cb8e998263fbdcccdb4b53e09d90",
     "magic_formula.py": "2be0492f1e4c483401c1cd8544381edeb364dd5380e4b8fe9796f613cc627048",
     "powertrain_lap_sim.py": "44d72961d5a01acce4129db66b86b7eb44b577d1a90bf6d0a5ba3a70cdc9e7c6",
     "tire_model.py": "da72dea8adf6b83846997fa02c9b1cade1b74272bcaa96f5aa0e2ea389005209"
@@ -291,5 +291,14 @@
     "previous_hashes": {
       "magic_formula.py": "31acfd244c5847bd9c7a9b6a8c2ea10cac8aa3da80e5931e39be7bc849f2308e"
     }
+  },
+  "wave5a2_recertification": {
+    "cycle": "WAVE_5A2_KINEMATICS_LAPSIM_FULLCAR_HONESTY_REMEDIATION",
+    "timestamp_iso": "2026-11-26T02:29:27.207595+00:00",
+    "reason": "dynamic_lap_sim.py remediated in Wave 5A-2 (incomplete-lap honesty: lap_completed flag, solver_converged, lap_time_s None, solver_warnings). Wave 5A baseline hash preserved below.",
+    "previous_hashes": {
+      "dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690"
+    },
+    "commit": "PENDING_USER_COMMIT"
   }
 }

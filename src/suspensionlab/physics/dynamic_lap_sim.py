@@ -1953,7 +1953,7 @@ class TelemetryReplayDriver:
 @dataclass
 class DynamicLapResult:
     """Complete results from high-fidelity 14-DOF transient lap simulation."""
-    total_time: float = 0.0
+    total_time: Optional[float] = 0.0
     sector_times: List[float] = field(default_factory=list)
     outcome: LapSimulationOutcome = LapSimulationOutcome.LAP_COMPLETED
     lap_completed: bool = True
@@ -2027,8 +2027,9 @@ class DynamicLapResult:
     validity_record: Optional[PhysicsValidityRecord] = None
 
     @property
-    def lap_time_s(self) -> float:
-        return self.total_time
+    def lap_time_s(self) -> Optional[float]:
+        # None when the lap was not completed: a partial run has no lap time.
+        return self.total_time if self.lap_completed else None
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert DynamicLapResult to fully-serializable dictionary matching API schema."""
@@ -2043,6 +2044,7 @@ class DynamicLapResult:
             "solver_name": self.solver_name,
             "tire_model_mode": self.tire_model_mode,
             "total_time_s": self.total_time,
+            "lap_time_s": self.lap_time_s,
             "sector_times_s": self.sector_times,
             "max_speed_kmh": self.max_speed_kmh,
             "min_speed_kmh": self.min_speed_kmh,
@@ -2342,7 +2344,9 @@ def solve_dynamic_lap(
     )
 
     return DynamicLapResult(
-        total_time=round(total_time, 3),
+        # An incomplete lap NEVER reports a lap time: a 36% aborted run must
+        # not surface as a valid converged lap.
+        total_time=round(total_time, 3) if lap_completed else None,
         sector_times=sec_times,
         outcome=sim_outcome,
         lap_completed=lap_completed,
@@ -2394,8 +2398,8 @@ def solve_dynamic_lap(
         tire_utilization_combined=u_comb,
         ax_available=ax_avail_ms2,
         ay_available=ay_avail_ms2,
-        solver_converged=True,
-        solver_warnings=[],
+        solver_converged=bool(lap_completed),
+        solver_warnings=([] if lap_completed else [f"Lap not completed: {term_reason}"]),
         model_assumptions={
             "drivetrain": p.drivetrain_layout,
             "differential": str(p.diff_rear.diff_type.value),
