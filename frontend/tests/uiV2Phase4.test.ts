@@ -6,8 +6,8 @@ import path from "node:path";
 import FourFootprintsSVG from "../components/v2/instruments/FourFootprintsSVG";
 import MotionRatioField from "../components/v2/instruments/MotionRatioField";
 import { WhyChainRows } from "../components/v2/instruments/WhyChainPanel";
-import { AttitudeReadout } from "../components/v2/instruments/AttitudeModel3D";
-import { TerrainReadout, terrainReadout, TERRAIN_DISCLAIMER } from "../components/v2/instruments/TerrainElevation3D";
+import { AttitudeReadout, LG_MIN_PX } from "../components/v2/instruments/AttitudeModel3D";
+import { TerrainReadout, ElevationProfile2D, terrainReadout, TERRAIN_DISCLAIMER } from "../components/v2/instruments/TerrainElevation3D";
 import {
   cornerLoadsAt, maxCornerLoadN, attitudeAt, exaggeratedPose, mrFieldCells, whyChainLevers, whyChainRows,
   type SteerGridResponse, type WhyChainResponse,
@@ -62,10 +62,14 @@ describe("FourFootprintsSVG wiring", () => {
     expect(html).not.toMatch(/°/);
   });
 
-  it("shows Not run when there is no series, instead of zero loads", () => {
+  it("shows Not available when a corner load channel is missing, instead of zero loads", () => {
     const html = renderToStaticMarkup(h(FourFootprintsSVG, { result: {}, params: lp, index: 0 }));
-    expect(html).toContain("Not run");
+    expect(html).toContain("Not available");
     expect(html).not.toContain("data-corner");
+    const { z_ufl, ...partial } = car.result as any;
+    const html2 = renderToStaticMarkup(h(FourFootprintsSVG, { result: partial, params: lp, index: 0 }));
+    expect(html2).toContain("Not available");
+    expect(html2).not.toContain("data-corner");
   });
 
   it("flags a corner with Fz clamped at 0 as contact lost", () => {
@@ -172,9 +176,35 @@ describe("Terrain readout", () => {
     expect(html).toContain(TERRAIN_DISCLAIMER);
     expect(html).toContain("-0.100 to 0.200 g");
     const flat = renderToStaticMarkup(h(TerrainReadout, { trace: { z_m: [0, 0, 0], vertical_g: [0, 0, 0], compression_mm: [1, 1, 1] } }));
-    expect(flat).toContain("Flat track: z = 0");
+    expect(flat).toContain("Not available");
+    expect(flat).not.toContain("Flat track");
+    expect(flat).not.toContain("data-testid=\"terrain-readout\"");
     expect(renderToStaticMarkup(h(TerrainReadout, { trace: {} }))).toContain("Not available");
     expect(terrainReadout({ z_m: [1, 2, 3] })!.vg).toBeNull();
+  });
+});
+
+describe("Ackermann gating and narrow-screen fallback", () => {
+  const grid = fx("phase4_steer_grid.json") as SteerGridResponse;
+  it("shows no Ackermann table when wheelbase_mm was not supplied", () => {
+    expect((grid as any).ackermann.status).toBe("NOT_MODELED");
+    expect(renderToStaticMarkup(h(MotionRatioField, { data: grid }))).not.toContain("mr-ackermann");
+  });
+  it("shows the backend's Ackermann numbers when COMPUTED", () => {
+    const data = { ...grid, ackermann: { status: "COMPUTED", wheelbase_mm: 2650, track_mm: 1520, bump_mm: 0,
+      points: [{ rack_travel_mm: 2.5, inner_deg: 11.518968, outer_deg: 9.112730, ideal_inner_deg: 10.018221, ackermann_pct: 265.738332 }] } };
+    const html = renderToStaticMarkup(h(MotionRatioField, { data: data as any }));
+    expect(html).toContain("mr-ackermann");
+    expect(html).toContain("11.52");
+    expect(html).toContain("265.7%");
+  });
+  it("lg breakpoint is 1024 px", () => {
+    expect(LG_MIN_PX).toBe(1024);
+  });
+  it("2D elevation profile renders real samples and nothing for a flat z", () => {
+    const ok = renderToStaticMarkup(h(ElevationProfile2D, { trace: { s_m: [0, 10, 20], z_m: [418, 424, 419] } }));
+    expect(ok).toContain("terrain-2d-profile");
+    expect(renderToStaticMarkup(h(ElevationProfile2D, { trace: { s_m: [0, 10], z_m: [0, 0] } }))).toBe("");
   });
 });
 

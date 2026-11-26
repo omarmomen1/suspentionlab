@@ -5,6 +5,7 @@ import EmptyState from "../EmptyState";
 import { useWideViewport } from "./AttitudeModel3D";
 
 export interface TerrainTrace {
+  s_m?: number[];
   x_m?: number[];
   y_m?: number[];
   z_m?: number[];
@@ -15,7 +16,7 @@ export interface TerrainTrace {
 
 export const TERRAIN_Z_EXAGGERATION = 5;
 export const TERRAIN_DISCLAIMER =
-  "Elevation: 19 altitude stations from the official Spa circuit map, spline-interpolated. Too coarse to resolve the local Eau Rouge compression.";
+  "Elevation: 19 altitude stations from the official Spa circuit map (7004 m lap), spline-interpolated between stations. Too coarse to resolve the local Eau Rouge compression.";
 
 const fin = (a: unknown): a is number[] => Array.isArray(a) && a.length > 1 && a.every((v) => typeof v === "number" && Number.isFinite(v));
 export const range = (a: number[]) => ({ min: Math.min(...a), max: Math.max(...a) });
@@ -30,18 +31,43 @@ export function terrainReadout(t: TerrainTrace | null | undefined) {
   };
 }
 
+/** True only when the trace carries a real, non-constant elevation profile. A constant z (all 0) is "no data", not a flat road. */
+export function hasElevationData(t: TerrainTrace | null | undefined): boolean {
+  const r = terrainReadout(t);
+  return !!r && !!r.z && r.z.max !== r.z.min;
+}
+
 export function TerrainReadout({ trace }: { trace: TerrainTrace | null | undefined }) {
   const r = terrainReadout(trace);
-  if (!r || !r.z) return <EmptyState kind="unavailable" reason="No elevation channel. Turn on Include Elevation (Spa) and run again." />;
+  if (!hasElevationData(trace) || !r || !r.z) return <EmptyState kind="unavailable" reason="No elevation data for this run. Only Spa has an elevation profile: turn on Include Elevation (Spa) and run again." />;
   const f = (x: { min: number; max: number } | null, u: string, d = 2) => (x ? `${x.min.toFixed(d)} to ${x.max.toFixed(d)} ${u}` : "not available");
-  const flat = r.z.max === r.z.min;
   return (
-    <dl data-testid="terrain-readout" className="text-[11px] text-[#cfd3da] m-0 grid grid-cols-3 gap-2">
+    <dl data-testid="terrain-readout" className="v2-num text-[11px] text-zinc-200 m-0 grid grid-cols-3 gap-2">
       <div><dt className="text-[#8a909a]">z</dt><dd className="m-0" data-zmin={r.z.min} data-zmax={r.z.max}>{f(r.z, "m", 1)}</dd></div>
       <div><dt className="text-[#8a909a]">Vertical g</dt><dd className="m-0">{f(r.vg, "g", 3)}</dd></div>
       <div><dt className="text-[#8a909a]">Compression</dt><dd className="m-0">{f(r.comp, "mm", 1)}</dd></div>
-      <div className="col-span-3 text-[#8a909a]" data-testid="terrain-disclaimer">{flat ? "Flat track: z = 0, no elevation data for this circuit." : TERRAIN_DISCLAIMER}</div>
+      <div className="col-span-3 text-[#8a909a]" data-testid="terrain-disclaimer">{TERRAIN_DISCLAIMER}</div>
     </dl>
+  );
+}
+
+/** Narrow-screen replacement for the canvas: z(s) as a 2D profile, real samples only. */
+export function ElevationProfile2D({ trace }: { trace: TerrainTrace | null | undefined }) {
+  if (!trace || !fin(trace.s_m) || !fin(trace.z_m) || !hasElevationData(trace)) return null;
+  const n = Math.min(trace.s_m.length, trace.z_m.length);
+  const step = Math.max(1, Math.floor(n / 300));
+  const zr = range(trace.z_m), sr = range(trace.s_m);
+  const W = 320, H = 90, M = 6;
+  const pts: string[] = [];
+  for (let i = 0; i < n; i += step) {
+    const x = M + ((trace.s_m[i] - sr.min) / Math.max(sr.max - sr.min, 1e-9)) * (W - 2 * M);
+    const y = H - M - ((trace.z_m[i] - zr.min) / Math.max(zr.max - zr.min, 1e-9)) * (H - 2 * M);
+    pts.push(`${x.toFixed(1)},${y.toFixed(1)}`);
+  }
+  return (
+    <svg data-testid="terrain-2d-profile" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Elevation versus distance" className="w-full">
+      <polyline points={pts.join(" ")} fill="none" stroke="#C8F04B" strokeWidth="1" />
+    </svg>
   );
 }
 
@@ -63,25 +89,25 @@ export default function TerrainElevation3D({ trace }: { trace: TerrainTrace | nu
     return new Float32Array(out);
   }, [trace]);
   const readout = <TerrainReadout trace={trace} />;
-  if (!pts) return readout;
+  if (!pts || !hasElevationData(trace)) return readout;
   return (
     <div data-testid="terrain-3d">
       {wide ? (
-        <div className="h-[240px] border border-[#2a2d33]">
+        <div className="h-[240px] border border-white/10">
           <Canvas camera={{ position: [5, 4, 5], fov: 35 }} dpr={[1, 1.5]}>
-            <gridHelper args={[8, 16, "#3a3f48", "#23262c"]} />
+            <gridHelper args={[8, 16, "#2a3036", "#1a2026"]} />
             <line>
               <bufferGeometry>
                 <bufferAttribute attach="attributes-position" count={pts.length / 3} array={pts} itemSize={3} />
               </bufferGeometry>
-              <lineBasicMaterial color="#f2a900" />
+              <lineBasicMaterial color="#C8F04B" />
             </line>
           </Canvas>
         </div>
       ) : (
-        <p className="text-[11px] text-[#8a909a] m-0" data-testid="terrain-2d-fallback">3D view hidden on narrow screens.</p>
+        <div data-testid="terrain-2d-fallback"><ElevationProfile2D trace={trace} /></div>
       )}
-      <p className="text-[11px] text-[#f2a900] m-0" data-testid="terrain-exaggeration">Height drawn ×{TERRAIN_Z_EXAGGERATION}.</p>
+      <p className="text-[11px] text-[#C8F04B] m-0" data-testid="terrain-exaggeration">Height drawn ×{TERRAIN_Z_EXAGGERATION}.</p>
       {readout}
     </div>
   );

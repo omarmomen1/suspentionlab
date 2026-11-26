@@ -8,7 +8,7 @@ const CW = 34, CH = 28, LM = 54, TM = 22;
 function colour(mr: number, lo: number, hi: number) {
   const t = hi > lo ? (mr - lo) / (hi - lo) : 0.5;
   const l = 22 + t * 48;
-  return `hsl(38, 90%, ${l.toFixed(1)}%)`;
+  return `hsl(73, 85%, ${l.toFixed(1)}%)`;
 }
 
 /** Heatmap of MR(bump, steer). Cells the solver could not reach are hatched and carry no number. */
@@ -24,7 +24,7 @@ export default function MotionRatioField({ data }: { data: SteerGridResponse | n
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Motion ratio versus bump and rack travel" className="w-full">
         <defs>
           <pattern id="mr-unreachable" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-            <rect width="6" height="6" fill="#15171a" />
+            <rect width="6" height="6" fill="#13181D" />
             <line x1="0" y1="0" x2="0" y2="6" stroke="#d9534f" strokeWidth="1.5" />
           </pattern>
         </defs>
@@ -52,6 +52,22 @@ export default function MotionRatioField({ data }: { data: SteerGridResponse | n
         {unreachable > 0 ? `${unreachable} hatched cell${unreachable === 1 ? "" : "s"}: unreachable, the solver did not converge. ` : ""}
         Clearances: {data.clearances?.status ?? "NOT_MODELED"}.
       </figcaption>
+      {data.ackermann?.status === "COMPUTED" && Array.isArray(data.ackermann.points) && (
+        <table data-testid="mr-ackermann" className="v2-num text-[11px] text-zinc-200 mt-2 border-collapse">
+          <caption className="text-left text-[#8a909a]">Ackermann at wheelbase {String(data.ackermann.wheelbase_mm)} mm, track {String(data.ackermann.track_mm)} mm (mirror-symmetric, static pose)</caption>
+          <tbody>
+            {(data.ackermann.points as any[]).map((pt, i) => (
+              <tr key={i} data-ackermann-row={pt.rack_travel_mm}>
+                <td className="pr-3">rack {pt.rack_travel_mm} mm</td>
+                <td className="pr-3">inner {Number(pt.inner_deg).toFixed(2)}°</td>
+                <td className="pr-3">outer {Number(pt.outer_deg).toFixed(2)}°</td>
+                <td className="pr-3">ideal inner {Number(pt.ideal_inner_deg).toFixed(2)}°</td>
+                <td>{Number(pt.ackermann_pct).toFixed(1)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </figure>
   );
 }

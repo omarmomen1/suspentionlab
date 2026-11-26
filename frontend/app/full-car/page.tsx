@@ -38,6 +38,7 @@ import KPICard from "../../components/sim/KPICard";
 import PlotBox from "../../components/sim/PlotBox";
 import { darkLayout, DARK_BASE } from "../../components/sim/theme";
 import { maxOf, minOf } from "../../lib/array";
+import EmptyState from "../../components/v2/EmptyState";
 import FourFootprintsSVG from "../../components/v2/instruments/FourFootprintsSVG";
 import type { FullCarLoadParams } from "../../lib/v2/phase4";
 
@@ -720,8 +721,10 @@ function FullCarDashboard() {
                         <span className="font-mono text-[#cfd3da]">{Array.isArray(r.time) && typeof r.time[idx] === "number" ? `${r.time[idx].toFixed(3)} s` : "n/a"}</span>
                       </label>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {lp ? <FourFootprintsSVG result={r as any} params={lp} index={idx} /> : <span className="text-[11px] text-[#8a909a]">Tire loads need a run in this session.</span>}
-                        <AttitudeModel3D result={r as any} index={idx} />
+                        <div className="hidden lg:block">
+                          {lp ? <FourFootprintsSVG result={r as any} params={lp} index={idx} /> : <EmptyState kind="unavailable" reason="Tire loads need a run in this session." />}
+                        </div>
+                        <AttitudeModel3D result={r as any} index={idx} loadParams={lp} />
                       </div>
                     </div>
                   );

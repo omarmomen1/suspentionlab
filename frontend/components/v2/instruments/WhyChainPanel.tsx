@@ -17,10 +17,10 @@ export interface WhyChainPanelProps {
 export function WhyChainRows({ result }: { result: WhyChainResponse }) {
   const rows = whyChainRows(result);
   return (
-    <ol data-testid="why-chain" data-complete={result.chain_complete ? "1" : "0"} className="m-0 p-0 list-none text-[11px] text-[#cfd3da]">
+    <ol data-testid="why-chain" data-complete={result.chain_complete ? "1" : "0"} className="v2-num m-0 p-0 list-none text-[11px] text-zinc-200">
       {rows.map((r) => (
-        <li key={r.link} data-link={r.link} data-status={r.status} className="border-t border-[#2a2d33] py-1">
-          <div className="flex gap-2"><span className="font-mono">{r.link}</span><span className={r.status === "NOT_MODELED" ? "text-[#d9534f]" : "text-[#f2a900]"}>{r.status}</span></div>
+        <li key={r.link} data-link={r.link} data-status={r.status} className="border-t border-white/10 py-1">
+          <div className="flex gap-2"><span className="font-mono">{r.link}</span><span className={r.status === "NOT_MODELED" ? "text-[#d9534f]" : "text-[#C8F04B]"}>{r.status}</span></div>
           {r.status === "NOT_MODELED" ? (
             <div className="text-[#8a909a]">{r.reason ?? "no reason code"}</div>
           ) : (
@@ -64,10 +64,10 @@ export default function WhyChainPanel({ setupAParams, setupBParams, track = "spa
   };
 
   return (
-    <section data-testid="why-chain-panel" className="border border-[#2a2d33] p-3">
+    <section data-testid="why-chain-panel" className="border border-white/10 bg-[#13181D] p-3">
       <div className="flex items-center gap-3">
         <h3 className="text-xs uppercase tracking-wide text-[#8a909a] m-0">Why Chain</h3>
-        <button type="button" onClick={run} disabled={!canRun || busy} className="text-[11px] px-2 py-1 border border-[#3a3f48] text-[#cfd3da] disabled:opacity-40">
+        <button type="button" onClick={run} disabled={!canRun || busy} className="text-[11px] px-2 py-1 border border-white/10 text-zinc-200 disabled:opacity-40">
           {busy ? "Running" : "Compute Why Chain"}
         </button>
       </div>

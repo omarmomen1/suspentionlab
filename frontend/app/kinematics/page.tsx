@@ -533,6 +533,7 @@ export default function KinematicsPage() {
   const [loading, setLoading] = useState<boolean>(false);
   const [mrField, setMrField] = useState<SteerGridResponse | null>(null);
   const [mrFieldBusy, setMrFieldBusy] = useState(false);
+  const [mrWheelbase, setMrWheelbase] = useState<string>("");
   const [mrFieldError, setMrFieldError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -669,7 +670,11 @@ export default function KinematicsPage() {
       const res = await fetchWithAuth("/api/v1/kinematics/mr-field", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hardpoints: { ...hp, ...staticAlignmentFor(selectedPreset) } }),
+        body: JSON.stringify({
+          hardpoints: { ...hp, ...staticAlignmentFor(selectedPreset) },
+          ...(Number.isFinite(Number(mrWheelbase)) && Number(mrWheelbase) > 500 && Number(mrWheelbase) < 6000 && mrWheelbase.trim() !== ""
+            ? { wheelbase_mm: Number(mrWheelbase) } : {}),
+        }),
       });
       if (!res.ok) {
         const d = await res.json().catch(() => ({}));
@@ -682,7 +687,7 @@ export default function KinematicsPage() {
     } finally {
       setMrFieldBusy(false);
     }
-  }, [fetchWithAuth, hp, selectedPreset]);
+  }, [fetchWithAuth, hp, selectedPreset, mrWheelbase]);
 
   // Solve Sweep for Setup B (for comparison overlay)
   const solveSetupB = useCallback(async () => {
@@ -1779,12 +1784,16 @@ export default function KinematicsPage() {
             )}
 
             {activeTab === "mr" && (
-              <div className="bg-[#080a10] border border-[#1c1f2e] rounded-xl p-4" data-testid="mr-field-card">
+              <div className="bg-[#13181D] border border-white/10 p-4" data-testid="mr-field-card">
                 <div className="flex items-center gap-3 mb-2">
                   <h3 className="text-xs uppercase tracking-wide text-[#8a909a] m-0">Motion-ratio field MR(bump, steer)</h3>
                   <button type="button" onClick={computeMrField} disabled={mrFieldBusy} className="text-[11px] px-2 py-1 border border-[#3a3f48] text-[#cfd3da] disabled:opacity-40">
                     {mrFieldBusy ? "Computing" : "Compute MR Field"}
                   </button>
+                  <label className="text-[11px] text-[#8a909a] flex items-center gap-1">
+                    Wheelbase (mm, optional, enables Ackermann)
+                    <input type="number" inputMode="decimal" value={mrWheelbase} onChange={(e) => setMrWheelbase(e.target.value)} className="v2-num w-20 bg-[#0C0F12] border border-white/10 px-1 py-0.5 text-zinc-200" aria-label="Wheelbase mm" />
+                  </label>
                 </div>
                 {mrFieldError && <p role="alert" className="text-[11px] text-[#d9534f] m-0 mb-2">{mrFieldError}</p>}
                 <MotionRatioField data={mrField} />

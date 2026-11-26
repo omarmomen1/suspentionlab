@@ -30,7 +30,7 @@ export default function FourFootprintsSVG({ result, params, index }: FourFootpri
   const c = cornerLoadsAt(result, params, index);
   const scale = maxCornerLoadN(result, params);
   if (!c || !scale || scale <= 0) {
-    return <EmptyState kind="not_run" reason="Run the full-car solver to see the four corner loads." />;
+    return <EmptyState kind="unavailable" reason="Corner load channels are missing from the solver payload." />;
   }
   const keys = ["fl", "fr", "rl", "rr"] as const;
   return (
@@ -42,10 +42,10 @@ export default function FourFootprintsSVG({ result, params, index }: FourFootpri
           const barH = (fz / scale) * FH;
           return (
             <g key={k} data-corner={k} data-fz={fz.toFixed(3)}>
-              <rect x={p.x} y={p.y} width={FW} height={FH} fill="none" stroke="#3a3f48" strokeWidth={1} />
-              <rect data-bar={k} x={p.x} y={p.y + FH - barH} width={FW} height={barH} fill={fz === 0 ? "#d9534f" : "#f2a900"} opacity={0.85} />
-              <text x={p.x + FW / 2} y={p.y - 8} textAnchor="middle" fontSize={11} fill="#cfd3da">{LABEL[k]}</text>
-              <text x={p.x + FW / 2} y={p.y + FH + 14} textAnchor="middle" fontSize={11} fill="#cfd3da">{Math.round(fz)} N</text>
+              <rect x={p.x} y={p.y} width={FW} height={FH} fill="none" stroke="rgba(255,255,255,0.10)" strokeWidth={1} />
+              <rect data-bar={k} x={p.x} y={p.y + FH - barH} width={FW} height={barH} fill={fz === 0 ? "#d9534f" : "#C8F04B"} opacity={0.85} />
+              <text className="v2-num" x={p.x + FW / 2} y={p.y - 8} textAnchor="middle" fontSize={11} fill="#e4e6e8">{LABEL[k]}</text>
+              <text className="v2-num" x={p.x + FW / 2} y={p.y + FH + 14} textAnchor="middle" fontSize={11} fill="#e4e6e8">{Math.round(fz)} N</text>
             </g>
           );
         })}

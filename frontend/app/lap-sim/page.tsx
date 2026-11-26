@@ -2629,7 +2629,7 @@ export default function LapSimPage() {
                   limits={envelopeLimits(result.ggv_envelope)}
                 />
 
-                <section data-testid="terrain-section" className="border border-hairline p-3 flex flex-col gap-2">
+                <section data-testid="terrain-section" className="border border-white/10 bg-[#13181D] p-3 flex flex-col gap-2">
                   <label className="flex items-center gap-2 text-xs text-zinc-300">
                     <input type="checkbox" checked={includeElevation} disabled={selectedCircuitId !== "spa"} onChange={(e) => setIncludeElevation(e.target.checked)} />
                     Include Elevation (Spa)
