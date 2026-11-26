@@ -125,15 +125,10 @@ class ParetoPoint:
 # Default quarter-car feasibility bounds, shared so /optimize, /experiment and
 # /compare enforce IDENTICAL feasibility unless the caller explicitly overrides.
 DEFAULT_MIN_SUSP_TRAVEL_MM = 0.0
-DEFAULT_MAX_SUSP_TRAVEL_MM = 150.0
-# NOTE (known, unresolved contract difference, do not read 150 as a validated limit):
-# 150 mm is a wide hardware-envelope default used only to reject non-physical
-# candidates in the Pareto search. Other layers in the repo apply tighter,
-# separately defined limits: services/setup_proposal.py CONSTRAINTS
-# peak_susp_travel_max = 0.08 m (80 mm) and services/experiment_service.py
-# check_engineering_constraints travel_limit = 55 mm (bump-stop clearance gate).
-# They are NOT unified here because the right number is an engineering decision.
-# Pass max_travel_mm explicitly to quarter_car_feasibility_constraints() to tighten.
+DEFAULT_MAX_SUSP_TRAVEL_MM = 80.0  # 0.080 m, the single travel limit shared by
+# /optimize, /experiment, /compare, setup_proposal and the AI engineer route.
+# Callers may still pass max_travel_mm explicitly to
+# quarter_car_feasibility_constraints() to override it.
 
 
 def json_safe_crowding(value: float):

@@ -103,4 +103,11 @@ describe("Wave 6 review fixes: session-expired signalling and re-auth email", ()
     expect(ctx).toContain("readOnly={emailLocked}");
     expect(ctx).not.toMatch(/value=\{user\?\.email \?\? ""\}\s*\n\s*readOnly\s*\n/);
   });
+
+  it("ReAuthModal opens only when this tab had an authenticated session", () => {
+    const ctx = read("contexts/AuthContext.tsx");
+    expect(ctx).toContain("const hadSessionRef = useRef(false)");
+    expect((ctx.match(/if \(hadSessionRef\.current\) setSessionExpired\(true\)/g) || []).length).toBe(2);
+    expect(ctx).not.toMatch(/^\s*setSessionExpired\(true\);/m);
+  });
 });

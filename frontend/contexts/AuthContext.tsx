@@ -92,6 +92,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [sessionExpired, setSessionExpired] = useState(false);
   const didInitRef = useRef(false);
+  // True once this tab has held an authenticated session. Anonymous visitors on
+  // public pages must never see "Session expired".
+  const hadSessionRef = useRef(false);
 
   const fetchMe = useCallback(async (force = false): Promise<AuthUser | null> => {
     if (!force && cachedUser && Date.now() - lastFetchTime < CACHE_TTL_MS) {
@@ -112,7 +115,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           const userObj: AuthUser = { ...data, plan: data.plan ?? "FREE" };
           cachedUser = userObj;
           lastFetchTime = Date.now();
-          setUser(userObj);
+          hadSessionRef.current = true;
+    setUser(userObj);
           return userObj;
         } else {
           cachedUser = null;
@@ -165,6 +169,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
     cachedUser = userObj;
     lastFetchTime = Date.now();
+    hadSessionRef.current = true;
     setUser(userObj);
     setSessionExpired(false);
     return userObj;
@@ -196,6 +201,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch {
       // ignore network errors on logout
     }
+    hadSessionRef.current = false;
     setUser(null);
     purgeLegacyStorage();
   }, []);
@@ -260,7 +266,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       // Refresh failed: the session is gone. Open the re-auth gate instead of a
       // hard logout so in-progress page state (unsaved inputs) stays mounted.
-      setSessionExpired(true);
+      if (hadSessionRef.current) setSessionExpired(true);
     }
     return res;
   }, [tryRefresh, getCsrfToken]);
@@ -269,7 +275,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // they open the same re-auth modal as fetchWithAuth callers.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const onExpired = () => setSessionExpired(true);
+    const onExpired = () => {
+      if (hadSessionRef.current) setSessionExpired(true);
+    };
     window.addEventListener("sl:session-expired", onExpired);
     return () => window.removeEventListener("sl:session-expired", onExpired);
   }, []);
@@ -278,6 +286,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // User chose to browse signed-out areas; clear the stale profile locally.
     cachedUser = null;
     lastFetchTime = 0;
+    hadSessionRef.current = false;
     setUser(null);
     setSessionExpired(false);
   }, []);

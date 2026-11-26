@@ -326,14 +326,15 @@ def build_engineering_causality_chain(
     return chain
 
 
-def check_engineering_constraints(cand_params: Dict[str, Any], cand_metrics: Dict[str, float]) -> Tuple[bool, List[Dict[str, Any]]]:
+def check_engineering_constraints(cand_params: Dict[str, Any], cand_metrics: Dict[str, float], travel_limit_mm: Optional[float] = None) -> Tuple[bool, List[Dict[str, Any]]]:
     """Evaluates physical and operational engineering constraints."""
     constraints = []
     all_passed = True
 
     # 1. Travel constraint
     travel = cand_metrics.get("peak_susp_travel_mm", 0.0)
-    travel_limit = 55.0  # mm
+    from suspensionlab.physics.pareto_optimizer import DEFAULT_MAX_SUSP_TRAVEL_MM
+    travel_limit = float(travel_limit_mm) if travel_limit_mm is not None else DEFAULT_MAX_SUSP_TRAVEL_MM  # mm
     passed_travel = travel <= travel_limit
     all_passed = all_passed and passed_travel
     constraints.append({

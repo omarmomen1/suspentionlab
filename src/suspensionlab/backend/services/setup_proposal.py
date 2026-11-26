@@ -39,9 +39,11 @@ SEARCH_SPACE: dict[str, list[float]] = {
     "c":   [0.80, 0.90, 1.0, 1.10, 1.20],
 }
 
+from suspensionlab.physics.pareto_optimizer import DEFAULT_MAX_SUSP_TRAVEL_MM
+
 # Hard validation limits.
 CONSTRAINTS = {
-    "peak_susp_travel_max": 0.08,     # m
+    "peak_susp_travel_max": DEFAULT_MAX_SUSP_TRAVEL_MM / 1000.0,     # m (80 mm, shared)
     "zeta_s_range": (0.15, 0.60),
 }
 

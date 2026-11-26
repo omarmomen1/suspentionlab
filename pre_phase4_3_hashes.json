@@ -48,7 +48,7 @@
     "src/suspensionlab/physics/optimization_engine.py": "c76abe1953f3758d86cca0a2581fa257a0f1d1d180dc1de85d42a67d0574dd87",
     "src/suspensionlab/physics/optimizer.py": "0dd649f48240adc2f237a7a1c547f7095fe48130a0b2f97b99db46551d8250ed",
     "src/suspensionlab/physics/parameter_identification.py": "73ffe930e83bac185b86dec07ec4145f32cbcc8ac97dbcbb3fc95044bc7fc11b",
-    "src/suspensionlab/physics/pareto_optimizer.py": "0cbc227fda1778429cfac26cb046fde846e4e82fbba5df63a0163940024ba7ab",
+    "src/suspensionlab/physics/pareto_optimizer.py": "620428f09601509cee7c710e8c09cc2ef1be980c074240660d6a7fdae39e090a",
     "src/suspensionlab/physics/post_track_loop.py": "6604832e6dc89b86eda4168a94093daf8d42aea7396c57449726cd397e99bb8d",
     "src/suspensionlab/physics/powertrain_lap_sim.py": "44d72961d5a01acce4129db66b86b7eb44b577d1a90bf6d0a5ba3a70cdc9e7c6",
     "src/suspensionlab/physics/provenance.py": "a38edbe8bca4740b79818fc7f3539bc00ec002f3286ac54714f885aa762e6d3a",
