@@ -38,6 +38,14 @@ import KPICard from "../../components/sim/KPICard";
 import PlotBox from "../../components/sim/PlotBox";
 import { darkLayout, DARK_BASE } from "../../components/sim/theme";
 import { maxOf, minOf } from "../../lib/array";
+import FourFootprintsSVG from "../../components/v2/instruments/FourFootprintsSVG";
+import type { FullCarLoadParams } from "../../lib/v2/phase4";
+
+// One WebGL canvas on this route, loaded only in the browser.
+const AttitudeModel3D = dynamic(() => import("../../components/v2/instruments/AttitudeModel3D"), {
+  ssr: false,
+  loading: () => <p className="text-[11px] text-[#8a909a] m-0">Loading 3D view</p>,
+});
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -46,6 +54,7 @@ const TABS = [
   { label: "Pitch & Roll",      icon: GitBranch   },
   { label: "Load Transfer",     icon: BarChart3   },
   { label: "PSD Analysis",      icon: Crosshair   },
+  { label: "Footprints & Attitude", icon: GitBranch },
 ];
 
 // ─── Plotly dark-theme base ──────────────────────────────────────────────────
@@ -195,6 +204,9 @@ function FullCarDashboard() {
   const [simError, setSimError] = useState<string | null>(null);
   const [validity, setValidity] = useState<ValidityReport | null>(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [scrubIdx, setScrubIdx] = useState(0);
+  // Load-relevant parameters of the run that produced the current results (k_t is the value the payload sends).
+  const runLoadParamsRef = useRef<FullCarLoadParams | null>(null);
   const [toast,     setToast]     = useState<Toast | null>(null);
 
   const [params, setParams, { undo, redo, reset, canUndo, canRedo }] = useUndoRedo({
@@ -222,6 +234,7 @@ function FullCarDashboard() {
   const buildPayload = () => {
     const b = params.L * (params.weight_dist / 100.0);
     const a = params.L - b;
+    runLoadParamsRef.current = { m_s: params.m_s, m_uf: params.m_uf, m_ur: params.m_ur, a, b, k_tf: 250000.0, k_tr: 250000.0 };
     return {
       params: { m_s: params.m_s, I_x: params.I_x, I_y: params.I_y, m_uf: params.m_uf, m_ur: params.m_ur, k_sf: params.k_sf, k_sr: params.k_sr, c_f: params.c_f, c_r: params.c_r, k_arb_f: params.k_arb_f, k_arb_r: params.k_arb_r, k_tf: 250000.0, k_tr: 250000.0, L: params.L, a: a, b: b, tw_f: params.tw_f, tw_r: params.tw_r, speed_mps: params.speed_kph / 3.6, c_tf: 0.0, c_tr: 0.0 },
       profile: { profile_type: "step", amplitude: params.p_amp, frequency: 2.0, duration: 5.0 },
@@ -694,6 +707,25 @@ function FullCarDashboard() {
                     </PlotBox>
                   </div>
                 )}
+                {/* ── TAB 4: FOOTPRINTS & ATTITUDE ── */}
+                {activeTab === 4 && (() => {
+                  const n = Array.isArray(r.time) ? r.time.length : 0;
+                  const idx = Math.min(scrubIdx, Math.max(0, n - 1));
+                  const lp = runLoadParamsRef.current;
+                  return (
+                    <div className="h-full overflow-y-auto p-4 flex flex-col gap-4" data-testid="footprints-attitude-tab">
+                      <label className="text-[11px] text-[#8a909a] flex items-center gap-3">
+                        Time
+                        <input type="range" min={0} max={Math.max(0, n - 1)} value={idx} onChange={(e) => setScrubIdx(Number(e.target.value))} aria-label="Scrub time index" className="flex-1" />
+                        <span className="font-mono text-[#cfd3da]">{Array.isArray(r.time) && typeof r.time[idx] === "number" ? `${r.time[idx].toFixed(3)} s` : "n/a"}</span>
+                      </label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {lp ? <FourFootprintsSVG result={r as any} params={lp} index={idx} /> : <span className="text-[11px] text-[#8a909a]">Tire loads need a run in this session.</span>}
+                        <AttitudeModel3D result={r as any} index={idx} />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}

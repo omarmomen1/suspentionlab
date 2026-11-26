@@ -12,6 +12,8 @@ import StudioShell, { ShellLeft, ShellCenter, ShellRight } from "../../component
 import VerdictRail from "../../components/v2/VerdictRail";
 import LedgerDock from "../../components/v2/instruments/LedgerDock";
 import { verdictStatus } from "../../lib/v2/status";
+import MotionRatioField from "../../components/v2/instruments/MotionRatioField";
+import type { SteerGridResponse } from "../../lib/v2/phase4";
 import SuspensionKinematics3D, { KinematicsGeometryMap } from "../../components/kinematics/SuspensionKinematics3D";
 import KinematicsComparisonPanel from "../../components/kinematics/KinematicsComparisonPanel";
 import KinematicsTargetBandsModal, { DEFAULT_TARGET_BANDS } from "../../components/kinematics/KinematicsTargetBandsModal";
@@ -529,6 +531,9 @@ export default function KinematicsPage() {
   });
 
   const [loading, setLoading] = useState<boolean>(false);
+  const [mrField, setMrField] = useState<SteerGridResponse | null>(null);
+  const [mrFieldBusy, setMrFieldBusy] = useState(false);
+  const [mrFieldError, setMrFieldError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Travel slider & animation
@@ -655,6 +660,29 @@ export default function KinematicsPage() {
       setLoading(false);
     }
   }, [fetchWithAuth, hp, selectedPreset, zMin, zMax, nSteps]);
+
+  // MR(bump, steer): real 2-D solve, python 5-DOF solver on the backend.
+  const computeMrField = useCallback(async () => {
+    setMrFieldBusy(true);
+    setMrFieldError(null);
+    try {
+      const res = await fetchWithAuth("/api/v1/kinematics/mr-field", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hardpoints: { ...hp, ...staticAlignmentFor(selectedPreset) } }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(typeof d.detail === "string" ? d.detail : `HTTP ${res.status}`);
+      }
+      setMrField((await res.json()) as SteerGridResponse);
+    } catch (err: any) {
+      setMrField(null);
+      setMrFieldError(formatApiError(err, "Failed to compute the MR field"));
+    } finally {
+      setMrFieldBusy(false);
+    }
+  }, [fetchWithAuth, hp, selectedPreset]);
 
   // Solve Sweep for Setup B (for comparison overlay)
   const solveSetupB = useCallback(async () => {
@@ -1747,6 +1775,19 @@ export default function KinematicsPage() {
                   useResizeHandler
                   onClick={handlePlotClick}
                 />
+              </div>
+            )}
+
+            {activeTab === "mr" && (
+              <div className="bg-[#080a10] border border-[#1c1f2e] rounded-xl p-4" data-testid="mr-field-card">
+                <div className="flex items-center gap-3 mb-2">
+                  <h3 className="text-xs uppercase tracking-wide text-[#8a909a] m-0">Motion-ratio field MR(bump, steer)</h3>
+                  <button type="button" onClick={computeMrField} disabled={mrFieldBusy} className="text-[11px] px-2 py-1 border border-[#3a3f48] text-[#cfd3da] disabled:opacity-40">
+                    {mrFieldBusy ? "Computing" : "Compute MR Field"}
+                  </button>
+                </div>
+                {mrFieldError && <p role="alert" className="text-[11px] text-[#d9534f] m-0 mb-2">{mrFieldError}</p>}
+                <MotionRatioField data={mrField} />
               </div>
             )}
 

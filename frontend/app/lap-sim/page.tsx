@@ -33,6 +33,13 @@ import PlanGate from "../../components/PlanGate";
 import Plot from "../../components/sim/Plot";
 import TrackMap, { CornerInfo, GgvEnvelopeData } from "../../components/sim/TrackMap";
 import EnvelopePlot from "../../components/v2/instruments/EnvelopePlot";
+import dynamic from "next/dynamic";
+
+// The only WebGL canvas on this route; browser-only.
+const TerrainElevation3D = dynamic(() => import("../../components/v2/instruments/TerrainElevation3D"), {
+  ssr: false,
+  loading: () => <p className="text-[11px] text-zinc-500 m-0">Loading 3D view</p>,
+});
 import LapDeltaView, { LapRunData, VehicleSetupParameters } from "../../components/sim/LapDeltaView";
 import { darkLayout } from "../../components/sim/theme";
 
@@ -150,6 +157,11 @@ interface LapSimResponse {
     ride_height_front_mm?: number[];
     ride_height_rear_mm?: number[];
     pitch_deg?: number[];
+    z_m?: number[];
+    dz_ds?: number[];
+    vertical_g?: number[];
+    vertical_load_delta_n?: number[];
+    compression_mm?: number[];
   };
   ggv_envelope?: GgvEnvelopeData;
   corner_opportunities?: CornerOpportunity[];
@@ -1175,6 +1187,8 @@ export default function LapSimPage() {
   // 3-Tab Track Input Selector: preset (Championship), custom (Architect), csv (Telemetry)
   const [trackInputTab, setTrackInputTab] = useState<TrackInputTab>("preset");
   const [selectedCircuitId, setSelectedCircuitId] = useState<string>("spa");
+  // Opt-in Spa elevation profile (coarse official-map stations). Off by default so results do not change.
+  const [includeElevation, setIncludeElevation] = useState<boolean>(false);
 
   // Manual Vehicle Overrides Lock (Toggle: 🔒 Overrides Locked / 🔓 Auto-Preset: On)
   const [manualOverridesLocked, setManualOverridesLocked] = useState<boolean>(false);
@@ -1467,6 +1481,8 @@ export default function LapSimPage() {
         },
       };
 
+      if (includeElevation && selectedCircuitId === "spa") payload.with_elevation = true;
+
       if (currentTab === "custom") {
         payload.segments = architectSegments.map((s) => ({
           type: s.type,
@@ -1567,6 +1583,11 @@ export default function LapSimPage() {
           ride_height_front_mm: raw.trace?.ride_height_front_mm ?? raw.telemetry?.ride_height_front_mm,
           ride_height_rear_mm: raw.trace?.ride_height_rear_mm ?? raw.telemetry?.ride_height_rear_mm,
           pitch_deg: raw.trace?.pitch_deg ?? raw.telemetry?.pitch_deg,
+          z_m: raw.trace?.z_m ?? raw.telemetry?.z_m,
+          dz_ds: raw.trace?.dz_ds ?? raw.telemetry?.dz_ds,
+          vertical_g: raw.trace?.vertical_g ?? raw.telemetry?.vertical_g,
+          vertical_load_delta_n: raw.trace?.vertical_load_delta_n ?? raw.telemetry?.vertical_load_delta_n,
+          compression_mm: raw.trace?.compression_mm ?? raw.telemetry?.compression_mm,
         },
         ggv_envelope: raw.ggv_envelope ?? raw.ggv,
         corner_opportunities: raw.corner_opportunities,
@@ -2608,6 +2629,15 @@ export default function LapSimPage() {
                   limits={envelopeLimits(result.ggv_envelope)}
                 />
 
+                <section data-testid="terrain-section" className="border border-hairline p-3 flex flex-col gap-2">
+                  <label className="flex items-center gap-2 text-xs text-zinc-300">
+                    <input type="checkbox" checked={includeElevation} disabled={selectedCircuitId !== "spa"} onChange={(e) => setIncludeElevation(e.target.checked)} />
+                    Include Elevation (Spa)
+                    <span className="text-[10px] text-zinc-500">{selectedCircuitId !== "spa" ? "Only Spa has elevation data. Other circuits stay flat (z = 0)." : "Applies on the next run. Also changes the grade term, so lap time changes."}</span>
+                  </label>
+                  <TerrainElevation3D trace={result.trace as any} />
+                </section>
+
                 {/* LapDeltaView (Setup A vs Setup B comparison) */}
                 <LapDeltaView
                   baselineRun={pinnedBaseline?.lap ?? null}
@@ -2622,6 +2652,8 @@ export default function LapSimPage() {
                   }}
                   setupAParams={pinnedBaseline?.cfg as any}
                   setupBParams={cfg as any}
+                  whyChainFetcher={fetchWithAuth as any}
+                  whyChainTrack={selectedCircuitId === "fsae_michigan" ? "fsae_endurance" : selectedCircuitId}
                   onPinBaseline={handlePinBaseline}
                   corners={trackInputTab === "preset" ? activeCircuit.corners.map((c) => ({ name: c.name, distM: c.distM })) : undefined}
                   onResetToBaseline={() => {

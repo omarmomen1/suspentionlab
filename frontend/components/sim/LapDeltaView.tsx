@@ -16,6 +16,7 @@ import {
 import Plot from "./Plot";
 import { darkLayout } from "./theme";
 import DifferenceRibbon from "../v2/instruments/DifferenceRibbon";
+import WhyChainPanel from "../v2/instruments/WhyChainPanel";
 import { cornerDeltasFromCumulative } from "../../lib/v2/instruments";
 
 export interface SectorDeltaItem {
@@ -89,6 +90,9 @@ export interface LapDeltaViewProps {
   onResetToBaseline?: () => void;
   /** Corner apex positions [m] for the difference ribbon. Omit when the track has no corner list. */
   corners?: { name: string; distM: number }[];
+  /** Authenticated fetch for the on-demand Why Chain. Omit to hide the panel. */
+  whyChainFetcher?: (url: string, init?: RequestInit) => Promise<Response>;
+  whyChainTrack?: string;
 }
 
 
@@ -118,6 +122,8 @@ export default function LapDeltaView({
   onPinBaseline,
   onResetToBaseline,
   corners,
+  whyChainFetcher,
+  whyChainTrack,
 }: LapDeltaViewProps) {
   // Normalize runs safely
   const runA = baselineRun ?? lapA ?? null;
@@ -549,6 +555,9 @@ export default function LapDeltaView({
             })}
           </div>
         </div>
+      )}
+      {whyChainFetcher && (
+        <WhyChainPanel setupAParams={setupAParams} setupBParams={setupBParams} track={whyChainTrack} fetcher={whyChainFetcher} />
       )}
     </div>
   );
