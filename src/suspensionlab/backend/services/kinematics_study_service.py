@@ -136,7 +136,10 @@ class KinematicsStudyService:
         tire_radius_m: float = 0.33,
     ) -> Dict[str, Any]:
         """Persist a named user setup."""
-        clean_hp = {k: [float(c) for c in v] for k, v in hardpoints.items()}
+        clean_hp = {
+            k: (float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else [float(c) for c in v])
+            for k, v in hardpoints.items()
+        }
         setup_data = {
             "id": setup_id,
             "name": name,
@@ -165,7 +168,10 @@ class KinematicsStudyService:
         tire_radius_m: float = 0.33,
     ) -> Dict[str, Any]:
         """Execute real kinematic sweep, compute derivatives, and persist result."""
-        clean_hp = {k: [float(c) for c in v] for k, v in hardpoints.items()}
+        clean_hp = {
+            k: (float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else [float(c) for c in v])
+            for k, v in hardpoints.items()
+        }
         curves = solve_kinematics(
             hardpoints=clean_hp,
             z_min_mm=z_min_mm,

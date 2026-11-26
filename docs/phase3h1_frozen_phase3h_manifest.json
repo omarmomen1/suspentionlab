@@ -8,7 +8,7 @@
     "sha256": "489adbf01d27da1c281c0fff353554dfd7d07a3f1c48e2744e9dd902546b74d3"
   },
   "physics_files_sha256": {
-    "dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690",
+    "dynamic_lap_sim.py": "bc409d2a228ca20adf5119502d6c227c5723cb8e998263fbdcccdb4b53e09d90",
     "brake_distribution.py": "15338e921252e35afc9ee543fdb996464e4784b36e1ce18e05c8832e392a57ea",
     "magic_formula.py": "2be0492f1e4c483401c1cd8544381edeb364dd5380e4b8fe9796f613cc627048",
     "tire_model.py": "da72dea8adf6b83846997fa02c9b1cade1b74272bcaa96f5aa0e2ea389005209"
@@ -31,6 +31,14 @@
     "reason": "Physics files remediated in Wave 5A (PKY1 sign, damper LUT linearisation, contact-loss clamp sign). Original phase baseline hashes preserved below.",
     "previous_hashes": {
       "magic_formula.py": "31acfd244c5847bd9c7a9b6a8c2ea10cac8aa3da80e5931e39be7bc849f2308e"
+    }
+  },
+  "wave5a2_recertification": {
+    "cycle": "WAVE_5A2_KINEMATICS_LAPSIM_FULLCAR_HONESTY_REMEDIATION",
+    "timestamp_iso": "2026-11-26T16:19:15.756151+00:00",
+    "reason": "Physics files remediated in Wave 5A-2. Previous (Wave 5A / original phase) hashes preserved below.",
+    "previous_hashes": {
+      "src/suspensionlab/physics/dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690"
     }
   }
 }

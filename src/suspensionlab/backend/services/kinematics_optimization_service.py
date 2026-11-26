@@ -163,8 +163,8 @@ class KinematicsOptimizationService:
         Ensures the complete scientific workflow:
         Sensitivity → Candidate Hardpoints → Experiment → Simulation → Compare → Validation.
         """
-        clean_base = {k: [float(c) for c in v] for k, v in baseline_hardpoints.items()}
-        clean_cand = {k: [float(c) for c in v] for k, v in candidate_hardpoints.items()}
+        clean_base = {k: (float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else [float(c) for c in v]) for k, v in baseline_hardpoints.items()}
+        clean_cand = {k: (float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else [float(c) for c in v]) for k, v in candidate_hardpoints.items()}
 
         is_valid, errs = HardpointSafetyValidator.validate(clean_cand)
         if not is_valid:

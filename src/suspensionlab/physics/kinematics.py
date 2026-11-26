@@ -1852,12 +1852,19 @@ def solve_kinematics(
             native_library_version="2.1.0",
             build_identifier="eigen-3.4.0-simd-x86_64",
         )
+        # Static alignment parity (Wave 5A-2): the Python solver adds the explicit
+        # static_camber_deg / static_toe_deg inputs to the rotation-induced angles
+        # at every step. The compiled solver has no such inputs, so apply the same
+        # offsets here on the C++ return path; otherwise the two backends disagree
+        # by exactly the static value (e.g. -1.2 deg camber for GT3 presets).
+        _static_camber = float(hardpoints.get("static_camber_deg", 0.0))
+        _static_toe = float(hardpoints.get("static_toe_deg", 0.0))
         for i in range(len(res.wheel_travel_mm)):
             geom = res.geometry_steps[i] if (hasattr(res, "geometry_steps") and len(res.geometry_steps) > i) else {}
             curves.points.append(KinematicPoint(
                 wheel_travel_mm       = res.wheel_travel_mm[i],
-                camber_deg            = res.camber_deg[i],
-                toe_deg               = res.toe_deg[i],
+                camber_deg            = res.camber_deg[i] + _static_camber,
+                toe_deg               = res.toe_deg[i] + _static_toe,
                 caster_deg            = res.caster_deg[i],
                 kpi_deg               = res.kpi_deg[i],
                 track_change_mm       = res.track_change_mm[i],

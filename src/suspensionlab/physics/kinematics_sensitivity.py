@@ -397,7 +397,7 @@ def compute_hardpoint_sensitivity(
 
     Guarantees every cell derives directly from solver executions.
     """
-    clean_hp = {k: [float(c) for c in v] for k, v in hardpoints.items()}
+    clean_hp = {k: (float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else [float(c) for c in v]) for k, v in hardpoints.items()}
 
     # Safety check on baseline
     is_valid, errs = HardpointSafetyValidator.validate(clean_hp)
@@ -574,7 +574,7 @@ def evaluate_engineering_question(
     testing perturbations using the real solver, and ranking candidates
     with explicit physical mechanism explanations.
     """
-    clean_hp = {k: [float(c) for c in v] for k, v in hardpoints.items()}
+    clean_hp = {k: (float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else [float(c) for c in v]) for k, v in hardpoints.items()}
 
     # Resolve question settings
     preset = PRESET_QUESTIONS.get(question_preset_id or "")
@@ -821,7 +821,7 @@ def optimize_hardpoints(
     the real kinematics solver at every evaluation.
     Extracts non-dominated Pareto frontier and explicitly computes best compromise.
     """
-    clean_hp = {k: [float(c) for c in v] for k, v in hardpoints.items()}
+    clean_hp = {k: (float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else [float(c) for c in v]) for k, v in hardpoints.items()}
 
     is_valid, errs = HardpointSafetyValidator.validate(clean_hp)
     if not is_valid:

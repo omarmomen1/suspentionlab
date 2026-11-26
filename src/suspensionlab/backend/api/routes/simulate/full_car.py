@@ -8,7 +8,7 @@ from suspensionlab.backend.security.auth import verify_api_key, require_permissi
 from suspensionlab.backend.security.permissions import Permission
 from suspensionlab.backend.core.compute_governance import bounded_run, assert_user_concurrency
 from suspensionlab.shared.models import FullCarSimulateRequest
-from suspensionlab.physics.full_car import FullCarParams, run_full_car_analysis, FourCornerRoadProfile
+from suspensionlab.physics.full_car import FullCarParams, run_full_car_analysis, FourCornerRoadProfile, FullCarDivergedError
 from suspensionlab.physics.quarter_car import RoadProfile, _road_profile_fn
 from typing import Any
 
@@ -60,6 +60,14 @@ async def simulate_full_car(
         return res_dict
     except HTTPException:
         raise
+    except FullCarDivergedError as e:
+        # Numerical blow-up is a property of the submitted parameter set, not a
+        # server fault: report a structured 422 instead of an unhandled 500.
+        logger.warning("Full-car simulation diverged: %s", e)
+        raise HTTPException(
+            status_code=422,
+            detail={"code": FullCarDivergedError.status, "message": str(e)},
+        )
     except TimeoutError:
         raise HTTPException(status_code=504, detail="Full-car simulation timed out.")
     except Exception as e:

@@ -102,8 +102,8 @@ class HardpointSetInput(BaseModel):
 
     # Static alignment (upright's built-in spindle angles; not recoverable
     # from hardpoint coordinates alone, so they are explicit inputs).
-    static_camber_deg: float = Field(default=-1.2,
-        description="Static camber built into the upright spindle [deg]")
+    static_camber_deg: float = Field(default=0.0,
+        description="Static camber built into the upright spindle [deg]. Default 0.0; GT3 presets set -1.2 explicitly.")
     static_toe_deg: float = Field(default=0.0,
         description="Static toe (shim/alignment setting) [deg, + = toe-out]")
 

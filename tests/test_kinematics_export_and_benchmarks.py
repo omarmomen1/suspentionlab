@@ -110,7 +110,10 @@ def test_gt3_camber_benchmark_regression():
 
     # Static camber check
     camber_static = camber[idx_0]
-    assert abs(camber_static) < 1.0, f"Baseline GT3 neutral camber was {camber_static}°"
+    # Wave 5A-2: the GT3 preset carries an explicit static_camber_deg of -1.2 (upright
+    # spindle setting); the neutral camber is that static value plus the rotation-induced
+    # part (~0 at neutral).
+    assert camber_static == pytest.approx(-1.2, abs=0.3), f"Baseline GT3 neutral camber was {camber_static}°"
 
     # Bump camber recovery check (top tilts inboard -> more negative camber in bump)
     camber_bump = camber[idx_bump]

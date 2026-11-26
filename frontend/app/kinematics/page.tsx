@@ -96,6 +96,10 @@ const BENCHMARK_CATALOG: Record<
     zRange: [number, number];
     tireRadiusM: number;
     hardpoints: Hardpoints;
+    /** Static camber built into the upright spindle [deg]; omitted = 0.0 (backend default). */
+    static_camber_deg?: number;
+    /** Static toe [deg, + = toe-out]; omitted = 0.0 (backend default). */
+    static_toe_deg?: number;
   }
 > = {
   gt3_touring: {
@@ -105,6 +109,8 @@ const BENCHMARK_CATALOG: Record<
     description: "Production-derived GT3 racecar double wishbone geometry with long control arms for high-speed stability.",
     zRange: [-50, 50],
     tireRadiusM: 0.330,
+    static_camber_deg: -1.2,
+    static_toe_deg: 0.0,
     hardpoints: {
       UWI_fwd: [-50.0, 300.0, 340.0],
       UWI_aft: [50.0, 300.0, 340.0],
@@ -127,6 +133,8 @@ const BENCHMARK_CATALOG: Record<
     description: "GT3 corner modified with 5mm outboard shim at lower ball joint (LWO Y+5mm) for enhanced static camber & lateral grip.",
     zRange: [-50, 50],
     tireRadiusM: 0.330,
+    static_camber_deg: -1.2,
+    static_toe_deg: 0.0,
     hardpoints: {
       UWI_fwd: [-50.0, 300.0, 340.0],
       UWI_aft: [50.0, 300.0, 340.0],
@@ -209,6 +217,12 @@ const BENCHMARK_CATALOG: Record<
     },
   },
 };
+
+/** Static alignment (spindle camber/toe) for a preset, sent to the solver alongside the hardpoints. */
+function staticAlignmentFor(presetId: string): { static_camber_deg: number; static_toe_deg: number } {
+  const p = BENCHMARK_CATALOG[presetId];
+  return { static_camber_deg: p?.static_camber_deg ?? 0.0, static_toe_deg: p?.static_toe_deg ?? 0.0 };
+}
 
 // ─── Plot Theme ───────────────────────────────────────────────────────────────
 const THEME = {
@@ -597,7 +611,7 @@ export default function KinematicsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          hardpoints: hp,
+          hardpoints: { ...hp, ...staticAlignmentFor(selectedPreset) },
           z_min_mm: zMin,
           z_max_mm: zMax,
           n_steps: nSteps,
@@ -629,7 +643,7 @@ export default function KinematicsPage() {
     } finally {
       setLoading(false);
     }
-  }, [fetchWithAuth, hp, zMin, zMax, nSteps]);
+  }, [fetchWithAuth, hp, selectedPreset, zMin, zMax, nSteps]);
 
   // Solve Sweep for Setup B (for comparison overlay)
   const solveSetupB = useCallback(async () => {
@@ -638,7 +652,7 @@ export default function KinematicsPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          hardpoints: hpB,
+          hardpoints: { ...hpB, ...staticAlignmentFor(selectedPresetB) },
           z_min_mm: zMin,
           z_max_mm: zMax,
           n_steps: nSteps,
@@ -651,7 +665,7 @@ export default function KinematicsPage() {
     } catch (err) {
       console.error("Failed to solve Setup B sweep:", err);
     }
-  }, [fetchWithAuth, hpB, zMin, zMax, nSteps]);
+  }, [fetchWithAuth, hpB, selectedPresetB, zMin, zMax, nSteps]);
 
   // Run full physics comparison between Setup A and Setup B
   const runComparison = useCallback(async () => {

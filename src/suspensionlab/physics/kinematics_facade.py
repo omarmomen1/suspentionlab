@@ -291,6 +291,11 @@ def _normalize_to_mm(hardpoints: Dict[str, Any]) -> Dict[str, List[float]]:
             out[k] = [float(v.get("x", 0.0)), float(v.get("y", 0.0)), float(v.get("z", 0.0))]
         elif isinstance(v, (list, tuple, np.ndarray)):
             out[k] = [float(c) for c in v]
+        elif isinstance(v, (int, float)) and not isinstance(v, bool):
+            # Scalar metadata (static_camber_deg / static_toe_deg) must pass
+            # through unchanged; zero-filling it into a 3-vector breaks the
+            # float() reads in the solver (Wave 5A-2 regression fix).
+            out[k] = float(v)
         else:
             out[k] = [0.0, 0.0, 0.0]
     return out

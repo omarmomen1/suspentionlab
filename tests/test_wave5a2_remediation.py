@@ -140,7 +140,10 @@ def test_route_defaults_match_gt3_baseline():
 
     hp = HardpointSetInput().to_dict()
     for k, v in GT3_HP.items():
+        if k.startswith("static_"):
+            continue  # static alignment defaults to 0.0; GT3 presets set -1.2 explicitly
         assert hp[k] == pytest.approx(v) if isinstance(v, float) else hp[k] == v
+    assert hp["static_camber_deg"] == 0.0 and hp["static_toe_deg"] == 0.0
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -368,3 +371,207 @@ def test_dynamic_lap_api_response_honesty():
     assert d2["lap_completed"] is True
     assert d2["lap_time_s"] == 87.1
     assert d2["solver_converged"] is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. API route boundaries (TestClient, not just unit calls)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _route_app(router, prefix="/api/v1", overrides=None):
+    from fastapi import FastAPI
+    app = FastAPI()
+    app.include_router(router, prefix=prefix)
+    for dep, fn in (overrides or {}).items():
+        app.dependency_overrides[dep] = fn
+    return app
+
+
+def _session_user(role):
+    u = types.SimpleNamespace(
+        user_id="wave5a2-route-test", team_id=None, organization_id=None,
+        plan="PRO", team_role=role, org_role=None, is_admin=False,
+        name="Route Tester", email="route@example.com",
+    )
+    u.can = lambda perm: True
+    return u
+
+
+def test_route_ai_approve_viewer_spoofed_role_gets_403(monkeypatch):
+    """POST /api/v1/ai/approve: the route passes the server-side session user into
+    approve_decision_with_gate; a Viewer spoofing CHIEF_RACE_ENGINEER gets HTTP 403."""
+    from fastapi.testclient import TestClient
+    from suspensionlab.backend.api.routes import ai_engineer_routes as aer
+    from suspensionlab.backend.security.auth import verify_api_key
+    from suspensionlab.physics.ai_engineering_authority import AIEngineeringToolRegistry
+
+    seen = {}
+    real = AIEngineeringToolRegistry.approve_decision_with_gate
+
+    def spy(*a, **kw):
+        seen["user_context"] = kw.get("user_context")
+        seen["approver_role"] = kw.get("approver_role")
+        return real(*a, **kw)
+
+    monkeypatch.setattr(AIEngineeringToolRegistry, "approve_decision_with_gate", staticmethod(spy))
+    viewer = _session_user("VIEWER")
+    client = TestClient(_route_app(aer.router, overrides={verify_api_key: lambda: viewer}))
+    r = client.post("/api/v1/ai/approve", json={
+        "decision_id": "dec-viewer", "approver_name": "Vic Viewer",
+        "approver_role": "CHIEF_RACE_ENGINEER", "autonomous_request": False,
+    })
+    assert r.status_code == 403, r.text
+    assert seen["user_context"] is viewer          # real session, not a client claim
+    assert seen["approver_role"] == "CHIEF_RACE_ENGINEER"  # claim only reaches the gate as untrusted input
+
+    # An authorised engineer session is accepted and signed with the SESSION identity.
+    monkeypatch.setenv("DECISION_HMAC_SECRET", "x" * 48)
+    eng = _session_user("ENGINEER")
+    client2 = TestClient(_route_app(aer.router, overrides={verify_api_key: lambda: eng}))
+    r2 = client2.post("/api/v1/ai/approve", json={
+        "decision_id": "dec-eng", "approver_name": "Spoofed Name",
+        "approver_role": "VIEWER", "autonomous_request": False,
+    })
+    assert r2.status_code == 200, r2.text
+    assert r2.json()["approver_name"] == "Route Tester"
+
+
+def test_route_quarter_car_overdamped_serializes_200(monkeypatch):
+    """POST /api/v1/simulate (quarter car), overdamped request (zeta_s/zeta_u -> None):
+    HTTP 200, clean JSON, null zeta, status flags; no TypeError / ValidationError."""
+    import asyncio
+    from fastapi.testclient import TestClient
+    from suspensionlab.backend.api.routes.simulate import quarter_car as qr
+    from suspensionlab.backend.security.auth import verify_api_key
+    from suspensionlab.backend.database.core import get_db_dependency
+    from suspensionlab.backend.services.simulation_service import SimulationService
+    from suspensionlab.backend.workers.unified_worker import _serialize_for_json
+    from suspensionlab.physics.quarter_car import QuarterCarParams, RoadProfile, run_quarter_car_analysis
+
+    # Runs the SAME solver + serializer the SIMULATE_QUARTER worker path uses
+    # (DB/Redis job bookkeeping is stubbed out).
+    async def _exec(**kw):
+        payload = kw["payload"]
+        raw = run_quarter_car_analysis(QuarterCarParams(**payload["params"]), RoadProfile(**payload["profile"]))
+        return {"job_id": "j-1", "status": "COMPLETED", "result": _serialize_for_json(raw), "error": None}
+
+    monkeypatch.setattr(SimulationService, "execute_or_enqueue", staticmethod(_exec))
+
+    async def _fake_db():
+        yield None
+
+    user = _session_user("ENGINEER")
+    app = _route_app(qr.router, overrides={verify_api_key: lambda: user, get_db_dependency: _fake_db})
+    client = TestClient(app)
+    r = client.post("/api/v1/simulate", json={
+        "params": {"c": 50000.0, "c_t": 5000.0},
+        "profile": {"profile_type": "step", "duration": 1.0},
+    })
+    assert r.status_code == 200, r.text
+    res = r.json()["result"]
+    assert res["zeta_s"] is None and res["zeta_u"] is None
+    assert res["f_n_s"] > 0 and res["f_n_u"] > 0
+
+
+def test_route_full_car_diverged_is_structured_not_500(monkeypatch):
+    """POST /api/v1/simulate/full-car: FullCarDivergedError must return a clean,
+    structured 4xx (code + message), never an unhandled HTTP 500."""
+    from fastapi.testclient import TestClient
+    from suspensionlab.backend.api.routes.simulate import full_car as fr
+    from suspensionlab.backend.security.auth import verify_api_key
+    from suspensionlab.backend.database.core import get_db_dependency
+    from suspensionlab.physics.full_car import FullCarDivergedError
+
+    def _diverge(*a, **k):
+        raise FullCarDivergedError("DIVERGED_NUMERICAL_INSTABILITY: test")
+
+    async def _bounded(fn, *a, **k):
+        k.pop("timeout", None); k.pop("model", None)
+        return fn(*a, **k)
+
+    async def _no_limit(*a, **k):
+        return None
+
+    async def _fake_db():
+        yield None
+
+    monkeypatch.setattr(fr, "run_full_car_analysis", _diverge)
+    monkeypatch.setattr(fr, "bounded_run", _bounded)
+    monkeypatch.setattr(fr, "assert_user_concurrency", _no_limit)
+    user = _session_user("ENGINEER")
+    app = _route_app(fr.router, overrides={verify_api_key: lambda: user, get_db_dependency: _fake_db})
+    client = TestClient(app, raise_server_exceptions=False)
+    r = client.post("/api/v1/simulate/full-car", json={"params": {}, "profile": {"profile_type": "step", "duration": 1.0}})
+    assert r.status_code in (400, 422), (r.status_code, r.text)
+    detail = r.json()["detail"]
+    assert isinstance(detail, dict)
+    assert detail["code"] == "DIVERGED_NUMERICAL_INSTABILITY"
+    assert detail["message"]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. C++ / Python static alignment parity
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_cpp_return_path_applies_static_alignment(monkeypatch):
+    """The compiled solver has no static_camber/static_toe inputs, so
+    solve_kinematics must add them on the C++ return path (otherwise C++ and
+    Python differ by exactly the static value, e.g. -1.2 deg camber)."""
+    import suspensionlab.physics.kinematics as kin
+
+    n = 5
+    zeros = [0.0] * n
+    fake = types.SimpleNamespace(
+        wheel_travel_mm=[-20.0, -10.0, 0.0, 10.0, 20.0],
+        camber_deg=[0.5, 0.25, 0.0, -0.25, -0.5], toe_deg=[0.1, 0.05, 0.0, -0.05, -0.1],
+        caster_deg=zeros, kpi_deg=zeros, track_change_mm=zeros, wheelbase_change_mm=zeros,
+        roll_center_height_mm=zeros, motion_ratio=zeros, scrub_radius_mm=zeros,
+        anti_dive_pct=None, anti_squat_pct=None, anti_lift_pct=None, jacking_force_coeff=None,
+    )
+
+    class _FakeBackend:
+        def __init__(self, *a, **k): pass
+        def sweep(self, *a, **k): return fake
+
+    import suspensionlab.physics.kinematics_facade as facade
+    monkeypatch.setattr(facade, "CppKinematicsBackend", _FakeBackend)
+    monkeypatch.setattr(kin, "_HAVE_CPP", True)
+
+    hp = dict(GT3_HP)
+    c = kin.solve_kinematics(hp, -20.0, 20.0, 5, mode="auto")
+    pts = c.points
+    assert pts[2].camber_deg == pytest.approx(-1.2, abs=1e-9)
+    assert pts[0].camber_deg == pytest.approx(0.5 - 1.2, abs=1e-9)
+    assert pts[0].toe_deg == pytest.approx(0.1, abs=1e-9)
+
+    # Non-GT3 geometry with no explicit static alignment must NOT be forced to -1.2
+    hp2 = {k: v for k, v in GT3_HP.items() if not k.startswith("static_")}
+    c2 = kin.solve_kinematics(hp2, -20.0, 20.0, 5, mode="auto")
+    assert c2.points[2].camber_deg == pytest.approx(0.0, abs=1e-9)
+
+
+def test_hardpoint_input_default_static_alignment_is_zero_and_gt3_explicit():
+    from suspensionlab.backend.api.routes import kinematics_routes as kr
+
+    assert kr.HardpointSetInput().static_camber_deg == 0.0
+    assert kr.HardpointSetInput().static_toe_deg == 0.0
+    cat = kr.BENCHMARK_PRESETS
+    assert cat, "preset catalog not found"
+    for pid, preset in cat.items():
+        hp = preset["hardpoints"]
+        if pid.startswith("gt3"):
+            assert hp["static_camber_deg"] == -1.2 and hp["static_toe_deg"] == 0.0
+        else:
+            assert hp.get("static_camber_deg", 0.0) == 0.0, pid
+
+
+def test_frontend_gt3_presets_carry_explicit_static_alignment():
+    import re
+    src = open(os.path.join(os.path.dirname(__file__), "..", "frontend", "app", "kinematics", "page.tsx"), encoding="utf-8").read()
+    for pid in ("gt3_touring", "gt3_camber_shim_5mm"):
+        i = src.index(f"  {pid}: {{")
+        block = src[i:src.index("hardpoints: {", i)]
+        assert "static_camber_deg: -1.2" in block and "static_toe_deg: 0.0" in block, pid
+    for pid in ("formula_sae", "formula_sae_low_rc", "lmp_prototype"):
+        i = src.index(f"  {pid}: {{")
+        block = src[i:src.index("hardpoints: {", i)]
+        assert "static_camber_deg" not in block, pid

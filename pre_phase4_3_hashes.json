@@ -34,9 +34,9 @@
     "src/suspensionlab/physics/handling_analysis.py": "bb2ed47844cb50e28caa60a7cde8d8e934c85e19e063cb2786618dd633712f8f",
     "src/suspensionlab/physics/handling_model.py": "619cbae5b250462012b3bd2f01ec2955f6cac636b44290d6ee117516e8912218",
     "src/suspensionlab/physics/hil_interface.py": "92d34d0ec48d78fe6771b5eaec38ed894945bb2c6ec332ac5ab9b0eb92da3c6e",
-    "src/suspensionlab/physics/kinematics.py": "4a9e14689cf64ffd42ac46a1c9b6834053180d45613b17199872945cbc9df054",
-    "src/suspensionlab/physics/kinematics_facade.py": "6bfac5e5af0aa69032c82bfbffa8ef884e4d2d838c783c3fb34a7dd810bc0e99",
-    "src/suspensionlab/physics/kinematics_sensitivity.py": "46cd05fa9911152ddb5c972d0a47dd687cd789e5f4e043bb99990acffa41c454",
+    "src/suspensionlab/physics/kinematics.py": "019bb67fca0baae62df77ab1a6c2a947de04a067e31043554931eb27d314d0a5",
+    "src/suspensionlab/physics/kinematics_facade.py": "d94e8a3fbd36e86892a6fd05377d795a880fcdf7c801b216012edcbbf3e8df86",
+    "src/suspensionlab/physics/kinematics_sensitivity.py": "21ec2eaa13fbaca1a9336a31e328f0d52f4fc5e1b30ad8ca7232bda626921f12",
     "src/suspensionlab/physics/kinematics_tensor_lut.py": "67136ae863b4e3c70bb4c8f51cd1d04536ba808273adec22da4e889f18477a63",
     "src/suspensionlab/physics/lap_delta.py": "577b82190f658d0102540e42429dd1e88c9b2a9d1657aba53cfc938a46be1f5d",
     "src/suspensionlab/physics/lap_sim.py": "d2cf7cdc26b580be458daf3c6d94c63520947ddc8362f3977d88ecdaa804f7f7",
@@ -85,9 +85,9 @@
   "manifests": {
     "docs/phase3c1_frozen_baseline_manifest.json": "cae584f165174a76cf4824485380d98794ae828bf90b4a1c59a6dcf0ea271fe1",
     "docs/phase3e_frozen_phase3d_manifest.json": "d09b85e233dd6c0b1b3db1bb264487c79176b9173107dd41d7b9628374ce80b8",
-    "docs/phase3g_frozen_phase3f1_manifest.json": "d819f314e7e282f12b114b0c6d0d460eb498e607429953ab28869383e599cd07",
-    "docs/phase3h1_frozen_phase3h_manifest.json": "8538143fe9234533d5bd20e8ac27f8fdc7d177f84abaae8d16a68cd51a999c0e",
-    "docs/phase3h_frozen_phase3g1_manifest.json": "e2a26e32e566f8ec15b3e3b12605fc2dec86e8d3cb6ab5a70ff306bcf3a9df62",
+    "docs/phase3g_frozen_phase3f1_manifest.json": "836e47da987dd1ccd0d81aecfc7bf20c6c3d3514bdfdb6644537ccd4ae3d5817",
+    "docs/phase3h1_frozen_phase3h_manifest.json": "462b800f793acb327a161b9aa57d4f241f5878e251836637af60a84c166c4f6b",
+    "docs/phase3h_frozen_phase3g1_manifest.json": "f9d6ed28e3ee6db88a1cfcad8a93c04cb6134329b5ca69e0ac0bd2702a9e47a0",
     "docs/phase3o_preregistration_manifest.json": "1b084961d4bd42680f4f9309ac73b7ee3efcb647230111ae1dd516714e300c53",
     "docs/phase3p_preregistration_manifest.json": "b74ea1192f5f6edb0181eed057b7aaa0dc89c5f78b82fae21d793e6368ac0f47"
   },
@@ -108,6 +108,14 @@
       "src/suspensionlab/physics/kinematics.py": "f1da154d9f837f362b65372b297fc30218bff6c884d11e21e3a23a1a5009b30b",
       "src/suspensionlab/physics/lap_sim.py": "5a82950a04a3d1ead55294ea9201b15085231c5b087b239a27e207d0607b4203",
       "src/suspensionlab/physics/quarter_car.py": "12706a5f3289a8e9f5619b0d6db2dc0a194d919b27fd11fa870e27c6bb166503"
+    },
+    "wave5a2_review_followup": {
+      "reason": "Omar review follow-up: kinematics.py solve_kinematics applies static_camber_deg/static_toe_deg on the C++ return path (C++/Python parity). Intermediate Wave 5A-2 hash preserved here; original pre-5A-2 hash remains in wave5a2_previous_hashes. Also: kinematics_facade.py and kinematics_sensitivity.py pass scalar static_camber_deg/static_toe_deg through (fixes zero-filled/crashing scalar handling that regressed 12 kinematics API tests).",
+      "previous_hashes": {
+        "src/suspensionlab/physics/kinematics.py": "4a9e14689cf64ffd42ac46a1c9b6834053180d45613b17199872945cbc9df054",
+        "src/suspensionlab/physics/kinematics_facade.py": "6bfac5e5af0aa69032c82bfbffa8ef884e4d2d838c783c3fb34a7dd810bc0e99",
+        "src/suspensionlab/physics/kinematics_sensitivity.py": "46cd05fa9911152ddb5c972d0a47dd687cd789e5f4e043bb99990acffa41c454"
+      }
     }
   }
 }

@@ -6,13 +6,13 @@
   "tire_scale_factor_s_tire": 1.16,
   "steering_compliance_k_delta": 0.000451,
   "physics_file_hashes": {
-    "src/suspensionlab/physics/dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690",
+    "src/suspensionlab/physics/dynamic_lap_sim.py": "bc409d2a228ca20adf5119502d6c227c5723cb8e998263fbdcccdb4b53e09d90",
     "src/suspensionlab/physics/magic_formula.py": "2be0492f1e4c483401c1cd8544381edeb364dd5380e4b8fe9796f613cc627048",
     "src/suspensionlab/physics/tire_model.py": "da72dea8adf6b83846997fa02c9b1cade1b74272bcaa96f5aa0e2ea389005209",
     "src/suspensionlab/physics/wheel_dynamics.py": "7b18dc638b0bcaddf42add726134102171a7bcb75dab1a9f80bbbdb23200cf42",
-    "src/suspensionlab/physics/kinematics.py": "f1da154d9f837f362b65372b297fc30218bff6c884d11e21e3a23a1a5009b30b",
+    "src/suspensionlab/physics/kinematics.py": "019bb67fca0baae62df77ab1a6c2a947de04a067e31043554931eb27d314d0a5",
     "src/suspensionlab/physics/half_car.py": "1497f41aa9559f2821c6559211a85bf6aee41350ce3750865e566472f303c96f",
-    "src/suspensionlab/physics/quarter_car.py": "12706a5f3289a8e9f5619b0d6db2dc0a194d919b27fd11fa870e27c6bb166503",
+    "src/suspensionlab/physics/quarter_car.py": "ca776c56d160316cefaeca26dfc63552f3f4fbce576729d31012cbfd1886f021",
     "src/suspensionlab/physics/contracts.py": "afb71fc4b9f7bc4a50e0c8eb544a83047bb1f084870a223443d6b12c9b05dbfe"
   },
   "baseline_test_suite_count": 104,
@@ -29,6 +29,16 @@
     "previous_hashes": {
       "src/suspensionlab/physics/magic_formula.py": "31acfd244c5847bd9c7a9b6a8c2ea10cac8aa3da80e5931e39be7bc849f2308e",
       "src/suspensionlab/physics/quarter_car.py": "65b3b882416db02c557a8bb1c12b22b2b67b412821d2dd07eb74f4d30d9aeae5"
+    }
+  },
+  "wave5a2_recertification": {
+    "cycle": "WAVE_5A2_KINEMATICS_LAPSIM_FULLCAR_HONESTY_REMEDIATION",
+    "timestamp_iso": "2026-11-26T16:19:15.755074+00:00",
+    "reason": "Physics files remediated in Wave 5A-2. Previous (Wave 5A / original phase) hashes preserved below.",
+    "previous_hashes": {
+      "src/suspensionlab/physics/dynamic_lap_sim.py": "4a7e3de081ba0b2212ba97e4259c80772434a72e02b4c7e734668d4c4d90e690",
+      "src/suspensionlab/physics/kinematics.py": "f1da154d9f837f362b65372b297fc30218bff6c884d11e21e3a23a1a5009b30b",
+      "src/suspensionlab/physics/quarter_car.py": "12706a5f3289a8e9f5619b0d6db2dc0a194d919b27fd11fa870e27c6bb166503"
     }
   }
 }

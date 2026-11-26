@@ -181,9 +181,14 @@ def test_quarter_car_zero_and_extreme_damping():
 
         assert modal["f_n_s"] > 0.5
         assert modal["f_n_u"] > 5.0
-        assert modal["zeta_s"] >= 0.0
-        assert not math.isnan(modal["zeta_s"])
-        assert not math.isinf(modal["zeta_s"])
+        # Wave 5A-2: an overdamped (real-pole) system reports zeta=None plus an explicit
+        # mode_status instead of a fabricated damping ratio; finite values are still sane.
+        if modal["zeta_s"] is None:
+            assert modal.get("mode_status_s") == "OVERDAMPED_OR_UNIDENTIFIED"
+        else:
+            assert modal["zeta_s"] >= 0.0
+            assert not math.isnan(modal["zeta_s"])
+            assert not math.isinf(modal["zeta_s"])
 
         prof = RoadProfile(profile_type="step", amplitude=0.02, duration=1.0)
         sim = simulate_time_response(p, prof)
