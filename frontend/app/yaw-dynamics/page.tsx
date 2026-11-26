@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
 import {
   Activity, RefreshCw, AlertCircle, TrendingUp, TrendingDown,
   Gauge, BarChart3, Play, Settings2,
 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
+import { useWorkspace } from "../../contexts/WorkspaceContext";
+import { formatApiError } from "../../lib/api_client";
 
 import Plot from "../../components/sim/Plot";
 
@@ -105,6 +107,7 @@ function ParamInput({ label, value, onChange, min, max, step = 0.1, unit = "" }:
 
 export default function YawDynamicsPage() {
   const { fetchWithAuth } = useAuth();
+  const { vehicle } = useWorkspace();
 
   const [params, setParams] = useState({
     mass:           800.0,
@@ -114,6 +117,21 @@ export default function YawDynamicsPage() {
     C_alpha_front:  120_000.0,
     C_alpha_rear:   140_000.0,
   });
+
+  // Drive from the shared Workspace vehicle (single source of truth); re-seed when
+  // the active workspace vehicle changes so pages never run a split-brain car.
+  const yawSeededFor = useRef<string | null>(null);
+  useEffect(() => {
+    if (vehicle && vehicle.id !== yawSeededFor.current) {
+      yawSeededFor.current = vehicle.id;
+      setParams((p) => ({
+        ...p,
+        mass: vehicle.mass_kg ?? p.mass,
+        wheelbase: vehicle.wheelbase_m ?? p.wheelbase,
+        cog_dist_front: vehicle.wheelbase_m ? Number((vehicle.wheelbase_m / 2).toFixed(3)) : p.cog_dist_front,
+      }));
+    }
+  }, [vehicle]);
 
   const [simParams, setSimParams] = useState({
     v_ms:      60.0,
@@ -158,7 +176,7 @@ export default function YawDynamicsPage() {
       setMmmResult(yawData.mmm);
       setTransient(transData);
     } catch (e: any) {
-      setError(e.message ?? "Request failed");
+      setError(formatApiError(e, "Yaw-dynamics request failed"));
     } finally {
       setLoading(false);
     }
@@ -298,7 +316,10 @@ export default function YawDynamicsPage() {
                   <MetricRow label="Understeer gradient"
                     value={metrics.understeer_gradient_deg_per_g.toFixed(2)} unit=" deg/g"
                     highlight={Math.abs(metrics.understeer_gradient_deg_per_g) > 2} />
-                  <MetricRow label="Neutral steer speed"
+                  {/* Never "Neutral steer speed": understeer -> characteristic, oversteer -> critical */}
+                  <MetricRow label={metrics.handling_class === "oversteer"
+                      ? "Critical Speed (V_cr)"
+                      : "Characteristic Speed (V_ch)"}
                     value={metrics.neutral_steer_speed_kmh !== null
                       ? metrics.neutral_steer_speed_kmh.toFixed(0) : "∞"} unit=" km/h" />
                   <MetricRow label="Yaw natural freq"

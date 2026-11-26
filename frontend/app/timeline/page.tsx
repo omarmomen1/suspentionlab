@@ -81,7 +81,7 @@ export default function TimelinePage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const carRef = vehicle?.name || vehicle?.id || "AMR24-EVO";
+      const carRef = vehicle?.name || vehicle?.id || "UNASSIGNED-VEHICLE";
       const [eventsRes, decisionsRes] = await Promise.all([
         TimelineDecisionApi.listEvents({
           vehicle_ref: carRef,

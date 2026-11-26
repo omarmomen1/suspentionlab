@@ -105,7 +105,11 @@ export default function WorkspaceStatusBar() {
 
         {/* Right: Trial Indicator, Validation Badge & Expandable Drawer Toggle */}
         <div className="flex items-center gap-2 shrink-0">
-          {(user?.is_trial || user?.plan === "TRIAL") && (
+          {/* Trial badge: only for genuinely active trials - never for PRO/ENTERPRISE
+              and never once trial_expires_at has passed (no "Day 8 of 7") */}
+          {(user?.is_trial || user?.plan === "TRIAL") &&
+            user?.plan !== "PRO" && user?.plan !== "ENTERPRISE" &&
+            (!user?.trial_expires_at || new Date(user.trial_expires_at).getTime() > Date.now()) && (
             <Link
               href="/evaluation"
               className="px-2 py-0.5 rounded border border-ansys-yellow/40 bg-ansys-yellow/10 text-ansys-yellow hover:bg-ansys-yellow/20 text-[10px] font-bold tracking-wider flex items-center gap-1.5 shrink-0 transition-all"

@@ -237,7 +237,7 @@ export default function DurabilityPage() {
                   { label: "Comfort Rating", value: result.comfort_rating, sub: result.iso_2631_class },
                   { label: "Body Accel (Wk-weighted)", value: `${result.rms_body_accel_wk.toFixed(3)} m/s²`, sub: "ISO 2631-1" },
                   { label: "Vibration Dose Value", value: `${result.vdv.toFixed(3)} m/s¹·⁷⁵`, sub: "VDV" },
-                  { label: "Best Component Life", value: result.best_range_km >= 1000 ? `${(result.best_range_km/1000).toFixed(0)}k km` : `${result.best_range_km} km`, sub: result.worst_component },
+                  { label: "Limiting Component Life", value: result.best_range_km >= 1000 ? `${(result.best_range_km/1000).toFixed(0)}k km` : `${result.best_range_km} km`, sub: result.worst_component },
                 ].map(({ label, value, sub }) => (
                   <div key={label} className="space-y-1">
                     <p className="text-[10px] text-gray-600 uppercase tracking-wider">{label}</p>

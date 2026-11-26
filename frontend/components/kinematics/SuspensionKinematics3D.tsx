@@ -361,9 +361,11 @@ function SuspensionScene({
       <CameraPresetController preset={preset} controlsRef={controlsRef} />
 
       {/* Lighting */}
-      <ambientLight intensity={0.65} />
-      <directionalLight position={[5, 8, 5]} intensity={1.2} castShadow />
-      <directionalLight position={[-5, -2, -5]} intensity={0.4} color="#60a5fa" />
+      {/* Brighter rig lighting so wishbones and axes read crisply on dark mode */}
+      <ambientLight intensity={0.95} />
+      <directionalLight position={[5, 8, 5]} intensity={1.7} castShadow />
+      <directionalLight position={[-5, -2, -5]} intensity={0.75} color="#60a5fa" />
+      <directionalLight position={[0, -6, 3]} intensity={0.35} color="#f2a900" />
 
       {/* Ground plane & Vehicle Centerline */}
       {showGround && (

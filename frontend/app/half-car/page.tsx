@@ -288,7 +288,8 @@ function HalfCarDashboard() {
                   className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white w-28 focus:outline-none focus:border-ansys-yellow/60">
                   <option value="step">Step</option>
                   <option value="sine">Sine Wave</option>
-                  <option value="bump">Single Bump</option>
+                  {/* canonical Wave 5A enum for the single half-sine bump */}
+                  <option value="single_bump">Single Bump</option>
                   <option value="pothole">Pothole</option>
                   <option value="random">Random Rough</option>
                 </select>

@@ -268,12 +268,12 @@ export default function Navbar() {
         {studioMode ? (
           <div
             data-studio-mode="true"
-            className="hidden lg:flex flex-1 min-w-0 items-center justify-center gap-1.5 px-2 text-xs font-medium overflow-hidden"
+            className="hidden lg:flex flex-1 min-w-0 items-center justify-center gap-1 xl:gap-1.5 px-1 xl:px-2 text-[11px] xl:text-xs font-medium overflow-visible"
           >
             {STUDIO_TOOLS.map(renderStudioTool)}
           </div>
         ) : (
-          <div className="hidden lg:flex flex-1 min-w-0 items-center justify-center gap-1.5 px-2 text-xs font-medium overflow-hidden">
+          <div className="hidden lg:flex flex-1 min-w-0 items-center justify-center gap-1 xl:gap-1.5 px-1 xl:px-2 text-[11px] xl:text-xs font-medium overflow-visible">
             {/* Stage 1: Setup */}
             <Link
               href="/garage"

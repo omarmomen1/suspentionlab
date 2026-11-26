@@ -9,6 +9,29 @@
 
 import { apiJson, apiFetch } from "./api";
 
+/**
+ * formatApiError - single shared error formatter.
+ * Always surfaces the real backend/client message; never emits "[object Object]".
+ * `context` is a short human phrase describing what failed.
+ */
+export function formatApiError(err: unknown, context: string): string {
+  let msg: string;
+  if (err instanceof Error) {
+    msg = err.message || err.name;
+  } else if (typeof err === "string") {
+    msg = err;
+  } else if (err && typeof err === "object") {
+    const o = err as Record<string, unknown>;
+    if (typeof o.detail === "string") msg = o.detail;
+    else if (typeof o.message === "string") msg = o.message;
+    else if (typeof o.error === "string") msg = o.error;
+    else msg = "Unknown error (server returned no message)";
+  } else {
+    msg = "Unknown error";
+  }
+  return context ? `${context}: ${msg}` : msg;
+}
+
 // ── Types & Interfaces ────────────────────────────────────────────────────────
 
 export interface QuarterCarRequest {
@@ -1343,23 +1366,27 @@ export class AiEngineerApi {
     });
   }
 
+  /**
+   * Human governance approval gate. Sends only the real approval payload -
+   * the backend derives the approver's role from the authenticated session
+   * and signs server-side. Never send client-fabricated roles or signatures.
+   */
   static async approveDecision(
     decisionId: string,
-    actionType: string,
-    signoffNotes: string,
-    userRole: string,
-    signature: string,
+    decisionType: string,
+    rationale: string,
+    approverName?: string,
     teamId?: string
-  ): Promise<{ status: string; approved_by: string; timestamp: string; hmac_signature: string }> {
+  ): Promise<{ status: string; approved_by?: string; timestamp?: string; [key: string]: unknown }> {
     return apiJson("/api/v1/ai/approve", {
       method: "POST",
       body: JSON.stringify({
         decision_id: decisionId,
-        action_type: actionType,
-        signoff_notes: signoffNotes,
-        user_role: userRole,
-        signature: signature,
+        decision_type: decisionType,
+        rationale,
+        approver_name: approverName,
         team_id: teamId,
+        autonomous_request: false,
       }),
     });
   }

@@ -108,7 +108,9 @@ interface ParsedCsvTelemetry {
     mean: number;
     std: number;
     missing_pct: number;
+    synthetic?: boolean;
   }>;
+  synthesizedChannels?: string[];
   maxG: number;
   latG: number;
   longG: number;
@@ -185,7 +187,7 @@ function parseTelemetryCsv(csvText: string): ParsedCsvTelemetry {
     const key = mappedKeys[c];
     const finiteVals = buckets[c].filter(Number.isFinite);
     if (finiteVals.length === 0) {
-      rejectedColumns.push(`${rawColumns[c]} (non-numeric/empty)`);
+      rejectedColumns.push(`${rawColumns[c]} (non-numeric/empty) - expected schema: time, speed, lat_g, long_g, damper_fl/vert_g channels as numeric columns`);
       continue;
     }
     // Deduplicate only non-NaN cleaned vector
@@ -229,6 +231,7 @@ function parseTelemetryCsv(csvText: string): ParsedCsvTelemetry {
   }
 
   // Synthesize vertical acceleration proxy if CSV lacks vert_g so quarter-car/full-car correlation works cleanly
+  const synthesizedChannels: string[] = [];
   if (!channels["vert_g"] && channels["damper_fl"] && channels["damper_fl"].length > 2) {
     const d = channels["damper_fl"];
     const dt = sampleRateHz > 0 ? 1 / sampleRateHz : 0.01;
@@ -238,6 +241,22 @@ function parseTelemetryCsv(csvText: string): ParsedCsvTelemetry {
       vertG[i] = Math.max(-4, Math.min(4, Number((accelMps2 / 9.81).toFixed(4))));
     }
     channels["vert_g"] = vertG;
+    // Double-differentiated from damper travel - must be labelled synthetic everywhere it shows.
+    synthesizedChannels.push("vert_g");
+    healthRows.push({
+      key: "vert_g",
+      name: "Vertical Acceleration (SYNTHETIC CHANNEL - derived from damper_fl)",
+      unit: "G",
+      state: "WARNING",
+      rate: sampleRateHz > 0 ? Number(sampleRateHz.toFixed(1)) : 100,
+      coverage: 100,
+      min: Math.min(...vertG),
+      max: Math.max(...vertG),
+      mean: Number((vertG.reduce((a, b) => a + b, 0) / vertG.length).toFixed(3)),
+      std: 0,
+      missing_pct: 0,
+      synthetic: true,
+    });
   }
 
   // Compute G-G circle point & peak envelope
@@ -267,6 +286,7 @@ function parseTelemetryCsv(csvText: string): ParsedCsvTelemetry {
     durationSec,
     channels,
     healthRows,
+    synthesizedChannels,
     maxG: Number(maxG.toFixed(2)),
     latG: Number(peakLat.toFixed(2)),
     longG: Number(peakLong.toFixed(2)),
@@ -563,6 +583,14 @@ function CorrelationCockpitContent() {
   }, [selectedModel]);
 
   const activeChannelData = modelComparisonData?.channels?.find((c: any) => c.channel_key === selectedChannelKey) || modelComparisonData?.channels?.[0];
+
+  // Zero-lie gate: never show green CORRELATED below the R^2 >= 0.70 acceptance threshold.
+  const activeR2 = Number(activeChannelData?.metrics?.r_squared);
+  const r2Ok = Number.isFinite(activeR2) && activeR2 >= 0.70;
+  const displayEpistemicLabel =
+    activeChannelData?.epistemic_label === "CORRELATED" && !r2Ok
+      ? "UNVERIFIED (R\u00b2 < 0.70)"
+      : activeChannelData?.epistemic_label;
 
   const { channelYMin, channelYMax, dynamicTimeLabels, scaleChannelY, scaleResidualY, channelZeroY } = useMemo(() => {
     const meas = (activeChannelData?.measured || []) as number[];
@@ -887,7 +915,14 @@ function CorrelationCockpitContent() {
                     .filter((ch) => healthFilter === "ALL" || ch.state === healthFilter)
                     .map((ch) => (
                       <tr key={ch.key} className="hover:bg-neutral-800/30">
-                        <td className="py-3 px-4 font-sans font-medium text-white">{ch.name}</td>
+                        <td className="py-3 px-4 font-sans font-medium text-white">
+                          {ch.name}
+                          {ch.synthetic && (
+                            <span className="ml-2 px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/40 font-mono">
+                              SYNTHETIC CHANNEL
+                            </span>
+                          )}
+                        </td>
                         <td className="py-3 px-4">
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -1101,14 +1136,14 @@ function CorrelationCockpitContent() {
                       <span className="text-neutral-400 uppercase">Synchronized Signal Comparison</span>
                       <span
                         className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          activeChannelData.epistemic_label === "CORRELATED"
+                          activeChannelData.epistemic_label === "CORRELATED" && r2Ok
                             ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                             : activeChannelData.epistemic_label === "INFERRED"
                             ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
                             : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
                         }`}
                       >
-                        {activeChannelData.epistemic_label}
+                        {displayEpistemicLabel}
                       </span>
                     </div>
                     <h3 className="text-xl font-bold text-white mt-0.5">{activeChannelData.name}</h3>
@@ -1151,7 +1186,7 @@ function CorrelationCockpitContent() {
                       )}
                     </div>
                     <div className="text-neutral-400">
-                      R² = <strong className="text-emerald-400">{activeChannelData.metrics.r_squared}</strong> &bull; RMSE ={" "}
+                      R² = <strong className={r2Ok ? "text-emerald-400" : "text-amber-400"}>{activeChannelData.metrics.r_squared}</strong> &bull; RMSE ={" "}
                       <strong className="text-cyan-400">
                         {activeChannelData.metrics.rmse} {activeChannelData.unit}
                       </strong>

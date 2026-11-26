@@ -34,6 +34,7 @@ import {
   AiChatResponse,
   AiToolSchema,
   AiCitation,
+  formatApiError,
 } from "../../lib/api_client";
 
 const PARAM_LABELS: Record<string, string> = {
@@ -181,7 +182,7 @@ export default function AIEngineerPage() {
       });
       setResult(data);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "AI Engine execution error");
+      setError(formatApiError(e, "AI Engine execution error"));
     } finally {
       setLoading(false);
     }
@@ -189,19 +190,28 @@ export default function AIEngineerPage() {
 
   const handleApproveGate = async () => {
     if (!result?.approval_gate) return;
+    if (!user) {
+      setError("Sign in required: only an authenticated engineer can approve a decision gate.");
+      return;
+    }
     setApproving(true);
     try {
-      const targetId = result.approval_gate.target_id || result.approval_gate.decision_id || result.approval_gate.decision_type || "EXP-SPA-SETUP-02";
-      const actionType = result.approval_gate.action_type || result.approval_gate.decision_type || "SETUP_MODIFICATION";
+      const targetId = result.approval_gate.target_id || result.approval_gate.decision_id || result.approval_gate.decision_type;
+      if (!targetId) {
+        setError("No decision id returned by the AI run - cannot approve. Re-run the analysis first.");
+        setApproving(false);
+        return;
+      }
+      const decisionType = result.approval_gate.action_type || result.approval_gate.decision_type || "SETUP_MODIFICATION";
+      // Real payload only: backend derives role from the session and signs server-side.
       const res = await AiEngineerApi.approveDecision(
         targetId,
-        actionType,
+        decisionType,
         approvalNotes,
-        user?.team_role || "CHIEF_RACE_ENGINEER",
-        "HUMAN_HMAC_SIG_" + Date.now().toString(16),
-        user?.team_id || undefined
+        user.name || user.email,
+        user.team_id || undefined
       );
-      setApprovalSuccess(`Approved by ${res.approved_by || "Human Race Engineer"}. Cryptographic HMAC-SHA256 signature recorded in audit log.`);
+      setApprovalSuccess(`Approved by ${res.approved_by || user.name || user.email}. Decision recorded in the audit ledger.`);
       setResult({
         ...result,
         approval_gate: {
@@ -210,11 +220,15 @@ export default function AIEngineerPage() {
         },
       });
     } catch (err: any) {
-      setError(err?.message || "Failed to sign off approval gate.");
+      setError(formatApiError(err, "Failed to sign off approval gate"));
     } finally {
       setApproving(false);
     }
   };
+
+  /** Render helper: only real strings render; objects never become "[object Object]". */
+  const asText = (v: unknown): string | null =>
+    typeof v === "string" && v.trim().length > 0 ? v : null;
 
   const getSourceBadgeColor = (source: string) => {
     switch (source) {
@@ -617,7 +631,7 @@ export default function AIEngineerPage() {
                         <div className="bg-zinc-900 p-3 rounded border border-zinc-800">
                           <span className="text-zinc-500 text-[10px] block uppercase">Proposed Action</span>
                           <span className="text-zinc-200 font-bold block mt-1">
-                            {result.setup_summary || result.approval_gate.change_summary || result.approval_gate.action_type || "Setup Modification Proposal"}
+                            {asText(result.setup_summary) || asText(result.approval_gate.change_summary) || asText(result.approval_gate.action_type) || "Setup Modification Proposal"}
                           </span>
                         </div>
                         <div className="bg-zinc-900 p-3 rounded border border-zinc-800">
@@ -688,7 +702,7 @@ export default function AIEngineerPage() {
                           Mandatory Human Governance Gate (Engineering Rule 8 &amp; 14)
                         </span>
                         <span className="text-zinc-300 text-[11px]">
-                          AI recommendations are uncertified engineering hypotheses. They must NEVER be automatically applied to vehicle setups or certified as track-ready without explicit HMAC sign-off from an authorized engineer.
+                          AI recommendations are uncertified engineering hypotheses. They must NEVER be automatically applied to vehicle setups or certified as track-ready without explicit human approval from an authorized engineer.
                         </span>
                       </div>
                     </div>
@@ -716,7 +730,7 @@ export default function AIEngineerPage() {
                     </span>
                   </div>
                   <p className="text-sm font-medium text-zinc-100 leading-relaxed font-sans whitespace-pre-line">
-                    {result.answer || result.setup_summary || result.diagnosis}
+                    {asText(result.answer) || asText(result.setup_summary) || asText(result.diagnosis) || "No response text returned."}
                   </p>
                 </div>
 

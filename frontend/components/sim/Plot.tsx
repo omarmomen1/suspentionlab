@@ -16,7 +16,16 @@ const PlotlyCore = dynamic(() => import("react-plotly.js"), {
   ),
 });
 
+const DEFAULT_CONFIG: Partial<PlotParams["config"]> = {
+  displaylogo: false,
+  responsive: true,
+  displayModeBar: true,
+  // Keep the modebar lean so it never crowds the chart title
+  modeBarButtonsToRemove: ["lasso2d", "select2d", "autoScale2d"],
+};
+
 export default function Plot(props: PlotParams) {
-  return <PlotlyCore {...props} />;
+  const { config, ...rest } = props;
+  return <PlotlyCore config={{ ...DEFAULT_CONFIG, ...(config as object) }} {...rest} />;
 }
 

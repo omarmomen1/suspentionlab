@@ -25,6 +25,8 @@ import {
   ArrowRight,
   Car,
 } from "lucide-react";
+import NextStepLink from "../../components/NextStepLink";
+import { formatApiError } from "../../lib/api_client";
 import { useAuth } from "../../contexts/AuthContext";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
 import PlanGate from "../../components/PlanGate";
@@ -115,6 +117,8 @@ export interface SetupSurfaceResult {
 
 interface LapSimResponse {
   lap_time_s: number;
+  lap_completed?: boolean;
+  outcome?: string;
   sector_times: number[];
   max_speed_kmh: number;
   min_speed_kmh: number;
@@ -126,6 +130,7 @@ interface LapSimResponse {
   min_rh_front_mm?: number;
   min_rh_rear_mm?: number;
   bottoming_events_count?: number;
+  front_lltd_estimated?: boolean;
   setup_surface?: SetupSurfaceResult;
   energy_used_kj: number;
   understeer_pct?: number;
@@ -1355,7 +1360,7 @@ export default function LapSimPage() {
     };
 
     setParsedCsvData(sampleCsvData);
-    setTelemetryFileName("MoTeC_Sample_Stint.csv");
+    setTelemetryFileName("MoTeC_Sample_Stint.csv [Local Estimate (Unsolved)]");
     setTrackInputTab("csv");
     handleSimulate(undefined, sampleCsvData, "csv");
   };
@@ -1493,11 +1498,8 @@ export default function LapSimPage() {
       const rawLapTime = raw.lap_time_s ?? raw.total_time_s ?? 0;
       let parsedSectors = Array.isArray(raw.sector_times) ? raw.sector_times : (Array.isArray(raw.sector_times_s) ? raw.sector_times_s : []);
       if (!parsedSectors || parsedSectors.length < 3 || parsedSectors[1] <= 0 || parsedSectors[2] <= 0) {
-        parsedSectors = [
-          Number((rawLapTime * 0.30).toFixed(3)),
-          Number((rawLapTime * 0.36).toFixed(3)),
-          Number((rawLapTime * 0.34).toFixed(3)),
-        ];
+        // No fabricated 30/36/34% splits - unknown sectors stay unknown (UI shows N/A).
+        parsedSectors = [];
       }
 
       // Exact mechanical front LLTD fallback
@@ -1509,6 +1511,8 @@ export default function LapSimPage() {
 
       const simData: LapSimResponse = {
         lap_time_s: rawLapTime,
+        lap_completed: raw.lap_completed ?? true,
+        outcome: raw.outcome,
         sector_times: parsedSectors,
         max_speed_kmh: raw.max_speed_kmh ?? 0,
         min_speed_kmh: raw.min_speed_kmh ?? 0,
@@ -1517,6 +1521,7 @@ export default function LapSimPage() {
         max_long_g: raw.max_long_g,
         max_braking_g: raw.max_braking_g,
         front_lltd_pct: raw.front_lltd_pct ?? fallbackFrontLltd,
+        front_lltd_estimated: raw.front_lltd_pct == null,
         min_rh_front_mm: raw.min_rh_front_mm ?? raw.telemetry?.min_rh_front_mm,
         min_rh_rear_mm: raw.min_rh_rear_mm ?? raw.telemetry?.min_rh_rear_mm,
         bottoming_events_count: raw.bottoming_events_count ?? 0,
@@ -1620,7 +1625,7 @@ export default function LapSimPage() {
 
       setResult(simData);
     } catch (e: any) {
-      setError(e.message ?? "Simulation failed");
+      setError(formatApiError(e, "Lap simulation failed"));
     } finally {
       setRunning(false);
     }
@@ -1671,9 +1676,11 @@ export default function LapSimPage() {
   }, [trackInputTab, activeCircuit, cornerOpportunities]);
 
   const tel = result?.trace;
-  const s1Time = result?.sector_times?.[0] ?? (result?.lap_time_s ? result.lap_time_s * 0.30 : 0);
-  const s2Time = result?.sector_times?.[1] ?? (result?.lap_time_s ? result.lap_time_s * 0.36 : 0);
-  const s3Time = result?.sector_times?.[2] ?? (result?.lap_time_s ? result.lap_time_s * 0.34 : 0);
+  // Unknown sectors stay unknown - no fabricated 30/36/34% splits.
+  const s1Time = result?.sector_times?.[0] ?? null;
+  const s2Time = result?.sector_times?.[1] ?? null;
+  const s3Time = result?.sector_times?.[2] ?? null;
+  const lapIncomplete = result?.lap_completed === false;
 
   return (
     <PlanGate required="PRO" feature="Lap Time & Track Sim">
@@ -1693,6 +1700,7 @@ export default function LapSimPage() {
               <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 font-mono ml-auto">
                 PRO SOLVER
               </span>
+              <NextStepLink />
             </div>
             <p className="text-[10px] text-zinc-400 leading-relaxed font-sans">
               Coupled aero, mass, &amp; suspension multi-body lap solver
@@ -2012,12 +2020,14 @@ export default function LapSimPage() {
             <div className="flex-shrink-0 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 p-3 border-b border-white/10 bg-[#090B10]/95 backdrop-blur-md z-20">
               <KpiPill
                 label="Lap Time"
-                value={formatLapTime(result.lap_time_s)}
+                value={lapIncomplete ? "INCOMPLETE" : formatLapTime(result.lap_time_s)}
                 accent
               />
               <KpiPill
                 label="S1 / S2 / S3"
-                value={`${s1Time.toFixed(1)} / ${s2Time.toFixed(1)} / ${s3Time.toFixed(1)}`}
+                value={s1Time != null && s2Time != null && s3Time != null
+                  ? `${s1Time.toFixed(1)} / ${s2Time.toFixed(1)} / ${s3Time.toFixed(1)}`
+                  : "N/A"}
                 unit="s"
               />
               <KpiPill
@@ -2027,22 +2037,26 @@ export default function LapSimPage() {
               />
               <KpiPill
                 label="Max Cornering"
-                value={(result.max_lat_g ?? 1.85).toFixed(2)}
+                value={result.max_lat_g != null ? result.max_lat_g.toFixed(2) : "N/A"}
                 unit="g"
               />
               <KpiPill
                 label="Max Braking"
-                value={(result.max_braking_g ?? 2.15).toFixed(2)}
+                value={result.max_braking_g != null ? result.max_braking_g.toFixed(2) : "N/A"}
                 unit="g"
               />
               <KpiPill
                 label="Front LLTD"
-                value={`${Number(result.front_lltd_pct ?? 50.6).toFixed(1)}`}
+                value={result.front_lltd_pct != null
+                  ? `${Number(result.front_lltd_pct).toFixed(1)}${result.front_lltd_estimated ? "*" : ""}`
+                  : "N/A"}
                 unit="%"
               />
               <KpiPill
                 label="Min Ride Height (F/R)"
-                value={`${Number(result.min_rh_front_mm ?? 24.2).toFixed(1)} / ${Number(result.min_rh_rear_mm ?? 31.8).toFixed(1)}`}
+                value={result.min_rh_front_mm != null && result.min_rh_rear_mm != null
+                  ? `${Number(result.min_rh_front_mm).toFixed(1)} / ${Number(result.min_rh_rear_mm).toFixed(1)}`
+                  : "N/A"}
                 unit="mm"
               />
               <KpiPill
@@ -2050,6 +2064,40 @@ export default function LapSimPage() {
                 value={result.energy_used_kj.toFixed(0)}
                 unit="kJ"
               />
+              <KpiPill
+                label="Bottoming Events"
+                value={`${result.bottoming_events_count ?? 0}`}
+                unit=""
+              />
+            </div>
+          )}
+
+          {/* Truthfulness banners */}
+          {result && lapIncomplete && (
+            <div className="flex-shrink-0 px-3 py-2 bg-red-950/60 border-b border-red-500/40 text-red-300 text-xs font-mono font-bold flex items-center gap-2">
+              LAP INCOMPLETE - PHYSICAL INSTABILITY{result.outcome ? ` (${result.outcome})` : ""}. No valid lap time - the displayed values describe the aborted run.
+            </div>
+          )}
+          {result && !lapIncomplete && (result.bottoming_events_count ?? 0) > 0 && (
+            <div className="flex-shrink-0 px-3 py-2 bg-amber-950/60 border-b border-amber-500/40 text-amber-300 text-xs font-mono font-bold flex items-center gap-2">
+              BOTTOMING DETECTED - {result.bottoming_events_count} event(s). Increase ride height or bump-stop rate.
+            </div>
+          )}
+          {result && !lapIncomplete && (result.bottoming_events_count ?? 0) === 0 &&
+            result.min_rh_front_mm != null && result.min_rh_rear_mm != null &&
+            (result.min_rh_front_mm <= 1.0 || result.min_rh_rear_mm <= 1.0) && (
+            <div className="flex-shrink-0 px-3 py-2 bg-amber-950/60 border-b border-amber-500/40 text-amber-300 text-xs font-mono font-bold flex items-center gap-2">
+              BOTTOMING DETECTED - minimum ride height at or below 1.0 mm.
+            </div>
+          )}
+          {result?.front_lltd_estimated && (
+            <div className="flex-shrink-0 px-3 py-1 bg-[#0C1018] border-b border-[#1A202D] text-zinc-500 text-[10px] font-mono">
+              * Front LLTD marked with an asterisk is a mechanical estimate derived from spring/ARB rates (motion ratios 0.72/0.74 assumed) - not solver output.
+            </div>
+          )}
+          {result && (
+            <div className="flex-shrink-0 px-3 py-1 bg-[#0C1018] border-b border-[#1A202D] text-zinc-600 text-[10px] font-mono">
+              QSS aero/tire baseline - verify against track telemetry before committing setup changes.
             </div>
           )}
 
@@ -2486,7 +2534,13 @@ export default function LapSimPage() {
                   setupAParams={pinnedBaseline?.cfg as any}
                   setupBParams={cfg as any}
                   onPinBaseline={handlePinBaseline}
-                  onResetToBaseline={() => pinnedBaseline && setCfg({ ...pinnedBaseline.cfg })}
+                  onResetToBaseline={() => {
+                    if (!pinnedBaseline) return;
+                    const c = { ...pinnedBaseline.cfg };
+                    setCfg(c);
+                    // Trigger a fresh re-solve with the restored setup
+                    handleSimulate(c);
+                  }}
                 />
               </>
             ) : (
