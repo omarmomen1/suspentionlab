@@ -143,7 +143,8 @@ describe("DifferenceRibbon, EnvelopePlot, lap-sim", () => {
     const s = read("app/lap-sim/page.tsx");
     expect(s).toContain("include_surface: false");
     expect(s).toContain("AbortController");
-    expect(s).toContain("Compute GGV Surface");
+    expect(s).toContain("Compute Setup Grid (21–51 s)");
+    expect(s).not.toContain("Compute GGV Surface");
     expect(s).toContain("Cancel");
   });
 });
@@ -388,5 +389,13 @@ describe("LedgerTable, DifferenceRibbon, EnvelopePlot data wiring", () => {
     const html = renderToStaticMarkup(h(EnvelopePlot, { latG: [NaN, 1], longG: [0, 0] }));
     expect(html).not.toMatch(/NaN/);
     expect(nums(html, /<circle cx="([-\d.]+)" cy="([-\d.]+)" r="1.2"/g)).toHaveLength(1);
+  });
+});
+
+import { DEFAULT_TARGET_BANDS } from "../components/kinematics/KinematicsTargetBandsModal";
+describe("motion-ratio band single source", () => {
+  it("modal default equals the Blueprint GT3 band, so they cannot disagree", () => {
+    expect(DEFAULT_TARGET_BANDS.motion_ratio).toEqual([...GT3_MOTION_RATIO_BAND]);
+    expect(DEFAULT_TARGET_BANDS.motion_ratio).not.toBe(GT3_MOTION_RATIO_BAND); // copy, not shared mutable
   });
 });

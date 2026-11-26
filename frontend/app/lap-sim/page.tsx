@@ -1207,7 +1207,7 @@ export default function LapSimPage() {
   // Simulation Results & View State
   const [running, setRunning] = useState<boolean>(false);
   const [result, setResult] = useState<LapSimResponse | null>(null);
-  // Optional setup-response surface ("Compute GGV Surface"): a second, cancellable request.
+  // Optional setup-response surface ("Compute Setup Grid"): a second, cancellable request.
   // The core solve stays on the fast path (include_surface: false).
   const lastPayloadRef = useRef<Record<string, any> | null>(null);
   const runSeqRef = useRef(0);
@@ -2591,7 +2591,7 @@ export default function LapSimPage() {
                             </button>
                           ) : (
                             <button type="button" onClick={computeSurface} className="rounded border border-signal bg-signal px-3 py-1.5 text-xs font-bold text-carbon hover:bg-[#d6f56e]">
-                              Compute GGV Surface
+                              Compute Setup Grid (21–51 s)
                             </button>
                           )}
                           {surfaceBusy && <p className="text-[10px] text-zinc-500">Computing the surface...</p>}

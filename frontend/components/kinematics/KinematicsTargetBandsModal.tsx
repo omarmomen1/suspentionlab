@@ -13,11 +13,13 @@ export interface TargetBandConfig {
   description: string;
 }
 
+import { GT3_MOTION_RATIO_BAND } from "../../lib/v2/instruments";
+
 export const DEFAULT_TARGET_BANDS: Record<string, [number, number]> = {
   camber_gain_deg_per_100mm: [-1.2, -0.4],
   toe_gain_deg_per_100mm: [-0.15, 0.15],
   roll_center_height_mm: [30.0, 110.0],
-  motion_ratio: [0.65, 0.90],
+  motion_ratio: [...GT3_MOTION_RATIO_BAND],
   scrub_radius_mm: [10.0, 45.0],
 };
 
