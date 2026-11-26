@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import Link from "next/link";
+import { Archivo, Inter, JetBrains_Mono } from "next/font/google";
 import { Suspense } from "react";
 import NavItem from "../components/NavItem";
 import GlobalSearchTrigger from "../components/GlobalSearchTrigger";
@@ -12,6 +13,13 @@ import PromptModalHost from "../components/sim/ModalHost";
 import NavigationProgressBar from "../components/NavigationProgressBar";
 import Navbar from "../components/Navbar";
 
+// V2 type system. Archivo for headings (variable width axis is not requested, so the
+// standard Archivo face is the fallback for "Archivo Expanded"), Inter for UI text,
+// JetBrains Mono strictly for numeric telemetry and KPI readouts.
+const archivo = Archivo({ subsets: ["latin"], variable: "--font-archivo", display: "swap" });
+const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
+const jetbrainsMono = JetBrains_Mono({ subsets: ["latin"], variable: "--font-jetbrains-mono", display: "swap" });
+
 export const metadata: Metadata = {
   title:       "SuspensionLab Pro | Engineering Simulation",
   description: "Enterprise-grade vehicle dynamics simulation environment.",
@@ -22,7 +30,7 @@ import WorkspaceStatusBar from "../components/WorkspaceStatusBar";
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${archivo.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
       <body suppressHydrationWarning className="font-sans bg-black text-gray-100 antialiased selection:bg-ansys-yellow selection:text-black flex flex-col h-screen overflow-hidden">
           <AuthProvider>
             <WorkspaceProvider>

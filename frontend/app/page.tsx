@@ -2,113 +2,51 @@
 
 import React from "react";
 import Link from "next/link";
-import {
-  ArrowRight,
-  Box,
-  Activity,
-  Car,
-  GitCompare,
-  Sliders,
-  History,
-  Check,
-  Sparkles,
-  Zap,
-  Shield,
-  Building2,
-  type LucideIcon,
-} from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-import { STUDIO_TOOLS, type StudioIconKey } from "../lib/navigation";
+import { NAV_V2 } from "../lib/navigation";
 import CommandCenterWorkspace from "../components/CommandCenterWorkspace";
+import BenchmarkWall from "../components/v2/BenchmarkWall";
+import StatusPill from "../components/v2/StatusPill";
 
-const TOOL_ICONS: Record<StudioIconKey, LucideIcon> = {
-  kinematics: Box,
-  quarter_car: Activity,
-  full_car: Car,
-  correlation: GitCompare,
-  optimizer: Sliders,
-  memory: History,
-  ai: Sparkles,
-};
+// Claims ledger. Every row names its evidence.
+// No benchmark in this repository compares against measured vehicle data.
+const CLAIMS: { claim: string; status: string; evidence: string }[] = [
+  { claim: "Quarter-car modal frequencies match the exact coupled 2-DOF roots (< 0.5%)", status: "VERIFIED", evidence: "Benchmark B-01" },
+  { claim: "Damper cycle energy: linear c_eff = c, bilinear (c_c + c_r)/2", status: "VERIFIED", evidence: "Benchmark B-02" },
+  { claim: "Standard .tir files (PKY1 = -15) give positive cornering stiffness", status: "VERIFIED", evidence: "Benchmark B-03" },
+  { claim: "Full-car heave mode matches the hand calculation on a symmetric car", status: "VERIFIED", evidence: "Benchmark B-04" },
+  { claim: "Tire model fit against Calspan TTC data", status: "NOT_RUN", evidence: "In progress, needs a licensed dataset" },
+  { claim: "Validated against measured vehicle data", status: "NOT_RUN", evidence: "No such comparison exists yet" },
+  { claim: "Elastokinematic toe compliance", status: "OUT_OF_DOMAIN", evidence: "Not modeled (rigid links and joints)" },
+];
 
-const TOOL_TIER_BADGES: Record<string, { label: string; style: string }> = {
-  kinematics: {
-    label: "FREE STUDIO",
-    style: "bg-emerald-500/15 border-emerald-500/40 text-emerald-300",
-  },
-  "quarter-car": {
-    label: "FREE HOOK + PRO LUTs",
-    style: "bg-emerald-500/15 border-emerald-500/40 text-emerald-300",
-  },
-  "full-car-handling": {
-    label: "PRO",
-    style: "bg-ansys-yellow/15 border-ansys-yellow/40 text-ansys-yellow",
-  },
-  "correlation-compare": {
-    label: "PRO",
-    style: "bg-ansys-yellow/15 border-ansys-yellow/40 text-ansys-yellow",
-  },
-  "sensitivity-optimizer": {
-    label: "PRO",
-    style: "bg-ansys-yellow/15 border-ansys-yellow/40 text-ansys-yellow",
-  },
-  "memory-reports": {
-    label: "TEAM PASS",
-    style: "bg-purple-500/15 border-purple-500/40 text-purple-300",
-  },
-  "ai-engineer": {
-    label: "AI SUITE",
-    style: "bg-indigo-500/15 border-indigo-500/40 text-indigo-300",
-  },
-};
-
-const PRICING_PREVIEW = [
+const PRICING = [
   {
-    name: "Starter",
+    name: "Free",
     price: "$0",
-    cadence: "forever",
-    desc: "3D Kinematics & Quarter-Car Preview.",
-    icon: Zap,
-    highlight: false,
-    features: [
-      "Interactive 3D Double-Wishbone Kinematics",
-      "Hardpoint sliders, camber & bump steer plots",
-      "Quarter-Car (2-DOF) ride & Bode preview",
-    ],
-    ctaLabel: "Launch 3D Kinematics",
-    ctaHref: "/kinematics",
+    cadence: "free account required",
+    desc: "3D Kinematics and Quarter-Car preview. You sign in first: the studios and the solvers need an account.",
+    cta: "Create a free account",
+    href: "/auth/register",
+    primary: false,
   },
   {
-    name: "Pro Engineer",
+    name: "Pro",
     price: "$79/mo",
-    cadence: "Gumroad license key",
-    desc: "Full-Car, Damper LUTs, Telemetry Correlation, Setup Optimizer & PDF Reports.",
-    icon: Shield,
-    highlight: true,
-    features: [
-      "Full-Car (7-DOF) & Handling Dynamics",
-      "Damper LUTs & Telemetry Correlation",
-      "Kinematics & Pareto Setup Optimizer",
-      "PDF Setup Sheets, CSV & MATLAB Exports",
-    ],
-    ctaLabel: "View Pro & Team Passes ($79/mo)",
-    ctaHref: "/pricing",
+    cadence: "license key",
+    desc: "Full-Car, damper LUTs, telemetry correlation, setup optimizer and PDF reports.",
+    cta: "View Pro & Team Passes ($79/mo)",
+    href: "/pricing",
+    primary: true,
   },
   {
-    name: "Race Team & Consultancy Pass",
+    name: "Team",
     price: "$499/yr",
-    cadence: "annual team pass (10 seats)",
-    desc: "Up to 10 Seats, Engineering Memory, Shared Reports & FMI Co-Sim.",
-    icon: Building2,
-    highlight: false,
-    features: [
-      "Everything in Pro Engineer",
-      "Up to 10 team seats & role permissions",
-      "Engineering Memory & signed decisions",
-      "Shared Reports & FMI 2.0 Co-Sim exports",
-    ],
-    ctaLabel: "View Team Pass",
-    ctaHref: "/pricing",
+    cadence: "up to 10 seats",
+    desc: "Everything in Pro, plus engineering memory, shared reports and FMI co-sim exports.",
+    cta: "See Team details",
+    href: "/pricing",
+    primary: false,
   },
 ];
 
@@ -116,431 +54,148 @@ export default function HomePage() {
   const { user } = useAuth();
 
   return (
-    <div className="w-full bg-[#08080a] text-white selection:bg-ansys-yellow selection:text-black min-h-full">
-      {/* ── 1. STUDIO HERO ───────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden border-b border-white/[0.08] pt-14 pb-16 px-4 sm:px-6">
-        <div className="absolute -top-24 right-0 w-[520px] h-[520px] bg-ansys-yellow/10 blur-3xl pointer-events-none" />
-        <div className="max-w-[1380px] mx-auto relative">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            {/* Left Column: Headlines & CTAs */}
-            <div className="lg:col-span-7 space-y-6">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-ansys-yellow/10 border border-ansys-yellow/30 text-ansys-yellow text-[11px] font-mono font-bold uppercase tracking-wider">
-                <Sparkles size={13} />
-                SuspensionLab Studio · Coupled Multi-Body Dynamics &amp; Lap Sim
-              </div>
-
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-white leading-[1.12]">
-                Coupled 3D Kinematics, Stiff BDF Ride/Handling &amp; Closed-Loop GGV Lap Time Simulation.
-              </h1>
-
-              <p className="text-base sm:text-lg text-gray-400 leading-relaxed max-w-2xl">
-                Design double-wishbone geometry, solve 7-DOF ride/handling, and simulate closed-loop GGV lap times with dynamic aero-pitch coupling directly in your browser. From CAD hardpoints to sub-second trackside setup optimization.
-              </p>
-
-              <div className="flex flex-wrap items-center gap-3 pt-2">
-                <Link
-                  href="/lap-sim"
-                  className="px-6 py-3.5 rounded-xl bg-ansys-yellow text-black font-bold text-sm hover:brightness-110 transition-all inline-flex items-center gap-2 shadow-[0_0_25px_rgba(242,169,0,0.28)]"
-                >
-                  <span>Launch ApexSim Lap Studio -&gt;</span>
-                  <ArrowRight size={16} />
-                </Link>
-
-                <Link
-                  href="/kinematics"
-                  className="px-6 py-3.5 rounded-xl bg-white/[0.05] hover:bg-white/[0.1] border border-white/15 text-white font-semibold text-sm transition-all inline-flex items-center gap-2"
-                >
-                  <span>Open Free 3D Kinematics Sandbox -&gt;</span>
-                </Link>
-
-                <Link
-                  href="/pricing"
-                  className="px-4 py-3.5 rounded-xl text-xs font-mono text-gray-400 hover:text-ansys-yellow transition-colors inline-flex items-center gap-1.5"
-                >
-                  <span>View Pro &amp; Team Passes ($79/mo)</span>
-                  <ArrowRight size={13} />
-                </Link>
-
-                {user && (
-                  <a
-                    href="#command-center"
-                    className="px-4 py-3.5 rounded-xl text-xs font-mono text-gray-300 hover:text-ansys-yellow transition-colors inline-flex items-center gap-1.5"
-                  >
-                    <span>Jump to Engineering Command Center</span>
-                    <ArrowRight size={13} />
-                  </a>
-                )}
-              </div>
-            </div>
-
-            {/* Right Column: Prominent Flagship Preview Card */}
-            <div className="lg:col-span-5">
-              <div className="p-6 rounded-2xl bg-[#0E121B] border border-cyan-500/30 shadow-2xl relative overflow-hidden group hover:border-cyan-400 transition-all">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-cyan-500/10 rounded-full blur-2xl pointer-events-none" />
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
-                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-cyan-400">
-                      FLAGSHIP CO-HEADLINE
-                    </span>
-                  </div>
-                  <span className="px-2 py-0.5 rounded bg-amber-500/15 border border-amber-500/30 text-amber-300 font-mono text-[10px] font-bold">
-                    PRO SOLVER
-                  </span>
-                </div>
-
-                <h3 className="text-xl font-bold text-white tracking-tight mb-2">
-                  ApexSim Lap Studio
-                </h3>
-                <p className="text-xs text-zinc-400 mb-5 leading-relaxed">
-                  Closed-loop multi-pass quasi-static vehicle solver with dynamic aero-pitch bottoming &amp; mechanical LLTD sensitivity.
-                </p>
-
-                {/* 4 Verified Capabilities */}
-                <div className="space-y-2.5 mb-6 text-xs font-mono">
-                  <div className="p-2.5 rounded-xl bg-[#141A26] border border-[#232D3F] flex items-start gap-2.5 text-zinc-300">
-                    <Check size={14} className="text-cyan-400 mt-0.5 shrink-0" />
-                    <div>
-                      <strong className="text-white block font-sans text-xs">1. 3-Pass Closed-Loop GGV Solver</strong>
-                      <span className="text-[11px] text-zinc-400">|v(0) - v(L)| &lt; 0.01 m/s cyclic convergence</span>
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 rounded-xl bg-[#141A26] border border-[#232D3F] flex items-start gap-2.5 text-zinc-300">
-                    <Check size={14} className="text-cyan-400 mt-0.5 shrink-0" />
-                    <div>
-                      <strong className="text-white block font-sans text-xs">2. Coupled Suspension LLTD &amp; Dynamic Aero-Pitch Bottoming Detection</strong>
-                      <span className="text-[11px] text-zinc-400">Dynamic ride height &amp; plank bottoming detection</span>
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 rounded-xl bg-[#141A26] border border-[#232D3F] flex items-start gap-2.5 text-zinc-300">
-                    <Check size={14} className="text-cyan-400 mt-0.5 shrink-0" />
-                    <div>
-                      <strong className="text-white block font-sans text-xs">3. Custom Track Segment &amp; GPS/CSV Circuit Reconstructor</strong>
-                      <span className="text-[11px] text-zinc-400">Direct MoTeC/AiM telemetry opportunity finder</span>
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 rounded-xl bg-[#141A26] border border-[#232D3F] flex items-start gap-2.5 text-zinc-300">
-                    <Check size={14} className="text-cyan-400 mt-0.5 shrink-0" />
-                    <div>
-                      <strong className="text-white block font-sans text-xs">4. 2D Setup Response Surface &amp; Ghost Delta (Setup A vs. Setup B)</strong>
-                      <span className="text-[11px] text-zinc-400">Live sector delta &amp; 1-click auto-optimizer</span>
-                    </div>
-                  </div>
-                </div>
-
-                <Link
-                  href="/lap-sim"
-                  className="w-full py-2.5 rounded-xl bg-[#06B6D4] hover:bg-[#22D3EE] text-black font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md"
-                >
-                  <span>Launch ApexSim Lap Studio -&gt;</span>
-                  <ArrowRight size={13} />
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── 2. SIX STUDIO TOOLS SHOWCASE ─────────────────────────────────── */}
-      <section className="py-16 px-4 sm:px-6 border-b border-white/[0.08]">
-        <div className="max-w-[1380px] mx-auto space-y-8">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <span className="text-[11px] font-mono font-bold uppercase tracking-[0.2em] text-ansys-yellow">
-                The 6 Studio Workspaces
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-bold text-white mt-1">
-                From hardpoint CAD geometry to race-ready setup sign-off
-              </h2>
-            </div>
-            <Link
-              href="/quarter-car"
-              className="text-xs font-mono text-ansys-yellow hover:underline inline-flex items-center gap-1"
-            >
-              <span>Try Quarter-Car &amp; Damper Studio</span>
-              <ArrowRight size={12} />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {STUDIO_TOOLS.map((tool, idx) => {
-              const Icon = TOOL_ICONS[tool.icon];
-              const tier = TOOL_TIER_BADGES[tool.id] ?? {
-                label: "STUDIO",
-                style: "bg-white/10 border-white/20 text-gray-200",
-              };
-
-              return (
-                <div
-                  key={tool.id}
-                  className="p-6 rounded-2xl bg-[#0e0e13] border border-white/[0.08] hover:border-ansys-yellow/40 transition-all flex flex-col justify-between space-y-5"
-                >
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2.5">
-                        <div className="p-2 rounded-xl bg-ansys-yellow/10 border border-ansys-yellow/25 text-ansys-yellow">
-                          <Icon size={18} />
-                        </div>
-                        <span className="text-[11px] font-mono text-gray-500">0{idx + 1}</span>
-                      </div>
-                      <span
-                        className={`px-2 py-0.5 rounded-full border text-[10px] font-mono font-bold uppercase tracking-wider ${tier.style}`}
-                      >
-                        {tier.label}
-                      </span>
-                    </div>
-
-                    <div>
-                      <h3 className="text-lg font-bold text-white">{tool.label}</h3>
-                      <div className="mt-2 space-y-1.5">
-                        {tool.routes.map((route) => (
-                          <Link
-                            key={route.href}
-                            href={route.href}
-                            className="block p-2.5 rounded-xl bg-white/[0.02] hover:bg-white/[0.06] border border-white/[0.05] transition-colors group"
-                          >
-                            <div className="flex items-center justify-between text-xs font-semibold text-gray-200 group-hover:text-ansys-yellow">
-                              <span>{route.label}</span>
-                              <ArrowRight size={12} />
-                            </div>
-                            <p className="text-[11px] text-gray-400 mt-0.5">{route.desc}</p>
-                          </Link>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-
-                  <Link
-                    href={tool.href}
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-ansys-yellow hover:underline"
-                  >
-                    <span>Open {tool.label}</span>
-                    <ArrowRight size={13} />
-                  </Link>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* ── 2.5. ENGINEERING VERIFICATION, MARGINS OF ERROR & WORKFLOW BENCHMARKS ── */}
-      <section className="py-16 px-4 sm:px-6 border-b border-white/[0.08] bg-[#08080a]">
-        <div className="max-w-[1380px] mx-auto space-y-12">
-          <div>
-            <span className="text-[11px] font-mono font-bold uppercase tracking-[0.2em] text-[#06B6D4]">
-              Rigorous Mathematical Credibility &amp; Productivity
-            </span>
-            <h2 className="text-2xl sm:text-3xl font-bold text-white mt-1">
-              Engineering Verification, Margins of Error &amp; Workflow Benchmarks
-            </h2>
-            <p className="text-sm text-gray-400 mt-2 max-w-3xl">
-              Transparent numerical tolerances, physical boundary conditions, and measured time savings compared to legacy multi-body CAD scripts and spreadsheet modeling.
+    <div className="min-h-full w-full bg-carbon text-white selection:bg-signal selection:text-carbon">
+      {/* 1. Hero */}
+      <section className="border-b border-hairline px-4 pb-16 pt-14 sm:px-6">
+        <div className="mx-auto grid max-w-[1280px] grid-cols-1 gap-10 lg:grid-cols-12">
+          <div className="space-y-6 lg:col-span-7">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-signal">SuspensionLab Studio</p>
+            <h1 className="font-[var(--font-display)] text-3xl font-bold leading-[1.1] tracking-tight sm:text-4xl lg:text-5xl">
+              Suspension kinematics, ride and handling solvers, and a lap simulator in your browser.
+            </h1>
+            <p className="max-w-2xl text-base leading-relaxed text-gray-400">
+              Design double-wishbone geometry from hardpoints, solve ride and handling models, and run closed-loop lap
+              simulations. Every result carries its solver build, run ID and input hash.
             </p>
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <Link href="/lap-sim" className="rounded border border-signal bg-signal px-5 py-3 text-sm font-bold text-carbon transition-colors hover:bg-[#d6f56e]">
+                Launch ApexSim Lap Studio -&gt;
+              </Link>
+              <Link href="/kinematics" className="rounded border border-hairline bg-panel px-5 py-3 text-sm font-semibold text-white transition-colors hover:bg-white/[0.06]">
+                Open Kinematics Sandbox -&gt;
+              </Link>
+              <Link href="/pricing" className="px-2 py-3 text-xs text-gray-400 transition-colors hover:text-signal">
+                View Pro &amp; Team Passes ($79/mo)
+              </Link>
+            </div>
+            {!user && (
+              <p data-testid="free-tier-auth-note" className="text-xs text-gray-400">
+                The Free plan costs nothing, but you need an account: solving requires sign-in, and signed-out requests are
+                rejected with 401 auth_required.
+              </p>
+            )}
+            {user && (
+              <a href="#command-center" className="inline-block text-xs text-gray-300 hover:text-signal">
+                Jump to Engineering Command Center
+              </a>
+            )}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Table A: Solver Verification & Physical Applicability Matrix */}
-            <div className="bg-[#0e0e12] border border-[#252525] rounded-2xl p-6 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#1f1f24]">
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#06B6D4]" />
-                    Solver Verification &amp; Physical Applicability Matrix
-                  </h3>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500">ISO 8855 / SAE J670</span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead>
-                      <tr className="border-b border-[#252525] text-gray-400 text-[11px]">
-                        <th className="pb-3 font-semibold">Physics Domain</th>
-                        <th className="pb-3 font-semibold">Numerical Method</th>
-                        <th className="pb-3 font-semibold">Rig / Physical Applicability</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#1a1a1f] text-gray-300">
-                      <tr>
-                        <td className="py-3.5 font-bold text-white">3D Spatial Kinematics</td>
-                        <td className="py-3.5 text-[#06B6D4]">Newton-Raphson rigid-body closure (≤ 10⁻¹⁰ mm residual)</td>
-                        <td className="py-3.5 text-gray-400">±0.05°–0.15° vs. physical K&amp;C rig due to elastomer bushing compliance</td>
-                      </tr>
-                      <tr>
-                        <td className="py-3.5 font-bold text-white">2-DOF &amp; 7-DOF Ride/Modal</td>
-                        <td className="py-3.5 text-[#06B6D4]">Stiff BDF ODE integration (rtol = 10⁻⁶, &lt;2.5% modal delta)</td>
-                        <td className="py-3.5 text-gray-400">±3%–8% vertical RMS accuracy on calibrated 4-post shaker / track profiles</td>
-                      </tr>
-                      <tr>
-                        <td className="py-3.5 font-bold text-white">Steady-State &amp; Transient Handling</td>
-                        <td className="py-3.5 text-[#06B6D4]">Coupled Roll-Stiffness &amp; Pacejka Model</td>
-                        <td className="py-3.5 text-gray-400">±5%–10% analytical under &lt;0.4g linear regime; &gt;0.5g nonlinear limit calibrated via CSV Telemetry Correlation</td>
-                      </tr>
-                      <tr>
-                        <td className="py-3.5 font-bold text-white flex items-center gap-2">
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#f2a900]" />
-                          ApexSim 3-Pass Closed-Loop GGV &amp; Aero-Pitch Lap Solver
-                        </td>
-                        <td className="py-3.5 text-[#06B6D4]">
-                          3-Pass Forward-Backward QSS with Cyclic Boundary Convergence &amp; Tire Load Sensitivity
-                        </td>
-                        <td className="py-3.5 text-gray-300">
-                          &le; 0.82% vs. analytical braking/cornering limits; &le; 1.5% closed-loop work-energy conservation
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <div className="mt-4 pt-3 border-t border-[#1a1a1f] text-[11px] text-gray-500 flex items-center justify-between">
-                <span>Deterministic BDF &amp; QR linear algebra execution</span>
-                <span className="text-emerald-400 font-bold">100% Deterministic Reproducibility</span>
-              </div>
-            </div>
+          {/* Real app proof: what the app actually runs today, with the evidence pointer for each. */}
+          <aside aria-label="What runs today" className="rounded border border-hairline bg-panel p-5 lg:col-span-5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">What runs today</p>
+            <ul className="mt-3 space-y-3 text-sm">
+              {[
+                ["3D double-wishbone kinematics", "Camber gain, bump steer, roll center from hardpoints"],
+                ["Quarter-car, half-car and 7-DOF full-car", "Modal frequencies, Bode plots, ISO 2631 comfort"],
+                ["ApexSim lap studio", "Closed-loop multi-pass solver with bottoming detection"],
+                ["Telemetry correlation and investigation", "Measured data against simulation, stage by stage"],
+              ].map(([t, d]) => (
+                <li key={t} className="border-t border-hairline pt-3 first:border-t-0 first:pt-0">
+                  <p className="font-semibold text-white">{t}</p>
+                  <p className="text-xs text-gray-400">{d}</p>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-4 text-[11px] text-gray-500">Live checks are on the Benchmark Wall below.</p>
+          </aside>
+        </div>
+      </section>
 
-            {/* Table B: Quantified Engineering Time-Savings Benchmarks */}
-            <div className="bg-[#0e0e12] border border-[#252525] rounded-2xl p-6 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#1f1f24]">
-                  <h3 className="text-base font-bold text-white flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[#F59E0B]" />
-                    Quantified Engineering Time-Savings Benchmarks
-                  </h3>
-                  <span className="text-[10px] font-mono uppercase tracking-wider text-gray-500">Trackside / CAE Velocity</span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs font-mono">
-                    <thead>
-                      <tr className="border-b border-[#252525] text-gray-400 text-[11px]">
-                        <th className="pb-3 font-semibold">Engineering Task</th>
-                        <th className="pb-3 font-semibold">Legacy Baseline</th>
-                        <th className="pb-3 font-semibold text-[#F59E0B]">SuspensionLab Studio</th>
-                        <th className="pb-3 font-semibold text-emerald-400">Speedup</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#1a1a1f] text-gray-300">
-                      <tr>
-                        <td className="py-3.5 font-bold text-white">36-Variable Hardpoint Jacobian Sensitivity Sweep</td>
-                        <td className="py-3.5 text-gray-400">~45 min (Manual CAD/Excel)</td>
-                        <td className="py-3.5 text-[#06B6D4] font-bold">&lt; 2 sec</td>
-                        <td className="py-3.5 text-emerald-400 font-bold">~1,350×</td>
-                      </tr>
-                      <tr>
-                        <td className="py-3.5 font-bold text-white">Multi-Objective Pareto Damper &amp; Spring Trade-Off (25+ runs)</td>
-                        <td className="py-3.5 text-gray-400">~2.0 hrs (Manual script loop)</td>
-                        <td className="py-3.5 text-[#06B6D4] font-bold">&lt; 5 sec</td>
-                        <td className="py-3.5 text-emerald-400 font-bold">~1,440×</td>
-                      </tr>
-                      <tr>
-                        <td className="py-3.5 font-bold text-white">Post-Session CSV Sync, G-G Circle &amp; 3-Page Vector PDF Dossier</td>
-                        <td className="py-3.5 text-gray-400">~2.0 hrs (MATLAB + Word)</td>
-                        <td className="py-3.5 text-[#06B6D4] font-bold">&lt; 3 min</td>
-                        <td className="py-3.5 text-emerald-400 font-bold">~40×</td>
-                      </tr>
-                      <tr>
-                        <td className="py-3.5 font-bold text-white">25-Point Front ARB &times; Aero Balance Lap-Time Surface</td>
-                        <td className="py-3.5 text-gray-400">~3.5 hrs (Manual multibody sweeps)</td>
-                        <td className="py-3.5 text-[#06B6D4] font-bold">&lt; 3 sec in ApexSim</td>
-                        <td className="py-3.5 text-emerald-400 font-bold">~4,200&times;</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <div className="mt-4 pt-3 border-t border-[#1a1a1f] text-[11px] text-gray-500 flex items-center justify-between">
-                <span>Measured on Formula Student &amp; GT3 track engineering workflows</span>
-                <span className="text-[#F59E0B] font-bold">Instant Trackside Decisions</span>
-              </div>
-            </div>
+      {/* 2. Live Benchmark Wall (reads /benchmark-status.json) */}
+      <BenchmarkWall />
+
+      {/* 3. Claims ledger */}
+      <section aria-labelledby="claims-title" className="border-b border-hairline px-4 py-14 sm:px-6">
+        <div className="mx-auto max-w-[1280px] space-y-5">
+          <h2 id="claims-title" className="font-[var(--font-display)] text-2xl font-bold">Claims ledger</h2>
+          <p className="max-w-3xl text-sm text-gray-400">
+            What we claim, what we check it against, and what is still open. We make no on-track or
+            real-vehicle validation claims.
+          </p>
+          <div className="overflow-x-auto rounded border border-hairline bg-panel">
+            <table className="w-full text-left text-xs">
+              <thead>
+                <tr className="border-b border-hairline text-[11px] text-gray-400">
+                  <th className="p-3">Claim</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3">Evidence</th>
+                </tr>
+              </thead>
+              <tbody>
+                {CLAIMS.map((c) => (
+                  <tr key={c.claim} className="border-b border-hairline last:border-b-0 text-gray-300">
+                    <td className="p-3">{c.claim}</td>
+                    <td className="p-3"><StatusPill status={c.status} /></td>
+                    <td className="p-3 text-gray-400">{c.evidence}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </section>
 
-      {/* ── 3. PRICING PREVIEW ───────────────────────────────────────────── */}
-      <section className="py-16 px-4 sm:px-6 border-b border-white/[0.08]">
-        <div className="max-w-[1380px] mx-auto space-y-10">
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <span className="text-[11px] font-mono font-bold uppercase tracking-[0.2em] text-ansys-yellow">
-                Pricing Preview
-              </span>
-              <h2 className="text-2xl sm:text-3xl font-bold text-white mt-1">
-                Free interactive hook, straightforward Gumroad &amp; team licensing
-              </h2>
-            </div>
-            <Link
-              href="/pricing"
-              className="text-xs font-mono text-ansys-yellow hover:underline inline-flex items-center gap-1"
-            >
-              <span>Full pricing &amp; FAQ</span>
-              <ArrowRight size={12} />
-            </Link>
+      {/* 4. Workspace map (same groups as the navigation) */}
+      <section aria-labelledby="studios-title" className="border-b border-hairline px-4 py-14 sm:px-6">
+        <div className="mx-auto max-w-[1280px] space-y-5">
+          <h2 id="studios-title" className="font-[var(--font-display)] text-2xl font-bold">Workspace</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {NAV_V2.filter((g) => g.id !== "overview").map((g) => (
+              <div key={g.id} className="rounded border border-hairline bg-panel p-4">
+                <h3 className="text-sm font-semibold text-white">{g.label}</h3>
+                <ul className="mt-2 space-y-1 text-xs">
+                  {g.routes.map((r) => (
+                    <li key={r.href}>
+                      <Link href={r.href} className="text-gray-300 hover:text-signal">{r.label}</Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
+        </div>
+      </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {PRICING_PREVIEW.map((tier) => {
-              const TierIcon = tier.icon;
-              return (
-                <div
-                  key={tier.name}
-                  className={`rounded-2xl p-7 bg-[#0d0d10] border flex flex-col justify-between ${
-                    tier.highlight
-                      ? "border-ansys-yellow shadow-[0_0_35px_rgba(242,169,0,0.09)]"
-                      : "border-white/[0.08]"
+      {/* 5. Open pricing */}
+      <section aria-labelledby="pricing-title" className="px-4 py-14 sm:px-6">
+        <div className="mx-auto max-w-[1280px] space-y-5">
+          <h2 id="pricing-title" className="font-[var(--font-display)] text-2xl font-bold">Pricing</h2>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {PRICING.map((t) => (
+              <div key={t.name} className={`flex flex-col justify-between rounded border bg-panel p-5 ${t.primary ? "border-signal" : "border-hairline"}`}>
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">{t.name}</p>
+                  <p className="mt-2 flex items-baseline gap-2">
+                    <span className="text-3xl font-bold text-white v2-num">{t.price}</span>
+                    <span className="text-xs text-gray-500">{t.cadence}</span>
+                  </p>
+                  <p className="mt-3 text-sm text-gray-400">{t.desc}</p>
+                </div>
+                <Link
+                  href={t.href}
+                  className={`mt-6 rounded border px-4 py-2.5 text-center text-sm font-bold transition-colors ${
+                    t.primary ? "border-signal bg-signal text-carbon hover:bg-[#d6f56e]" : "border-hairline text-white hover:bg-white/[0.06]"
                   }`}
                 >
-                  <div>
-                    <div className="flex items-center justify-between gap-2 mb-4">
-                      <div className="flex items-center gap-2">
-                        <TierIcon size={16} className="text-ansys-yellow" />
-                        <span className="text-xs font-bold uppercase tracking-widest text-gray-400">
-                          {tier.name}
-                        </span>
-                      </div>
-                      {tier.highlight && (
-                        <span className="px-2.5 py-0.5 rounded-full bg-ansys-yellow text-black text-[10px] font-bold uppercase tracking-wider">
-                          Most Popular
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="flex items-baseline gap-2 mb-2">
-                      <span className="text-3xl font-bold text-white">{tier.price}</span>
-                      <span className="text-xs text-gray-500">{tier.cadence}</span>
-                    </div>
-                    <p className="text-sm text-gray-400 mb-6">{tier.desc}</p>
-
-                    <ul className="space-y-2.5 mb-8">
-                      {tier.features.map((feat) => (
-                        <li key={feat} className="flex items-start gap-2 text-sm text-gray-300">
-                          <Check size={14} className="text-emerald-400 mt-0.5 shrink-0" />
-                          <span>{feat}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <Link
-                    href={tier.ctaHref}
-                    className={`w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                      tier.highlight
-                        ? "bg-ansys-yellow text-black hover:brightness-110"
-                        : "bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-white"
-                    }`}
-                  >
-                    <span>{tier.ctaLabel}</span>
-                    <ArrowRight size={14} />
-                  </Link>
-                </div>
-              );
-            })}
+                  {t.cta}
+                </Link>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ── 4. AUTHENTICATED ENGINEERING COMMAND CENTER ──────────────────── */}
       {user && (
         <section id="command-center" aria-label="Engineering Command Center">
           <CommandCenterWorkspace />

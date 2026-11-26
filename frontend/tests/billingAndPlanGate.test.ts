@@ -337,33 +337,33 @@ describe("PricingPage Gumroad Studio Tiers", () => {
 });
 
 describe("Landing Page, Offline Fonts, Settings #billing & Env Files", () => {
-  it("renders SuspensionLab Studio landing page with hero CTAs, 6 Studio tools, and pricing preview", () => {
+  it("renders the V2 landing page: hero CTAs, Benchmark Wall, claims ledger and open pricing", () => {
     const html = renderWithAuth(null, React.createElement(HomePage));
     expect(html).toContain("Launch ApexSim Lap Studio");
     expect(html).toContain('href="/lap-sim"');
-    expect(html).toContain("Open Free 3D Kinematics Sandbox");
+    expect(html).toContain("Open Kinematics Sandbox");
     expect(html).toContain('href="/kinematics"');
     expect(html).toContain("View Pro &amp; Team Passes ($79/mo)");
     expect(html).toContain('href="/pricing"');
-    expect(html).toContain("3D Kinematics &amp; Hardpoints");
-    expect(html).toContain("Quarter-Car &amp; Damper Studio");
-    expect(html).toContain("Full-Car &amp; Handling");
-    expect(html).toContain("Telemetry &amp; Setup Correlation");
-    expect(html).toContain("Setup Sensitivity &amp; Optimizer");
-    expect(html).toContain("Engineering Memory &amp; Reports");
+    expect(html).toContain('data-testid="benchmark-wall"');
+    expect(html).toContain("Claims ledger");
     expect(html).toContain("$0");
     expect(html).toContain("$79/mo");
     expect(html).toContain("$499/yr");
+    expect(html).toContain("you need an account");
     expect(html).not.toContain("Engineering Command Center");
+    expect(html).not.toMatch(/Twin Replay/i);
+    expect(html).not.toMatch(/race-proven|validated on real cars/i);
   });
 
-  it("uses local/system CSS fonts in layout.tsx and globals.css instead of next/font/google", () => {
+  it("loads Archivo, Inter and JetBrains Mono through next/font/google in layout.tsx", () => {
     const layoutSrc = fs.readFileSync(path.join(FRONTEND_ROOT, "app", "layout.tsx"), "utf-8");
     const globalsSrc = fs.readFileSync(path.join(FRONTEND_ROOT, "app", "globals.css"), "utf-8");
-    expect(layoutSrc).not.toContain("next/font/google");
+    expect(layoutSrc).toContain('from "next/font/google"');
+    for (const f of ["Archivo", "Inter", "JetBrains_Mono"]) expect(layoutSrc).toContain(f);
+    for (const v of ["--font-archivo", "--font-inter", "--font-jetbrains-mono"]) expect(layoutSrc).toContain(v);
     expect(globalsSrc).toContain("--font-inter");
     expect(globalsSrc).toContain("--font-jetbrains-mono");
-    expect(globalsSrc).toContain("JetBrains Mono");
   });
 
   it("places Gumroad CTA above license key input in settings/page.tsx", () => {

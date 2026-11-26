@@ -18,7 +18,13 @@ export type StudioIconKey =
   | "correlation"
   | "optimizer"
   | "memory"
-  | "ai";
+  | "ai"
+  | "overview"
+  | "studios"
+  | "apexsim"
+  | "telemetry"
+  | "optimize"
+  | "reports";
 
 export interface StudioToolGroup {
   id: string;
@@ -314,3 +320,107 @@ export const FULL_MOBILE_SECTIONS: MobileNavSection[] = [
     ],
   },
 ];
+
+
+/**
+ * V2 workspace navigation (Phase 1): 7 groups, same data feeds desktop and mobile.
+ * Every route from the previous Studio, Standard and mobile menus is still
+ * reachable. /investigate lives under Telemetry, /cae under Reports.
+ */
+export const NAV_V2: StudioToolGroup[] = [
+  {
+    id: "overview",
+    label: "Overview",
+    href: "/garage",
+    icon: "overview",
+    dropdownAlign: "left",
+    routes: [
+      { href: "/garage", label: "Garage & Setup", desc: "Vehicle profiles and saved configurations" },
+      { href: "/docs", label: "Docs", desc: "Guides, model assumptions and API reference" },
+      { href: "/pricing", label: "Pricing", desc: "Free, Pro and Team plans" },
+    ],
+  },
+  {
+    id: "studios",
+    label: "Studios",
+    href: "/kinematics",
+    icon: "studios",
+    dropdownAlign: "left",
+    routes: [
+      { href: "/kinematics", label: "3D Kinematics & Hardpoints", desc: "Roll centers, camber gain, bump steer" },
+      { href: "/quarter-car", label: "Quarter-Car & Damper Studio", desc: "2-DOF bounce, damper LUT, ISO 2631 comfort" },
+      { href: "/half-car", label: "Half-Car (4-DOF)", desc: "Pitch and bounce coupling" },
+      { href: "/full-car", label: "Full-Car (7-DOF)", desc: "4-corner heave, pitch and roll" },
+      { href: "/handling", label: "Handling Dynamics", desc: "Bicycle model, slip angles, yaw response" },
+      { href: "/yaw-dynamics", label: "Yaw Dynamics & MMM", desc: "Milliken Moment Diagram and aero balance" },
+      { href: "/active", label: "Active Suspension", desc: "Skyhook, groundhook and LQR control" },
+      { href: "/nvh", label: "NVH & Acoustics", desc: "FFT spectrum and resonance isolation" },
+      { href: "/durability", label: "Durability", desc: "Load-cycle and fatigue estimates" },
+    ],
+  },
+  {
+    id: "apexsim",
+    label: "ApexSim",
+    href: "/lap-sim",
+    icon: "apexsim",
+    dropdownAlign: "left",
+    routes: [
+      { href: "/lap-sim", label: "ApexSim Lap Studio", desc: "Quasi-static track solver, bottleneck map, delta analysis", badge: "PRO" },
+    ],
+  },
+  {
+    id: "telemetry",
+    label: "Telemetry",
+    href: "/correlation",
+    icon: "telemetry",
+    dropdownAlign: "left",
+    routes: [
+      { href: "/correlation", label: "Correlation Cockpit", desc: "Measured telemetry vs simulation" },
+      { href: "/investigate", label: "Investigation Room", desc: "Guided stage-by-stage telemetry investigation" },
+      { href: "/digital-twin", label: "Digital Twin", desc: "State observer and continuous calibration" },
+    ],
+  },
+  {
+    id: "optimize",
+    label: "Optimize",
+    href: "/optimize",
+    icon: "optimize",
+    dropdownAlign: "right",
+    routes: [
+      { href: "/experiment", label: "1-Click Experiment", desc: "Hypothesis, candidate setups and constraint checks" },
+      { href: "/optimize", label: "Pareto Optimizer", desc: "Comfort and tire-load frontier" },
+      { href: "/compare", label: "Setup Compare (A vs B)", desc: "Side-by-side setup delta" },
+      { href: "/setup-sensitivity", label: "Setup Sensitivity", desc: "ARB, ride height and aero sweeps" },
+      { href: "/sensitivity", label: "Parameter Sensitivity", desc: "One-at-a-time parameter sweeps" },
+    ],
+  },
+  {
+    id: "reports",
+    label: "Reports",
+    href: "/report",
+    icon: "reports",
+    dropdownAlign: "right",
+    routes: [
+      { href: "/report", label: "Engineering Reports", desc: "Simulation and compliance report export" },
+      { href: "/cae", label: "CAE Interop (Adams / MATLAB)", desc: "MSC Adams, MATLAB and CarMaker decks" },
+      { href: "/engineering-memory", label: "Engineering Memory", desc: "Development timeline and signed decisions", aliases: ["/timeline"] },
+      { href: "/vnv", label: "V&V Evidence", desc: "Solver validation and benchmarks" },
+      { href: "/audit", label: "Audit & Governance", desc: "Tamper-evident ledger" },
+    ],
+  },
+  {
+    id: "ai-engineer",
+    label: "AI Engineer",
+    href: "/ai-engineer",
+    icon: "ai",
+    dropdownAlign: "right",
+    routes: [
+      { href: "/ai-engineer", label: "AI Race Engineer", desc: "Physics-grounded diagnosis and sign-off" },
+    ],
+  },
+];
+
+/** The navigation groups rendered by Navbar and MobileNav. */
+export function getNavGroups(): StudioToolGroup[] {
+  return NAV_V2;
+}

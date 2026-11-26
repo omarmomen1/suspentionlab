@@ -22,10 +22,8 @@ import GlobalSearchTrigger from "./GlobalSearchTrigger";
 import UserMenu from "./UserMenu";
 import MobileNav from "./MobileNav";
 import {
-  ALL_SOLVER_ITEMS,
   STUDIO_PRICING_CTA,
-  STUDIO_TOOLS,
-  VALIDATION_ITEMS,
+  getNavGroups,
   isStudioModeEnabled,
   isToolGroupActive,
   matchesRoute,
@@ -35,6 +33,12 @@ import {
 } from "../lib/navigation";
 
 const STUDIO_ICONS: Record<StudioIconKey, LucideIcon> = {
+  overview: Compass,
+  studios: Wrench,
+  apexsim: Car,
+  telemetry: Activity,
+  optimize: Sliders,
+  reports: FileText,
   kinematics: Compass,
   quarter_car: Activity,
   full_car: Car,
@@ -44,27 +48,8 @@ const STUDIO_ICONS: Record<StudioIconKey, LucideIcon> = {
   ai: Sparkles,
 };
 
-function StudioToolLabel({ id, fallback }: { id: string; fallback: string }) {
-  switch (id) {
-    case "kinematics":
-      return <span className="whitespace-nowrap">3D Kinematics</span>;
-    case "quarter-car":
-      return <span className="whitespace-nowrap">Quarter-Car</span>;
-    case "full-car-handling":
-      return <span className="whitespace-nowrap">Full-Car</span>;
-    case "correlation-compare":
-      return <span className="whitespace-nowrap">Correlation</span>;
-    case "sensitivity-optimizer":
-      return <span className="whitespace-nowrap">Setup &amp; Opt</span>;
-    case "memory-reports":
-      return <span className="whitespace-nowrap">Memory &amp; PDF</span>;
-    case "ai-engineer":
-      return <span className="whitespace-nowrap">AI Engineer</span>;
-    case "lap-sim":
-      return <span className="whitespace-nowrap">ApexSim</span>;
-    default:
-      return <span className="whitespace-nowrap">{fallback}</span>;
-  }
+function StudioToolLabel({ fallback }: { id: string; fallback: string }) {
+  return <span className="whitespace-nowrap">{fallback}</span>;
 }
 
 export default function Navbar() {
@@ -98,13 +83,6 @@ export default function Navbar() {
       document.removeEventListener("keydown", handleKeyDown);
     };
   }, []);
-
-  const isSolversActive = ALL_SOLVER_ITEMS.some(
-    (item) => pathname === item.href || pathname.startsWith(item.href + "/")
-  );
-  const isValidationActive = VALIDATION_ITEMS.some(
-    (item) => pathname === item.href || pathname.startsWith(item.href + "/")
-  );
 
   const renderDropdownPanel = (
     id: string,
@@ -264,221 +242,41 @@ export default function Navbar() {
           </Link>
         </div>
 
-        {/* Center: Navigation (Studio Mode = 6 core visual tools; Standard = 7-stage executive workflow) */}
-        {studioMode ? (
-          <div
-            data-studio-mode="true"
-            className="hidden lg:flex flex-1 min-w-0 items-center justify-center gap-1 xl:gap-1.5 px-1 xl:px-2 text-[11px] xl:text-xs font-medium overflow-visible"
-          >
-            {STUDIO_TOOLS.map(renderStudioTool)}
-          </div>
-        ) : (
-          <div className="hidden lg:flex flex-1 min-w-0 items-center justify-center gap-1 xl:gap-1.5 px-1 xl:px-2 text-[11px] xl:text-xs font-medium overflow-visible">
-            {/* Stage 1: Setup */}
-            <Link
-              href="/garage"
-              aria-current={pathname === "/garage" ? "page" : undefined}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all ${
-                pathname === "/garage"
-                  ? "text-white bg-white/[0.08] font-semibold border border-white/10 shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
-              }`}
-            >
-              <Wrench size={13} className={pathname === "/garage" ? "text-ansys-yellow" : "text-zinc-500"} />
-              <span>Setup</span>
-            </Link>
-
-            {/* Stage 2: Experiment */}
-            <Link
-              href="/experiment"
-              aria-current={pathname === "/experiment" ? "page" : undefined}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all ${
-                pathname === "/experiment"
-                  ? "text-white bg-white/[0.08] font-semibold border border-white/10 shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
-              }`}
-            >
-              <FlaskConical size={13} className={pathname === "/experiment" ? "text-ansys-yellow" : "text-zinc-500"} />
-              <span>Experiment</span>
-            </Link>
-
-            {/* Stage 3: Analyze & Solvers Suite */}
-            <div className="relative">
-              <div
-                className={`flex items-center rounded-lg transition-all border ${
-                  isSolversActive || openMenu === "solvers"
-                    ? "bg-white/[0.08] border-white/10 text-white shadow-sm"
-                    : "border-transparent text-zinc-400 hover:text-white hover:bg-white/[0.04]"
-                }`}
-              >
-                <Link
-                  href="/quarter-car"
-                  aria-current={isSolversActive ? "page" : undefined}
-                  className="flex items-center gap-1.5 pl-2.5 pr-1 py-1.5 font-medium"
-                >
-                  <Activity size={13} className={isSolversActive ? "text-ansys-yellow" : "text-zinc-500"} />
-                  <span>Analyze</span>
-                </Link>
-                <button
-                  id="analyze-solvers-dropdown-btn"
-                  type="button"
-                  onMouseDown={(e) => e.stopPropagation()}
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    setOpenMenu((prev) => (prev === "solvers" ? null : "solvers"));
-                  }}
-                  aria-expanded={openMenu === "solvers"}
-                  aria-haspopup="true"
-                  aria-controls="solvers-dropdown"
-                  aria-label="All Physics Solvers"
-                  className="pr-2 pl-1 py-1.5 text-zinc-400 hover:text-white"
-                  title="All Physics Solvers"
-                >
-                  <ChevronDown
-                    size={11}
-                    className={`transition-transform duration-150 ${
-                      openMenu === "solvers" ? "rotate-180 text-ansys-yellow" : ""
-                    }`}
-                  />
-                </button>
-              </div>
-
-              {openMenu === "solvers" &&
-                renderDropdownPanel("solvers-dropdown", "Vehicle Physics Engines", ALL_SOLVER_ITEMS, "left", true)}
-            </div>
-
-            {/* Stage 4: Compare */}
-            <Link
-              href="/compare"
-              aria-current={pathname === "/compare" || pathname === "/setup-sensitivity" ? "page" : undefined}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all ${
-                pathname === "/compare" || pathname === "/setup-sensitivity"
-                  ? "text-white bg-white/[0.08] font-semibold border border-white/10 shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
-              }`}
-            >
-              <GitCompare
-                size={13}
-                className={
-                  pathname === "/compare" || pathname === "/setup-sensitivity" ? "text-ansys-yellow" : "text-zinc-500"
-                }
-              />
-              <span>Compare</span>
-            </Link>
-
-            {/* Stage 5: Optimize */}
-            <Link
-              href="/optimize"
-              aria-current={pathname === "/optimize" || pathname === "/ai-engineer" ? "page" : undefined}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all ${
-                pathname === "/optimize" || pathname === "/ai-engineer"
-                  ? "text-white bg-white/[0.08] font-semibold border border-white/10 shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
-              }`}
-            >
-              <Sparkles
-                size={13}
-                className={pathname === "/optimize" || pathname === "/ai-engineer" ? "text-ansys-yellow" : "text-zinc-500"}
-              />
-              <span>Optimize</span>
-            </Link>
-
-            {/* Stage 6: Validation & Fleet Intelligence Suite */}
-            <div className="relative">
-              <button
-                id="validation-dropdown-btn"
-                type="button"
-                onMouseDown={(e) => e.stopPropagation()}
-                onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
-                  setOpenMenu((prev) => (prev === "validation" ? null : "validation"));
-                }}
-                aria-expanded={openMenu === "validation"}
-                aria-haspopup="true"
-                aria-controls="validation-dropdown"
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all ${
-                  isValidationActive || openMenu === "validation"
-                    ? "text-white bg-white/[0.08] font-semibold border border-white/10 shadow-sm"
-                    : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
-                }`}
-              >
-                <ShieldCheck size={13} className={isValidationActive ? "text-ansys-yellow" : "text-zinc-500"} />
-                <span>Validation</span>
-                <ChevronDown
-                  size={11}
-                  className={`transition-transform duration-150 ${
-                    openMenu === "validation" ? "rotate-180 text-ansys-yellow" : "text-zinc-500"
-                  }`}
-                />
-              </button>
-
-              {openMenu === "validation" &&
-                renderDropdownPanel("validation-dropdown", "Validation & Governance", VALIDATION_ITEMS, "left")}
-            </div>
-
-            {/* Stage 7: Report */}
-            <Link
-              href="/report"
-              aria-current={pathname === "/report" ? "page" : undefined}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-all ${
-                pathname === "/report"
-                  ? "text-white bg-white/[0.08] font-semibold border border-white/10 shadow-sm"
-                  : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
-              }`}
-            >
-              <FileText size={13} className={pathname === "/report" ? "text-ansys-yellow" : "text-zinc-500"} />
-              <span>Report</span>
-            </Link>
-          </div>
-        )}
+        {/* Center: V2 workspace navigation (7 groups, fits 1024px+; dropdowns overflow-visible) */}
+        <div
+          data-nav-version="v2"
+          data-studio-mode={studioMode ? "true" : undefined}
+          className="hidden lg:flex flex-1 min-w-0 items-center justify-center gap-0.5 xl:gap-1.5 px-1 xl:px-2 text-[11px] xl:text-xs font-medium overflow-visible"
+        >
+          {getNavGroups().map(renderStudioTool)}
+        </div>
 
         {/* Right Side: Docs & Pricing (standard) or highlighted Upgrade CTA (Studio Mode), Search & User Menu */}
         <div className="flex items-center gap-2.5 shrink-0">
-          {studioMode ? (
-            user?.plan !== "ENTERPRISE" && (
-              <>
-                <Link
-                  href={STUDIO_PRICING_CTA.href}
-                  aria-current={pathname === STUDIO_PRICING_CTA.href ? "page" : undefined}
-                  className={`hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${
-                    pathname === STUDIO_PRICING_CTA.href
-                      ? "bg-ansys-yellow text-black ring-2 ring-ansys-yellow/50 shadow-[0_0_12px_rgba(242,169,0,0.35)]"
-                      : "bg-ansys-yellow text-black hover:brightness-110 shadow-[0_0_10px_rgba(242,169,0,0.2)]"
-                  }`}
-                >
-                  <Sparkles size={12} className="shrink-0" />
-                  <span>{STUDIO_PRICING_CTA.label}</span>
-                </Link>
-                <div className="h-4 w-px bg-white/10 mx-0.5 hidden md:block" role="separator" aria-orientation="vertical" />
-              </>
-            )
-          ) : (
-            <>
-              <Link
-                href="/docs"
-                className={`hidden md:inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                  pathname === "/docs"
-                    ? "text-white bg-white/[0.08]"
-                    : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
-                }`}
-              >
-                Docs
-              </Link>
-              <Link
-                href="/pricing"
-                className={`hidden md:inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
-                  pathname === "/pricing"
-                    ? "text-white bg-white/[0.08]"
-                    : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
-                }`}
-              >
-                Pricing
-              </Link>
-              <div className="h-4 w-px bg-white/10 mx-0.5 hidden md:block" role="separator" aria-orientation="vertical" />
-            </>
+          <Link
+            href="/docs"
+            className={`hidden xl:inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+              pathname === "/docs"
+                ? "text-white bg-white/[0.08]"
+                : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
+            }`}
+          >
+            Docs
+          </Link>
+          {user?.plan !== "ENTERPRISE" && (
+            <Link
+              href={STUDIO_PRICING_CTA.href}
+              aria-current={pathname === STUDIO_PRICING_CTA.href ? "page" : undefined}
+              className={`hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-colors whitespace-nowrap border ${
+                pathname === STUDIO_PRICING_CTA.href
+                  ? "bg-[#C8F04B] text-[#0C0F12] border-[#C8F04B]"
+                  : "bg-[#C8F04B] text-[#0C0F12] border-[#C8F04B] hover:bg-[#d6f56e]"
+              }`}
+            >
+              <span>{STUDIO_PRICING_CTA.label}</span>
+            </Link>
           )}
+          <div className="h-4 w-px bg-white/10 mx-0.5 hidden md:block" role="separator" aria-orientation="vertical" />
           <GlobalSearchTrigger />
           <UserMenu />
         </div>
