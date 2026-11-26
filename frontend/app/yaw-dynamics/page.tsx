@@ -29,6 +29,8 @@ const PLOTLY_BASE = {
 interface StabilityMetrics {
   understeer_gradient_deg_per_g: number;
   neutral_steer_speed_kmh: number | null;
+  critical_speed_kmh?: number | null;
+  characteristic_speed_kmh?: number | null;
   stability_index: number;
   yaw_natural_freq_hz: number;
   yaw_damping_ratio: number;
@@ -320,8 +322,13 @@ export default function YawDynamicsPage() {
                   <MetricRow label={metrics.handling_class === "oversteer"
                       ? "Critical Speed (V_cr)"
                       : "Characteristic Speed (V_ch)"}
-                    value={metrics.neutral_steer_speed_kmh !== null
-                      ? metrics.neutral_steer_speed_kmh.toFixed(0) : "∞"} unit=" km/h" />
+                    value={(() => {
+                      const vSpeed = metrics.handling_class === "oversteer"
+                        ? metrics.critical_speed_kmh
+                        : (metrics.characteristic_speed_kmh ?? metrics.neutral_steer_speed_kmh);
+                      return typeof vSpeed === "number" && Number.isFinite(vSpeed)
+                        ? vSpeed.toFixed(0) : "N/A";
+                    })()} unit=" km/h" />
                   <MetricRow label="Yaw natural freq"
                     value={metrics.yaw_natural_freq_hz.toFixed(2)} unit=" Hz" />
                   <MetricRow label="Yaw damping ratio"

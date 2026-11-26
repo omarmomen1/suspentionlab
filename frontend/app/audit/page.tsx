@@ -269,7 +269,9 @@ export default function AuditPage() {
           <div className={`p-5 rounded-2xl border ${
             verifyError
               ? "bg-amber-950/20 border-amber-800/40"
-              : verification?.is_valid
+              : verification === null
+              ? "bg-zinc-900/40 border-zinc-700/40"
+              : verification.is_valid
               ? "bg-emerald-950/20 border-emerald-800/40"
               : "bg-red-950/20 border-red-800/40"
           }`}>
@@ -277,19 +279,23 @@ export default function AuditPage() {
               <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Chain Integrity</span>
               {verifyError ? (
                 <AlertTriangle size={18} className="text-amber-400" />
-              ) : verification?.is_valid ? (
+              ) : verification === null ? (
+                <RefreshCw size={18} className="text-zinc-400 animate-spin" />
+              ) : verification.is_valid ? (
                 <ShieldCheck size={18} className="text-emerald-400" />
               ) : (
                 <AlertTriangle size={18} className="text-red-400 animate-pulse" />
               )}
             </div>
-            <div className={`text-xl font-bold mt-2 ${verifyError ? "text-amber-400" : verification?.is_valid ? "text-emerald-400" : "text-red-400"}`}>
-              {verifyError ? "UNVERIFIED" : verification?.chain_integrity || "VERIFYING..."}
+            <div className={`text-xl font-bold mt-2 ${verifyError ? "text-amber-400" : verification === null ? "text-zinc-400" : verification.is_valid ? "text-emerald-400" : "text-red-400"}`}>
+              {verifyError ? "UNVERIFIED" : verification === null ? "VERIFYING..." : verification.chain_integrity || (verification.is_valid ? "VALID" : "BROKEN")}
             </div>
             <p className="text-[11px] text-gray-400 mt-1">
               {verifyError
                 ? verifyError
-                : verification?.is_valid
+                : verification === null
+                ? "Checking sequential SHA-256 blocks..."
+                : verification.is_valid
                 ? "All sequential SHA-256 blocks cryptographically valid."
                 : "Tamper or sequence break detected in ledger."}
             </p>

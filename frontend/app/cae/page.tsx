@@ -23,6 +23,7 @@ import {
 /** Safe finite-number formatting: renders "N/A" for null/NaN/Infinity so
     ingestion and comparison metrics can never crash the ErrorBoundary. */
 function fmt(v: unknown, digits: number, suffix = ""): string {
+  if (v == null || v === "" || typeof v === "boolean") return "N/A";
   const n = typeof v === "number" ? v : Number(v);
   return Number.isFinite(n) ? `${n.toFixed(digits)}${suffix}` : "N/A";
 }

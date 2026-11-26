@@ -67,14 +67,32 @@ export default function KinematicsModelValidity({
   const [expanded, setExpanded] = useState(true);
 
   // Decouple Numerical vs Physical
-  const numStatus = numericalStatus || modelValidity?.numerical_status || (allConverged ? "PASS" : "FAIL");
-  const physStatus = physicalStatus || modelValidity?.physical_status || (report?.valid !== false ? "PASS" : "FAIL");
-  const ovStatus = overallStatus || modelValidity?.overall_status || (numStatus === "PASS" && physStatus === "PASS" ? "PASS" : (numStatus === "FAIL" || physStatus === "FAIL" ? "FAIL" : "WARN"));
+  // Single unified status enum. With no solver data at all, every status is
+  // UNVERIFIED: never a default PASS / 100% / 0 VIOLATIONS.
+  type ValidityStatus = "PASS" | "WARN" | "FAIL" | "UNVERIFIED";
+  const hasSolverData = !!(report || modelValidity || numericalStatus || physicalStatus || overallStatus);
+  const numStatus: ValidityStatus = !hasSolverData
+    ? "UNVERIFIED"
+    : numericalStatus || modelValidity?.numerical_status || (allConverged ? "PASS" : "FAIL");
+  const physStatus: ValidityStatus = !hasSolverData
+    ? "UNVERIFIED"
+    : physicalStatus || modelValidity?.physical_status || (report ? (report.valid !== false ? "PASS" : "FAIL") : "UNVERIFIED");
+  const derivedStatus: ValidityStatus =
+    numStatus === "FAIL" || physStatus === "FAIL"
+      ? "FAIL"
+      : numStatus === "UNVERIFIED" || physStatus === "UNVERIFIED"
+      ? "UNVERIFIED"
+      : numStatus === "PASS" && physStatus === "PASS"
+      ? "PASS"
+      : "WARN";
+  const ovStatus: ValidityStatus = !hasSolverData
+    ? "UNVERIFIED"
+    : overallStatus || modelValidity?.overall_status || derivedStatus;
   const isValid = ovStatus === "PASS";
 
   const isNumericallyConvergedPhysicallyQuestionable = numStatus === "PASS" && physStatus !== "PASS";
 
-  const coveragePct = modelValidity?.validation_coverage_pct ?? report?.validation_coverage_pct ?? (ovStatus === "PASS" ? 100 : 0);
+  const coveragePct = modelValidity?.validation_coverage_pct ?? report?.validation_coverage_pct ?? null;
   const issues = report?.issues || [];
   const geometryIssuesCount = modelValidity?.geometry_issues ?? ((report?.critical_count || 0) + (report?.warning_count || 0));
 
@@ -91,6 +109,8 @@ export default function KinematicsModelValidity({
           ? "border-emerald-500/30"
           : ovStatus === "WARN"
           ? "border-amber-500/40"
+          : ovStatus === "UNVERIFIED"
+          ? "border-zinc-600/50"
           : "border-rose-500/50"
       } ${className}`}
     >
@@ -107,18 +127,20 @@ export default function KinematicsModelValidity({
                     ? "bg-emerald-950/70 border-emerald-500/50 text-emerald-300"
                     : ovStatus === "WARN"
                     ? "bg-amber-950/70 border-amber-500/50 text-amber-300"
+                    : ovStatus === "UNVERIFIED"
+                    ? "bg-zinc-900/70 border-zinc-500/50 text-zinc-300"
                     : "bg-rose-950/70 border-rose-500/50 text-rose-300"
                 }`}
               >
                 <span className="relative flex h-2 w-2">
                   <span
                     className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
-                      ovStatus === "PASS" ? "bg-emerald-400" : ovStatus === "WARN" ? "bg-amber-400" : "bg-rose-400"
+                      ovStatus === "PASS" ? "bg-emerald-400" : ovStatus === "WARN" ? "bg-amber-400" : ovStatus === "UNVERIFIED" ? "bg-zinc-400" : "bg-rose-400"
                     }`}
                   />
                   <span
                     className={`relative inline-flex rounded-full h-2 w-2 ${
-                      ovStatus === "PASS" ? "bg-emerald-500" : ovStatus === "WARN" ? "bg-amber-500" : "bg-rose-500"
+                      ovStatus === "PASS" ? "bg-emerald-500" : ovStatus === "WARN" ? "bg-amber-500" : ovStatus === "UNVERIFIED" ? "bg-zinc-500" : "bg-rose-500"
                     }`}
                   />
                 </span>
@@ -128,7 +150,7 @@ export default function KinematicsModelValidity({
               {/* Numerical Status Pill */}
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#141620] border border-[#232738] text-[11px] font-mono">
                 <span className="text-gray-400">Numerical:</span>
-                <span className={`font-bold ${numStatus === "PASS" ? "text-emerald-400" : numStatus === "WARN" ? "text-amber-400" : "text-rose-400"}`}>
+                <span className={`font-bold ${numStatus === "PASS" ? "text-emerald-400" : numStatus === "WARN" ? "text-amber-400" : numStatus === "UNVERIFIED" ? "text-zinc-400" : "text-rose-400"}`}>
                   {numStatus}
                 </span>
               </div>
@@ -136,7 +158,7 @@ export default function KinematicsModelValidity({
               {/* Physical Status Pill */}
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#141620] border border-[#232738] text-[11px] font-mono">
                 <span className="text-gray-400">Physical:</span>
-                <span className={`font-bold ${physStatus === "PASS" ? "text-emerald-400" : physStatus === "WARN" ? "text-amber-400" : "text-rose-400"}`}>
+                <span className={`font-bold ${physStatus === "PASS" ? "text-emerald-400" : physStatus === "WARN" ? "text-amber-400" : physStatus === "UNVERIFIED" ? "text-zinc-400" : "text-rose-400"}`}>
                   {physStatus}
                 </span>
               </div>
@@ -186,13 +208,13 @@ export default function KinematicsModelValidity({
                       Coverage
                     </span>
                     <span className="text-xs font-mono font-bold text-cyan-300">
-                      {coveragePct}%
+                      {coveragePct === null ? "N/A" : `${coveragePct}%`}
                     </span>
                   </div>
                   <div className="w-20 h-1.5 bg-gray-800 rounded-full overflow-hidden mt-0.5">
                     <div
                       className="h-full bg-gradient-to-r from-cyan-500 to-emerald-400 rounded-full transition-all duration-300"
-                      style={{ width: `${Math.min(100, Math.max(0, coveragePct))}%` }}
+                      style={{ width: `${Math.min(100, Math.max(0, coveragePct ?? 0))}%` }}
                     />
                   </div>
                 </div>
@@ -245,7 +267,7 @@ export default function KinematicsModelValidity({
       {expanded && (
         <div className="p-4 bg-[#0a0b0e] space-y-4">
           {/* Critical Solver / Model Failure Banner */}
-          {!isValid && (
+          {ovStatus === "FAIL" && (
             <div className="p-3 bg-rose-950/40 border border-rose-500/50 rounded-lg flex items-start gap-3">
               <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
               <div>
@@ -362,6 +384,27 @@ export default function KinematicsModelValidity({
                 })}
               </div>
             </div>
+          ) : ovStatus === "UNVERIFIED" ? (
+            <div className="p-3 bg-zinc-900/40 border border-zinc-600/40 rounded-lg flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <HelpCircle className="w-4 h-4 text-zinc-400 shrink-0" />
+                <span className="text-xs text-zinc-300 font-medium">
+                  No solver data yet. Run the kinematic solve to verify admissibility constraints.
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-zinc-300 font-bold px-2 py-0.5 rounded bg-zinc-900/60 border border-zinc-600/50">
+                UNVERIFIED
+              </span>
+            </div>
+          ) : ovStatus !== "PASS" ? (
+            <div className={`p-3 rounded-lg flex items-center justify-between border ${ovStatus === "FAIL" ? "bg-rose-950/20 border-rose-500/30" : "bg-amber-950/20 border-amber-500/30"}`}>
+              <div className="flex items-center gap-2.5">
+                <AlertTriangle className={`w-4 h-4 shrink-0 ${ovStatus === "FAIL" ? "text-rose-400" : "text-amber-400"}`} />
+                <span className={`text-xs font-medium ${ovStatus === "FAIL" ? "text-rose-200" : "text-amber-200"}`}>
+                  Model status is {ovStatus}; the solver reported no itemised violations. See the numerical and physical status above.
+                </span>
+              </div>
+            </div>
           ) : (
             <div className="p-3 bg-emerald-950/20 border border-emerald-500/30 rounded-lg flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -388,8 +431,8 @@ export default function KinematicsModelValidity({
             </div>
             <div className="flex items-center gap-2">
               <span className="text-gray-500 font-sans">Status:</span>
-              <span className={allConverged ? "text-emerald-400" : "text-rose-400"}>
-                {allConverged ? "ALL ITERATIONS CONVERGED" : "PARTIAL DRIFT"}
+              <span className={!hasSolverData ? "text-zinc-400" : allConverged ? "text-emerald-400" : "text-rose-400"}>
+                {!hasSolverData ? "NO SOLVER DATA" : allConverged ? "ALL ITERATIONS CONVERGED" : "PARTIAL DRIFT"}
               </span>
             </div>
             {backendInfo?.execution_time_ms !== undefined && (
