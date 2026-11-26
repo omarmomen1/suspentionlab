@@ -42,12 +42,14 @@ async def test_revision_history_diff_and_rollback(authenticated_client, seeded_u
     })
     assert create.status_code in (200, 201), create.text[:300]
     pid = create.json()["id"]
+    assert create.json()["version"] == 1
 
     # Update params -> new revision with diff
     upd = await authenticated_client.put(f"/api/v1/profiles/{pid}", json={
         "params": {"m_s": 300.0, "k_s": 30000.0, "c": 2000.0},
     })
     assert upd.status_code == 200, upd.text[:300]
+    assert upd.json()["version"] == 2          # params change bumps version
 
     revs = await authenticated_client.get(f"/api/v1/profiles/{pid}/revisions")
     assert revs.status_code == 200, revs.text[:300]
@@ -72,4 +74,28 @@ async def test_revision_history_diff_and_rollback(authenticated_client, seeded_u
     rb = await authenticated_client.post(f"/api/v1/profiles/{pid}/rollback/1")
     assert rb.status_code == 200, rb.text[:300]
     assert rb.json()["new_revision"] == 3
+    assert rb.json()["version"] == 3           # rollback bumps version too
     assert rb.json()["params"]["k_s"] == 25000.0
+
+
+@pytest.mark.asyncio
+async def test_profile_create_is_atomic_when_revision_write_fails(
+        authenticated_client, seeded_user, db_session, monkeypatch):
+    """If the revision write fails, no orphan profile may remain (single transaction)."""
+    from sqlalchemy import select, func
+    from suspensionlab.backend.api.routes import profiles as prof
+    from suspensionlab.backend.database.models.profile import VehicleProfile
+
+    async def boom(*a, **kw):
+        raise RuntimeError("revision write failed")
+
+    monkeypatch.setattr(prof, "_save_revision", boom)
+    r = await authenticated_client.post("/api/v1/profiles", json={
+        "name": "orphan-check", "vehicle_type": "QUARTER_CAR",
+        "params": {"m_s": 300.0, "k_s": 25000.0, "c": 2000.0},
+    })
+    assert r.status_code == 503, r.text[:300]
+    n = (await db_session.execute(
+        select(func.count()).select_from(VehicleProfile).where(VehicleProfile.name == "orphan-check")
+    )).scalar_one()
+    assert n == 0

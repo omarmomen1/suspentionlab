@@ -67,3 +67,23 @@ def test_corner_solution_warning():
     assert any("k_s=LOWER" in w for w in warns), f"expected corner warning, got {warns}"
     d = f.to_dict()
     assert "corner_warnings" in d
+
+
+def test_to_dict_is_strict_json_no_infinity():
+    """Boundary points have crowding_distance == inf internally; the serialized
+    frontier must be strict JSON (no Infinity token) with None for boundary points."""
+    import json
+    from suspensionlab.physics.pareto_optimizer import (
+        ParetoFrontier, ParetoPoint, OptimizationObjective, json_safe_crowding,
+    )
+    assert json_safe_crowding(float("inf")) is None
+    assert json_safe_crowding(0.5) == 0.5
+    objs = [OptimizationObjective("a", minimize=True), OptimizationObjective("b", minimize=True)]
+    fr = ParetoFrontier(objs)
+    for i in range(5):
+        fr.add_point(ParetoPoint(params={"x": i}, objectives={"a": float(i), "b": float(4 - i)},
+                                 constraints={}, feasible=True))
+    out = fr.to_dict()
+    text = json.dumps(out, allow_nan=False)  # raises on inf/nan
+    assert "Infinity" not in text
+    assert any(p["crowding_distance"] is None for p in out["frontier"])

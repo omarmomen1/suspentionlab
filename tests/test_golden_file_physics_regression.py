@@ -78,15 +78,21 @@ def test_gt3_baseline_benchmarks_5_of_5_zero_warnings():
     the pure kinematic solver (no compliance model), so the assertion is:
     all 5 benchmarks evaluated, every modeled one PASS, none FAIL.
     """
-    from suspensionlab.backend.services.kinematics_study_service import PRESET_SETUPS
-    from suspensionlab.physics.kinematics import solve_kinematics
+    from suspensionlab.backend.api.routes import kinematics_routes
+    from suspensionlab.physics.kinematics import PhysicalValidityEvaluator, solve_kinematics
 
-    gt3_hp = PRESET_SETUPS["gt3_touring"]["hardpoints"]
+    # The route's own GT3 preset (what the UI actually loads), not a service copy.
+    gt3_hp = kinematics_routes.BENCHMARK_PRESETS["gt3_touring"]["hardpoints"]
     sweep = solve_kinematics(
         hardpoints=gt3_hp, z_min_mm=-30.0, z_max_mm=30.0, n_steps=61
     ).to_dict()
-    sweep_warnings = list(sweep.get("warnings", []) or [])
+    sweep_warnings = list((sweep.get("metadata") or {}).get("warnings", []) or [])
     assert not sweep_warnings, f"Untouched GT3 baseline must produce 0 warnings, got: {sweep_warnings}"
+    # The sweep dict carries no warnings key, so the check above alone could never
+    # fail. The real warning source is the physical-validity evaluator.
+    validity = PhysicalValidityEvaluator.evaluate(gt3_hp, sweep)
+    assert validity["warnings"] == [], f"GT3 baseline physical-validity warnings: {validity['warnings']}"
+    assert validity["physical_status"] == "PASS"
 
     benchmarks = get_kinematics_benchmarks(gt3_hp, sweep)
     assert len(benchmarks) == 5
@@ -132,6 +138,21 @@ async def test_single_sample_telemetry_upload_returns_422(authenticated_client):
     assert response.status_code == 422, (
         f"1-sample telemetry must be rejected with 422, got {response.status_code}: {response.text[:300]}"
     )
+
+
+@pytest.mark.asyncio
+async def test_single_sample_telemetry_lap_sim_simulate_returns_422(authenticated_client):
+    """POST /api/v1/lap-sim/simulate with a 1-sample telemetry log: 422, no Spa substitution."""
+    body = {"mode": "csv", "telemetry": {"time_s": [0.0], "speed_ms": [30.0], "lat_g": [0.5]}}
+    response = await authenticated_client.post("/api/v1/lap-sim/simulate", json=body)
+    assert response.status_code == 422, (
+        f"1-sample telemetry must be rejected with 422, got {response.status_code}: {response.text[:300]}"
+    )
+    assert "at least 2" in response.text
+
+    csv_body = {"mode": "csv", "csv_data": "time_s,speed_ms,lat_g\n0.0,30,0.5\n"}
+    response2 = await authenticated_client.post("/api/v1/lap-sim/simulate", json=csv_body)
+    assert response2.status_code == 422, response2.text
 
 
 # ── Solver provenance: real build stamp, run_id, input hash (Wave 6 §1) ─────

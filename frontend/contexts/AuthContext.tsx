@@ -265,6 +265,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return res;
   }, [tryRefresh, getCsrfToken]);
 
+  // apiFetch callers (lib/api.ts) signal an unrecoverable 401 via a window event so
+  // they open the same re-auth modal as fetchWithAuth callers.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onExpired = () => setSessionExpired(true);
+    window.addEventListener("sl:session-expired", onExpired);
+    return () => window.removeEventListener("sl:session-expired", onExpired);
+  }, []);
+
   const dismissReAuth = useCallback(() => {
     // User chose to browse signed-out areas; clear the stale profile locally.
     cachedUser = null;
@@ -288,16 +297,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 function ReAuthModal() {
   const { user, login, logout } = useAuth();
   const [password, setPassword] = useState("");
+  const [typedEmail, setTypedEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // When the profile has no email (e.g. the session is already gone), the field
+  // must be editable so the user is never trapped in a read-only blank modal.
+  const emailLocked = Boolean(user?.email);
+  const emailValue = emailLocked ? (user?.email as string) : typedEmail;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user?.email || !password) return;
+    if (!emailValue.trim() || !password) return;
     setBusy(true);
     setError(null);
     try {
-      await login(user.email, password);
+      await login(emailValue.trim(), password);
       // login() clears sessionExpired; page state below the modal is preserved.
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign-in failed");
@@ -334,9 +348,11 @@ function ReAuthModal() {
           <input
             id="reauth-email"
             type="email"
-            value={user?.email ?? ""}
-            readOnly
-            style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #374151", background: "#1f2937", color: "#9ca3af" }}
+            value={emailValue}
+            readOnly={emailLocked}
+            onChange={(ev) => setTypedEmail(ev.target.value)}
+            autoComplete="username"
+            style={{ width: "100%", padding: 8, borderRadius: 6, border: "1px solid #374151", background: "#1f2937", color: emailLocked ? "#9ca3af" : "#e5e7eb" }}
           />
         </label>
         <label style={{ display: "block", fontSize: 13, marginBottom: 12 }}>

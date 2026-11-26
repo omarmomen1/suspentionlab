@@ -53,6 +53,7 @@ class ProfileResponse(BaseModel):
     params: Dict[str, Any]
     user_id: Any
     team_id: Optional[Any] = None
+    version: Optional[int] = None
     created_at: datetime
     updated_at: datetime
 
@@ -93,11 +94,9 @@ async def _save_revision(db, profile, u_id, user, old_params: Optional[dict]):
         author_name=getattr(user, "name", None) or getattr(user, "email", None),
     )
     db.add(rev)
-    await db.commit()
-    await db.refresh(rev)
-    # The commit expired the profile instance; refresh so response
-    # serialization does not trigger lazy IO outside a greenlet.
-    await db.refresh(profile)
+    # Atomic: no commit here. The caller commits the profile change and its
+    # revision together in ONE transaction (flush only, so rev.id is assigned).
+    await db.flush()
     return rev
 
 
@@ -127,14 +126,20 @@ async def create_profile(
     trial = await TrialService.assert_trial_access(db, user, action="vehicle", delta=1)
 
     try:
+        # Wave 6: profile + revision #1 are written in ONE transaction, so a failure
+        # cannot leave an orphan profile without its revision.
         db.add(db_profile)
-        await db.commit()
-        await db.refresh(db_profile)
-        if trial:
-            await TrialService.record_trial_usage(db, user, action="vehicle", delta=1)
-        # Wave 6: revision #1 for every new profile
+        await db.flush()
         await _save_revision(db, db_profile, u_id, user, old_params=None)
+        if trial:
+            # record_trial_usage commits: that single commit covers the profile,
+            # its revision and the trial counter together.
+            await TrialService.record_trial_usage(db, user, action="vehicle", delta=1)
+        else:
+            await db.commit()
+        await db.refresh(db_profile)
     except HTTPException:
+        await db.rollback()
         raise
     except Exception as exc:
         await db.rollback()
@@ -272,13 +277,19 @@ async def update_profile(
         profile.vehicle_type = update_data.vehicle_type
     if update_data.params is not None:
         profile.params = update_data.params
+        profile.version = (profile.version or 1) + 1
 
-    await db.commit()
-    await db.refresh(profile)
-
-    # Wave 6: every params change saves a new revision with parent + diff
-    if update_data.params is not None:
-        await _save_revision(db, profile, u_id, user, old_params=old_params)
+    try:
+        # Wave 6: a params change saves a revision (parent + diff) in the SAME
+        # transaction as the profile update: flush, add revision, one commit.
+        if update_data.params is not None:
+            await db.flush()
+            await _save_revision(db, profile, u_id, user, old_params=old_params)
+        await db.commit()
+        await db.refresh(profile)
+    except Exception as exc:
+        await db.rollback()
+        raise _db_unavailable(exc)
 
     try:
         from suspensionlab.backend.security.audit import record_audit_event
@@ -478,13 +489,21 @@ async def rollback_profile_revision(
     u_id = _to_uuid(getattr(user, "user_id", None) or getattr(user, "id", None))
     old_params = profile.params
     profile.params = target.params
-    await db.commit()
-    await db.refresh(profile)
-    new_rev = await _save_revision(db, profile, u_id, user, old_params=old_params)
+    profile.version = (profile.version or 1) + 1
+    try:
+        await db.flush()
+        new_rev = await _save_revision(db, profile, u_id, user, old_params=old_params)
+        new_rev_number = new_rev.revision_number
+        await db.commit()
+        await db.refresh(profile)
+    except Exception as exc:
+        await db.rollback()
+        raise _db_unavailable(exc)
 
     return {
         "profile_id": str(profile.id),
         "rolled_back_to": revision_number,
-        "new_revision": new_rev.revision_number,
+        "new_revision": new_rev_number,
+        "version": profile.version,
         "params": profile.params,
     }

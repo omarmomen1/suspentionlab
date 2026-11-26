@@ -86,3 +86,21 @@ describe("Wave 6 Cookie-Only Auth Migration", () => {
     expect(src).toContain("sl_token"); // comment documents the cookie fallback
   });
 });
+
+describe("Wave 6 review fixes: session-expired signalling and re-auth email", () => {
+  it("apiFetch dispatches sl:session-expired when refresh fails, AuthContext listens", () => {
+    const api = read("lib/api.ts");
+    expect(api).toContain('SESSION_EXPIRED_EVENT = "sl:session-expired"');
+    expect(api).toMatch(/dispatchEvent\(new Event\(SESSION_EXPIRED_EVENT\)\)/);
+    const ctx = read("contexts/AuthContext.tsx");
+    expect(ctx).toMatch(/addEventListener\("sl:session-expired"/);
+    expect(ctx).toMatch(/removeEventListener\("sl:session-expired"/);
+  });
+
+  it("ReAuthModal email is editable when the profile has no email", () => {
+    const ctx = read("contexts/AuthContext.tsx");
+    expect(ctx).toContain("const emailLocked = Boolean(user?.email)");
+    expect(ctx).toContain("readOnly={emailLocked}");
+    expect(ctx).not.toMatch(/value=\{user\?\.email \?\? ""\}\s*\n\s*readOnly\s*\n/);
+  });
+});

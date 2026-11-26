@@ -501,19 +501,18 @@ async def solve(
     derivatives = compute_kinematic_derivatives(d)
     geom_hash = compute_geometry_hash(hp_dict)
     run_id = f"swp-{uuid.uuid4().hex[:12]}"
-    # Wave 6: provenance input hash over the exact solver inputs.
-    try:
-        from suspensionlab.physics.provenance import compute_input_sha256
-        input_sha256 = compute_input_sha256({
-            "hardpoints": hp_dict,
-            "z_min_mm": req.z_min_mm,
-            "z_max_mm": req.z_max_mm,
-            "n_steps": req.n_steps,
-            "static_camber_deg": req.static_camber_deg,
-            "static_toe_deg": req.static_toe_deg,
-        })
-    except Exception:
-        input_sha256 = ""
+    # Wave 6: provenance input hash over the exact solver inputs. Static camber
+    # and toe live on the hardpoint set and are already inside hp_dict. A failure
+    # here must be loud: an empty hash would silently void the provenance claim.
+    from suspensionlab.physics.provenance import compute_input_sha256
+    input_sha256 = compute_input_sha256({
+        "hardpoints": hp_dict,
+        "z_min_mm": req.z_min_mm,
+        "z_max_mm": req.z_max_mm,
+        "n_steps": req.n_steps,
+        "tire_radius_m": req.tire_radius_m,
+        "backend": req.backend,
+    })
     now_iso = datetime.now(timezone.utc).isoformat()
 
     n_conv = sum(1 for c in d["converged"] if c)

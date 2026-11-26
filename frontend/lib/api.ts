@@ -49,6 +49,9 @@ export function normalizeApiUrl(url: string): string {
   return `${API_BASE}${cleanUrl}`;
 }
 
+/** Window event fired when a 401 could not be refreshed; AuthContext listens. */
+export const SESSION_EXPIRED_EVENT = "sl:session-expired";
+
 let apiRefreshPromise: Promise<boolean> | null = null;
 
 /** Cookie-only session refresh: the server reads the HttpOnly sl_refresh_token
@@ -97,6 +100,10 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
     if (refreshed) {
       // Rotated cookies ride along automatically on the retry.
       res = await fetch(fullUrl, { ...options, credentials: "include", headers });
+    } else if (typeof window !== "undefined") {
+      // Refresh failed: tell AuthContext so it opens the same ReAuthModal that
+      // fetchWithAuth callers get (no hard logout, unsaved inputs stay mounted).
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
     }
   }
 

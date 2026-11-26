@@ -126,6 +126,27 @@ class ParetoPoint:
 # /compare enforce IDENTICAL feasibility unless the caller explicitly overrides.
 DEFAULT_MIN_SUSP_TRAVEL_MM = 0.0
 DEFAULT_MAX_SUSP_TRAVEL_MM = 150.0
+# NOTE (known, unresolved contract difference, do not read 150 as a validated limit):
+# 150 mm is a wide hardware-envelope default used only to reject non-physical
+# candidates in the Pareto search. Other layers in the repo apply tighter,
+# separately defined limits: services/setup_proposal.py CONSTRAINTS
+# peak_susp_travel_max = 0.08 m (80 mm) and services/experiment_service.py
+# check_engineering_constraints travel_limit = 55 mm (bump-stop clearance gate).
+# They are NOT unified here because the right number is an engineering decision.
+# Pass max_travel_mm explicitly to quarter_car_feasibility_constraints() to tighten.
+
+
+def json_safe_crowding(value: float):
+    """Crowding distance for JSON: boundary points are +inf, which is not valid JSON.
+
+    Returns None for non-finite values (meaning "boundary / unbounded"), else a
+    rounded float.
+    """
+    try:
+        v = float(value)
+    except (TypeError, ValueError):
+        return None
+    return round(v, 6) if np.isfinite(v) else None
 
 
 def quarter_car_feasibility_constraints(
@@ -274,6 +295,7 @@ class ParetoFrontier:
                 "constraints":     {k: round(v, 6) for k, v in p.constraints.items()},
                 "feasible":        p.feasible,
                 "pareto_rank":     p.pareto_rank,
+                "crowding_distance": json_safe_crowding(p.crowding_distance),
                 "is_pareto_optimal": bool(p.pareto_rank == 0 and p.feasible),
             }
 

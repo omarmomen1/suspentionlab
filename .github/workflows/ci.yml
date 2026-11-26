@@ -91,10 +91,11 @@ jobs:
 
       - name: Alembic single-head migration check
         run: |
-          HEADS=$(alembic heads | wc -l)
+          # stdout can carry log lines; count only real "(head)" revision lines (stderr dropped).
+          HEADS=$(alembic heads 2>/dev/null | grep -c '(head)')
           echo "alembic heads: $HEADS"
-          alembic heads
-          test "$HEADS" -eq 1 || { echo "ERROR: multiple alembic heads detected"; exit 1; }
+          alembic heads 2>/dev/null
+          test "$HEADS" -eq 1 || { echo "ERROR: expected exactly 1 alembic head, found $HEADS"; exit 1; }
 
       - name: Run pytest with coverage
         run: |
@@ -506,14 +507,18 @@ jobs:
 
       - name: Start Backend Server
         run: |
+          # ENVIRONMENT=DEV makes the app startup seed the demo users (james@company.com),
+          # so the smoke test user exists. Wait for health instead of a fixed sleep.
           python -m uvicorn suspensionlab.backend.api.main:app --host 0.0.0.0 --port 8000 &
-          sleep 3
+          for i in $(seq 1 60); do curl -sf http://localhost:8000/health && break; sleep 2; done
+          curl -sf http://localhost:8000/health || { echo "backend did not become healthy"; exit 1; }
 
       - name: Start Frontend Server
         working-directory: frontend
         run: |
           npm run start -- -p 3000 &
-          sleep 5
+          for i in $(seq 1 60); do curl -sf http://localhost:3000/ >/dev/null && break; sleep 2; done
+          curl -sf http://localhost:3000/ >/dev/null || { echo "frontend did not start"; exit 1; }
 
       - name: Run E2E smoke gate (sign-in, nav, core routes, PDF export)
         run: npx playwright test tests/e2e/smoke.spec.ts

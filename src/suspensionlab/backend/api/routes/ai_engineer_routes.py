@@ -1907,13 +1907,16 @@ async def approve_ai_decision(
         )
         # Wave 6: append-only hash-chained audit record, server-side identity only.
         from suspensionlab.backend.security.audit import record_audit_event
-        gate_data = res.get("data", {}) if isinstance(res, dict) else {}
+        # approve_decision_with_gate returns approver_name / approver_role /
+        # hmac_signature / approved_at at the TOP LEVEL of the result.
+        gate_data = res.get("data") if isinstance(res, dict) and isinstance(res.get("data"), dict) else (res if isinstance(res, dict) else {})
+        _org_id = getattr(user, "organization_id", None) or getattr(user, "org_id", None)
         await record_audit_event(
             db,
             event_type="ai.decision.approved",
             user_id=str(getattr(user, "user_id", "")),
             team_id=str(getattr(user, "team_id", None)) if getattr(user, "team_id", None) else None,
-            organization_id=str(getattr(user, "org_id", None)) if getattr(user, "org_id", None) else None,
+            organization_id=str(_org_id) if _org_id else None,
             artifact_id=f"APPROVAL-{req.decision_id}",
             metadata={
                 "decision_id": req.decision_id,
