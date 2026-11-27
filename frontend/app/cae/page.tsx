@@ -367,7 +367,7 @@ export default function CaeInteroperabilityPage() {
                   <button
                     onClick={handleCompare}
                     disabled={comparing}
-                    className="py-2 px-4 rounded-xl bg-ansys-yellow text-black font-bold text-xs hover:brightness-110 transition-all flex items-center gap-1.5 shadow-lg"
+                    className="py-2 px-4 rounded-xl bg-signal text-carbon border border-signal font-bold text-xs hover:bg-[#d6f56e] transition-colors flex items-center gap-1.5"
                   >
                     <GitCompare className="w-3.5 h-3.5" />
                     <span>Compare Solvers</span>
@@ -609,7 +609,7 @@ export default function CaeInteroperabilityPage() {
                 <button
                   onClick={handleCompare}
                   disabled={comparing}
-                  className="mt-2 px-4 py-2 rounded-xl bg-ansys-yellow text-black font-bold text-xs hover:brightness-110 transition-all inline-flex items-center gap-1.5"
+                  className="mt-2 px-4 py-2 rounded-xl bg-signal text-carbon border border-signal font-bold text-xs hover:bg-[#d6f56e] transition-all inline-flex items-center gap-1.5"
                 >
                   <GitCompare className="w-3.5 h-3.5" />
                   <span>Run Comparison Now</span>

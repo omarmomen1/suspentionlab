@@ -254,7 +254,7 @@ export default function AuditPage() {
 
             <button
               onClick={() => handleExport("json")}
-              className="flex items-center gap-2 px-3.5 py-2 bg-ansys-yellow text-black rounded-xl text-xs font-bold hover:brightness-110 transition-all shadow-lg shadow-ansys-yellow/10"
+              className="flex items-center gap-2 px-3.5 py-2 bg-signal text-carbon border border-signal rounded-xl text-xs font-bold hover:bg-[#d6f56e] transition-colors"
             >
               <FileText size={13} />
               <span>Export Verified JSON</span>

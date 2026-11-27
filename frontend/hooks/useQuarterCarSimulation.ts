@@ -73,6 +73,12 @@ export function useQuarterCarSimulation({ authHeader, showToast, autoRun }: UseQ
   const runSimulation = async (isRetry = false) => {
     const errorMsg = validateParams();
     if (errorMsg) {
+      setResults(null);
+      setLastValidResult(null);
+      setValidity(null);
+      setSimParams(null);
+      setSimError(errorMsg);
+      setLoadingStage(null);
       showToast(errorMsg, "error");
       return;
     }

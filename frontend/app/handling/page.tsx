@@ -452,7 +452,7 @@ function HandlingDashboard() {
             className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
               isRunning
                 ? "bg-[#222] text-gray-500 cursor-not-allowed"
-                : "bg-ansys-yellow text-black hover:brightness-110 shadow-[0_0_20px_rgba(242,169,0,0.2)]"
+                : "bg-signal text-carbon border border-signal hover:bg-[#d6f56e]"
             }`}
           >
             {isRunning ? (

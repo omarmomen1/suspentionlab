@@ -186,7 +186,7 @@ function ActiveSuspensionDashboard() {
 
         <div className="flex items-center gap-2">
           <button onClick={runSimulation} disabled={isRunning}
-            className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${isRunning ? "bg-[#222] text-gray-500 cursor-not-allowed" : "bg-ansys-yellow text-black hover:brightness-110 shadow-[0_0_20px_rgba(242,169,0,0.2)]"}`}>
+            className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${isRunning ? "bg-[#222] text-gray-500 cursor-not-allowed" : "bg-signal text-carbon border border-signal hover:bg-[#d6f56e]"}`}>
             {isRunning ? <><div className="w-3 h-3 border border-gray-600 border-t-gray-300 rounded-full animate-spin" />Solving…</> : <><Zap size={13} fill="currentColor" /> Run Skyhook</>}
           </button>
         </div>
@@ -244,7 +244,7 @@ function ActiveSuspensionDashboard() {
               </div>
 
               <div className="flex gap-1.5 shrink-0">
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-ansys-yellow text-black shadow-[0_0_12px_rgba(242,169,0,0.2)]">
+                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-signal text-carbon border border-signal">
                   <Pulse size={12} /> Time Domain Control Response
                 </button>
               </div>

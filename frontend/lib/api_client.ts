@@ -1114,6 +1114,7 @@ export class ReportsApi {
 
   static async createReportFromRun(data: {
     simulation_run_id: string;
+    baseline_run_id?: string;
     title?: string;
     notes?: string;
   }): Promise<any> {
@@ -1123,8 +1124,9 @@ export class ReportsApi {
     });
   }
 
-  static async hydrateReport(runIdOrLabel: string): Promise<any> {
-    return apiJson(`/api/v1/reports/hydrate/${encodeURIComponent(runIdOrLabel)}`);
+  static async hydrateReport(runIdOrLabel: string, baselineRunId?: string): Promise<any> {
+    const qs = baselineRunId ? `?baseline_run_id=${encodeURIComponent(baselineRunId)}` : "";
+    return apiJson(`/api/v1/reports/hydrate/${encodeURIComponent(runIdOrLabel)}${qs}`);
   }
 
   static async getReportRecord(reportIdOrToken: string): Promise<any> {

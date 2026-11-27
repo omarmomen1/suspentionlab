@@ -234,7 +234,7 @@ export default function LapDeltaView({
         {onPinBaseline && (
           <button
             onClick={onPinBaseline}
-            className="mt-2 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-[#f2a900] text-black hover:bg-[#ffb800] transition-all flex items-center gap-1.5 cursor-pointer shadow-md"
+            className="mt-2 px-3.5 py-1.5 rounded-lg text-xs font-bold bg-signal text-carbon border border-signal hover:bg-[#d6f56e] transition-all flex items-center gap-1.5 cursor-pointer"
           >
             <Pin size={12} />
             Pin Current Setup as Baseline A

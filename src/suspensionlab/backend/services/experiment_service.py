@@ -771,10 +771,11 @@ class ExperimentService:
 
         rp = road_profile or {}
         prof = RoadProfile(
-            profile_type="sine",
-            amplitude=0.03,
-            frequency=2.0,
-            duration=1.0,
+            profile_type=str(rp.get("profile_type", "iso8608")),
+            iso_class=str(rp.get("iso_class", "B")),
+            amplitude=float(rp.get("amplitude", 0.02)),
+            frequency=float(rp.get("frequency", 2.0)),
+            duration=float(rp.get("duration", 1.0)),
             speed_mps=float(rp.get("speed_mps", rp.get("v_ms", 30.0))),
         )
 
@@ -788,8 +789,8 @@ class ExperimentService:
         constraints = quarter_car_feasibility_constraints()
 
         ranges = param_ranges or {
-            "k_s": [20000.0, 50000.0, 5],
-            "c": [1400.0, 3200.0, 5],
+            "k_s": [15000.0, 55000.0, 6],
+            "c": [900.0, 3900.0, 6],
         }
         ranges_tuple = {k: (float(v[0]), float(v[1]), int(v[2])) for k, v in ranges.items()}
 
@@ -849,7 +850,7 @@ class ExperimentService:
             "best_compromise": best,
             "best_compromise_explanation": best_explanation,
             "validation_state": "UNVALIDATED",
-            "solver": "scipy.integrate.solve_ivp(RK45, rtol=1e-6) Grid Search",
+            "solver": "scipy.integrate.solve_ivp(RK45, rtol=1e-6) + NSGA-II Pareto Ranking",
         }
 
     @staticmethod

@@ -33,7 +33,7 @@ const PLANS = [
     price: "$79",
     billing: "/ month",
     description: "Full-Car, Damper LUTs, Telemetry Correlation, Setup Optimizer & PDF Reports.",
-    color: "border-ansys-yellow shadow-[0_0_40px_rgba(242,169,0,0.08)]",
+    color: "border-signal",
     badge: "Most Popular",
     features: [
       "Everything in Starter",
@@ -46,7 +46,7 @@ const PLANS = [
     ],
     cta: "Activate License Key →",
     ctaHref: "/settings#billing",
-    ctaStyle: "bg-ansys-yellow text-black font-bold hover:brightness-110 shadow-[0_0_20px_rgba(242,169,0,0.25)]",
+    ctaStyle: "bg-signal text-carbon font-bold border border-signal hover:bg-[#d6f56e]",
     icon: Shield,
   },
   {
@@ -155,7 +155,7 @@ export default function PricingPage() {
                   </div>
                 ) : plan.badge && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="px-3 py-1 bg-ansys-yellow text-black text-[10px] font-bold uppercase tracking-wider rounded-full">
+                    <span className="px-3 py-1 bg-signal text-carbon text-[10px] font-bold uppercase tracking-wider rounded-full">
                       {plan.badge}
                     </span>
                   </div>
@@ -255,8 +255,8 @@ export default function PricingPage() {
           <h2 className="text-3xl font-semibold text-white mb-3">Still have questions?</h2>
           <p className="text-gray-500 mb-8">Our team of engineers is happy to walk you through the right plan for your use case.</p>
           <Link href="mailto:support@suspensionlab.io"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-ansys-yellow text-black font-bold rounded-xl
-              hover:brightness-110 transition-all shadow-[0_0_20px_rgba(242,169,0,0.2)]">
+            className="inline-flex items-center gap-2 px-6 py-3 bg-signal text-carbon border border-signal font-bold rounded-xl
+              hover:bg-[#d6f56e] transition-colors">
             Talk to an Engineer <ArrowRight size={16} />
           </Link>
         </div>

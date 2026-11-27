@@ -33,21 +33,37 @@ interface ParsedError {
 
 function parseApiError(raw: unknown): ParsedError {
   if (!raw) return { message: "An unexpected error occurred.", isAuth: false };
-  let text = typeof raw === "string" ? raw : (raw as any)?.message || String(raw);
+  const text = typeof raw === "string" ? raw : (raw as any)?.message || String(raw);
 
   try {
     const json = JSON.parse(text);
+    const rawDetail = json?.detail;
+    const detailText =
+      typeof rawDetail === "string"
+        ? rawDetail
+        : rawDetail && typeof rawDetail === "object"
+        ? [
+            typeof rawDetail.error === "string" ? rawDetail.error : null,
+            Array.isArray(rawDetail.blocking_reasons) && rawDetail.blocking_reasons.length > 0
+              ? rawDetail.blocking_reasons.join("; ")
+              : null,
+            typeof rawDetail.message === "string" ? rawDetail.message : null,
+          ]
+            .filter(Boolean)
+            .join(": ")
+        : "";
+    const detailLower = detailText.toLowerCase();
     if (
       json.status === 401 ||
-      json.detail?.toLowerCase().includes("token") ||
-      json.detail?.toLowerCase().includes("expired") ||
-      json.detail?.toLowerCase().includes("invalid_api_key") ||
-      json.type?.includes("invalid_api_key")
+      detailLower.includes("token") ||
+      detailLower.includes("expired") ||
+      detailLower.includes("invalid_api_key") ||
+      String(json.type || "").includes("invalid_api_key")
     ) {
       return { message: "You need to be signed in to analyze telemetry sessions.", isAuth: true };
     }
-    if (json.detail) return { message: json.detail, isAuth: false };
-    if (json.title) return { message: json.title, isAuth: false };
+    if (detailText) return { message: detailText, isAuth: false };
+    if (typeof json.title === "string" && json.title) return { message: json.title, isAuth: false };
   } catch {}
 
   const lower = text.toLowerCase();
@@ -333,7 +349,7 @@ export default function DigitalTwinPage() {
                 </div>
                 <Link
                   href="/correlation"
-                  className="shrink-0 px-4 py-2.5 text-xs font-semibold uppercase tracking-wider bg-amber-500 hover:bg-amber-400 text-black rounded-lg shadow-lg transition-colors flex items-center gap-2"
+                  className="shrink-0 px-4 py-2.5 text-xs font-bold uppercase tracking-wider bg-signal hover:bg-[#d6f56e] text-carbon border border-signal rounded-lg transition-colors flex items-center gap-2"
                 >
                   <span>Investigate in Correlation Cockpit</span>
                   <ArrowRight className="w-4 h-4" />
@@ -640,7 +656,7 @@ export default function DigitalTwinPage() {
               <button
                 onClick={handleAnalyse}
                 disabled={!file || isAnalysing}
-                className="flex items-center space-x-2 bg-amber-600 hover:bg-amber-500 text-white px-6 py-2.5 rounded-lg font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-amber-900/20 ml-auto"
+                className="flex items-center space-x-2 bg-signal hover:bg-[#d6f56e] text-carbon border border-signal px-6 py-2.5 rounded-lg font-bold transition-colors disabled:opacity-50 disabled:cursor-not-allowed ml-auto"
               >
                 {isAnalysing ? (
                   <>

@@ -168,7 +168,7 @@ function NVHDashboard() {
           </div>
 
           <div className="flex gap-1.5 shrink-0">
-            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-ansys-yellow text-black shadow-[0_0_12px_rgba(242,169,0,0.2)]">
+            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-signal text-carbon border border-signal">
               <Waves size={12} /> Spectrogram
             </button>
           </div>

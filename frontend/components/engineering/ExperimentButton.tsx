@@ -46,8 +46,8 @@ export default function ExperimentButton({
   }[size];
 
   const variantClasses = {
-    primary: "bg-ansys-yellow text-black hover:brightness-110 shadow-[0_0_15px_rgba(242,169,0,0.25)]",
-    secondary: "bg-purple-950/60 hover:bg-purple-900/60 text-purple-200 border border-purple-500/40 shadow-[0_0_15px_rgba(168,85,247,0.2)]",
+    primary: "bg-signal text-carbon border border-signal hover:bg-[#d6f56e]",
+    secondary: "bg-purple-950/60 hover:bg-purple-900/60 text-purple-200 border border-purple-500/40",
     danger: "bg-rose-950/60 hover:bg-rose-900/60 text-rose-200 border border-rose-500/40",
   }[variant];
 

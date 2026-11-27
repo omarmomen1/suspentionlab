@@ -298,9 +298,9 @@ export default function PDFExport({
       pdf.text("2. Key Simulated Metrics & Performance Indicators (Actual Simulation Output)", margin + 4, y + 6);
 
       const metricEntries = metrics ? Object.entries(metrics) : [
-        ["Simulated Lap Delta", "+0.000 s (Baseline)"],
-        ["Front Turn-in Grip", "N/A"],
-        ["Rear Platform Stability", "N/A"],
+        ["Simulated Lap Delta", "Baseline run (no comparison)"],
+        ["Front Turn-in Grip", "Baseline run (no comparison)"],
+        ["Rear Platform Stability", "Baseline run (no comparison)"],
         ["Telemetry Correlation", typeof correlationPct === "number" ? `${correlationPct.toFixed(1)} %` : "UNVALIDATED (No empirical dataset)"],
         ["Wk-Weighted RMS Accel", "N/A"],
         ["Vibration Dose Value (VDV)", "N/A"],

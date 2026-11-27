@@ -472,7 +472,7 @@ function InvestigateContent() {
                   </div>
                   <button
                     onClick={() => setActiveStage("WHY")}
-                    className="px-4 py-1.5 rounded-lg bg-ansys-yellow text-black font-bold hover:brightness-110 flex items-center gap-1 cursor-pointer"
+                    className="px-4 py-1.5 rounded-lg bg-signal text-carbon border border-signal font-bold hover:bg-[#d6f56e] flex items-center gap-1 cursor-pointer"
                   >
                     <span>Analyze Root Cause</span>
                     <ArrowRight size={13} />
@@ -618,7 +618,7 @@ function InvestigateContent() {
                 <div className="pt-2 flex justify-end">
                   <button
                     onClick={() => setActiveStage("EVIDENCE")}
-                    className="px-4 py-2 rounded-xl bg-ansys-yellow text-black font-bold hover:brightness-110 flex items-center gap-1 cursor-pointer"
+                    className="px-4 py-2 rounded-xl bg-signal text-carbon border border-signal font-bold hover:bg-[#d6f56e] flex items-center gap-1 cursor-pointer transition-colors"
                   >
                     <span>Inspect Measured Evidence</span>
                     <ArrowRight size={13} />
@@ -683,7 +683,7 @@ function InvestigateContent() {
               <div className="mt-4 pt-4 border-t border-white/10 flex justify-end">
                 <button
                   onClick={() => setActiveStage("TEST")}
-                  className="px-4 py-2 rounded-xl bg-ansys-yellow text-black font-bold hover:brightness-110 flex items-center gap-1 cursor-pointer font-mono"
+                  className="px-4 py-2 rounded-xl bg-signal text-carbon border border-signal font-bold hover:bg-[#d6f56e] flex items-center gap-1 cursor-pointer font-mono transition-colors"
                 >
                   <span>Formulate Candidate Setup</span>
                   <ArrowRight size={13} />
@@ -866,7 +866,7 @@ function InvestigateContent() {
                       data-testid="btn-generate-proposal"
                       disabled={isGeneratingProposal}
                       onClick={handleGenerateProposal}
-                      className="w-full py-2.5 px-4 rounded-xl bg-ansys-yellow hover:bg-yellow-400 text-black font-bold font-mono text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50 shadow-md cursor-pointer"
+                      className="w-full py-2.5 px-4 rounded-xl bg-signal hover:bg-[#d6f56e] text-carbon border border-signal font-bold font-mono text-xs flex items-center justify-center gap-2 transition-all disabled:opacity-50 cursor-pointer"
                     >
                       <Sparkles size={14} />
                       <span>{isGeneratingProposal ? "Simulating Feasible Candidates..." : "[ Generate Setup Proposal from Current Simulation ]"}</span>

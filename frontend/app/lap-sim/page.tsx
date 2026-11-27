@@ -1956,7 +1956,7 @@ export default function LapSimPage() {
               onClick={() => handleSimulate()}
               disabled={running}
               id="run-lap-sim-btn"
-              className="w-full py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-[#f2a900] text-black hover:bg-[#ffb800] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer shadow-lg"
+              className="w-full py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-signal text-carbon border border-signal hover:bg-[#d6f56e] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
             >
               {running ? (
                 <>
