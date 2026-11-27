@@ -147,6 +147,13 @@ export default function AIEngineerPage() {
   const [approving, setApproving] = useState(false);
   const [approvalNotes, setApprovalNotes] = useState("Engineering sign-off confirmed after physical track parameter verification.");
   const [approvalSuccess, setApprovalSuccess] = useState<string | null>(null);
+  const [approvalError, setApprovalError] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ msg: string; type: "error" | "success" } | null>(null);
+
+  const showToast = (msg: string, type: "error" | "success") => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 7000);
+  };
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -174,11 +181,15 @@ export default function AIEngineerPage() {
     setResult(null);
     setError("");
     setApprovalSuccess(null);
+    setApprovalError(null);
 
     try {
       const data = await AiEngineerApi.chat(textToSubmit.trim(), {
         vehicle_id: workspace.vehicle.id,
         setup_version: workspace.setup.version,
+        simulation_run_id: workspace.simulation.activeRunId || undefined,
+        telemetry_session_id: workspace.telemetry.sessionId || undefined,
+        track_name: workspace.track.name || undefined,
       });
       setResult(data);
     } catch (e: unknown) {
@@ -190,15 +201,23 @@ export default function AIEngineerPage() {
 
   const handleApproveGate = async () => {
     if (!result?.approval_gate) return;
+    setApprovalError(null);
+    setError("");
     if (!user) {
-      setError("Sign in required: only an authenticated engineer can approve a decision gate.");
+      const msg = "Sign in required: only an authenticated authorized engineer can approve a decision gate.";
+      setApprovalError(msg);
+      setError(msg);
+      showToast(msg, "error");
       return;
     }
     setApproving(true);
     try {
       const targetId = result.approval_gate.target_id || result.approval_gate.decision_id || result.approval_gate.decision_type;
       if (!targetId) {
-        setError("No decision id returned by the AI run - cannot approve. Re-run the analysis first.");
+        const msg = "No decision id returned by the AI run - cannot approve. Re-run the analysis first.";
+        setApprovalError(msg);
+        setError(msg);
+        showToast(msg, "error");
         setApproving(false);
         return;
       }
@@ -211,7 +230,9 @@ export default function AIEngineerPage() {
         user.name || user.email,
         user.team_id || undefined
       );
-      setApprovalSuccess(`Approved by ${res.approved_by || user.name || user.email}. Decision recorded in the audit ledger.`);
+      const okMsg = `Approved by ${res.approved_by || user.name || user.email}. Decision recorded in the audit ledger.`;
+      setApprovalSuccess(okMsg);
+      showToast(okMsg, "success");
       setResult({
         ...result,
         approval_gate: {
@@ -220,15 +241,63 @@ export default function AIEngineerPage() {
         },
       });
     } catch (err: any) {
-      setError(formatApiError(err, "Failed to sign off approval gate"));
+      const rawMsg = err instanceof Error ? err.message : String(err ?? "");
+      let detailMsg = formatApiError(err, "");
+      const jsonIdx = rawMsg.indexOf("{");
+      if (jsonIdx !== -1) {
+        try {
+          const parsed = JSON.parse(rawMsg.slice(jsonIdx));
+          if (typeof parsed?.detail === "string" && parsed.detail) {
+            detailMsg = parsed.detail;
+          }
+        } catch {}
+      }
+      const is403 =
+        rawMsg.includes("403") ||
+        rawMsg.toLowerCase().includes("forbidden") ||
+        detailMsg.toLowerCase().includes("403") ||
+        detailMsg.toLowerCase().includes("lacks permission") ||
+        detailMsg.toLowerCase().includes("not authorized");
+      const friendlyMsg = is403
+        ? `Permission denied (HTTP 403): Approval requires an authorized engineering role (Race Engineer, Lead, or Admin). ${detailMsg && !detailMsg.startsWith("API 403") ? detailMsg : ""}`.trim()
+        : formatApiError(err, "Failed to sign off approval gate");
+      setApprovalError(friendlyMsg);
+      setError(friendlyMsg);
+      showToast(friendlyMsg, "error");
     } finally {
       setApproving(false);
     }
   };
 
-  /** Render helper: only real strings render; objects never become "[object Object]". */
-  const asText = (v: unknown): string | null =>
-    typeof v === "string" && v.trim().length > 0 ? v : null;
+  /** Render helper: formats strings/numbers/objects safely; never emits "[object Object]". */
+  const asText = (v: unknown): string | null => {
+    if (typeof v === "string") {
+      return v.trim().length > 0 ? v : null;
+    }
+    if (typeof v === "number" || typeof v === "boolean") {
+      return String(v);
+    }
+    if (Array.isArray(v)) {
+      const parts = v.map((item) => asText(item)).filter((x): x is string => Boolean(x));
+      return parts.length > 0 ? parts.join(", ") : null;
+    }
+    if (v && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      if (typeof o.metric === "string" && "baseline" in o && "predicted" in o) {
+        const pct = typeof o.change_pct === "number" ? ` (${o.change_pct > 0 ? "+" : ""}${o.change_pct}%)` : "";
+        return `${o.metric}: ${o.baseline} → ${o.predicted}${o.unit ? ` ${o.unit}` : ""}${pct}`;
+      }
+      if (typeof o.message === "string") return o.message;
+      if (typeof o.description === "string") return o.description;
+      if (typeof o.summary === "string") return o.summary;
+      const entries = Object.entries(o)
+        .filter(([, val]) => val !== null && val !== undefined)
+        .map(([k, val]) => `${k.replace(/_/g, " ")}: ${asText(val) ?? ""}`)
+        .filter((s) => !s.endsWith(": "));
+      return entries.length > 0 ? entries.join(", ") : null;
+    }
+    return null;
+  };
 
   const getSourceBadgeColor = (source: string) => {
     switch (source) {
@@ -266,6 +335,20 @@ export default function AIEngineerPage() {
 
   return (
     <div className="min-h-full bg-[#0a0a0c] text-white">
+      {toast && (
+        <div
+          role="alert"
+          aria-live="assertive"
+          data-testid="ai-engineer-toast"
+          className={`fixed top-14 right-4 z-50 max-w-md px-4 py-3 rounded-xl border text-xs font-mono shadow-2xl ${
+            toast.type === "error"
+              ? "bg-rose-950/95 border-rose-500/50 text-rose-200"
+              : "bg-emerald-950/95 border-emerald-500/50 text-emerald-200"
+          }`}
+        >
+          {toast.msg}
+        </div>
+      )}
       {/* Top Banner & Context */}
       <div className="border-b border-zinc-800 bg-[#0d0d10] px-6 py-6">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -467,7 +550,7 @@ export default function AIEngineerPage() {
               <button
                 onClick={() => handleSubmit()}
                 disabled={loading || !problem.trim()}
-                className="px-5 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 disabled:opacity-40 text-white font-medium text-xs flex items-center gap-2 transition shadow-lg shadow-indigo-500/20"
+                className="px-5 py-2 rounded-lg bg-signal text-carbon border border-signal hover:bg-[#d6f56e] disabled:opacity-40 font-bold text-xs flex items-center gap-2 transition-colors"
               >
                 {loading ? (
                   <>
@@ -625,7 +708,7 @@ export default function AIEngineerPage() {
 
                     <div className="text-xs text-zinc-300 font-sans leading-relaxed">
                       <div className="p-3 rounded-lg bg-amber-950/30 border border-amber-500/30 text-amber-200/90 text-xs mb-3 font-mono">
-                        ⚠️ {result.approval_gate.rationale || result.approval_gate.warning || "Setup changes require Race Engineer sign-off before track deployment."}
+                        ⚠️ {asText(result.approval_gate.rationale) || asText(result.approval_gate.warning) || "Setup changes require Race Engineer sign-off before track deployment."}
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 font-mono text-xs">
                         <div className="bg-zinc-900 p-3 rounded border border-zinc-800">
@@ -637,24 +720,33 @@ export default function AIEngineerPage() {
                         <div className="bg-zinc-900 p-3 rounded border border-zinc-800">
                           <span className="text-zinc-500 text-[10px] block uppercase">Target &amp; Required Role</span>
                           <span className="text-zinc-200 font-bold block mt-1">
-                            Target: {result.approval_gate.decision_type || result.approval_gate.target_id || "SETUP_MODIFICATION"}
+                            Target: {asText(result.approval_gate.decision_type) || asText(result.approval_gate.target_id) || "SETUP_MODIFICATION"}
                           </span>
                           <span className="text-emerald-400 block text-[11px] mt-1">
-                            Required Role: {result.approval_gate.role_required || result.approval_gate.required_role || "Race Engineer"}
+                            Required Role: {asText(result.approval_gate.role_required) || asText(result.approval_gate.required_role) || "Race Engineer"}
                           </span>
                         </div>
                       </div>
                       <div className="mt-3 bg-zinc-900 p-3 rounded border border-zinc-800 font-mono text-xs">
                         <span className="text-zinc-500 text-[10px] block uppercase">Impact Assessment</span>
                         <span className="text-cyan-300 block mt-1">
-                          {typeof result.predicted_effects === "string"
-                            ? result.predicted_effects
-                            : result.predicted_effects && typeof result.predicted_effects === "object"
-                            ? Object.entries(result.predicted_effects).map(([k, v]) => `${k.replace(/_/g, " ")}: ${v}`).join(", ")
-                            : result.approval_gate.impact_assessment || "Verified lap delta, stability limits, and ride-height compliance across high-speed sectors."}
+                          {asText(result.predicted_effects) ||
+                            asText(result.approval_gate.impact_assessment) ||
+                            "Verified lap delta, stability limits, and ride-height compliance across simulated conditions."}
                         </span>
                       </div>
                     </div>
+
+                    {approvalError && (
+                      <div
+                        role="alert"
+                        data-testid="ai-approve-error"
+                        className="p-3 rounded-lg bg-rose-950/40 border border-rose-500/50 text-rose-200 font-mono text-xs flex items-start gap-2"
+                      >
+                        <AlertTriangle size={15} className="text-rose-400 shrink-0 mt-0.5" />
+                        <span>{approvalError}</span>
+                      </div>
+                    )}
 
                     {(result.approval_gate.status === "APPROVED" || approvalSuccess) ? (
                       <div className="p-3 rounded-lg bg-emerald-950/30 border border-emerald-500/40 text-emerald-300 font-mono text-xs flex items-center gap-2">
@@ -752,20 +844,20 @@ export default function AIEngineerPage() {
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
                     <div className="bg-zinc-950 p-2.5 rounded border border-zinc-800/80">
                       <span className="text-zinc-500 block text-[10px]">SIMULATIONS EXECUTED</span>
-                      <span className="text-zinc-200 font-bold">{result.evidence?.simulations_run || result.provenance?.simulation_count || 12} sweeps</span>
+                      <span className="text-zinc-200 font-bold">{result.evidence?.simulations_run ?? result.provenance?.simulation_count ?? 0} sweeps</span>
                     </div>
                     <div className="bg-zinc-950 p-2.5 rounded border border-zinc-800/80">
                       <span className="text-zinc-500 block text-[10px]">CONSTRAINTS SATISFIED</span>
-                      <span className="text-emerald-400 font-bold">✅ {result.provenance?.constraint_status || "VERIFIED"}</span>
+                      <span className="text-emerald-400 font-bold">✅ {asText(result.provenance?.constraint_status) || "VERIFIED"}</span>
                     </div>
                     <div className="bg-zinc-950 p-2.5 rounded border border-zinc-800/80">
                       <span className="text-zinc-500 block text-[10px]">SOLVER MODEL</span>
-                      <span className="text-zinc-200 truncate block">{result.provenance?.model_version || "RK45-ODE-v2.4"}</span>
+                      <span className="text-zinc-200 truncate block">{asText(result.provenance?.model_version) || "Not reported"}</span>
                     </div>
                     <div className="bg-zinc-950 p-2.5 rounded border border-zinc-800/80">
                       <span className="text-zinc-500 block text-[10px]">CALCULATED CONFIDENCE</span>
                       <span className="text-indigo-400 font-bold">
-                        {typeof result.confidence === "number" ? (result.confidence * 100).toFixed(1) : "95.0"}%
+                        {typeof result.confidence === "number" ? `${(result.confidence * 100).toFixed(1)}%` : "Not scored"}
                       </span>
                     </div>
                   </div>
@@ -810,9 +902,9 @@ export default function AIEngineerPage() {
                     <Activity className="w-4 h-4" />
                     3. Engineering Interpretation (Physical Mechanism &amp; Causal Dynamics)
                   </span>
-                  {result.engineering_interpretation && (
+                  {asText(result.engineering_interpretation) && (
                     <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-500/30 text-xs text-purple-200 font-sans leading-relaxed whitespace-pre-line">
-                      {result.engineering_interpretation}
+                      {asText(result.engineering_interpretation)}
                     </div>
                   )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -820,13 +912,13 @@ export default function AIEngineerPage() {
                       <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1">
                         Observable Dynamic Behavior
                       </span>
-                      <p className="text-xs text-zinc-300 leading-relaxed font-sans">{result.diagnosis}</p>
+                      <p className="text-xs text-zinc-300 leading-relaxed font-sans">{asText(result.diagnosis) || "No diagnosis returned."}</p>
                     </div>
                     <div className="p-4 rounded-xl bg-zinc-950/80 border border-zinc-850">
                       <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1">
                         Causal Root Cause in State Space
                       </span>
-                      <p className="text-xs text-zinc-300 leading-relaxed font-sans">{result.root_cause}</p>
+                      <p className="text-xs text-zinc-300 leading-relaxed font-sans">{asText(result.root_cause) || "No root cause returned."}</p>
                     </div>
                   </div>
                 </div>
@@ -837,9 +929,9 @@ export default function AIEngineerPage() {
                     <AlertTriangle className="w-4 h-4" />
                     4. Uncertainty &amp; Boundary Conditions
                   </span>
-                  {result.uncertainty && (
+                  {asText(result.uncertainty) && (
                     <div className="p-4 rounded-xl bg-amber-950/20 border border-amber-500/30 text-xs text-amber-200 font-mono leading-relaxed whitespace-pre-line">
-                      {result.uncertainty}
+                      {asText(result.uncertainty)}
                     </div>
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
@@ -870,9 +962,9 @@ export default function AIEngineerPage() {
                     </span>
                   </div>
 
-                  {result.next_action && (
+                  {asText(result.next_action) && (
                     <div className="p-4 rounded-xl bg-cyan-950/25 border border-cyan-500/35 text-xs text-cyan-200 font-mono leading-relaxed whitespace-pre-line">
-                      {result.next_action}
+                      {asText(result.next_action)}
                     </div>
                   )}
 
@@ -951,15 +1043,15 @@ export default function AIEngineerPage() {
                         className="p-3 rounded-lg bg-zinc-950 border border-zinc-800/80 flex items-center justify-between text-xs font-mono"
                       >
                         <div className="flex items-center gap-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getSourceBadgeColor(cite?.source_type || "SIMULATION")}`}>
-                            {cite?.source_type || "SOLVER"}
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getSourceBadgeColor(asText(cite?.source_type) || "SIMULATION")}`}>
+                            {asText(cite?.source_type) || "SOLVER"}
                           </span>
-                          <span className="text-zinc-300 font-semibold">{cite?.field_path || (cite as any)?.title || (cite as any)?.source || "Modal Metric"}</span>
+                          <span className="text-zinc-300 font-semibold">{asText(cite?.field_path) || asText((cite as any)?.title) || asText((cite as any)?.source) || "Modal Metric"}</span>
                           <span className="text-zinc-600">via</span>
-                          <span className="text-zinc-400">{cite?.tool_name || (cite as any)?.source || (cite as any)?.id || "scipy-ode"}</span>
+                          <span className="text-zinc-400">{asText(cite?.tool_name) || asText((cite as any)?.source) || asText((cite as any)?.id) || "scipy-ode"}</span>
                         </div>
                         <div className="text-right">
-                          <span className="text-emerald-400 font-bold">{cite?.value ? String(cite.value) : "Verified"}</span>
+                          <span className="text-emerald-400 font-bold">{asText(cite?.value) || "Verified"}</span>
                         </div>
                       </div>
                     ))

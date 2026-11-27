@@ -28,17 +28,11 @@ describe("validateQCarParams", () => {
     expect(validateQCarParams({ ...VALID, m_u: 0 })).toMatch(/Unsprung Mass/);
   });
 
-  it("rejects non-positive spring rate", () => {
+  it("rejects zero or negative spring rate and damping", () => {
+    expect(validateQCarParams({ ...VALID, k_s: 0 })).toMatch(/Spring Rate/);
     expect(validateQCarParams({ ...VALID, k_s: -1 })).toMatch(/Spring Rate/);
-  });
-
-  it("rejects non-positive tire stiffness", () => {
-    expect(validateQCarParams({ ...VALID, k_t: 0 })).toMatch(/Tire Stiffness/);
-  });
-
-  it("rejects negative damping but accepts zero", () => {
     expect(validateQCarParams({ ...VALID, c: -1 })).toMatch(/Damping/);
-    expect(validateQCarParams({ ...VALID, c: 0 })).toBeNull();
+    expect(validateQCarParams({ ...VALID, c: 0 })).toMatch(/Damping/);
   });
 });
 

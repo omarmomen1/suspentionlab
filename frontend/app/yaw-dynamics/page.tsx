@@ -263,8 +263,8 @@ export default function YawDynamicsPage() {
             <button
               onClick={runAnalysis}
               disabled={loading}
-              className="flex items-center gap-2 px-4 py-2 bg-[#f2a900] hover:bg-[#f2a900]/80 disabled:opacity-50
-                text-black text-xs font-bold rounded-lg transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-signal hover:bg-[#d6f56e] border border-signal disabled:opacity-50
+                text-carbon text-xs font-bold rounded-lg transition-colors"
             >
               {loading ? <RefreshCw size={13} className="animate-spin" /> : <Play size={13} />}
               Compute MMM

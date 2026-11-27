@@ -682,6 +682,7 @@ async def hydrate_engineering_report(
     run_id_or_label: str,
     user_id: Optional[str] = None,
     team_id: Optional[str] = None,
+    baseline_run_id: Optional[str] = None,
 ) -> dict:
     """
     Step 1 & Step 2 — Genuine Report Hydration with Zero Static Values.
@@ -689,6 +690,16 @@ async def hydrate_engineering_report(
     solver, telemetry, optimization, and validation facets.
     """
     run = await get_simulation_run(db, run_id_or_label, user_id, team_id)
+
+    baseline_run: Optional[SimulationRun] = None
+    effective_baseline_id = (baseline_run_id or "").strip()
+    if effective_baseline_id and effective_baseline_id.lower() not in ("none", "off"):
+        try:
+            candidate_base = await get_simulation_run(db, effective_baseline_id, user_id, team_id)
+            if str(candidate_base.id) != str(run.id):
+                baseline_run = candidate_base
+        except LookupError:
+            baseline_run = None
 
     params = dict(run.params or {})
     result = dict(run.result or {})
@@ -760,9 +771,51 @@ async def hydrate_engineering_report(
             validation_state = "DEGRADED"
 
     # 4. Real Simulation Delta & Optimization Consequence (Zero Demo Mode Fabrication)
-    lap_delta_s = float(result["lap_delta_s"]) if result.get("lap_delta_s") is not None else 0.0
-    front_grip_pct = float(result["front_turn_in_grip_pct"]) if result.get("front_turn_in_grip_pct") is not None else 0.0
-    rear_stability_pct = float(result["rear_platform_stability_pct"]) if result.get("rear_platform_stability_pct") is not None else 0.0
+    base_res = dict(baseline_run.result or {}) if baseline_run else {}
+    has_lap_delta = result.get("lap_delta_s") is not None or (
+        baseline_run is not None and result.get("lap_time_s") is not None and base_res.get("lap_time_s") is not None
+    )
+    has_grip_delta = result.get("front_turn_in_grip_pct") is not None or (
+        baseline_run is not None and result.get("rms_tire_load") is not None and base_res.get("rms_tire_load") not in (None, 0, 0.0)
+    )
+    has_stability_delta = result.get("rear_platform_stability_pct") is not None or (
+        baseline_run is not None and result.get("rms_body_accel_wk") is not None and base_res.get("rms_body_accel_wk") not in (None, 0, 0.0)
+    )
+    has_baseline_comparison = bool(baseline_run is not None or has_lap_delta or has_grip_delta or has_stability_delta)
+
+    if result.get("lap_delta_s") is not None:
+        lap_delta_str = f"{float(result['lap_delta_s']):+.3f} s"
+    elif baseline_run is not None and result.get("lap_time_s") is not None and base_res.get("lap_time_s") is not None:
+        lap_delta_val = float(result["lap_time_s"]) - float(base_res["lap_time_s"])
+        lap_delta_str = f"{lap_delta_val:+.3f} s"
+    elif baseline_run is not None:
+        lap_delta_str = "N/A (quarter-car ODE)"
+    else:
+        lap_delta_str = "Baseline run (no comparison)"
+
+    if result.get("front_turn_in_grip_pct") is not None:
+        front_grip_str = f"{float(result['front_turn_in_grip_pct']):+.1f} %"
+    elif baseline_run is not None and result.get("rms_tire_load") is not None and base_res.get("rms_tire_load") not in (None, 0, 0.0):
+        base_tl = float(base_res["rms_tire_load"])
+        cur_tl = float(result["rms_tire_load"])
+        grip_pct = ((base_tl - cur_tl) / abs(base_tl)) * 100.0
+        front_grip_str = f"{grip_pct:+.1f} %"
+    elif baseline_run is not None:
+        front_grip_str = "N/A"
+    else:
+        front_grip_str = "Baseline run (no comparison)"
+
+    if result.get("rear_platform_stability_pct") is not None:
+        rear_stability_str = f"{float(result['rear_platform_stability_pct']):+.1f} %"
+    elif baseline_run is not None and result.get("rms_body_accel_wk") is not None and base_res.get("rms_body_accel_wk") not in (None, 0, 0.0):
+        base_wk = float(base_res["rms_body_accel_wk"])
+        cur_wk = float(result["rms_body_accel_wk"])
+        stab_pct = ((base_wk - cur_wk) / abs(base_wk)) * 100.0
+        rear_stability_str = f"{stab_pct:+.1f} %"
+    elif baseline_run is not None:
+        rear_stability_str = "N/A"
+    else:
+        rear_stability_str = "Baseline run (no comparison)"
 
     # 5. Provenance Hashes
     input_hash = getattr(run, "input_hash", None) or run.params_hash or canonical_hash(params)
@@ -777,9 +830,9 @@ async def hydrate_engineering_report(
     telemetry_ref = run.telemetry_ref or f"TELEMETRY-SYNC-{run_label}"
 
     metrics = {
-        "Simulated Lap Delta": f"{lap_delta_s:+.3f} s",
-        "Front Turn-in Grip": f"{front_grip_pct:+.1f} %",
-        "Rear Platform Stability": f"{rear_stability_pct:+.1f} %",
+        "Simulated Lap Delta": lap_delta_str,
+        "Front Turn-in Grip": front_grip_str,
+        "Rear Platform Stability": rear_stability_str,
         "Telemetry Correlation": f"{correlation_pct:.1f} %" if correlation_pct is not None else "UNVALIDATED (No empirical dataset)",
         "Wk-Weighted RMS Accel": f"{rms_body_accel_wk:.4f} m/s²",
         "Vibration Dose Value (VDV)": f"{vdv:.2f} m/s^1.75",
@@ -830,20 +883,8 @@ async def hydrate_engineering_report(
         sim_long=sim_long_g,
     )
 
-    # Parameter diff against nominal or baseline setup
-    nominal_baseline = {
-        "m_s": 300.0,
-        "k_s": 35000.0,
-        "c": 2000.0,
-        "k_t": 200000.0,
-        "MR": 1.0,
-    }
-    baseline = params.get("baseline_params") or nominal_baseline
-    m_s_base = float(baseline.get("m_s", 300.0))
-    k_s_base = float(baseline.get("k_s", 35000.0))
-    c_base = float(baseline.get("c", 2000.0))
-    k_t_base = float(baseline.get("k_t", 200000.0))
-    mr_base = float(baseline.get("MR", 1.0))
+    # Parameter diff only when a real baseline run or explicit baseline_params exists
+    baseline = (dict(baseline_run.params or {}) if baseline_run is not None else None) or params.get("baseline_params")
 
     def _diff_pct(sim: float, base: float) -> str:
         if base == 0.0:
@@ -851,17 +892,27 @@ async def hydrate_engineering_report(
         pct = ((sim - base) / base) * 100.0
         return f"{pct:+.1f}%"
 
-    param_changes = [
-        {"parameter": "Sprung Mass (m_s)", "baseline": f"{m_s_base:.1f} kg", "simulated": f"{m_s:.1f} kg", "delta": _diff_pct(m_s, m_s_base)},
-        {"parameter": "Suspension Stiffness (k_s)", "baseline": f"{k_s_base:.0f} N/m", "simulated": f"{k_s:.0f} N/m", "delta": _diff_pct(k_s, k_s_base)},
-        {"parameter": "Suspension Damping (c)", "baseline": f"{c_base:.0f} Ns/m", "simulated": f"{c:.0f} Ns/m", "delta": _diff_pct(c, c_base)},
-        {"parameter": "Tire Stiffness (k_t)", "baseline": f"{k_t_base:.0f} N/m", "simulated": f"{k_t:.0f} N/m", "delta": _diff_pct(k_t, k_t_base)},
-        {"parameter": "Motion Ratio (MR)", "baseline": f"{mr_base:.2f}", "simulated": f"{mr:.2f}", "delta": _diff_pct(mr, mr_base)},
-    ]
+    if isinstance(baseline, dict) and baseline:
+        m_s_base = float(baseline.get("m_s", m_s))
+        k_s_base = float(baseline.get("k_s", k_s))
+        c_base = float(baseline.get("c", c))
+        k_t_base = float(baseline.get("k_t", k_t))
+        mr_base = float(baseline.get("MR", mr))
+        param_changes = [
+            {"parameter": "Sprung Mass (m_s)", "baseline": f"{m_s_base:.1f} kg", "simulated": f"{m_s:.1f} kg", "delta": _diff_pct(m_s, m_s_base)},
+            {"parameter": "Suspension Stiffness (k_s)", "baseline": f"{k_s_base:.0f} N/m", "simulated": f"{k_s:.0f} N/m", "delta": _diff_pct(k_s, k_s_base)},
+            {"parameter": "Suspension Damping (c)", "baseline": f"{c_base:.0f} Ns/m", "simulated": f"{c:.0f} Ns/m", "delta": _diff_pct(c, c_base)},
+            {"parameter": "Tire Stiffness (k_t)", "baseline": f"{k_t_base:.0f} N/m", "simulated": f"{k_t:.0f} N/m", "delta": _diff_pct(k_t, k_t_base)},
+            {"parameter": "Motion Ratio (MR)", "baseline": f"{mr_base:.2f}", "simulated": f"{mr:.2f}", "delta": _diff_pct(mr, mr_base)},
+        ]
+    else:
+        param_changes = []
 
     return {
         "run_id": run_label,
         "simulation_run_id": str(run.id),
+        "baseline_run_id": baseline_run.label if baseline_run is not None else None,
+        "has_baseline_comparison": has_baseline_comparison,
         "doc_id": doc_id,
         "title": run.title or f"Engineering Decision & Compliance Report — {run_label}",
         "vehicle_ref": vehicle_ref,

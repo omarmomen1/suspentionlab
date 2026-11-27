@@ -185,10 +185,10 @@ export default function MobileNav({ defaultOpen = false }: { defaultOpen?: boole
                       href={STUDIO_PRICING_CTA.href}
                       prefetch={true}
                       aria-current={pathname === STUDIO_PRICING_CTA.href ? "page" : undefined}
-                      className={`flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg text-xs font-bold transition-all ${
+                      className={`flex items-center justify-center gap-2 w-full px-3 py-2.5 rounded-lg text-xs font-bold transition-colors border border-signal ${
                         pathname === STUDIO_PRICING_CTA.href
-                          ? "bg-ansys-yellow text-black ring-2 ring-ansys-yellow/50 shadow-[0_0_12px_rgba(242,169,0,0.35)]"
-                          : "bg-ansys-yellow text-black hover:brightness-110 shadow-[0_0_10px_rgba(242,169,0,0.2)]"
+                          ? "bg-signal text-carbon"
+                          : "bg-signal text-carbon hover:bg-[#d6f56e]"
                       }`}
                     >
                       <Sparkles size={13} className="shrink-0" />

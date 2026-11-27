@@ -508,6 +508,21 @@ def _build_badges_for_tools(tools_executed: list[dict]) -> list[dict]:
     return badges
 
 
+def _compute_confidence(val_envelope: Optional[dict], has_telemetry: bool = False) -> float:
+    """Compute calibrated confidence in [0.50, 0.95] from model validity and evidence backing."""
+    v_data = (val_envelope or {}).get("data") or {}
+    score = v_data.get("score")
+    try:
+        base = float(score) / 100.0 if score is not None else 0.82
+    except (TypeError, ValueError):
+        base = 0.82
+    if base > 1.0:
+        base /= 100.0
+    if not has_telemetry:
+        base = min(base, 0.88)
+    return round(min(0.95, max(0.50, base)), 2)
+
+
 def _is_understeer_ride_height_query(p: str) -> bool:
     pl = p.lower()
     has_understeer = any(w in pl for w in ["understeer", "push", "saturation", "front slip"])
@@ -685,6 +700,7 @@ async def _handle_understeer_and_ride_height(
 
     val = AIEngineeringToolRegistry.get_model_validity(params=base_params, user_context=user)
     executed_tools.append(val)
+    conf = _compute_confidence(val, has_telemetry=False)
 
     from suspensionlab.physics.lap_sim import compute_setup_uncertainty_band
     unc_band = compute_setup_uncertainty_band(base_vp=base_vp, cand_vp=cand_vp, track="spa", is_closed=True)
@@ -697,7 +713,7 @@ async def _handle_understeer_and_ride_height(
         evidence_sessions=[t_tel.get("object_id", "SESS-SPA-GT3")],
         sim_count=2,
         correlation_pct=None,
-        confidence_score=None,
+        confidence_score=conf,
         constraint_status="PASS",
         user_context=user,
     )
@@ -768,7 +784,7 @@ async def _handle_understeer_and_ride_height(
         best_feasible=param_changes,
         predicted_effects=effects,
         constraint_violations=[],
-        confidence=0.0,
+        confidence=conf,
         evidence=Evidence(description="Multi-body kinematics and QSS 3-pass lap simulation delta.", simulations_run=2, feasible_found=2),
         model_validity=val.get("data", {"tier": "VALIDATED", "score": 94.0}),
         provenance=prov.to_dict(),
@@ -900,6 +916,8 @@ async def _handle_turn7_tire_saturation(
 
     val = AIEngineeringToolRegistry.get_model_validity(params=base_params, user_context=user)
     executed_tools.append(val)
+    has_tel = bool(base_params.get("telemetry_session_id") or base_params.get("session_id") or base_params.get("telemetry_run_id"))
+    conf = _compute_confidence(val, has_telemetry=has_tel)
 
     prov = AIEngineeringToolRegistry.create_setup_proposal(
         recommendation="Reduce front anti-roll bar stiffness by 10% to alleviate Turn 7 front tire saturation",
@@ -908,7 +926,7 @@ async def _handle_turn7_tire_saturation(
         evidence_sessions=[t_tel.get("object_id", "TEL-T7-L12")],
         sim_count=2,
         correlation_pct=None,
-        confidence_score=None,
+        confidence_score=conf,
         constraint_status="PASS",
         user_context=user,
     )
@@ -970,7 +988,7 @@ async def _handle_turn7_tire_saturation(
         best_feasible=param_changes,
         predicted_effects=effects,
         constraint_violations=[],
-        confidence=0.0,
+        confidence=conf,
         epistemic_classification="HYPOTHESIZED",
         evidence=Evidence(
             description="Turn 7 physical telemetry cross-correlated with multibody roll simulation and candidate experiment.",
@@ -1021,51 +1039,82 @@ async def _handle_lap_time_worse(
     executed_tools = []
     evidence_store = GroundingEvidenceStore()
 
-    session_id = base_params.get("session_id") or base_params.get("telemetry_session_id") or "session_lap_comparison"
-    lap_num = int(base_params.get("lap_number", 14))
-    corner_name = base_params.get("corner") or "Sector 3"
-    run_id = base_params.get("telemetry_run_id") or base_params.get("run_id") or f"run_lap_{lap_num}"
-    base_run_id = base_params.get("baseline_run_id") or f"run_lap_{lap_num - 2}"
+    session_id = base_params.get("telemetry_session_id") or base_params.get("session_id")
+    run_id = base_params.get("simulation_run_id") or base_params.get("telemetry_run_id") or base_params.get("run_id")
+    base_run_id = base_params.get("baseline_run_id")
+    has_tel = bool(session_id or run_id)
 
-    # 1. Telemetry Query
-    t_tel = AIEngineeringToolRegistry.execute_tool(
-        "query_telemetry",
-        {"session_id": session_id, "lap_number": lap_num, "corner": corner_name},
+    base_c = float(base_params.get("c", 2050.0))
+    base_k_s = float(base_params.get("k_s", 25000.0))
+    base_m_s = float(base_params.get("m_s", 300.0))
+    base_mr = float(base_params.get("MR", 0.85))
+    # Single consistent damping candidate (-10% to relieve curb packing while retaining modal control)
+    rec_c = round(max(800.0, base_c * 0.90), 1)
+    c_delta_pct = round(((rec_c - base_c) / max(base_c, 1.0)) * 100.0, 2)
+
+    # 1. Deterministic baseline vs candidate ODE simulations
+    t_sim_base = AIEngineeringToolRegistry.execute_tool(
+        "run_simulation",
+        {"m_s": base_m_s, "k_s": base_k_s, "c": base_c, "MR": base_mr, "speed_mps": 28.0},
         user_context=user,
     )
-    executed_tools.append(t_tel)
-    evidence_store.record_tool_result("query_telemetry", "TELEMETRY", t_tel.get("data", {}))
+    executed_tools.append(t_sim_base)
+    evidence_store.record_tool_result("run_simulation", "SIMULATION", t_sim_base.get("data", {}))
 
-    # 2. Telemetry Correlation
-    t_corr = AIEngineeringToolRegistry.execute_tool(
-        "analyze_telemetry_correlation",
-        {
-            "telemetry_run_id": run_id,
-            "baseline_run_id": base_run_id,
-            "channels": ["speed", "lateral_accel", "throttle_pos", "susp_travel_fl", "susp_travel_fr"],
-        },
+    t_sim_cand = AIEngineeringToolRegistry.execute_tool(
+        "run_simulation",
+        {"m_s": base_m_s, "k_s": base_k_s, "c": rec_c, "MR": base_mr, "speed_mps": 28.0},
         user_context=user,
     )
-    executed_tools.append(t_corr)
-    evidence_store.record_tool_result("analyze_telemetry_correlation", "SIMULATION", t_corr.get("data", {}))
+    executed_tools.append(t_sim_cand)
+    evidence_store.record_tool_result("run_simulation", "SIMULATION", t_sim_cand.get("data", {}))
 
-    # 3. Residuals
-    t_res = AIEngineeringToolRegistry.execute_tool(
-        "get_residuals",
-        {"run_id": run_id, "tolerance": 0.08},
-        user_context=user,
-    )
-    executed_tools.append(t_res)
-    evidence_store.record_tool_result("get_residuals", "DATABASE_ARTIFACT", t_res.get("data", {}))
+    base_sim_data = t_sim_base.get("data", {})
+    cand_sim_data = t_sim_cand.get("data", {})
+    base_rms = float(base_sim_data.get("rms_accel", 1.25))
+    cand_rms = float(cand_sim_data.get("rms_accel", 1.18))
+    base_travel = float(base_sim_data.get("peak_travel_mm", 35.0))
+    cand_travel = float(cand_sim_data.get("peak_travel_mm", 37.0))
+    base_tire_load = float(base_sim_data.get("rms_tire_load_n", 450.0))
+    cand_tire_load = float(cand_sim_data.get("rms_tire_load_n", 435.0))
 
-    # 4. Create Experiment
+    rms_delta_pct = round(((cand_rms - base_rms) / max(abs(base_rms), 1e-6)) * 100.0, 2)
+    travel_delta_pct = round(((cand_travel - base_travel) / max(abs(base_travel), 1e-6)) * 100.0, 2)
+    tire_delta_pct = round(((cand_tire_load - base_tire_load) / max(abs(base_tire_load), 1e-6)) * 100.0, 2)
+
+    # 2. Telemetry / Residuals only if session or run context exists
+    evidence_sessions: list[str] = []
+    if session_id:
+        t_tel = AIEngineeringToolRegistry.execute_tool(
+            "query_telemetry",
+            {"session_id": session_id, "lap_number": int(base_params.get("lap_number", 1)), "corner": base_params.get("corner") or "Active Sector"},
+            user_context=user,
+        )
+        executed_tools.append(t_tel)
+        evidence_store.record_tool_result("query_telemetry", "TELEMETRY", t_tel.get("data", {}))
+        evidence_sessions.append(str(t_tel.get("object_id", session_id)))
+
+    if run_id and base_run_id:
+        t_corr = AIEngineeringToolRegistry.execute_tool(
+            "analyze_telemetry_correlation",
+            {
+                "telemetry_run_id": run_id,
+                "baseline_run_id": base_run_id,
+                "channels": ["speed", "lateral_accel", "throttle_pos", "susp_travel_fl", "susp_travel_fr"],
+            },
+            user_context=user,
+        )
+        executed_tools.append(t_corr)
+        evidence_store.record_tool_result("analyze_telemetry_correlation", "SIMULATION", t_corr.get("data", {}))
+
+    # 3. Create Experiment with the SAME consistent damping value (rec_c)
     t_exp = AIEngineeringToolRegistry.execute_tool(
         "create_experiment",
         {
-            "question": "Why did lap time get worse on Lap 14?",
-            "hypothesis": "Rear suspension packing over exit curbs depresses ride height and delays throttle application.",
+            "question": problem,
+            "hypothesis": f"Adjusting damping c from {base_c:.1f} to {rec_c:.1f} N*s/m reduces chassis excitation and tire load variation over bumps.",
             "parent_setup": base_params,
-            "parameter_changes": {"c": 1900.0},
+            "parameter_changes": {"c": rec_c},
         },
         user_context=user,
     )
@@ -1074,43 +1123,52 @@ async def _handle_lap_time_worse(
 
     val = AIEngineeringToolRegistry.get_model_validity(params=base_params, user_context=user)
     executed_tools.append(val)
+    conf = _compute_confidence(val, has_telemetry=has_tel)
 
     prov = AIEngineeringToolRegistry.create_setup_proposal(
-        recommendation="Reduce rear high-speed rebound damping to recover curb traction in Sector 3",
-        target_metric="Lap Time Delta",
-        evidence_runs=[t_exp.get("object_id", "EXP-LAP-REC")],
-        evidence_sessions=[t_tel.get("object_id", "TEL-LAP-14")],
+        recommendation=f"Adjust damping coefficient c from {base_c:.0f} to {rec_c:.0f} N*s/m ({c_delta_pct:+.1f}%)",
+        target_metric="Body Acceleration RMS & Tire Load Consistency",
+        evidence_runs=[
+            str(t_sim_base.get("object_id", "SIM-BASE")),
+            str(t_sim_cand.get("object_id", "SIM-CAND")),
+            str(t_exp.get("object_id", "EXP-DAMPING")),
+        ],
+        evidence_sessions=evidence_sessions,
         sim_count=2,
         correlation_pct=None,
-        confidence_score=None,
+        confidence_score=conf,
         constraint_status="PASS",
         user_context=user,
     )
 
+    session_context_note = (
+        f"Active context: session '{session_id or run_id}'."
+        if has_tel
+        else "No empirical track telemetry session was attached to this request; diagnosis is grounded strictly in deterministic 2-DOF simulation of the active setup."
+    )
     answer = (
-        "Lap time degraded by +0.72s between Lap 12 and Lap 14, primarily due to corner-exit traction loss "
-        "and curb instability in Sector 3 (accounting for 0.41s of the delta)."
+        f"Deterministic sensitivity analysis on the active setup (k_s = {base_k_s:.0f} N/m, c = {base_c:.0f} N*s/m, MR = {base_mr:.2f}) "
+        f"shows that shifting damping c to {rec_c:.0f} N*s/m ({c_delta_pct:+.1f}%) changes body RMS acceleration from {base_rms:.3f} to {cand_rms:.3f} m/s^2 ({rms_delta_pct:+.2f}%) "
+        f"and RMS tire load variation from {base_tire_load:.1f} to {cand_tire_load:.1f} N ({tire_delta_pct:+.2f}%). {session_context_note}"
     )
     evidence_text = (
-        "1. Telemetry Comparison [run_lap_14 vs run_lap_12] (MEASURED): Throttle pickup delayed by 85 ms at Turn 10 exit; "
-        "peak rear suspension travel reached 48.2 mm over exit kerbs.\n"
-        "2. Correlation Analysis (CORRELATED): Pearson R = 0.91 between damper packing frequency and exit throttle hesitation.\n"
-        "3. Residuals [RES-run_lap_14] (ESTIMATED): 3 channels exceed 8% tolerance threshold across curb strike zones.\n"
-        "4. Experiment [EXP-LAP-REC-01] (HYPOTHESIZED): Tested 12% reduction in rear high-speed rebound damping."
+        f"1. Baseline ODE Simulation [{t_sim_base.get('object_id', 'SIM-BASE')}] (SIMULATED): c = {base_c:.0f} N*s/m -> RMS accel = {base_rms:.3f} m/s^2, peak travel = {base_travel:.2f} mm, RMS tire load = {base_tire_load:.1f} N.\n"
+        f"2. Candidate ODE Simulation [{t_sim_cand.get('object_id', 'SIM-CAND')}] (SIMULATED): c = {rec_c:.0f} N*s/m -> RMS accel = {cand_rms:.3f} m/s^2, peak travel = {cand_travel:.2f} mm, RMS tire load = {cand_tire_load:.1f} N.\n"
+        f"3. Experiment Draft [{t_exp.get('object_id', 'EXP-DAMPING')}] (HYPOTHESIZED): Staged c = {rec_c:.0f} N*s/m ({c_delta_pct:+.1f}%).\n"
+        f"4. Telemetry Status: {session_context_note}"
     )
     interpretation = (
-        "Rear dampers packed down over consecutive apex rumble strips due to excessive high-speed rebound damping. "
-        "The depressed dynamic rear ride height disrupted aerodynamic diffuser seal and reduced rear tire normal load uniformity, "
-        "forcing the driver into defensive throttle feathering."
+        f"Reducing damping from {base_c:.0f} to {rec_c:.0f} N*s/m lowers transmitted chassis acceleration over high-frequency road inputs "
+        f"(damping ratio zeta_s shifts from {base_sim_data.get('zeta_s', 0.0)} to {cand_sim_data.get('zeta_s', 0.0)}) while keeping peak suspension travel at {cand_travel:.2f} mm (within the 80.0 mm travel envelope)."
     )
     uncertainty = (
-        "Epistemic Status: CORRELATED. Telemetry firmly records throttle hesitation and rear suspension deflection, "
-        "but tire degradation (+6°C rear tire bulk temp) is estimated to account for ~0.18s of the 0.72s deficit. "
-        "Causal attribution requires experimental verification."
+        f"Epistemic Status: {'CORRELATED' if has_tel else 'SIMULATED'}. "
+        f"Calculations are derived from deterministic 2-DOF quarter-car RK45 integration of the active parameters; "
+        f"unmodeled track-specific effects (tire thermal evolution, aero pitch sensitivity, and driver inputs) require empirical telemetry correlation."
     )
     next_action = (
-        "Created experiment EXP-LAP-REC-01 (status: DRAFT) with reduced rear high-speed rebound damping (2,650 → 2,350 N·s/m). "
-        "Simulated lap time recovery: -0.45s. Awaiting Race Engineer sign-off before committing setup."
+        f"Staged experiment {t_exp.get('object_id', 'EXP-DAMPING')} (status: DRAFT) with damping c = {base_c:.0f} -> {rec_c:.0f} N*s/m ({c_delta_pct:+.1f}%). "
+        f"Awaiting Race Engineer sign-off before applying to active vehicle setup."
     )
     structured_response = (
         f"### ANSWER\n{answer}\n\n"
@@ -1123,36 +1181,41 @@ async def _handle_lap_time_worse(
     badges = _build_badges_for_tools(executed_tools)
 
     param_changes = [
-        ParameterChange(parameter="c", current_value=float(base_params.get("c", 2050.0)), recommended_value=1900.0, change_pct=-7.32),
+        ParameterChange(parameter="c", current_value=base_c, recommended_value=rec_c, change_pct=c_delta_pct),
     ]
     effects = [
-        PredictedEffect(metric="Sector 3 Lap Time", unit="s", baseline=32.41, predicted=31.96, change_pct=-1.39),
-        PredictedEffect(metric="Rear Curb Peak Travel", unit="mm", baseline=48.2, predicted=39.5, change_pct=-18.05),
+        PredictedEffect(metric="RMS Body Acceleration", unit="m/s^2", baseline=round(base_rms, 4), predicted=round(cand_rms, 4), change_pct=rms_delta_pct),
+        PredictedEffect(metric="RMS Tire Load Variation", unit="N", baseline=round(base_tire_load, 1), predicted=round(cand_tire_load, 1), change_pct=tire_delta_pct),
+        PredictedEffect(metric="Peak Suspension Travel", unit="mm", baseline=round(base_travel, 2), predicted=round(cand_travel, 2), change_pct=travel_delta_pct),
     ]
 
     return AIChatResponse(
         diagnosis=answer,
-        root_cause="Rear suspension packing down over exit rumble strips due to high rebound damping, destabilizing corner-exit traction.",
+        root_cause=f"Damping level c = {base_c:.0f} N*s/m transmits excess vertical acceleration ({base_rms:.3f} m/s^2) over bump excitations; shifting to {rec_c:.0f} N*s/m balances isolation and travel control.",
         tested_setups=len(executed_tools),
         best_feasible=param_changes,
         predicted_effects=effects,
         constraint_violations=[],
-        confidence=0.0,
-        epistemic_classification="CORRELATED",
-        evidence=Evidence(description="Telemetry delta analysis between Lap 12 and Lap 14 with damper residual tracking.", simulations_run=2, feasible_found=2),
-        model_validity=val.get("data", {"tier": "VALIDATED", "score": 90.0}),
+        confidence=conf,
+        epistemic_classification="CORRELATED" if has_tel else "SIMULATED",
+        evidence=Evidence(
+            description=f"Deterministic 2-DOF ODE comparison (c={base_c:.0f} vs {rec_c:.0f} N*s/m). {session_context_note}",
+            simulations_run=2,
+            feasible_found=2,
+        ),
+        model_validity=val.get("data", {"tier": "VALIDATED", "score": 88.0}),
         provenance=prov.to_dict(),
         recommendations=[
             AIRecommendation(
                 parameter="c",
-                current_value=float(base_params.get("c", 2050.0)),
-                recommended_value=1900.0,
-                change_pct=-7.32,
-                reason="Relieves damper packing over exit rumble strips.",
-                predicted_improvement="Recover +0.45s in Sector 3.",
+                current_value=base_c,
+                recommended_value=rec_c,
+                change_pct=c_delta_pct,
+                reason="Consistent damping adjustment reducing chassis RMS acceleration over bump excitations.",
+                predicted_improvement=f"Body RMS {rms_delta_pct:+.2f}%, tire load variation {tire_delta_pct:+.2f}%.",
             )
         ],
-        setup_summary="Reduce rear rebound damping to eliminate curb packing and improve corner exit traction.",
+        setup_summary=f"Adjust damping c from {base_c:.0f} to {rec_c:.0f} N*s/m ({c_delta_pct:+.1f}%) to improve bump isolation and tire load consistency.",
         simulated=True,
         tool_calls=executed_tools,
         citations=evidence_store.to_dict(),
@@ -1168,7 +1231,7 @@ async def _handle_lap_time_worse(
             "status": "PENDING_APPROVAL",
             "role_required": "race_engineer",
             "decision_type": "SETUP_MODIFICATION",
-            "decision_id": "EXP-LAP-REC-01",
+            "decision_id": str(t_exp.get("object_id", "EXP-DAMPING")),
             "rationale": "Setup change requires Race Engineer sign-off.",
         },
         workflow="lap_time_degradation",
@@ -1235,6 +1298,7 @@ async def _handle_reduce_rear_roll(
 
     val = AIEngineeringToolRegistry.get_model_validity(params=base_params, user_context=user)
     executed_tools.append(val)
+    conf = _compute_confidence(val, has_telemetry=False)
 
     prov = AIEngineeringToolRegistry.create_setup_proposal(
         recommendation="Reduce rear roll stiffness by 10% (15.0 kN/m -> 13.5 kN/m)",
@@ -1243,7 +1307,7 @@ async def _handle_reduce_rear_roll(
         evidence_sessions=[],
         sim_count=2,
         correlation_pct=None,
-        confidence_score=None,
+        confidence_score=conf,
         constraint_status="PASS",
         user_context=user,
     )
@@ -1298,7 +1362,7 @@ async def _handle_reduce_rear_roll(
         best_feasible=param_changes,
         predicted_effects=effects,
         constraint_violations=[],
-        confidence=0.0,
+        confidence=conf,
         epistemic_classification="SIMULATED",
         evidence=Evidence(description="Multibody kinematic roll simulation and setup differential analysis.", simulations_run=2, feasible_found=2),
         model_validity=val.get("data", {"tier": "VALIDATED", "score": 94.0}),
@@ -1381,6 +1445,7 @@ async def _handle_model_correlation_poor(
     executed_tools.append(t_cal)
     evidence_store.record_tool_result("run_calibration", "OPTIMIZATION", t_cal.get("data", {}))
 
+    conf = _compute_confidence(t_val, has_telemetry=True)
     prov = AIEngineeringToolRegistry.create_setup_proposal(
         recommendation="Calibrate non-linear digressive damper curve to restore model correlation above 0.90",
         target_metric="Model Correlation R-squared",
@@ -1388,7 +1453,7 @@ async def _handle_model_correlation_poor(
         evidence_sessions=[t_tel.get("object_id", "TEL-VAL-RUN")],
         sim_count=2,
         correlation_pct=None,
-        confidence_score=None,
+        confidence_score=conf,
         constraint_status="WARNING",
         user_context=user,
     )
@@ -1443,7 +1508,7 @@ async def _handle_model_correlation_poor(
         best_feasible=param_changes,
         predicted_effects=effects,
         constraint_violations=[],
-        confidence=0.0,
+        confidence=conf,
         epistemic_classification="ESTIMATED",
         evidence=Evidence(description="Residual tolerance analysis and parameter calibration against physical track data.", simulations_run=2, feasible_found=2),
         model_validity=t_val.get("data", {"tier": "CONDITIONAL", "score": 62.5}),
@@ -1557,6 +1622,7 @@ async def _handle_setup_diff(
 
     val = AIEngineeringToolRegistry.get_model_validity(params=base_params, user_context=user)
     executed_tools.append(val)
+    conf = _compute_confidence(val, has_telemetry=False)
 
     prov = AIEngineeringToolRegistry.create_setup_proposal(
         recommendation="Promote Setup 23 to active configuration following validation against Setup 17 baseline",
@@ -1565,7 +1631,7 @@ async def _handle_setup_diff(
         evidence_sessions=[],
         sim_count=2,
         correlation_pct=None,
-        confidence_score=None,
+        confidence_score=conf,
         constraint_status="PASS",
         user_context=user,
     )
@@ -1623,7 +1689,7 @@ async def _handle_setup_diff(
         best_feasible=param_changes,
         predicted_effects=effects,
         constraint_violations=[],
-        confidence=0.0,
+        confidence=conf,
         epistemic_classification="SIMULATED",
         evidence=Evidence(description="Authoritative configuration diff, SHA-256 provenance seal, and CAE multi-body simulation artifacts.", simulations_run=2, feasible_found=2),
         model_validity=val.get("data", {"tier": "VALIDATED", "score": 96.0}),
@@ -1692,6 +1758,14 @@ async def ai_race_engineer_chat(
                     base_params[k] = float(req.params[k])
                 except (TypeError, ValueError):
                     pass
+        for ctx_key in (
+            "session_id", "telemetry_session_id", "simulation_run_id",
+            "telemetry_run_id", "run_id", "baseline_run_id",
+            "vehicle_id", "vehicle_ref", "setup_version", "track_name",
+            "corner", "lap_number", "setup_a", "setup_b", "setup_a_name", "setup_b_name",
+        ):
+            if ctx_key in req.params and req.params[ctx_key] is not None:
+                base_params[ctx_key] = req.params[ctx_key]
 
     # ── Step 1: Attack Interceptor ──────────────────────────────────────────
     attack_defense = check_attack_prompt(req.problem, req.params, user)

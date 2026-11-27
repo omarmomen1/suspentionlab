@@ -81,20 +81,20 @@ export interface Hardpoints {
   PRO: HP3;
 }
 
-// ─── Default Hardpoints (Right-front corner, Formula car) ──────────────────────
+// ─── Default Hardpoints (GT3 Touring Car Baseline, Right-front corner) ───────
 const DEFAULT_HP: Hardpoints = {
-  UWI_fwd: [-50, 80, 300],
-  UWI_aft: [50, 80, 300],
-  UWO: [0, 650, 295],
-  LWI_fwd: [-80, 80, 155],
-  LWI_aft: [80, 80, 155],
-  LWO: [0, 720, 145],
-  TRI: [0, 150, 220],
-  TRO: [-15, 710, 205],
-  WC: [0, 760, 220],
-  CP: [0, 760, 0],
-  PRI: [-20, 300, 390],
-  PRO: [-15, 690, 250],
+  UWI_fwd: [-50.0, 300.0, 340.0],
+  UWI_aft: [50.0, 300.0, 340.0],
+  UWO: [-19.0, 660.0, 425.0],
+  LWI_fwd: [-80.0, 300.0, 202.0],
+  LWI_aft: [80.0, 300.0, 202.0],
+  LWO: [0.0, 692.0, 235.0],
+  TRI: [0.0, 200.0, 190.0],
+  TRO: [-15.0, 710.0, 230.0],
+  WC: [-7.05, 758.0, 330.0],
+  CP: [-7.05, 758.0, 0.0],
+  PRI: [-20.0, 350.0, 620.0],
+  PRO: [-15.0, 610.0, 268.0],
 };
 
 // ─── Built-in Benchmark Catalog ───────────────────────────────────────────────
@@ -1055,7 +1055,7 @@ export default function KinematicsPage() {
           <button
             onClick={solve}
             disabled={loading}
-            className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-bold text-xs bg-amber-500 hover:bg-amber-400 text-black border border-amber-400/50 shadow-lg shadow-black/40 disabled:opacity-50 transition-all cursor-pointer"
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg font-bold text-xs bg-signal hover:bg-[#d6f56e] text-carbon border border-signal disabled:opacity-50 transition-colors cursor-pointer"
           >
             {loading ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
             <span>{loading ? "Solving…" : "Recompute Sweep"}</span>

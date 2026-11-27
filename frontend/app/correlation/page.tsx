@@ -73,20 +73,23 @@ const CHANNEL_META: Record<string, { name: string; unit: string }> = {
 function mapHeaderKey(rawHeader: string): string {
   const norm = rawHeader.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
   if (norm === "t" || norm === "timestamp" || norm === "time_s" || norm === "sec" || norm === "seconds" || norm === "elapsed_time" || norm === "time") return "time";
+  if (norm === "dist" || norm === "distance_m" || norm === "lap_dist" || norm === "distance") return "distance";
   if (norm === "gps_speed" || norm === "v" || norm === "vehicle_speed" || norm === "speed_kmh" || norm === "v_kph" || norm === "ground_speed" || norm === "car_speed" || norm === "speed") return "speed";
-  if (norm === "g_lat" || norm === "latacc" || norm === "lat_acc" || norm === "lataccel" || norm === "lat_accel" || norm === "ay" || norm === "lateral_acc" || norm === "lat_g") return "lat_g";
-  if (norm === "g_lon" || norm === "inlineacc" || norm === "lonacc" || norm === "lon_g" || norm === "lonaccel" || norm === "longaccel" || norm === "ax" || norm === "long_acc" || norm === "long_g") return "long_g";
-  if (norm === "g_vert" || norm === "vertacc" || norm === "az" || norm === "vert_g" || norm === "vertaccel" || norm === "vert_acc" || norm === "heave_accel") return "vert_g";
-  if (norm === "susptravel_fl" || norm === "damper_fl" || norm === "damper_disp_fl") return "damper_fl";
-  if (norm === "susptravel_fr" || norm === "damper_fr" || norm === "damper_disp_fr") return "damper_fr";
-  if (norm === "susptravel_rl" || norm === "damper_rl" || norm === "damper_disp_rl") return "damper_rl";
-  if (norm === "susptravel_rr" || norm === "damper_rr" || norm === "damper_disp_rr") return "damper_rr";
-  if (norm === "steerangle" || norm === "steer_deg" || norm === "steering" || norm === "steer") return "steer";
+  if (norm === "g_lat" || norm === "latacc" || norm === "lat_acc" || norm === "lataccel" || norm === "lat_accel" || norm === "ay" || norm === "lateral_acc" || norm === "lat_g" || norm === "g_force_lat") return "lat_g";
+  if (norm === "g_lon" || norm === "inlineacc" || norm === "lonacc" || norm === "lon_g" || norm === "lonaccel" || norm === "longaccel" || norm === "ax" || norm === "long_acc" || norm === "long_g" || norm === "g_force_long") return "long_g";
+  if (norm === "g_vert" || norm === "vertacc" || norm === "az" || norm === "vert_g" || norm === "vertaccel" || norm === "vert_acc" || norm === "heave_accel" || norm === "g_force_vert") return "vert_g";
+  if (norm === "susptravel_fl" || norm === "susp_fl" || norm === "damper_fl" || norm === "damper_disp_fl") return "damper_fl";
+  if (norm === "susptravel_fr" || norm === "susp_fr" || norm === "damper_fr" || norm === "damper_disp_fr") return "damper_fr";
+  if (norm === "susptravel_rl" || norm === "susp_rl" || norm === "damper_rl" || norm === "damper_disp_rl") return "damper_rl";
+  if (norm === "susptravel_rr" || norm === "susp_rr" || norm === "damper_rr" || norm === "damper_disp_rr") return "damper_rr";
+  if (norm === "steerangle" || norm === "steer_deg" || norm === "steering" || norm === "steer" || norm === "steering_angle") return "steer";
   if (norm === "brakepress_f" || norm === "brake_front" || norm === "brake_press" || norm === "brake") return "brake";
-  if (norm === "throttlepos" || norm === "tps" || norm === "throttle") return "throttle";
+  if (norm === "throttlepos" || norm === "throttle_pos" || norm === "tps" || norm === "throttle") return "throttle";
   if (norm === "enginerpm" || norm === "rpm" || norm === "engine_rpm") return "engine_rpm";
   return norm || "unknown";
 }
+
+const RECOGNIZED_TELEMETRY_CHANNELS = new Set(Object.keys(CHANNEL_META));
 
 interface ParsedCsvTelemetry {
   rawColumns: string[];
@@ -130,9 +133,18 @@ function parseTelemetryCsv(csvText: string): ParsedCsvTelemetry {
 
   const rawColumns = firstLine
     .split(delim)
-    .map((c) => c.trim())
+    .map((c) => c.trim().replace(/^["']|["']$/g, ""))
     .filter(Boolean);
+  if (rawColumns.length < 2) {
+    throw new Error("Telemetry CSV schema rejected: expected at least a time column and one telemetry channel.");
+  }
   const mappedKeys = rawColumns.map(mapHeaderKey);
+  const recognizedNonTime = mappedKeys.filter((k) => k !== "time" && RECOGNIZED_TELEMETRY_CHANNELS.has(k));
+  if (!mappedKeys.includes("time") || recognizedNonTime.length === 0) {
+    throw new Error(
+      `Telemetry CSV schema rejected: columns [${rawColumns.join(", ")}] do not include a valid time column and recognized vehicle/suspension channels (e.g. time, speed, lat_g, long_g, vert_g, susp_fl/damper_fl).`
+    );
+  }
 
   const buckets: number[][] = mappedKeys.map(() => []);
   const validCounts: number[] = mappedKeys.map(() => 0);
@@ -230,6 +242,16 @@ function parseTelemetryCsv(csvText: string): ParsedCsvTelemetry {
     });
   }
 
+  // Require >= 2 valid numeric samples on time and at least one recognized non-time channel
+  const validRecognizedDataChannels = Object.keys(channels).filter(
+    (k) => k !== "time" && RECOGNIZED_TELEMETRY_CHANNELS.has(k) && channels[k].length >= 2
+  );
+  if (!channels["time"] || channels["time"].length < 2 || validRecognizedDataChannels.length === 0) {
+    throw new Error(
+      "Telemetry CSV schema rejected: requires at least 2 valid numeric rows for time and a recognized telemetry channel."
+    );
+  }
+
   // Synthesize vertical acceleration proxy if CSV lacks vert_g so quarter-car/full-car correlation works cleanly
   const synthesizedChannels: string[] = [];
   if (!channels["vert_g"] && channels["damper_fl"] && channels["damper_fl"].length > 2) {
@@ -310,6 +332,7 @@ function CorrelationCockpitContent() {
   const [activeDatasetName, setActiveDatasetName] = useState<string>("sample_spa_gt3.csv");
   const [isSampleDataset, setIsSampleDataset] = useState<boolean>(true);
   const [loadingSampleId, setLoadingSampleId] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [parsedTelemetry, setParsedTelemetry] = useState<Record<string, number[]> | null>(null);
   const [gCircleStats, setGCircleStats] = useState<{ maxG: number; latG: number; longG: number }>({
     maxG: 1.85,
@@ -359,6 +382,7 @@ function CorrelationCockpitContent() {
 
   const applyCsvMetadata = (csvText: string, filename: string, sampleFlag: boolean) => {
     const parsed = parseTelemetryCsv(csvText);
+    setUploadError(null);
     setActiveDatasetName(filename);
     setIsSampleDataset(sampleFlag);
     setParsedTelemetry(parsed.channels);
@@ -402,13 +426,24 @@ function CorrelationCockpitContent() {
 
   const handleCsvUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const uploaded = e.target.files?.[0];
+    e.target.value = "";
     if (!uploaded) return;
+    setUploadError(null);
     const reader = new FileReader();
     reader.onload = (ev) => {
       const text = typeof ev.target?.result === "string" ? ev.target.result : "";
-      if (text) {
-        applyCsvMetadata(text, uploaded.name, isSampleTelemetryFilename(uploaded.name));
+      if (!text.trim()) {
+        setUploadError(`Rejected "${uploaded.name}": uploaded CSV file is empty.`);
+        return;
       }
+      try {
+        applyCsvMetadata(text, uploaded.name, isSampleTelemetryFilename(uploaded.name));
+      } catch (err: any) {
+        setUploadError(err?.message || `Rejected "${uploaded.name}": invalid telemetry CSV schema.`);
+      }
+    };
+    reader.onerror = () => {
+      setUploadError(`Failed to read "${uploaded.name}".`);
     };
     reader.readAsText(uploaded);
   };
@@ -765,6 +800,22 @@ function CorrelationCockpitContent() {
                   </label>
                 </div>
               </div>
+
+              {uploadError && (
+                <div
+                  role="alert"
+                  data-testid="telemetry-schema-error"
+                  className="p-3.5 rounded-lg bg-rose-950/40 border border-rose-500/50 text-rose-200 text-xs font-mono flex items-start gap-2.5"
+                >
+                  <AlertOctagon className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-bold uppercase tracking-wider text-rose-300 block mb-0.5">
+                      Telemetry CSV Schema Rejected
+                    </span>
+                    <span>{uploadError}</span>
+                  </div>
+                </div>
+              )}
 
               {/* Ingestion Metrics Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
@@ -1306,7 +1357,7 @@ function CorrelationCockpitContent() {
                 {/* BUTTON: INVESTIGATE RESIDUAL */}
                 <button
                   onClick={() => handleInvestigateResidual(activeChannelData)}
-                  className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold uppercase tracking-wider bg-amber-500 hover:bg-amber-400 text-black rounded-lg shadow-md transition-all"
+                  className="flex items-center gap-2 px-5 py-2.5 text-xs font-bold uppercase tracking-wider bg-signal hover:bg-[#d6f56e] text-carbon border border-signal rounded-lg transition-colors"
                 >
                   <Search className="w-4 h-4" />
                   <span>Investigate Residual &rarr;</span>

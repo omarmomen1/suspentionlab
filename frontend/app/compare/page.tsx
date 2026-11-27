@@ -302,7 +302,7 @@ function CompareContent() {
               className={`px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 transition-all shadow-lg ${
                 testQueued
                   ? "bg-green-500 text-black shadow-green-500/20"
-                  : "bg-ansys-yellow hover:bg-yellow-400 text-black shadow-ansys-yellow/10"
+                  : "bg-signal hover:bg-[#d6f56e] text-carbon border border-signal"
               }`}
             >
               <Zap size={14} className={testQueued ? "text-black" : "text-black"} />
@@ -448,7 +448,7 @@ function CompareContent() {
                 </div>
                 <button
                   onClick={handleTestThisChange}
-                  className="w-full sm:w-auto px-4 py-2 rounded-lg bg-ansys-yellow/20 hover:bg-ansys-yellow/30 border border-ansys-yellow/40 text-ansys-yellow text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
+                  className="w-full sm:w-auto px-4 py-2 rounded-lg bg-signal/15 hover:bg-signal/25 border border-signal/40 text-signal text-xs font-semibold flex items-center justify-center gap-1.5 transition-all"
                 >
                   <Zap size={13} />
                   <span>[ TEST THIS CHANGE ]</span>

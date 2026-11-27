@@ -99,8 +99,8 @@ export default function LoginPage() {
         <button
           type="submit"
           disabled={loading}
-          className="w-full py-2.5 bg-ansys-yellow text-black text-sm font-bold rounded-xl
-            hover:brightness-110 transition-all shadow-[0_0_16px_rgba(242,169,0,0.2)]
+          className="w-full py-2.5 bg-signal text-carbon border border-signal text-sm font-bold rounded-xl
+            hover:bg-[#d6f56e] transition-colors
             disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
         >
           {loading ? <><Loader2 size={14} className="animate-spin" /> Signing in…</> : "Sign In"}

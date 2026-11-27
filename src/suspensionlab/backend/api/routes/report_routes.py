@@ -23,6 +23,7 @@ router = APIRouter(prefix="/reports", tags=["Reporting"])
 
 class CreateReportRequest(BaseModel):
     simulation_run_id: str = "latest"
+    baseline_run_id: Optional[str] = None
     title: str = ""
     notes: str = ""
 
@@ -592,6 +593,7 @@ async def generate_engineering_decision_report(
 @router.get("/hydrate/{run_id_or_label}")
 async def hydrate_report_endpoint(
     run_id_or_label: str,
+    baseline_run_id: Optional[str] = None,
     user: UserContext = Depends(require_permission(Permission.SIMULATION_READ)),
     db: AsyncSession = Depends(get_db_dependency),
 ):
@@ -607,7 +609,9 @@ async def hydrate_report_endpoint(
         if (run_id_or_label or "").strip().lower() == "latest":
             latest_run = await report_service.resolve_latest_or_baseline_run(db, uid, tid)
             target_id = str(latest_run.id)
-        data = await report_service.hydrate_engineering_report(db, target_id, uid, tid)
+        data = await report_service.hydrate_engineering_report(
+            db, target_id, uid, tid, baseline_run_id=baseline_run_id
+        )
         return data
     except LookupError as e:
         raise HTTPException(status_code=404, detail=str(e))
@@ -649,7 +653,9 @@ async def create_from_run_endpoint(
             title=req.title,
             notes=req.notes,
         )
-        hydrated = await report_service.hydrate_engineering_report(db, str(rep.simulation_id), uid, tid)
+        hydrated = await report_service.hydrate_engineering_report(
+            db, str(rep.simulation_id), uid, tid, baseline_run_id=req.baseline_run_id
+        )
         return {
             "id": str(rep.id),
             "token": rep.token,

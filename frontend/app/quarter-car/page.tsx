@@ -140,6 +140,7 @@ function QuarterCarDashboard() {
     validity,
     simParams,
     params, setParams,
+    validateParams,
     buildPayload,
     runSimulation,
   } = useQuarterCarSimulation({ authHeader, showToast, autoRun });
@@ -299,10 +300,12 @@ function QuarterCarDashboard() {
     return { F_spring, F_damper, F_total, relVel };
   }, [results, simParams, params]); // NOT dependent on live `params`
 
-  // Zero-lie gate: a verdict requires real, non-empty simulation data -
-  // never render "results" for an error payload or an empty time vector.
+  // Zero-lie gate: a verdict requires real, non-empty, physically valid simulation data -
+  // never render stale results for invalid parameters (e.g. k_s <= 0 or c <= 0).
+  const paramValidationError = validateParams();
+  const effectiveError = paramValidationError || simError;
   const hasResults = Boolean(
-    results && !results.error && Array.isArray(results.time) && results.time.length > 0
+    !paramValidationError && results && !results.error && Array.isArray(results.time) && results.time.length > 0
   );
 
   const r = results as Record<string, unknown> & {
@@ -322,7 +325,7 @@ function QuarterCarDashboard() {
   } | null;
 
   // V2 verdict, ledger and pinned PDF rows.
-  const verdict = verdictStatus({ isRunning, error: simError, hasResults, validityTier: validity ? resolveValidityTier(validity) : null });
+  const verdict = verdictStatus({ isRunning, error: effectiveError, hasResults, validityTier: validity ? resolveValidityTier(validity) : null });
   const ledgerSource = (results as any)?.run_id ? `solver run ${(results as any).run_id}` : "this session's solver run";
   const ledgerRows = useMemo(
     () => (hasResults ? quarterCarLedgerRows(r as any, (simParams ?? params) as any, verdict.status, ledgerSource) : []),
@@ -386,10 +389,10 @@ function QuarterCarDashboard() {
           <DataExport results={results} fileName={`QCar_${Math.round(params.k_s)}_${Math.round(params.c)}`} />
 
           <button id="btn-run" onClick={() => runSimulation()} disabled={isRunning}
-            className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
+            className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${
               isRunning
                 ? "bg-[#222] text-gray-500 cursor-not-allowed"
-                : "bg-ansys-yellow text-black hover:brightness-110 shadow-[0_0_20px_rgba(242,169,0,0.2)]"
+                : "bg-signal text-carbon border border-signal hover:bg-[#d6f56e]"
             }`}>
             {isRunning ? (
               <><div className="w-3 h-3 border border-gray-600 border-t-gray-300 rounded-full animate-spin" />Solving…</>
@@ -486,9 +489,14 @@ function QuarterCarDashboard() {
             </ParamSection>
             <ParamSection title="Suspension">
               <ParameterInput label="Spring Rate"    val={params.k_s} unit="N/m"   step={500} hasError={params.k_s <= 0} onChange={(v) => setParams({ ...params, k_s: v })} />
-              <ParameterInput label="Damping"        val={params.c}   unit="N·s/m" step={50}  hasError={params.c < 0} onChange={(v) => setParams({ ...params, c:   v })} />
+              <ParameterInput label="Damping"        val={params.c}   unit="N·s/m" step={50}  hasError={params.c <= 0} onChange={(v) => setParams({ ...params, c:   v })} />
               <ParameterInput label="Tire Stiffness" val={params.k_t} unit="N/m"   step={5000} hasError={params.k_t <= 0} onChange={(v) => setParams({ ...params, k_t: v })} />
               <ParameterInput label="Motion Ratio (spring/wheel)"   val={params.MR}  unit="—"     step={0.01} min={0.1} hasError={params.MR <= 0} onChange={(v) => setParams({ ...params, MR:  v })} />
+              {paramValidationError && (
+                <div role="alert" data-testid="qcar-param-error" className="p-2.5 rounded-lg bg-red-950/40 border border-red-500/40 text-[11px] text-red-300 font-mono leading-snug">
+                  {paramValidationError}
+                </div>
+              )}
               <DamperLUTInput 
                 label="Non-Linear Damper Curve"
                 isActive={params.damper_curve_v !== null}
@@ -552,36 +560,38 @@ function QuarterCarDashboard() {
             {/* Derived params display */}
             <ParamSection title="Derived">
               {(() => {
-                const kw = params.k_s * params.MR * params.MR;
-                const cw = params.c * params.MR * params.MR;
-                const fs = (1 / (2 * Math.PI)) * Math.sqrt(kw / Math.max(params.m_s, 1e-6));
-                const fu = (1 / (2 * Math.PI)) * Math.sqrt((kw + params.k_t) / Math.max(params.m_u, 1e-6));
-                const zeta = cw / Math.max(1e-9, 2 * Math.sqrt(kw * Math.max(params.m_s, 1e-6)));
+                const validGeom = params.k_s > 0 && params.MR > 0 && params.m_s > 0 && params.m_u > 0 && params.k_t > 0;
+                const kw = validGeom ? params.k_s * params.MR * params.MR : 0;
+                const cw = params.c > 0 && params.MR > 0 ? params.c * params.MR * params.MR : 0;
+                const fs = kw > 0 ? (1 / (2 * Math.PI)) * Math.sqrt(kw / params.m_s) : null;
+                const fu = validGeom ? (1 / (2 * Math.PI)) * Math.sqrt((kw + params.k_t) / params.m_u) : null;
+                const zeta = kw > 0 && cw > 0 ? cw / (2 * Math.sqrt(kw * params.m_s)) : null;
+                const staticDeflMm = kw > 0 ? (params.m_s * 9.81) / kw * 1000 : null;
                 return (
                   <div className="space-y-1.5 font-mono text-[10px]">
                     <div className="flex justify-between text-gray-500">
                       <span>Sprung Freq f_s</span>
-                      <span className="text-ansys-yellow font-bold">{fs.toFixed(2)} Hz</span>
+                      <span className="text-signal font-bold">{fs !== null && Number.isFinite(fs) ? `${fs.toFixed(2)} Hz` : "Not available"}</span>
                     </div>
                     <div className="flex justify-between text-gray-500">
                       <span>Unsprung Freq f_u</span>
-                      <span className="text-cyan-400 font-bold">{fu.toFixed(2)} Hz</span>
+                      <span className="text-cyan-400 font-bold">{fu !== null && Number.isFinite(fu) ? `${fu.toFixed(2)} Hz` : "Not available"}</span>
                     </div>
                     <div className="flex justify-between text-gray-500">
                       <span>Damping Ratio ζ</span>
-                      <span className="text-emerald-400 font-bold">{zeta.toFixed(3)}</span>
+                      <span className="text-emerald-400 font-bold">{zeta !== null && Number.isFinite(zeta) ? zeta.toFixed(3) : "Not available"}</span>
                     </div>
                     <div className="flex justify-between text-gray-600">
                       <span>Wheel Rate k_w</span>
-                      <span className="text-gray-400">{kw.toFixed(0)} N/m</span>
+                      <span className="text-gray-400">{kw > 0 && Number.isFinite(kw) ? `${kw.toFixed(0)} N/m` : "Not available"}</span>
                     </div>
                     <div className="flex justify-between text-gray-600">
                       <span>Mass Ratio μ</span>
-                      <span className="text-gray-400">{(params.m_u / params.m_s).toFixed(3)}</span>
+                      <span className="text-gray-400">{params.m_s > 0 ? (params.m_u / params.m_s).toFixed(3) : "Not available"}</span>
                     </div>
                     <div className="flex justify-between text-gray-600">
                       <span>Static Defl.</span>
-                      <span className="text-gray-400">{((params.m_s * 9.81) / kw * 1000).toFixed(1)} mm</span>
+                      <span className="text-gray-400">{staticDeflMm !== null && Number.isFinite(staticDeflMm) ? `${staticDeflMm.toFixed(1)} mm` : "Not available"}</span>
                     </div>
                     <div className="pt-1 border-t border-[#1e1e1e] text-[9px] text-gray-700 leading-tight">
                       k_w = k_s × MR²&nbsp;&nbsp;|&nbsp;&nbsp;MR = spring travel / wheel travel
@@ -600,11 +610,12 @@ function QuarterCarDashboard() {
 
           {/* Instant Analytical Modal Strip */}
           {(() => {
-            const kw = params.k_s * params.MR * params.MR;
-            const cw = params.c * params.MR * params.MR;
-            const fs = (1 / (2 * Math.PI)) * Math.sqrt(kw / Math.max(params.m_s, 1e-6));
-            const fu = (1 / (2 * Math.PI)) * Math.sqrt((kw + params.k_t) / Math.max(params.m_u, 1e-6));
-            const zeta = cw / Math.max(1e-9, 2 * Math.sqrt(kw * Math.max(params.m_s, 1e-6)));
+            const validGeom = params.k_s > 0 && params.MR > 0 && params.m_s > 0 && params.m_u > 0 && params.k_t > 0;
+            const kw = validGeom ? params.k_s * params.MR * params.MR : 0;
+            const cw = params.c > 0 && params.MR > 0 ? params.c * params.MR * params.MR : 0;
+            const fs = kw > 0 ? (1 / (2 * Math.PI)) * Math.sqrt(kw / params.m_s) : null;
+            const fu = validGeom ? (1 / (2 * Math.PI)) * Math.sqrt((kw + params.k_t) / params.m_u) : null;
+            const zeta = kw > 0 && cw > 0 ? cw / (2 * Math.sqrt(kw * params.m_s)) : null;
             return (
               <div className="bg-[#111113] border border-[#1e1e1e] rounded-xl px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 font-mono text-xs">
                 <span className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">
@@ -613,34 +624,34 @@ function QuarterCarDashboard() {
                 <div className="flex flex-wrap items-center gap-5">
                   <div>
                     <span className="text-gray-500 mr-1.5">Sprung f_s:</span>
-                    <span className="text-ansys-yellow font-bold">{fs.toFixed(2)} Hz</span>
+                    <span className="text-signal font-bold">{fs !== null && Number.isFinite(fs) ? `${fs.toFixed(2)} Hz` : "Not available"}</span>
                   </div>
                   <div>
                     <span className="text-gray-500 mr-1.5">Unsprung f_u:</span>
-                    <span className="text-cyan-400 font-bold">{fu.toFixed(2)} Hz</span>
+                    <span className="text-cyan-400 font-bold">{fu !== null && Number.isFinite(fu) ? `${fu.toFixed(2)} Hz` : "Not available"}</span>
                   </div>
                   <div>
                     <span className="text-gray-500 mr-1.5">Damping ζ:</span>
-                    <span className="text-emerald-400 font-bold">{zeta.toFixed(3)}</span>
+                    <span className="text-emerald-400 font-bold">{zeta !== null && Number.isFinite(zeta) ? zeta.toFixed(3) : "Not available"}</span>
                   </div>
                   <div>
                     <span className="text-gray-500 mr-1.5">Wheel Rate k_w:</span>
-                    <span className="text-gray-200">{kw.toFixed(0)} N/m</span>
+                    <span className="text-gray-200">{kw > 0 && Number.isFinite(kw) ? `${kw.toFixed(0)} N/m` : "Not available"}</span>
                   </div>
                 </div>
               </div>
             );
           })()}
 
-          {/* Empty state */}
-          {!results && !isRunning && (
+          {/* Empty state (only when no results and no active validation/sim error) */}
+          {!hasResults && !isRunning && !effectiveError && (
             <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl flex flex-col items-center justify-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-ansys-yellow/5 border border-ansys-yellow/10 flex items-center justify-center">
-                <Activity size={32} strokeWidth={1} className="text-ansys-yellow/40" />
+              <div className="w-16 h-16 rounded-2xl bg-signal/5 border border-signal/15 flex items-center justify-center">
+                <Activity size={32} strokeWidth={1} className="text-signal/50" />
               </div>
               <div className="text-center">
                 <p className="text-sm font-semibold text-gray-400 mb-1">
-                  Configure parameters and click <span className="text-ansys-yellow">Run Solver</span>
+                  Configure parameters and click <span className="text-signal">Run Solver</span>
                 </p>
                 <p className="text-xs text-gray-700">
                   2-DOF quarter car · BDF implicit stiff solver · Impedance matrix FRF · ISO 2631-1 Wk weighting
@@ -689,12 +700,12 @@ function QuarterCarDashboard() {
             </div>
           )}
 
-          {/* Error: only show centered full error if no previous valid results exist */}
-          {!hasResults && Boolean(results?.error || simError) && (
+          {/* Error: show centered full error if no valid results exist (including invalid k_s <= 0 or c <= 0) */}
+          {!hasResults && !isRunning && Boolean(results?.error || effectiveError) && (
             <div className="flex-1 bg-[#111113] border border-red-900/30 rounded-xl p-6 flex flex-col items-center justify-center">
               <EngineeringErrorDisplay
-                error={(results as any)?.message || simError}
-                onRetry={retrySimulation}
+                error={(results as any)?.message || effectiveError}
+                onRetry={paramValidationError ? undefined : retrySimulation}
                 onDismiss={() => setSimError(null)}
                 retryCount={retryCount}
               />
@@ -1283,10 +1294,10 @@ function QuarterCarDashboard() {
               { label: "RMS body accel (Wk)", value: hasResults ? ((r as any)?.rms_body_accel_wk ?? (r as any)?.rms_body_accel) : null, unit: "m/s²", decimals: 3 },
               { label: "Peak suspension travel", value: hasResults && typeof (r as any)?.peak_susp_travel === "number" ? (r as any).peak_susp_travel * 1000 : null, unit: "mm", decimals: 1 },
             ]}
-            solverVersion={(results as any)?.solver_version}
-            runId={(results as any)?.run_id}
-            inputSha256={(results as any)?.input_sha256}
-            action={{ label: "Run Solver", onClick: () => runSimulation(), loading: isRunning }}
+            solverVersion={(hasResults ? (results as any)?.solver_version : null)}
+            runId={(hasResults ? (results as any)?.run_id : null)}
+            inputSha256={(hasResults ? (results as any)?.input_sha256 : null)}
+            action={{ label: "Run Solver", onClick: () => runSimulation(), loading: isRunning, disabled: Boolean(paramValidationError) }}
           />
         </ShellRight>
       </StudioShell>

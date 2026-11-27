@@ -36,11 +36,12 @@ export const DEFAULT_QCAR_PARAMS: QCarParams = {
 
 /** Returns an error message when parameters are physically invalid, else null. */
 export function validateQCarParams(params: QCarParams): string | null {
-  if (params.m_s <= 0) return "Sprung Mass must be strictly positive.";
-  if (params.m_u <= 0) return "Unsprung Mass must be strictly positive.";
-  if (params.k_s <= 0) return "Spring Rate must be strictly positive.";
-  if (params.k_t <= 0) return "Tire Stiffness must be strictly positive.";
-  if (params.c < 0) return "Damping cannot be negative.";
+  if (!Number.isFinite(params.m_s) || params.m_s <= 0) return "Sprung Mass must be strictly positive.";
+  if (!Number.isFinite(params.m_u) || params.m_u <= 0) return "Unsprung Mass must be strictly positive.";
+  if (!Number.isFinite(params.k_s) || params.k_s <= 0) return "Spring Rate (k_s) must be strictly positive (k_s > 0).";
+  if (!Number.isFinite(params.c) || params.c <= 0) return "Damping (c) must be strictly positive (c > 0).";
+  if (!Number.isFinite(params.k_t) || params.k_t <= 0) return "Tire Stiffness must be strictly positive.";
+  if (!Number.isFinite(params.MR) || params.MR <= 0) return "Motion Ratio must be strictly positive.";
   return null;
 }
 

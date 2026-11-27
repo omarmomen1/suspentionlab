@@ -334,6 +334,64 @@ async def download_reference_csv_template():
     )
 
 
+def _validate_telemetry_csv_schema(csv_content: str) -> tuple[list[str], dict]:
+    """Validate that an uploaded CSV contains a header row with recognizable telemetry channels.
+
+    Rejects arbitrary/unrelated CSVs (e.g., 3-column CSVs with no time base or
+    vehicle/suspension channels) with HTTP 422 before downstream ingestion.
+    """
+    headers: list[str] = []
+    data_rows = 0
+    for line in csv_content.splitlines():
+        s = line.strip()
+        if not s or s.startswith(("#", "//")):
+            continue
+        if not headers:
+            if s.startswith('"') and "," not in s:
+                continue
+            delim = "\t" if "\t" in s else (";" if ";" in s and "," not in s else ",")
+            headers = [h.strip().strip('"').strip("'") for h in s.split(delim) if h.strip()]
+        else:
+            data_rows += 1
+
+    if not headers:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "Telemetry CSV schema rejected: no CSV header row found.",
+                "pipeline_status": "REJECTED",
+                "blocking_reasons": ["Missing CSV header row."],
+            },
+        )
+
+    from suspensionlab.physics.telemetry_parser import identify_channels
+    identified = identify_channels(headers)
+    non_time_channels = [k for k in identified.keys() if k != "time"]
+    if "time" not in identified or not non_time_channels:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "Telemetry CSV schema validation failed",
+                "pipeline_status": "REJECTED",
+                "blocking_reasons": [
+                    f"Unrecognized telemetry CSV schema: columns {headers} must include a time column and at least one valid telemetry channel (e.g. speed, lat_g, long_g, vert_g, susp_fl)."
+                ],
+                "columns_found": headers,
+                "mapped_channels": list(identified.keys()),
+            },
+        )
+    if data_rows < 1:
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error": "Telemetry CSV schema rejected: no data rows found.",
+                "pipeline_status": "REJECTED",
+                "blocking_reasons": ["Telemetry CSV contains headers but zero data rows."],
+            },
+        )
+    return headers, identified
+
+
 @router.post(
     "/channel-map-preview",
     dependencies=[
@@ -353,21 +411,7 @@ async def channel_map_preview(
     content_bytes = await file.read(50 * 1024 * 1024)
     csv_content = content_bytes.decode("utf-8", errors="replace")
 
-    # Extract the header line (first non-comment line with commas)
-    headers: list[str] = []
-    for line in csv_content.splitlines():
-        line = line.strip()
-        if not line or line.startswith(("#", "//", '"')):
-            continue
-        if "," in line:
-            headers = [h.strip() for h in line.split(",")]
-            break
-
-    if not headers:
-        raise HTTPException(status_code=400, detail="No CSV header row found in the uploaded file.")
-
-    from suspensionlab.physics.telemetry_parser import identify_channels
-    identified = identify_channels(headers)
+    headers, identified = _validate_telemetry_csv_schema(csv_content)
     mapped_raw = {info.raw_name for info in identified.values()}
     unmapped = [h for h in headers if h not in mapped_raw and h]
 
@@ -427,6 +471,9 @@ async def analyse_telemetry(
         csv_content = content_bytes.decode("utf-8", errors="replace")
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Cannot decode file: {exc}")
+
+    # Validate telemetry CSV schema before running analysis
+    _validate_telemetry_csv_schema(csv_content)
 
     # Parse optional model params
     params_dict: dict | None = None
@@ -561,6 +608,7 @@ async def create_telemetry_dataset_endpoint(
     )
 
     csv_content = content_bytes.decode("utf-8", errors="replace")
+    _validate_telemetry_csv_schema(csv_content)
 
     from suspensionlab.physics.telemetry_dataset import TelemetryDataset, TelemetrySource
     from suspensionlab.physics.telemetry_health import assess_telemetry_health, TelemetryPipelineStatus
@@ -620,6 +668,7 @@ async def calibrate_forward_model_endpoint(
     """
     content_bytes = await file.read(50 * 1024 * 1024)
     csv_content = content_bytes.decode("utf-8", errors="replace")
+    _validate_telemetry_csv_schema(csv_content)
 
     try:
         nom_dict = json.loads(nominal_params)

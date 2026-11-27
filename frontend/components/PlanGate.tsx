@@ -116,7 +116,7 @@ export default function PlanGate({ required, children, overlay = false, compact 
           {feature && <p className="text-xs text-gray-300 mb-1">{feature}</p>}
           <p className="text-xs text-gray-400 mb-3 text-center max-w-[200px]">{copy.desc}</p>
           <Link href="/pricing"
-            className="text-xs font-bold px-3 py-1.5 bg-ansys-yellow text-black rounded-lg hover:brightness-110 transition-all">
+            className="text-xs font-bold px-3 py-1.5 bg-signal text-carbon border border-signal rounded-lg hover:bg-[#d6f56e] transition-colors">
             Upgrade Plan
           </Link>
         </div>
@@ -173,14 +173,14 @@ export default function PlanGate({ required, children, overlay = false, compact 
               href={process.env.NEXT_PUBLIC_GUMROAD_TEAM_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold tracking-wide transition-all shadow-md"
+              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-signal hover:bg-[#d6f56e] text-carbon border border-signal text-xs font-bold tracking-wide transition-colors"
             >
               Unlock Race Team Pass ($499/yr) -&gt;
             </a>
           ) : (
             <Link
               href="/pricing"
-              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold tracking-wide transition-all shadow-md"
+              className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-signal hover:bg-[#d6f56e] text-carbon border border-signal text-xs font-bold tracking-wide transition-colors"
             >
               Unlock Race Team Pass ($499/yr) -&gt;
             </Link>
@@ -190,14 +190,14 @@ export default function PlanGate({ required, children, overlay = false, compact 
             href={process.env.NEXT_PUBLIC_GUMROAD_PRO_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold tracking-wide transition-all shadow-md"
+            className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-signal hover:bg-[#d6f56e] text-carbon border border-signal text-xs font-bold tracking-wide transition-colors"
           >
             Unlock Pro Pass on Gumroad ($79/mo) -&gt;
           </a>
         ) : (
           <Link
             href="/pricing"
-            className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold tracking-wide transition-all shadow-md"
+            className="inline-flex items-center justify-center px-5 py-2.5 rounded-xl bg-signal hover:bg-[#d6f56e] text-carbon border border-signal text-xs font-bold tracking-wide transition-colors"
           >
             Unlock Pro Pass on Gumroad ($79/mo) -&gt;
           </Link>

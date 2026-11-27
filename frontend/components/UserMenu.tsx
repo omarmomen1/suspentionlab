@@ -64,8 +64,8 @@ export default function UserMenu() {
           Sign In
         </Link>
         <Link href="/auth/register"
-          className="text-xs px-3 py-1.5 bg-ansys-yellow text-black font-bold rounded-lg
-            hover:brightness-110 transition-all">
+          className="text-xs px-3 py-1.5 bg-signal text-carbon font-bold rounded-lg border border-signal
+            hover:bg-[#d6f56e] transition-colors">
           Get Started
         </Link>
       </div>

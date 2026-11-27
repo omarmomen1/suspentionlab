@@ -44,6 +44,7 @@ function ReportContent() {
 
   const [runsList, setRunsList] = useState<any[]>([]);
   const [selectedRunLabel, setSelectedRunLabel] = useState<string>(queryRunId || "");
+  const [baselineRunLabel, setBaselineRunLabel] = useState<string>("");
 
   const [report, setReport] = useState<any>(null);
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
@@ -88,15 +89,17 @@ function ReportContent() {
     init();
   }, [queryRunId]);
 
-  async function loadReportForRun(runIdOrLabel: string, allowFallback: boolean = true) {
+  async function loadReportForRun(runIdOrLabel: string, allowFallback: boolean = true, baselineId?: string) {
     setLoading(true);
     setError(null);
+    const activeBaseline = baselineId !== undefined ? baselineId : baselineRunLabel;
     try {
       const recordRes = await ReportsApi.createReportFromRun({
         simulation_run_id: runIdOrLabel,
+        baseline_run_id: activeBaseline || undefined,
         title: `Engineering Decision & Compliance Report — ${runIdOrLabel}`,
       }).catch(async () => {
-        const hyd = await ReportsApi.hydrateReport(runIdOrLabel);
+        const hyd = await ReportsApi.hydrateReport(runIdOrLabel, activeBaseline || undefined);
         return { id: hyd.simulation_run_id, token: "", status: "PROPOSED", doc_id: hyd.doc_id, hydrated: hyd };
       });
 
@@ -250,7 +253,7 @@ function ReportContent() {
         <p className="text-xs text-gray-400 max-w-md text-center">{error || "No engineering report data found."}</p>
         <button
           onClick={triggerBenchmarkSimulation}
-          className="px-4 py-2 bg-ansys-yellow text-black text-xs font-bold rounded-xl hover:brightness-110 transition flex items-center gap-2"
+          className="px-4 py-2 bg-signal text-carbon border border-signal text-xs font-bold rounded-xl hover:bg-[#d6f56e] transition-colors flex items-center gap-2"
         >
           <RefreshCw size={14} /> Execute Real Benchmark Simulation
         </button>
@@ -306,16 +309,43 @@ function ReportContent() {
                 aria-label="Select simulation run"
                 value={selectedRunLabel}
                 onChange={(e) => {
-                  setSelectedRunLabel(e.target.value);
-                  loadReportForRun(e.target.value);
+                  const nextRun = e.target.value;
+                  setSelectedRunLabel(nextRun);
+                  if (baselineRunLabel === nextRun) {
+                    setBaselineRunLabel("");
+                    loadReportForRun(nextRun, true, "");
+                  } else {
+                    loadReportForRun(nextRun);
+                  }
                 }}
-                className="px-3 py-1.5 rounded-xl bg-[#141417] border border-[#25252c] text-xs font-mono text-gray-300 focus:outline-none focus:border-ansys-yellow"
+                className="px-3 py-1.5 rounded-xl bg-[#141417] border border-[#25252c] text-xs font-mono text-gray-300 focus:outline-none focus:border-signal"
               >
                 {runsList.map((run) => (
                   <option key={run.label} value={run.label}>
                     {run.label} ({run.track_ref || run.simulation_type})
                   </option>
                 ))}
+              </select>
+            )}
+            {runsList.length > 1 && (
+              <select
+                aria-label="Compare against baseline run"
+                value={baselineRunLabel}
+                onChange={(e) => {
+                  const nextBase = e.target.value;
+                  setBaselineRunLabel(nextBase);
+                  loadReportForRun(selectedRunLabel || report.run_id, true, nextBase);
+                }}
+                className="px-3 py-1.5 rounded-xl bg-[#141417] border border-[#25252c] text-xs font-mono text-gray-300 focus:outline-none focus:border-signal"
+              >
+                <option value="">Baseline run (no comparison)</option>
+                {runsList
+                  .filter((run) => run.label !== selectedRunLabel)
+                  .map((run) => (
+                    <option key={run.label} value={run.label}>
+                      vs {run.label}
+                    </option>
+                  ))}
               </select>
             )}
 
@@ -425,31 +455,35 @@ function ReportContent() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-[#0f0f12] print:bg-white border border-[#1e1e24] print:border-gray-300 rounded-2xl p-4">
                 <p className="text-[10px] font-bold text-gray-500 print:text-gray-600 uppercase tracking-wider">Simulated Lap Delta</p>
-                <p className="text-2xl font-black text-emerald-400 print:text-emerald-700 font-mono mt-1">
-                  {metrics["Simulated Lap Delta"] || "-0.087 s"}
+                <p className="text-lg font-black text-emerald-400 print:text-emerald-700 font-mono mt-1">
+                  {metrics["Simulated Lap Delta"] || "Baseline run (no comparison)"}
                 </p>
-                <p className="text-[11px] text-gray-400 print:text-gray-600 mt-1">Settling time improvement</p>
+                <p className="text-[11px] text-gray-400 print:text-gray-600 mt-1">
+                  {report.baseline_run_id ? `Compared vs ${report.baseline_run_id}` : "Select a baseline run to compare"}
+                </p>
               </div>
               <div className="bg-[#0f0f12] print:bg-white border border-[#1e1e24] print:border-gray-300 rounded-2xl p-4">
                 <p className="text-[10px] font-bold text-gray-500 print:text-gray-600 uppercase tracking-wider">Front Turn-in Grip</p>
-                <p className="text-2xl font-black text-ansys-yellow print:text-amber-800 font-mono mt-1">
-                  {metrics["Front Turn-in Grip"] || "+1.8 %"}
+                <p className="text-lg font-black text-signal print:text-amber-800 font-mono mt-1">
+                  {metrics["Front Turn-in Grip"] || "Baseline run (no comparison)"}
                 </p>
-                <p className="text-[11px] text-gray-400 print:text-gray-600 mt-1">Tire grip exploitation</p>
+                <p className="text-[11px] text-gray-400 print:text-gray-600 mt-1">Tire load consistency delta</p>
               </div>
               <div className="bg-[#0f0f12] print:bg-white border border-[#1e1e24] print:border-gray-300 rounded-2xl p-4">
                 <p className="text-[10px] font-bold text-gray-500 print:text-gray-600 uppercase tracking-wider">Rear Platform Stability</p>
-                <p className="text-2xl font-black text-blue-400 print:text-blue-700 font-mono mt-1">
-                  {metrics["Rear Platform Stability"] || "+3.1 %"}
+                <p className="text-lg font-black text-blue-400 print:text-blue-700 font-mono mt-1">
+                  {metrics["Rear Platform Stability"] || "Baseline run (no comparison)"}
                 </p>
-                <p className="text-[11px] text-gray-400 print:text-gray-600 mt-1">High-speed pitch damped</p>
+                <p className="text-[11px] text-gray-400 print:text-gray-600 mt-1">Platform Wk isolation delta</p>
               </div>
               <div className="bg-[#0f0f12] print:bg-white border border-[#1e1e24] print:border-gray-300 rounded-2xl p-4">
                 <p className="text-[10px] font-bold text-gray-500 print:text-gray-600 uppercase tracking-wider">Telemetry Correlation</p>
-                <p className="text-2xl font-black text-cyan-400 print:text-cyan-700 font-mono mt-1">
-                  {metrics["Telemetry Correlation"] || `${report.correlation_pct?.toFixed(1)} %`}
+                <p className="text-lg font-black text-cyan-400 print:text-cyan-700 font-mono mt-1">
+                  {metrics["Telemetry Correlation"] || (typeof report.correlation_pct === "number" ? `${report.correlation_pct.toFixed(1)} %` : "UNVALIDATED")}
                 </p>
-                <p className="text-[11px] text-gray-400 print:text-gray-600 mt-1">Residual MAE: 1.41 mm</p>
+                <p className="text-[11px] text-gray-400 print:text-gray-600 mt-1">
+                  {typeof report.correlation_pct === "number" ? "Empirical model correlation" : "No empirical telemetry dataset"}
+                </p>
               </div>
             </div>
 
@@ -855,7 +889,7 @@ function ReportContent() {
               <Link
                 href={shareUrl.replace(window.location.origin, "")}
                 target="_blank"
-                className="px-4 py-2 rounded-xl bg-ansys-yellow text-black text-xs font-bold hover:brightness-110 transition flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl bg-signal text-carbon border border-signal text-xs font-bold hover:bg-[#d6f56e] transition-colors flex items-center gap-1.5"
               >
                 Open Shared View <ArrowUpRight size={14} />
               </Link>

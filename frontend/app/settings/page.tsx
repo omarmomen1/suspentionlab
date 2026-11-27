@@ -296,8 +296,8 @@ export default function SettingsPage() {
                     </div>
                     {plan !== "ENTERPRISE" && (
                       <Link href="/pricing"
-                        className="px-4 py-2 bg-ansys-yellow text-black text-xs font-bold rounded-xl
-                          hover:brightness-110 transition-all shrink-0">
+                        className="px-4 py-2 bg-signal text-carbon border border-signal text-xs font-bold rounded-xl
+                          hover:bg-[#d6f56e] transition-colors shrink-0">
                         Upgrade
                       </Link>
                     )}
@@ -330,7 +330,7 @@ export default function SettingsPage() {
                         <button
                           onClick={activateLicense}
                           disabled={activatingLicense || !gumroadKey.trim()}
-                          className="px-4 py-2 bg-ansys-yellow text-black text-xs font-bold rounded-xl hover:brightness-110 transition-all disabled:opacity-40 flex items-center gap-1.5"
+                          className="px-4 py-2 bg-signal text-carbon border border-signal text-xs font-bold rounded-xl hover:bg-[#d6f56e] transition-colors disabled:opacity-40 flex items-center gap-1.5"
                         >
                           {activatingLicense ? <Loader2 size={12} className="animate-spin" /> : <Key size={12} />}
                           Verify Key
@@ -355,7 +355,7 @@ export default function SettingsPage() {
                     <Key size={32} className="mx-auto text-gray-700 mb-3" />
                     <p className="text-sm text-gray-500 mb-4">API key access requires the Pro or Enterprise plan.</p>
                     <Link href="/pricing"
-                      className="px-4 py-2 bg-ansys-yellow text-black text-xs font-bold rounded-xl hover:brightness-110">
+                      className="px-4 py-2 bg-signal text-carbon border border-signal text-xs font-bold rounded-xl hover:bg-[#d6f56e] transition-colors">
                       Upgrade to Pro
                     </Link>
                   </div>
@@ -389,8 +389,8 @@ export default function SettingsPage() {
                         className="flex-1 bg-[#0d0d0f] border border-[#252525] rounded-xl px-3 py-2 text-sm text-white
                           placeholder:text-gray-700 focus:outline-none focus:border-ansys-yellow/60 transition-all" />
                       <button onClick={createKey} disabled={creatingKey || !newKeyName.trim()}
-                        className="px-4 py-2 bg-ansys-yellow text-black text-xs font-bold rounded-xl
-                          hover:brightness-110 transition-all disabled:opacity-40 flex items-center gap-1.5">
+                        className="px-4 py-2 bg-signal text-carbon border border-signal text-xs font-bold rounded-xl
+                          hover:bg-[#d6f56e] transition-colors disabled:opacity-40 flex items-center gap-1.5">
                         {creatingKey ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
                         Create
                       </button>

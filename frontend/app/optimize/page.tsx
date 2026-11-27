@@ -38,14 +38,14 @@ import {
 function OptimizeContent() {
   const router = useRouter();
 
-  // Parameter grid ranges
-  const [ksMin, setKsMin] = useState<number>(20000);
-  const [ksMax, setKsMax] = useState<number>(50000);
-  const [ksSteps, setKsSteps] = useState<number>(5);
+  // Parameter grid ranges (wide feasible space for multi-point NSGA-II Pareto frontier)
+  const [ksMin, setKsMin] = useState<number>(15000);
+  const [ksMax, setKsMax] = useState<number>(55000);
+  const [ksSteps, setKsSteps] = useState<number>(6);
 
-  const [cMin, setCMin] = useState<number>(1400);
-  const [cMax, setCMax] = useState<number>(3200);
-  const [cSteps, setCSteps] = useState<number>(5);
+  const [cMin, setCMin] = useState<number>(900);
+  const [cMax, setCMax] = useState<number>(3900);
+  const [cSteps, setCSteps] = useState<number>(6);
 
   const [roadSpeed, setRoadSpeed] = useState<number>(30); // m/s (~108 km/h)
 
@@ -121,21 +121,29 @@ function OptimizeContent() {
     return frontierData.candidates;
   }, [frontierData, filterMode]);
 
-  // Archetype setups
+  // Archetype setups: ensure distinct setups on multi-point Pareto frontiers
   const archetypeBestCompromise = frontierData?.best_compromise;
   const archetypeMaxGrip = useMemo(() => {
-    if (!frontierData?.pareto_frontier || frontierData.pareto_frontier.length === 0) return null;
-    return [...frontierData.pareto_frontier].sort(
+    const front = frontierData?.pareto_frontier;
+    if (!front || front.length === 0) return null;
+    const sorted = [...front].sort(
       (a, b) => (a.objectives.tire_load_variation || 0) - (b.objectives.tire_load_variation || 0)
-    )[0];
-  }, [frontierData]);
+    );
+    return sorted.find((c) => front.length < 3 || c.candidate_id !== archetypeBestCompromise?.candidate_id) ?? sorted[0];
+  }, [frontierData, archetypeBestCompromise]);
 
   const archetypeMaxComfort = useMemo(() => {
-    if (!frontierData?.pareto_frontier || frontierData.pareto_frontier.length === 0) return null;
-    return [...frontierData.pareto_frontier].sort(
+    const front = frontierData?.pareto_frontier;
+    if (!front || front.length === 0) return null;
+    const sorted = [...front].sort(
       (a, b) => (a.objectives.rms_body_accel || 0) - (b.objectives.rms_body_accel || 0)
-    )[0];
-  }, [frontierData]);
+    );
+    return sorted.find(
+      (c) =>
+        front.length < 3 ||
+        (c.candidate_id !== archetypeBestCompromise?.candidate_id && c.candidate_id !== archetypeMaxGrip?.candidate_id)
+    ) ?? sorted[0];
+  }, [frontierData, archetypeBestCompromise, archetypeMaxGrip]);
 
   // Scatter plot coordinate calculation
   const plotBounds = useMemo(() => {
@@ -198,9 +206,9 @@ function OptimizeContent() {
               type="button"
               onClick={() => runBatchOptimization(true)}
               disabled={isRunning}
-              className="px-4 py-2 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold flex items-center gap-2 transition-all shadow-md disabled:opacity-50"
+              className="px-4 py-2 rounded-lg bg-signal hover:bg-[#d6f56e] text-carbon border border-signal text-xs font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
             >
-              <Play size={13} className={isRunning ? "animate-spin" : "fill-black"} />
+              <Play size={13} className={isRunning ? "animate-spin" : "fill-current"} />
               <span>{isRunning ? "Evaluating Candidates..." : "Run Batch Candidate Optimization"}</span>
             </button>
           </div>
@@ -754,7 +762,7 @@ function OptimizeContent() {
                 <button
                   data-testid="btn-test-candidate-inspector"
                   onClick={() => handleTestCandidate(selectedCandidate)}
-                  className="w-full py-2.5 rounded-lg bg-ansys-yellow hover:bg-yellow-400 text-black text-xs font-bold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-ansys-yellow/10"
+                  className="w-full py-2.5 rounded-lg bg-signal hover:bg-[#d6f56e] text-carbon border border-signal text-xs font-bold flex items-center justify-center gap-2 transition-colors"
                 >
                   <Zap size={14} />
                   <span>[ TEST THIS CANDIDATE IN BUILDER ]</span>
@@ -789,7 +797,7 @@ function OptimizeContent() {
                   onClick={() => setFilterMode("pareto")}
                   className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
                     filterMode === "pareto"
-                      ? "bg-amber-500 text-black font-bold shadow-sm"
+                      ? "bg-signal text-carbon font-bold shadow-sm"
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
@@ -799,7 +807,7 @@ function OptimizeContent() {
                   onClick={() => setFilterMode("feasible")}
                   className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
                     filterMode === "feasible"
-                      ? "bg-amber-500 text-black font-bold shadow-sm"
+                      ? "bg-signal text-carbon font-bold shadow-sm"
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
@@ -809,7 +817,7 @@ function OptimizeContent() {
                   onClick={() => setFilterMode("all")}
                   className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
                     filterMode === "all"
-                      ? "bg-amber-500 text-black font-bold shadow-sm"
+                      ? "bg-signal text-carbon font-bold shadow-sm"
                       : "text-gray-400 hover:text-white"
                   }`}
                 >
@@ -887,7 +895,7 @@ function OptimizeContent() {
                               e.stopPropagation();
                               handleTestCandidate(cand);
                             }}
-                            className="px-2.5 py-1 rounded bg-ansys-yellow/20 hover:bg-ansys-yellow/30 text-ansys-yellow text-[11px] font-sans font-semibold transition-colors inline-flex items-center gap-1"
+                            className="px-2.5 py-1 rounded bg-signal/15 hover:bg-signal/25 border border-signal/30 text-signal text-[11px] font-sans font-semibold transition-colors inline-flex items-center gap-1"
                           >
                             <Zap size={11} />
                             <span>Test</span>

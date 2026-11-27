@@ -180,7 +180,7 @@ export default function PromptModalHost() {
             ref={okButtonRef}
             type="button"
             onClick={confirm}
-            className="px-3 py-1.5 text-xs font-bold rounded-lg bg-ansys-yellow text-black hover:brightness-110 transition-all"
+            className="px-3 py-1.5 text-xs font-bold rounded-lg bg-signal text-carbon border border-signal hover:bg-[#d6f56e] transition-colors"
           >
             {state.mode === "prompt" ? "Save" : "OK"}
           </button>

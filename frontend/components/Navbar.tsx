@@ -269,8 +269,8 @@ export default function Navbar() {
               aria-current={pathname === STUDIO_PRICING_CTA.href ? "page" : undefined}
               className={`hidden md:inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-colors whitespace-nowrap border ${
                 pathname === STUDIO_PRICING_CTA.href
-                  ? "bg-[#C8F04B] text-[#0C0F12] border-[#C8F04B]"
-                  : "bg-[#C8F04B] text-[#0C0F12] border-[#C8F04B] hover:bg-[#d6f56e]"
+                  ? "bg-signal text-carbon border-signal"
+                  : "bg-signal text-carbon border-signal hover:bg-[#d6f56e]"
               }`}
             >
               <span>{STUDIO_PRICING_CTA.label}</span>

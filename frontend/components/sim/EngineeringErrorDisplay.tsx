@@ -402,7 +402,7 @@ RAW DETAILS: ${diag.rawDetails || "N/A"}`;
           {onRetry && (
             <button
               onClick={onRetry}
-              className="px-4 py-1.5 bg-ansys-yellow text-black font-bold text-xs rounded-xl hover:brightness-110 flex items-center gap-1.5 transition-all shadow-lg"
+              className="px-4 py-1.5 bg-signal text-carbon border border-signal font-bold text-xs rounded-xl hover:bg-[#d6f56e] flex items-center gap-1.5 transition-colors"
             >
               <RotateCcw size={13} />
               Retry Simulation
