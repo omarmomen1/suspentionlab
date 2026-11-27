@@ -12,9 +12,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, Sparkles, X } from "lucide-react";
 import {
-  FULL_MOBILE_SECTIONS,
   STUDIO_PRICING_CTA,
-  STUDIO_TOOLS,
+  getNavGroups,
   isStudioModeEnabled,
   matchesRoute,
 } from "../lib/navigation";
@@ -126,12 +125,12 @@ export default function MobileNav({ defaultOpen = false }: { defaultOpen?: boole
               aria-label="Mobile navigation links"
               data-studio-mode={studioMode ? "true" : undefined}
             >
-              {studioMode ? (
+              {(
                 <div className="space-y-1">
                   <div className="px-4 pt-3 pb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-ansys-yellow">
-                    Engineering Studio Tools
+                    Workspace
                   </div>
-                  {STUDIO_TOOLS.map((tool) => {
+                  {getNavGroups().map((tool) => {
                     if (tool.routes.length === 1) {
                       const route = tool.routes[0];
                       const active = matchesRoute(pathname, route.href, route.aliases);
@@ -200,32 +199,6 @@ export default function MobileNav({ defaultOpen = false }: { defaultOpen?: boole
                     </p>
                   </div>
                 </div>
-              ) : (
-                FULL_MOBILE_SECTIONS.map((section) => (
-                  <div key={section.title} className="mb-2">
-                    <div className="px-4 pt-3 pb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-gray-400">
-                      {section.title}
-                    </div>
-                    {section.links.map((link) => {
-                      const active = matchesRoute(pathname, link.href, link.aliases);
-                      return (
-                        <Link
-                          key={link.href}
-                          href={link.href}
-                          prefetch={true}
-                          aria-current={active ? "page" : undefined}
-                          className={`block px-4 py-2 text-sm transition-colors ${
-                            active
-                              ? "text-ansys-yellow bg-ansys-yellow/5 border-l-2 border-ansys-yellow font-semibold"
-                              : "text-gray-300 hover:text-white hover:bg-white/5 border-l-2 border-transparent"
-                          }`}
-                        >
-                          {link.label}
-                        </Link>
-                      );
-                    })}
-                  </div>
-                ))
               )}
             </nav>
           </div>

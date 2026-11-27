@@ -363,6 +363,18 @@ KinematicPoint KinematicsSolver::extract(
 
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Rack travel (V2 Phase 3): translate TRI along Y, keep the tie-rod length
+// ─────────────────────────────────────────────────────────────────────────────
+
+KinematicsSolver KinematicsSolver::with_rack_travel(double rack_mm) const
+{
+    HardpointSet shifted = hp_;
+    shifted.TRI.y() += rack_mm;   // L_TRO_sq is deliberately NOT recomputed
+    return KinematicsSolver(shifted);
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Public interface: solve single step
 // ─────────────────────────────────────────────────────────────────────────────
 

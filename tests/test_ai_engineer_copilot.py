@@ -280,7 +280,7 @@ async def test_approval_gate_blocks_autonomous_ai(race_engineer):
 
 
 @pytest.mark.asyncio
-async def test_approval_gate_accepts_authorized_human(chief_engineer):
+async def test_approval_gate_accepts_authorized_human(chief_engineer, monkeypatch):
     """Authorized human engineers can sign off decisions with HMAC-SHA256 audit trail."""
     gate_req = ApprovalGateRequest(
         decision_id="EXP-T7-SAT-2026",
@@ -290,8 +290,18 @@ async def test_approval_gate_accepts_authorized_human(chief_engineer):
         decision_type="SETUP_MODIFICATION",
         rationale="Telemetry confirms front slip saturation; 10% front ARB softening approved for FP2.",
     )
-    res = await approve_ai_decision(gate_req, user=chief_engineer)
+    # Wave 6: the route now writes a hash-chained audit record. Direct-call test, so
+    # pass a stand-in db and capture the record instead of hitting a database.
+    import suspensionlab.backend.security.audit as audit_mod
+    audit_calls = []
 
+    async def fake_record_audit_event(db, event_type, **kw):
+        audit_calls.append({"event_type": event_type, **kw})
+
+    monkeypatch.setattr(audit_mod, "record_audit_event", fake_record_audit_event)
+    res = await approve_ai_decision(gate_req, user=chief_engineer, db=object())
+
+    assert len(audit_calls) == 1 and audit_calls[0]["event_type"] == "ai.decision.approved"
     assert res["result_status"] == "SUCCESS"
     assert res["approval_status"] == "APPROVED"
     assert res["approver_name"] == "Dr. Marcus Weber"

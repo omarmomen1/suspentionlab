@@ -1745,6 +1745,25 @@ class Phase3LSetupEngineeringService:
         db.add(rec)
         await db.flush()
 
+        # Wave 6: write an append-only, hash-chained audit record for the sign-off
+        # so every setup approval is part of the tamper-evident audit chain.
+        from suspensionlab.backend.security.audit import record_audit_event
+        await record_audit_event(
+            db,
+            event_type="setup.decision.approved",
+            user_id=str(user_id),
+            team_id=str(team_id) if team_id else None,
+            artifact_id=f"{approval_code}:{decision_code}",
+            metadata={
+                "decision_code": decision_code,
+                "approval_code": approval_code,
+                "approver_name": approver_name,
+                "approver_role": approver_role,
+                "approval_signature": signature,
+                "artifact_hash": art_hash,
+            },
+        )
+
         return {
             "approval_code": approval_code,
             "decision_code": decision_code,

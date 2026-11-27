@@ -17,13 +17,12 @@ export function getCsrfToken(): string {
   return match ? match[2] : "";
 }
 
+/**
+ * Wave 6: cookie-only auth. Access tokens live exclusively in HttpOnly cookies
+ * and are never readable from JavaScript. Kept for compatibility; always "".
+ */
 export function getAuthToken(): string {
-  if (typeof window === "undefined") return "";
-  try {
-    return localStorage.getItem("sl_token") || sessionStorage.getItem("sl_token") || "";
-  } catch {
-    return "";
-  }
+  return "";
 }
 
 export const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/+$/, "");
@@ -50,19 +49,15 @@ export function normalizeApiUrl(url: string): string {
   return `${API_BASE}${cleanUrl}`;
 }
 
-let apiRefreshPromise: Promise<string | null> | null = null;
+/** Window event fired when a 401 could not be refreshed; AuthContext listens. */
+export const SESSION_EXPIRED_EVENT = "sl:session-expired";
 
-async function tryRefreshToken(): Promise<string | null> {
-  if (typeof window === "undefined") return null;
-  let storedRefreshToken = "";
-  try {
-    storedRefreshToken = (localStorage.getItem("sl_refresh_token") || sessionStorage.getItem("sl_refresh_token") || "").trim();
-  } catch {
-    return null;
-  }
-  if (!storedRefreshToken) {
-    return null;
-  }
+let apiRefreshPromise: Promise<boolean> | null = null;
+
+/** Cookie-only session refresh: the server reads the HttpOnly sl_refresh_token
+ * cookie and rotates both cookies. Resolves true when the session was renewed. */
+async function tryRefreshSession(): Promise<boolean> {
+  if (typeof window === "undefined") return false;
   if (apiRefreshPromise) return apiRefreshPromise;
 
   apiRefreshPromise = (async () => {
@@ -72,26 +67,11 @@ async function tryRefreshToken(): Promise<string | null> {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ refresh_token: storedRefreshToken }),
+        body: JSON.stringify({}),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.token) {
-          try {
-            localStorage.setItem("sl_token", data.token);
-            if (data.refresh_token) {
-              localStorage.setItem("sl_refresh_token", data.refresh_token);
-            }
-          } catch {}
-          return data.token as string;
-        }
-      }
-      try {
-        localStorage.removeItem("sl_refresh_token");
-      } catch {}
-      return null;
+      return res.ok;
     } catch {
-      return null;
+      return false;
     } finally {
       apiRefreshPromise = null;
     }
@@ -102,14 +82,12 @@ async function tryRefreshToken(): Promise<string | null> {
 
 export async function apiFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const fullUrl = normalizeApiUrl(url);
-  const token = getAuthToken();
 
   const headers: Record<string, string> = {
     "X-CSRF-Token": getCsrfToken(),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(options.headers as Record<string, string> ?? {}),
   };
-  
+
   let res = await fetch(fullUrl, { ...options, credentials: "include", headers });
 
   const isAuthEndpoint =
@@ -118,19 +96,14 @@ export async function apiFetch(url: string, options: RequestInit = {}): Promise<
     fullUrl.includes("/auth/clear-cookie");
 
   if (res.status === 401 && !isAuthEndpoint) {
-    const refreshedToken = await tryRefreshToken();
-    if (refreshedToken) {
-      const retryHeaders: Record<string, string> = {
-        ...headers,
-        Authorization: `Bearer ${refreshedToken}`,
-      };
-      res = await fetch(fullUrl, { ...options, credentials: "include", headers: retryHeaders });
-    } else {
-      if (typeof window !== "undefined") {
-        try {
-          localStorage.removeItem("sl_token");
-        } catch {}
-      }
+    const refreshed = await tryRefreshSession();
+    if (refreshed) {
+      // Rotated cookies ride along automatically on the retry.
+      res = await fetch(fullUrl, { ...options, credentials: "include", headers });
+    } else if (typeof window !== "undefined") {
+      // Refresh failed: tell AuthContext so it opens the same ReAuthModal that
+      // fetchWithAuth callers get (no hard logout, unsaved inputs stay mounted).
+      window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
     }
   }
 

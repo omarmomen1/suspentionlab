@@ -32,6 +32,14 @@ import { useWorkspace } from "../../contexts/WorkspaceContext";
 import PlanGate from "../../components/PlanGate";
 import Plot from "../../components/sim/Plot";
 import TrackMap, { CornerInfo, GgvEnvelopeData } from "../../components/sim/TrackMap";
+import EnvelopePlot from "../../components/v2/instruments/EnvelopePlot";
+import dynamic from "next/dynamic";
+
+// The only WebGL canvas on this route; browser-only.
+const TerrainElevation3D = dynamic(() => import("../../components/v2/instruments/TerrainElevation3D"), {
+  ssr: false,
+  loading: () => <p className="text-[11px] text-zinc-500 m-0">Loading 3D view</p>,
+});
 import LapDeltaView, { LapRunData, VehicleSetupParameters } from "../../components/sim/LapDeltaView";
 import { darkLayout } from "../../components/sim/theme";
 
@@ -149,6 +157,11 @@ interface LapSimResponse {
     ride_height_front_mm?: number[];
     ride_height_rear_mm?: number[];
     pitch_deg?: number[];
+    z_m?: number[];
+    dz_ds?: number[];
+    vertical_g?: number[];
+    vertical_load_delta_n?: number[];
+    compression_mm?: number[];
   };
   ggv_envelope?: GgvEnvelopeData;
   corner_opportunities?: CornerOpportunity[];
@@ -1158,12 +1171,24 @@ const GT3_BASELINE_PROFILE: CoupledVehicleConfig = {
 
 // ─── Main ApexSim Cockpit Component ───────────────────────────────────────────
 
+/** Model limit half-axes [g] from the solver envelope. Undefined when the envelope has no data (nothing is invented). */
+function envelopeLimits(ggv?: GgvEnvelopeData): { latG?: number; accelG?: number; brakeG?: number } | null {
+  if (!ggv) return null;
+  const maxOf = (g?: number[], ms2?: number[]): number | undefined => {
+    const v = g && g.length ? g : ms2 && ms2.length ? ms2.map((a) => a / 9.81) : undefined;
+    return v ? Math.max(...v.map((x) => Math.abs(x))) : undefined;
+  };
+  return { latG: maxOf(ggv.ay_max_g, ggv.ay_max_ms2), accelG: maxOf(ggv.ax_accel_g, ggv.ax_accel_ms2), brakeG: maxOf(ggv.ax_brake_g, ggv.ax_brake_ms2) };
+}
+
 export default function LapSimPage() {
   const { fetchWithAuth } = useAuth();
 
   // 3-Tab Track Input Selector: preset (Championship), custom (Architect), csv (Telemetry)
   const [trackInputTab, setTrackInputTab] = useState<TrackInputTab>("preset");
   const [selectedCircuitId, setSelectedCircuitId] = useState<string>("spa");
+  // Opt-in Spa elevation profile (coarse official-map stations). Off by default so results do not change.
+  const [includeElevation, setIncludeElevation] = useState<boolean>(false);
 
   // Manual Vehicle Overrides Lock (Toggle: 🔒 Overrides Locked / 🔓 Auto-Preset: On)
   const [manualOverridesLocked, setManualOverridesLocked] = useState<boolean>(false);
@@ -1196,6 +1221,13 @@ export default function LapSimPage() {
   // Simulation Results & View State
   const [running, setRunning] = useState<boolean>(false);
   const [result, setResult] = useState<LapSimResponse | null>(null);
+  // Optional setup-response surface ("Compute Setup Grid"): a second, cancellable request.
+  // The core solve stays on the fast path (include_surface: false).
+  const lastPayloadRef = useRef<Record<string, any> | null>(null);
+  const runSeqRef = useRef(0);
+  const surfaceAbortRef = useRef<AbortController | null>(null);
+  const [surfaceBusy, setSurfaceBusy] = useState<boolean>(false);
+  const [surfaceMsg, setSurfaceMsg] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hoverDist, setHoverDist] = useState<number | null>(null);
 
@@ -1449,6 +1481,8 @@ export default function LapSimPage() {
         },
       };
 
+      if (includeElevation && selectedCircuitId === "spa") payload.with_elevation = true;
+
       if (currentTab === "custom") {
         payload.segments = architectSegments.map((s) => ({
           type: s.type,
@@ -1470,6 +1504,13 @@ export default function LapSimPage() {
         payload.track_coordinates = { x: trackX, y: trackY };
         payload.sector_boundaries = sectorBounds;
       }
+
+      // A new core solve invalidates any surface request still in flight.
+      surfaceAbortRef.current?.abort();
+      runSeqRef.current += 1;
+      lastPayloadRef.current = { ...payload, include_surface: false };
+      setSurfaceBusy(false);
+      setSurfaceMsg(null);
 
       const res = await fetchWithAuth("/api/v1/lap-sim/simulate", {
         method: "POST",
@@ -1542,6 +1583,11 @@ export default function LapSimPage() {
           ride_height_front_mm: raw.trace?.ride_height_front_mm ?? raw.telemetry?.ride_height_front_mm,
           ride_height_rear_mm: raw.trace?.ride_height_rear_mm ?? raw.telemetry?.ride_height_rear_mm,
           pitch_deg: raw.trace?.pitch_deg ?? raw.telemetry?.pitch_deg,
+          z_m: raw.trace?.z_m ?? raw.telemetry?.z_m,
+          dz_ds: raw.trace?.dz_ds ?? raw.telemetry?.dz_ds,
+          vertical_g: raw.trace?.vertical_g ?? raw.telemetry?.vertical_g,
+          vertical_load_delta_n: raw.trace?.vertical_load_delta_n ?? raw.telemetry?.vertical_load_delta_n,
+          compression_mm: raw.trace?.compression_mm ?? raw.telemetry?.compression_mm,
         },
         ggv_envelope: raw.ggv_envelope ?? raw.ggv,
         corner_opportunities: raw.corner_opportunities,
@@ -1630,6 +1676,52 @@ export default function LapSimPage() {
       setRunning(false);
     }
   };
+
+  const cancelSurface = () => {
+    surfaceAbortRef.current?.abort();
+  };
+
+  const computeSurface = async () => {
+    const base = lastPayloadRef.current;
+    if (!base || surfaceBusy) return;
+    const seq = runSeqRef.current;
+    const ctrl = new AbortController();
+    surfaceAbortRef.current = ctrl;
+    setSurfaceBusy(true);
+    setSurfaceMsg(null);
+    try {
+      const res = await fetchWithAuth("/api/v1/lap-sim/simulate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...base, include_surface: true }),
+        signal: ctrl.signal,
+      });
+      if (!res.ok) {
+        let detail: unknown = null;
+        try { detail = await res.json(); } catch { /* non-JSON error body */ }
+        throw detail ?? new Error(`Surface request failed (${res.status})`);
+      }
+      const raw = await res.json();
+      if (seq !== runSeqRef.current) return; // inputs changed while the surface was computing: discard
+      const surface = raw.setup_surface ?? raw.telemetry?.setup_surface;
+      if (!surface) {
+        setSurfaceMsg("The solver returned no surface for this input.");
+        return;
+      }
+      setResult((prev) => (prev ? { ...prev, setup_surface: surface } : prev));
+    } catch (e: any) {
+      if (e?.name === "AbortError") {
+        setSurfaceMsg("Surface computation cancelled.");
+      } else {
+        setSurfaceMsg(formatApiError(e, "Surface computation failed"));
+      }
+    } finally {
+      if (seq === runSeqRef.current) setSurfaceBusy(false);
+      if (surfaceAbortRef.current === ctrl) surfaceAbortRef.current = null;
+    }
+  };
+
+  useEffect(() => () => surfaceAbortRef.current?.abort(), []);
 
   const tabMountedRef = useRef(false);
   useEffect(() => {
@@ -2511,13 +2603,40 @@ export default function LapSimPage() {
                           useResizeHandler
                         />
                       ) : (
-                        <div className="h-full flex items-center justify-center text-xs text-zinc-500 font-mono">
-                          Simulating setup response grid...
+                        <div data-testid="surface-compute" className="h-full flex flex-col items-center justify-center gap-2 px-4 text-center text-xs text-zinc-400 font-mono">
+                          <p>Setup-response surface (front ARB x aero balance) is not computed on the fast solve.</p>
+                          <p className="text-[10px] text-zinc-600">The backend notes it takes roughly 21-51 s instead of 0.5-1.5 s.</p>
+                          {surfaceBusy ? (
+                            <button type="button" onClick={cancelSurface} className="rounded border border-hairline px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/[0.06]">
+                              Cancel
+                            </button>
+                          ) : (
+                            <button type="button" onClick={computeSurface} className="rounded border border-signal bg-signal px-3 py-1.5 text-xs font-bold text-carbon hover:bg-[#d6f56e]">
+                              Compute Setup Grid (21–51 s)
+                            </button>
+                          )}
+                          {surfaceBusy && <p className="text-[10px] text-zinc-500">Computing the surface...</p>}
+                          {surfaceMsg && <p role="status" className="text-[10px] text-warning">{surfaceMsg}</p>}
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
+
+                <EnvelopePlot
+                  latG={result.trace.lat_g}
+                  longG={result.trace.long_g}
+                  limits={envelopeLimits(result.ggv_envelope)}
+                />
+
+                <section data-testid="terrain-section" className="border border-white/10 bg-[#13181D] p-3 flex flex-col gap-2">
+                  <label className="flex items-center gap-2 text-xs text-zinc-300">
+                    <input type="checkbox" checked={includeElevation} disabled={selectedCircuitId !== "spa"} onChange={(e) => setIncludeElevation(e.target.checked)} />
+                    Include Elevation (Spa)
+                    <span className="text-[10px] text-zinc-500">{selectedCircuitId !== "spa" ? "Only Spa has elevation data. Other circuits stay flat (z = 0)." : "Applies on the next run. Also changes the grade term, so lap time changes."}</span>
+                  </label>
+                  <TerrainElevation3D trace={result.trace as any} />
+                </section>
 
                 {/* LapDeltaView (Setup A vs Setup B comparison) */}
                 <LapDeltaView
@@ -2533,7 +2652,10 @@ export default function LapSimPage() {
                   }}
                   setupAParams={pinnedBaseline?.cfg as any}
                   setupBParams={cfg as any}
+                  whyChainFetcher={fetchWithAuth as any}
+                  whyChainTrack={selectedCircuitId === "fsae_michigan" ? "fsae_endurance" : selectedCircuitId}
                   onPinBaseline={handlePinBaseline}
+                  corners={trackInputTab === "preset" ? activeCircuit.corners.map((c) => ({ name: c.name, distM: c.distM })) : undefined}
                   onResetToBaseline={() => {
                     if (!pinnedBaseline) return;
                     const c = { ...pinnedBaseline.cfg };

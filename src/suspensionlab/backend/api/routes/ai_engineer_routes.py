@@ -38,8 +38,11 @@ import httpx
 
 from suspensionlab.physics.quarter_car import QuarterCarParams, RoadProfile, run_quarter_car_analysis
 from suspensionlab.physics.model_validity import assess_quarter_car
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from suspensionlab.backend.security.auth import verify_api_key, UserContext
 from suspensionlab.backend.security.audit import log_audit_event
+from suspensionlab.backend.database.core import get_db_dependency
 from suspensionlab.physics.ai_engineering_authority import (
     AIEngineeringToolRegistry,
     EngineeringAnswerProvenance,
@@ -377,8 +380,10 @@ PARAM_VARIATIONS = {
     "k_t": [0.85, 0.925, 1.0, 1.075, 1.15],
 }
 
+from suspensionlab.physics.pareto_optimizer import DEFAULT_MAX_SUSP_TRAVEL_MM
+
 CONSTRAINTS = {
-    "peak_susp_travel_max": 0.08,
+    "peak_susp_travel_max": DEFAULT_MAX_SUSP_TRAVEL_MM / 1000.0,
     "zeta_s_range": (0.15, 0.60),
 }
 
@@ -1885,11 +1890,14 @@ Respond with ONLY JSON:
 async def approve_ai_decision(
     req: ApprovalGateRequest,
     user: UserContext = Depends(verify_api_key),
+    db: AsyncSession = Depends(get_db_dependency),
 ):
     """
     Mandatory Human Governance Approval Gate.
     The AI is strictly prohibited from autonomously signing off validation or approving decisions.
     Requires explicit human authorization from an authorized engineering role.
+    Every approval is written to the append-only, server-signed, SHA-256
+    hash-chained audit log, tied to the verified server-side user/org/role.
     """
     try:
         res = AIEngineeringToolRegistry.approve_decision_with_gate(
@@ -1899,7 +1907,39 @@ async def approve_ai_decision(
             autonomous_request=req.autonomous_request,
             user_context=user,
         )
+        # Wave 6: append-only hash-chained audit record, server-side identity only.
+        from suspensionlab.backend.security.audit import record_audit_event
+        # approve_decision_with_gate returns approver_name / approver_role /
+        # hmac_signature / approved_at at the TOP LEVEL of the result.
+        gate_data = res.get("data") if isinstance(res, dict) and isinstance(res.get("data"), dict) else (res if isinstance(res, dict) else {})
+        _org_id = getattr(user, "organization_id", None) or getattr(user, "org_id", None)
+        try:
+            await record_audit_event(
+                db,
+                event_type="ai.decision.approved",
+                user_id=str(getattr(user, "user_id", "")),
+                team_id=str(getattr(user, "team_id", None)) if getattr(user, "team_id", None) else None,
+                organization_id=str(_org_id) if _org_id else None,
+                artifact_id=f"APPROVAL-{req.decision_id}",
+                metadata={
+                    "decision_id": req.decision_id,
+                    "decision_type": getattr(req, "decision_type", None),
+                    "approver_name": gate_data.get("approver_name"),
+                    "approver_role": gate_data.get("approver_role"),
+                    "hmac_signature": gate_data.get("hmac_signature"),
+                    "approved_at": gate_data.get("approved_at"),
+                    "human_governance_verified": gate_data.get("human_governance_verified", True),
+                },
+            )
+        except Exception as audit_exc:
+            logger.exception("Audit write failed during /ai/approve (failing closed): %s", audit_exc)
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Approval could not be recorded in the audit log; approval not completed.",
+            )
         return res
+    except HTTPException:
+        raise
     except RBACPermissionDenied as exc:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     except Exception as exc:

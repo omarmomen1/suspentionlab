@@ -20,6 +20,16 @@
   --color-ansys-border: rgba(255, 255, 255, 0.08);
   --color-ansys-ink: #090A0F;
 
+  /* ── V2 dark instrument tokens (Phase 1): flat fills, 1px hairlines, no gradients/glass/glow ── */
+  --color-carbon: #0C0F12;
+  --color-panel: #13181D;
+  --color-signal: #C8F04B;
+  --color-verified: #4AD991;
+  --color-warning: #FFB84D;
+  --color-fault: #FF5C5C;
+  --color-measured: #57C8DC;
+  --color-hairline: rgba(255, 255, 255, 0.10);
+  --font-display: var(--font-archivo), 'Archivo', var(--font-inter), system-ui, sans-serif;
   --color-black: #090B10;
 
   /* Primary Yellow / Amber Accent Remap */
@@ -584,3 +594,7 @@
     }
   }
 }
+
+/* V2 helpers: hairline borders and tabular numerals for telemetry readouts. */
+.v2-hairline { border: 1px solid var(--color-hairline); }
+.v2-num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }

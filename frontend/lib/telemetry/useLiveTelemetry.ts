@@ -90,8 +90,11 @@ export function useLiveTelemetry(token: string | null) {
 
     const wsProtocol = API_BASE.startsWith("https") ? "wss:" : "ws:";
     const host = API_BASE.replace(/^https?:\/\//, "");
-    const authToken = token || "demo";
-    const wsUrl = `${wsProtocol}//${host}/api/v1/telemetry/live?token=${encodeURIComponent(authToken)}&session_id=sess-live&format=binary`;
+    // Wave 6 cookie-only auth: when no explicit token is supplied, omit the
+    // query param so the backend authenticates via the HttpOnly sl_token
+    // cookie (sent automatically on same-origin WebSocket handshakes).
+    const tokenParam = token ? `&token=${encodeURIComponent(token)}` : "";
+    const wsUrl = `${wsProtocol}//${host}/api/v1/telemetry/live?session_id=sess-live&format=binary${tokenParam}`;
 
     try {
       const ws = new WebSocket(wsUrl);
@@ -251,7 +254,7 @@ export function useLiveTelemetry(token: string | null) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: token ? `Bearer ${token}` : "",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({ session_id: "sess-live" }),
         });
@@ -268,7 +271,7 @@ export function useLiveTelemetry(token: string | null) {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: token ? `Bearer ${token}` : "",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: JSON.stringify({
           dataset: "sample_data/motec_spa_session.csv",

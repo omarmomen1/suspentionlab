@@ -113,7 +113,7 @@ async def websocket_telemetry_endpoint(
         except (WebSocketDisconnect, asyncio.CancelledError):
             pass
         except Exception as e:
-            logger.debug("Telemetry sender exception: %s", e)
+            logger.warning("Telemetry sender exception (org=%s session=%s): %s", user_org_id, session_id, e)
 
     async def receiver_loop():
         try:
@@ -125,17 +125,42 @@ async def websocket_telemetry_endpoint(
                 if "text" in msg and msg["text"]:
                     try:
                         data = json.loads(msg["text"])
-                    except Exception:
+                    except Exception as json_exc:
+                        # Wave 6: never silently swallow DAQ rejections
+                        count = subscriber.count_rejection("invalid_json")
+                        logger.warning(
+                            "Telemetry DAQ rejection (invalid_json) org=%s session=%s count=%d: %s",
+                            user_org_id, session_id, count, json_exc,
+                        )
+                        await websocket.send_json({
+                            "type": "error",
+                            "reason": "invalid_json",
+                            "detail": "Frame rejected: not valid JSON.",
+                            "rejection_count": count,
+                        })
                         continue
 
                     if data.get("type") == "ping":
                         subscriber.last_heartbeat = time.time()
                         await websocket.send_json({"type": "pong", "ts": time.time()})
                     elif "speed_ms" in data or "channels" in data:
-                        processed = gateway.validate_and_process(
-                            data, org_id=user_org_id, session_id=session_id
-                        )
-                        await global_telemetry_hub.broadcast_frame(processed)
+                        try:
+                            processed = gateway.validate_and_process(
+                                data, org_id=user_org_id, session_id=session_id
+                            )
+                            await global_telemetry_hub.broadcast_frame(processed)
+                        except Exception as val_exc:
+                            count = subscriber.count_rejection("validation_failed")
+                            logger.warning(
+                                "Telemetry DAQ rejection (validation_failed) org=%s session=%s count=%d: %s",
+                                user_org_id, session_id, count, val_exc,
+                            )
+                            await websocket.send_json({
+                                "type": "error",
+                                "reason": "validation_failed",
+                                "detail": str(val_exc)[:200],
+                                "rejection_count": count,
+                            })
 
                 elif "bytes" in msg and msg["bytes"]:
                     raw_bytes = msg["bytes"]
@@ -147,11 +172,21 @@ async def websocket_telemetry_endpoint(
                             )
                             await global_telemetry_hub.broadcast_frame(processed)
                         except Exception as exc:
-                            logger.debug("Failed unpacking binary frame from DAQ client: %s", exc)
+                            count = subscriber.count_rejection("bad_binary_frame")
+                            logger.warning(
+                                "Telemetry DAQ rejection (bad_binary_frame) org=%s session=%s count=%d: %s",
+                                user_org_id, session_id, count, exc,
+                            )
+                            await websocket.send_json({
+                                "type": "error",
+                                "reason": "bad_binary_frame",
+                                "detail": "Binary SLTP frame could not be unpacked or failed validation.",
+                                "rejection_count": count,
+                            })
         except (WebSocketDisconnect, asyncio.CancelledError):
             pass
         except Exception as e:
-            logger.debug("Telemetry receiver exception: %s", e)
+            logger.warning("Telemetry receiver exception (org=%s session=%s): %s", user_org_id, session_id, e)
 
     sender_task = asyncio.create_task(sender_loop())
     receiver_task = asyncio.create_task(receiver_loop())
@@ -274,10 +309,82 @@ async def get_replay_status(session_id: str = "sess-live"):
 
 @router.get("/stats")
 async def get_telemetry_stats(session_id: str = "sess-live"):
-    """Get streaming hub and ingestion gateway statistics."""
+    """Get streaming hub and ingestion gateway statistics (incl. structured rejection counts)."""
     return {
         "hub": global_telemetry_hub.get_stats(),
         "gateway": gateway.get_stats(session_id),
+    }
+
+
+_REFERENCE_CSV_TEMPLATE = (
+    "time,speed,throttle,brake,steering,vert_g,lat_g,long_g,susp_fl,susp_fr,susp_rl,susp_rr\n"
+    "0.00,0.0,0.0,0.0,0.0,0.00,0.00,0.00,0.0,0.0,0.0,0.0\n"
+    "0.01,0.1,0.0,0.0,0.0,0.01,0.00,0.01,0.1,0.1,0.1,0.1\n"
+)
+
+
+@router.get("/csv-template")
+async def download_reference_csv_template():
+    """Downloadable reference CSV template for telemetry uploads (Wave 6 §2)."""
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(
+        _REFERENCE_CSV_TEMPLATE,
+        media_type="text/csv",
+        headers={"Content-Disposition": 'attachment; filename="suspensionlab_telemetry_template.csv"'},
+    )
+
+
+@router.post(
+    "/channel-map-preview",
+    dependencies=[
+        Depends(require_permission(Permission.TELEMETRY_READ)),
+        Depends(RateLimiter("rate_limit_simulate")),
+    ],
+)
+async def channel_map_preview(
+    file: UploadFile = File(..., description="Telemetry CSV (MoTeC, AiM, generic)"),
+):
+    """Channel auto-mapping PREVIEW for MoTeC/AiM CSVs (Wave 6 §2).
+
+    Runs only the channel-identification stage: returns the detected channel
+    mapping, inferred units, per-channel confidence, and the list of unmapped
+    columns, WITHOUT running correlation or any heavy analysis.
+    """
+    content_bytes = await file.read(50 * 1024 * 1024)
+    csv_content = content_bytes.decode("utf-8", errors="replace")
+
+    # Extract the header line (first non-comment line with commas)
+    headers: list[str] = []
+    for line in csv_content.splitlines():
+        line = line.strip()
+        if not line or line.startswith(("#", "//", '"')):
+            continue
+        if "," in line:
+            headers = [h.strip() for h in line.split(",")]
+            break
+
+    if not headers:
+        raise HTTPException(status_code=400, detail="No CSV header row found in the uploaded file.")
+
+    from suspensionlab.physics.telemetry_parser import identify_channels
+    identified = identify_channels(headers)
+    mapped_raw = {info.raw_name for info in identified.values()}
+    unmapped = [h for h in headers if h not in mapped_raw and h]
+
+    return {
+        "columns": headers,
+        "channel_map": {
+            std_key: {
+                "raw_name": info.raw_name,
+                "column_index": info.column_index,
+                "inferred_unit": info.inferred_unit,
+                "confidence": info.confidence,
+            }
+            for std_key, info in identified.items()
+        },
+        "unmapped_columns": unmapped,
+        "n_mapped": len(identified),
+        "n_unmapped": len(unmapped),
     }
 
 

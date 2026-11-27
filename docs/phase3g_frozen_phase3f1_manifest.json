@@ -40,5 +40,14 @@
       "src/suspensionlab/physics/kinematics.py": "f1da154d9f837f362b65372b297fc30218bff6c884d11e21e3a23a1a5009b30b",
       "src/suspensionlab/physics/quarter_car.py": "12706a5f3289a8e9f5619b0d6db2dc0a194d919b27fd11fa870e27c6bb166503"
     }
+  },
+  "v2_phase3_recertification": {
+    "cycle": "V2_PHASE_3_PHYSICS_ENGINES",
+    "timestamp_iso": "2026-11-26T21:03:30.988351+00:00",
+    "reason": "kinematics.py changed in V2 Phase 3 (optional rack_travel_mm; 2-D bump/steer grid solver). Registry hash before this cycle preserved below.",
+    "previous_hashes": {
+      "src/suspensionlab/physics/kinematics.py": "019bb67fca0baae62df77ab1a6c2a947de04a067e31043554931eb27d314d0a5"
+    },
+    "commit": "V2_PHASE_3_PHYSICS_ENGINES"
   }
 }

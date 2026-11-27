@@ -4,7 +4,7 @@ from suspensionlab.backend.database.models.user import User
 from suspensionlab.backend.database.models.team import Team
 from suspensionlab.backend.database.models.scim_group import SCIMGroup, scim_group_members
 from suspensionlab.backend.database.models.job import JobRecord
-from suspensionlab.backend.database.models.profile import VehicleProfile
+from suspensionlab.backend.database.models.profile import VehicleProfile, ProfileRevision
 from suspensionlab.backend.database.models.session import SimSession, SessionComment
 from suspensionlab.backend.database.models.audit import AuditLog, EngineeringAuditLog, AuditOutbox
 from suspensionlab.backend.database.models.user_api_key import UserApiKey

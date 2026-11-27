@@ -1,0 +1,122 @@
+{
+  "schema_version": 2,
+  "generated_by": "scripts/generate_benchmark_status.py",
+  "git_sha": "88431db9207bf2a8c4fe02ccb456aa2aaef7a5e5",
+  "generated_at": "2026-11-26T18:25:29+00:00",
+  "pytest_exit_code": 0,
+  "scope_note": "Solver self-consistency benchmarks against exact analytical references. Not a validation against measured vehicle data.",
+  "benchmarks": [
+    {
+      "id": "B-01",
+      "name": "Quarter-car eigenanalysis",
+      "description": "Solver vs exact coupled 2-DOF characteristic roots. The uncoupled sqrt(k_w/m_s)/2pi value is reported separately as an approximation.",
+      "verdict": "PASS",
+      "checks": [
+        {
+          "test": "test_b01_solver_matches_exact_coupled_characteristic_roots",
+          "verdict": "PASS",
+          "measured": {
+            "body_delta_pct": 0.0,
+            "exact_coupled_body_hz": 1.2001,
+            "exact_coupled_hop_hz": 12.38,
+            "hop_delta_pct": 0.0,
+            "solver_body_hz": 1.2001,
+            "solver_hop_hz": 12.38,
+            "uncoupled_sqrt_kw_over_ms_hz": 1.2349
+          },
+          "tolerance": {
+            "coupled_delta_pct": 0.5
+          },
+          "reference": "Roots of the coupled 2-DOF characteristic polynomial (exact). Uncoupled sqrt(k_w/m_s)/2pi is an approximation that neglects tire stiffness and unsprung mass."
+        }
+      ]
+    },
+    {
+      "id": "B-02",
+      "name": "Damper cycle energy",
+      "description": "Linear c_eff = c and bilinear (c_c + c_r)/2 through the Wave 5A phase integral.",
+      "verdict": "PASS",
+      "checks": [
+        {
+          "test": "test_b02_bilinear_damper_c_eff_is_mean_of_slopes",
+          "verdict": "PASS",
+          "measured": {
+            "c_eff": 2249.9991,
+            "expected_mean": 2250.0,
+            "rel_err": 3.921631559933303e-07
+          },
+          "tolerance": {
+            "rel": 0.001
+          },
+          "reference": "Exact: (c_c + c_r)/2 from the half-cycle energy split"
+        },
+        {
+          "test": "test_b02_linear_damper_c_eff_equals_c",
+          "verdict": "PASS",
+          "measured": {
+            "c": 2000.0,
+            "c_eff": 1999.9994,
+            "rel_err": 2.941223668813109e-07
+          },
+          "tolerance": {
+            "rel": 0.001
+          },
+          "reference": "Exact: W = c*pi*v_peak^2 per cycle"
+        }
+      ]
+    },
+    {
+      "id": "B-03",
+      "name": "Tire cornering sign",
+      "description": "Standard .tir with PKY1 = -15.0 gives positive cornering stiffness. Calspan TTC fit is IN_PROGRESS.",
+      "verdict": "PASS",
+      "checks": [
+        {
+          "test": "test_b03_negative_pky1_gives_positive_stiffness_and_about_pdy1_g",
+          "verdict": "PASS",
+          "measured": {
+            "cornering_stiffness_n_per_rad": 54269.9,
+            "peak_grip_g": 1.0,
+            "pky1": -15.0
+          },
+          "tolerance": {
+            "expected_peak_grip_g": 1.0,
+            "peak_grip_g": [
+              0.98,
+              1.02
+            ]
+          },
+          "reference": "Wave 5A abs(PKY1) fix. Peak grip is the model output for this synthetic .tir, not a measurement."
+        }
+      ],
+      "pending": {
+        "calspan_ttc_fit": "IN_PROGRESS",
+        "reason": "Needs a licensed Calspan TTC dataset; not in this repository."
+      }
+    },
+    {
+      "id": "B-04",
+      "name": "Full-car heave mode",
+      "description": "Symmetric 4-corner heave vs the exact quarter-car hand calculation, plus roll/pitch symmetry.",
+      "verdict": "PASS",
+      "checks": [
+        {
+          "test": "test_b04_symmetric_heave_mode_matches_hand_calculation",
+          "verdict": "PASS",
+          "measured": {
+            "delta_pct": 0.0,
+            "hand_calc_heave_hz": 1.4035,
+            "pitch_leakage": 1.7120509544209356e-15,
+            "roll_leakage": 8.080114175495732e-17,
+            "solver_heave_hz": 1.4035
+          },
+          "tolerance": {
+            "delta_pct": 0.5,
+            "symmetry_leakage": 1e-06
+          },
+          "reference": "Symmetric 4-corner heave equals a quarter car carrying m_s/4 (exact)."
+        }
+      ]
+    }
+  ]
+}

@@ -30,6 +30,11 @@ import {
 import { useUndoRedo } from "../../hooks/useUndoRedo";
 import { useWorkspace } from "../../contexts/WorkspaceContext";
 import PDFExport from "../../components/PDFExport";
+import EnvelopePlot from "../../components/v2/instruments/EnvelopePlot";
+import StudioShell, { ShellLeft, ShellCenter, ShellRight } from "../../components/v2/StudioShell";
+import VerdictRail from "../../components/v2/VerdictRail";
+import { verdictStatus } from "../../lib/v2/status";
+
 import DataExport from "../../components/DataExport";
 import PlanGate from "../../components/PlanGate";
 import SimHistory, { saveSimulationToHistory } from "../../components/SimHistory";
@@ -329,6 +334,9 @@ function HandlingDashboard() {
     return diagramData.points[idx];
   }, [diagramData]);
 
+  // V2 verdict. The handling model reports UNVALIDATED | PROVISIONAL | VALIDATED.
+  const verdict = verdictStatus({ isRunning, hasResults: Boolean(diagramData), validityTier: validityData?.model_validation_status ?? null });
+
   return (
     <div className="h-full flex flex-col p-5 pt-3 gap-3 min-h-0 bg-[#0a0a0c] text-white">
       {toast && (
@@ -462,9 +470,10 @@ function HandlingDashboard() {
       </div>
 
       {/* Main Workspace Layout */}
-      <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
+      <StudioShell>
         {/* Left Parameter Drawer */}
-        <div className="w-64 shrink-0 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-y-auto custom-scrollbar">
+        <ShellLeft className="lg:w-60">
+        <div className="w-full lg:w-64 lg:shrink-0 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-y-auto custom-scrollbar">
           <div className="px-4 py-3 border-b border-[#1e1e1e] sticky top-0 bg-[#0d0d0f] z-10">
             <h2 className="text-xs font-semibold text-gray-300 flex items-center gap-2">
               <Settings2 size={13} className="text-ansys-yellow" /> Vehicle Parameters
@@ -574,8 +583,10 @@ function HandlingDashboard() {
             </ParamSection>
           </div>
         </div>
+        </ShellLeft>
 
         {/* Right Dashboard Area */}
+        <ShellCenter>
         <div id="sim-report" className="flex-1 flex flex-col gap-3 min-w-0 overflow-hidden">
           {/* Top KPI Cards */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 shrink-0">
@@ -1354,8 +1365,30 @@ function HandlingDashboard() {
               </div>
             )}
           </div>
+          {diagramData?.points && diagramData.points.length > 0 && (
+            <EnvelopePlot
+              title="G-G view (steady-state cornering, longitudinal = 0)"
+              latG={diagramData.points.map((p: any) => p.ay_g)}
+              longG={diagramData.points.map(() => 0)}
+              limits={{ latG: diagramData.ay_peak_g }}
+            />
+          )}
         </div>
-      </div>
+        </ShellCenter>
+        <ShellRight>
+          <VerdictRail
+            status={verdict.status}
+            statusLabel={verdict.label}
+            heroes={[
+              { label: "Understeer gradient", value: diagramData?.kus_linear_deg_per_g, unit: "deg/G", decimals: 2 },
+              { label: "Peak lateral grip", value: diagramData?.ay_peak_g, unit: "G", decimals: 2 },
+              { label: "Limiting axle", value: diagramData?.limiting_axle },
+            ]}
+            solverVersion={provenanceData?.solver_versions?.handling_dynamics}
+            action={{ label: "Solve Handling", onClick: () => runFullAnalysis(), loading: isRunning }}
+          />
+        </ShellRight>
+      </StudioShell>
 
       {/* Model Validity Modal */}
       {showValidityModal && validityData && (

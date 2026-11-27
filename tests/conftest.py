@@ -115,7 +115,17 @@ def mock_redis():
         
         sync_mock = MagicMock()
         sync_mock.get.side_effect = lambda k: _store.get(k)
-        sync_mock.set.side_effect = lambda k, v: _store.update({k: v}) or True
+        sync_mock.ping.return_value = True
+        sync_mock.exists.side_effect = lambda *ks: sum(1 for k in ks if k in _store)
+
+        def _sync_set(k, v, nx=False, px=None, ex=None, **kw):
+            # Mirror Redis SET NX semantics: return None when NX and key exists
+            if nx and k in _store:
+                return None
+            _store[k] = v.encode() if isinstance(v, str) else v
+            return True
+
+        sync_mock.set.side_effect = _sync_set
         
         with patch("redis.asyncio.from_url", return_value=mock), \
              patch("redis.Redis.from_url", return_value=sync_mock):

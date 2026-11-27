@@ -504,6 +504,9 @@ async def simulate_lap_endpoint(
 
     KNOWN_PRESETS = {"spa", "silverstone", "monza", "fsae_endurance", "spa_francorchamps", "silverstone_gp", "autodromo_nazionale_monza", "fsae"}
     is_preset_requested = isinstance(track_arg, str) and track_arg.lower().strip() in KNOWN_PRESETS
+    # V2 Phase 3: opt-in documented elevation profile (Spa only; other circuits stay z = 0).
+    if is_preset_requested and request_data.get("with_elevation") is True:
+        track_arg = get_builtin_track(track_arg, with_elevation=True)
 
     # Backward compatibility: top-level distances and curvatures
     if not is_preset_requested and not segments_arg and not telemetry_arg and "distances" in request_data and "curvatures" in request_data:
@@ -628,6 +631,14 @@ async def simulate_lap_endpoint(
             "ride_height_rear_mm": sim_res.trace.get("ride_height_rear_mm", []),
             "pitch_deg": sim_res.trace.get("pitch_deg", []),
             "roll_deg": sim_res.trace.get("roll_deg", []),
+            "z_m": sim_res.trace.get("z_m", []),
+            "dz_ds": sim_res.trace.get("dz_ds", []),
+            "kappa_z_per_m": sim_res.trace.get("kappa_z_per_m", []),
+            "vertical_g": sim_res.trace.get("vertical_g", []),
+            "vertical_load_delta_n": sim_res.trace.get("vertical_load_delta_n", []),
+            "compression_mm": sim_res.trace.get("compression_mm", []),
+            "compression_front_mm": sim_res.trace.get("compression_front_mm", []),
+            "compression_rear_mm": sim_res.trace.get("compression_rear_mm", []),
         },
         "ggv": {
             "speeds_kmh": sim_res.ggv_envelope["speeds_kmh"],
@@ -645,6 +656,38 @@ async def simulate_lap_endpoint(
     })
 
     return response_payload
+
+
+class WhyChainRequest(BaseModel):
+    """Setup A vs B levers. Lever names are LapSimVehicleParams attributes."""
+    model_config = ConfigDict(extra="forbid")
+    setup_a: Dict[str, float]
+    setup_b: Dict[str, float]
+    track: str = "spa"
+    corner: Optional[Dict[str, float]] = None
+    base_vehicle: Optional[Dict[str, Any]] = None
+
+
+@router.post(
+    "/lap-sim/why-chain",
+    summary="Deterministic coupled QSS Why Chain (Setup A vs B)",
+)
+async def why_chain_endpoint(
+    body: WhyChainRequest,
+    user: UserContext = Depends(verify_api_key),
+    _limiter: Any = Depends(RateLimiter("rate_limit_simulate")),
+):
+    """Numbers, units and solver sources only. Unreachable links return NOT_MODELED."""
+    from suspensionlab.physics.why_chain import compute_why_chain
+    import asyncio
+    import functools
+    loop = asyncio.get_running_loop()
+    try:
+        return await loop.run_in_executor(None, functools.partial(
+            compute_why_chain, body.setup_a, body.setup_b, track=body.track,
+            corner=body.corner, base_vehicle=body.base_vehicle))
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.post("/lapsim/run")

@@ -219,6 +219,16 @@ class TrackSegment:
     y_m:           float = 0.0
     v_driver_kmh:  Optional[float] = None
     v_driver_ms:   Optional[float] = None
+    # V2 Phase 3 vertical profile. ``elevation`` is z(s) [m]; ``dz_ds`` is the slope and
+    # ``kappa_z`` = d2z/ds2 [1/m] the vertical curvature (positive in a valley = compression).
+    # All default to 0.0, which is a flat track. ``elevation_source`` says where real values came from.
+    dz_ds:         float = 0.0
+    kappa_z:       float = 0.0
+    elevation_source: str = "none"
+
+    @property
+    def z_m(self) -> float:
+        return self.elevation
 
 
 @dataclass
@@ -1189,8 +1199,31 @@ _FSAE_LANDMARKS = np.array([
     [-40.0, -30.0], [-10.0, -50.0], [20.0, -80.0], [50.0, -60.0], [30.0, -20.0], [0.0, 0.0]
 ], dtype=float)
 
-def get_builtin_track(name: str) -> List[TrackSegment]:
-    """Generate high-fidelity built-in circuits: spa, silverstone, monza, fsae_endurance."""
+def get_builtin_track(name: str, with_elevation: bool = False) -> List[TrackSegment]:
+    """Generate high-fidelity built-in circuits: spa, silverstone, monza, fsae_endurance.
+
+    ``with_elevation=True`` (opt-in, so existing results do not change) attaches a vertical
+    profile. Only Spa has real data (official circuit-map altitude stations, see
+    ``track_geometry.SPA_ELEVATION_SOURCE``); every other circuit stays at z = 0.0 with
+    ``elevation_source == "none"``: no elevation is invented for them.
+    """
+    segments = _get_builtin_track_flat(name)
+    if with_elevation and name.lower().strip() in ("spa", "spa_francorchamps", "spa-francorchamps"):
+        from suspensionlab.physics.track_geometry import (
+            SPA_ELEVATION_STATIONS_M, SPA_ELEVATION_SOURCE, elevation_profile_from_stations,
+        )
+        dist = np.array([sg.distance for sg in segments], dtype=float)
+        st = np.array(SPA_ELEVATION_STATIONS_M, dtype=float)
+        z, d1, kz = elevation_profile_from_stations(
+            dist, st[:, 0], st[:, 1], periodic=True, station_span_m=float(dist[-1]))
+        for sg, zi, di, ki in zip(segments, z, d1, kz):
+            sg.elevation, sg.dz_ds, sg.kappa_z = float(zi), float(di), float(ki)
+            sg.elevation_source = SPA_ELEVATION_SOURCE
+    return segments
+
+
+def _get_builtin_track_flat(name: str) -> List[TrackSegment]:
+    """Flat built-in circuits (z = 0)."""
     track_key = name.lower().strip()
 
     if track_key in ("spa", "spa_francorchamps", "spa-francorchamps"):
@@ -2052,6 +2085,9 @@ def simulate_lap(
     curv = np.array([abs(s.curvature) for s in track_segs], dtype=float)
     bank = np.array([s.bank_angle for s in track_segs], dtype=float)
     elev = np.array([s.elevation for s in track_segs], dtype=float)
+    # V2 Phase 3 vertical profile channels (flat track = zeros)
+    dz_ds_arr = np.array([getattr(s, "dz_ds", 0.0) for s in track_segs], dtype=float)
+    kappa_z_arr = np.array([getattr(s, "kappa_z", 0.0) for s in track_segs], dtype=float)
     surface_mu = np.array([getattr(s, "surface_mu", 1.0) for s in track_segs], dtype=float)
 
     has_uploaded_driver = any(getattr(s, "v_driver_kmh", None) is not None for s in track_segs)
@@ -2475,6 +2511,17 @@ def simulate_lap(
     rh_rear_mm = np.zeros(n)
     pitch_deg = np.zeros(n)
     bottoming_count = 0
+    # Vertical-profile load (V2 Phase 3). A point-mass car on a profile with vertical curvature
+    # kappa_z has vertical acceleration a_z = v^2 kappa_z (up in a valley, kappa_z > 0), so the
+    # normal load changes by dFz = m v^2 kappa_z (negative on a crest = unloading). The
+    # longitudinal grade effect is already handled by the grade term of the speed solver.
+    # The load acts at the CG, so each axle takes its static weight share. Flat track gives 0.
+    wdf = float(getattr(vp, "weight_dist_f", getattr(vp, "weight_dist_front", 0.48)))
+    v_for_vert = np.asarray(v_sol, dtype=float)
+    vertical_dfz_n = mass * v_for_vert ** 2 * kappa_z_arr
+    vertical_g = vertical_dfz_n / (mass * 9.81)
+    compression_front_mm = np.zeros(n)
+    compression_rear_mm = np.zeros(n)
 
     for i in range(n):
         ax_val = long_g[i] * 9.81
@@ -2490,7 +2537,7 @@ def simulate_lap(
 
         max_lin_deflec_f = max(0.0, (static_rh_f - bump_engagement_rh) / 1000.0)
         f_lin_cap_f = 2.0 * max(k_wf, 1000.0) * max_lin_deflec_f
-        f_net_f = fz_aero_f - dFz_long
+        f_net_f = fz_aero_f - dFz_long + vertical_dfz_n[i] * wdf
         if f_net_f > f_lin_cap_f:
             deflec_f_mm = (max_lin_deflec_f + (f_net_f - f_lin_cap_f) / (2.0 * (k_wf + k_bump))) * 1000.0
         else:
@@ -2498,7 +2545,7 @@ def simulate_lap(
 
         max_lin_deflec_r = max(0.0, (static_rh_r - bump_engagement_rh) / 1000.0)
         f_lin_cap_r = 2.0 * max(k_wr, 1000.0) * max_lin_deflec_r
-        f_net_r = fz_aero_r + dFz_long
+        f_net_r = fz_aero_r + dFz_long + vertical_dfz_n[i] * (1.0 - wdf)
         if f_net_r > f_lin_cap_r:
             deflec_r_mm = (max_lin_deflec_r + (f_net_r - f_lin_cap_r) / (2.0 * (k_wr + k_bump))) * 1000.0
         else:
@@ -2513,6 +2560,8 @@ def simulate_lap(
 
         rh_front_mm[i] = rh_f
         rh_rear_mm[i] = rh_r
+        compression_front_mm[i] = static_rh_f - rh_f
+        compression_rear_mm[i] = static_rh_r - rh_r
 
         pitch_rad = math.atan2((rh_r - rh_f) / 1000.0, wb)
         pitch_deg[i] = math.degrees(pitch_rad)
@@ -2600,6 +2649,16 @@ def simulate_lap(
         "ride_height_rear_mm": [round(float(rh), 2) for rh in rh_rear_mm],
         "pitch_deg": [round(float(p), 3) for p in pitch_deg],
         "roll_deg": [round(float(r), 3) for r in roll_deg],
+        # V2 Phase 3 vertical channels. z_m is the track elevation (0.0 when none was supplied);
+        # compression is static ride height minus dynamic ride height at each axle.
+        "z_m": [round(float(z), 3) for z in elev],
+        "dz_ds": [round(float(g), 5) for g in dz_ds_arr],
+        "kappa_z_per_m": [float(k) for k in kappa_z_arr],
+        "vertical_g": [round(float(g), 5) for g in vertical_g],
+        "vertical_load_delta_n": [round(float(f), 1) for f in vertical_dfz_n],
+        "compression_front_mm": [round(float(c), 3) for c in compression_front_mm],
+        "compression_rear_mm": [round(float(c), 3) for c in compression_rear_mm],
+        "compression_mm": [round(float(0.5 * (a + b)), 3) for a, b in zip(compression_front_mm, compression_rear_mm)],
     }
 
     # Lateral Load Transfer Distribution (LLTD) front percentage

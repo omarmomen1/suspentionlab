@@ -2,7 +2,7 @@
 // Full Car Page
 
 "use client";
-import { useState, useRef, Suspense, useMemo, useEffect } from "react";
+import { useState, useRef, Suspense, useMemo, useEffect, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { useJobPolling } from "../../hooks/useJobPolling";
@@ -17,19 +17,36 @@ import {
 import NextStepLink from "../../components/NextStepLink";
 import { formatApiError } from "../../lib/api_client";
 import { useUndoRedo } from "../../hooks/useUndoRedo";
-import PDFExport from "../../components/PDFExport";
+import PDFExport, { type PinnedLedgerRow } from "../../components/PDFExport";
+import type { LedgerRow } from "../../components/v2/instruments/LedgerTable";
+import { fullCarLedgerRows } from "../../lib/v2/ledgers";
+import StudioShell, { ShellLeft, ShellCenter, ShellRight } from "../../components/v2/StudioShell";
+import VerdictRail from "../../components/v2/VerdictRail";
+import LedgerDock from "../../components/v2/instruments/LedgerDock";
+import { verdictStatus } from "../../lib/v2/status";
+import { toPinnedPdfRows } from "../../lib/v2/ledgers";
+
 import DataExport from "../../components/DataExport";
 import PlanGate from "../../components/PlanGate";
 import ComparePanel from "../../components/ComparePanel";
 import SimHistory, { saveSimulationToHistory } from "../../components/SimHistory";
 import { useAuth } from "../../contexts/AuthContext";
 
-import ModelValidity, { ValidityReport } from "../../components/ModelValidity";
+import ModelValidity, { ValidityReport, resolveValidityTier } from "../../components/ModelValidity";
 import Plot from "../../components/sim/Plot";
 import KPICard from "../../components/sim/KPICard";
 import PlotBox from "../../components/sim/PlotBox";
 import { darkLayout, DARK_BASE } from "../../components/sim/theme";
 import { maxOf, minOf } from "../../lib/array";
+import EmptyState from "../../components/v2/EmptyState";
+import FourFootprintsSVG from "../../components/v2/instruments/FourFootprintsSVG";
+import type { FullCarLoadParams } from "../../lib/v2/phase4";
+
+// One WebGL canvas on this route, loaded only in the browser.
+const AttitudeModel3D = dynamic(() => import("../../components/v2/instruments/AttitudeModel3D"), {
+  ssr: false,
+  loading: () => <p className="text-[11px] text-[#8a909a] m-0">Loading 3D view</p>,
+});
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -38,6 +55,7 @@ const TABS = [
   { label: "Pitch & Roll",      icon: GitBranch   },
   { label: "Load Transfer",     icon: BarChart3   },
   { label: "PSD Analysis",      icon: Crosshair   },
+  { label: "Footprints & Attitude", icon: GitBranch },
 ];
 
 // ─── Plotly dark-theme base ──────────────────────────────────────────────────
@@ -187,6 +205,9 @@ function FullCarDashboard() {
   const [simError, setSimError] = useState<string | null>(null);
   const [validity, setValidity] = useState<ValidityReport | null>(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [scrubIdx, setScrubIdx] = useState(0);
+  // Load-relevant parameters of the run that produced the current results (k_t is the value the payload sends).
+  const runLoadParamsRef = useRef<FullCarLoadParams | null>(null);
   const [toast,     setToast]     = useState<Toast | null>(null);
 
   const [params, setParams, { undo, redo, reset, canUndo, canRedo }] = useUndoRedo({
@@ -214,6 +235,7 @@ function FullCarDashboard() {
   const buildPayload = () => {
     const b = params.L * (params.weight_dist / 100.0);
     const a = params.L - b;
+    runLoadParamsRef.current = { m_s: params.m_s, m_uf: params.m_uf, m_ur: params.m_ur, a, b, k_tf: 250000.0, k_tr: 250000.0 };
     return {
       params: { m_s: params.m_s, I_x: params.I_x, I_y: params.I_y, m_uf: params.m_uf, m_ur: params.m_ur, k_sf: params.k_sf, k_sr: params.k_sr, c_f: params.c_f, c_r: params.c_r, k_arb_f: params.k_arb_f, k_arb_r: params.k_arb_r, k_tf: 250000.0, k_tr: 250000.0, L: params.L, a: a, b: b, tw_f: params.tw_f, tw_r: params.tw_r, speed_mps: params.speed_kph / 3.6, c_tf: 0.0, c_tr: 0.0 },
       profile: { profile_type: "step", amplitude: params.p_amp, frequency: 2.0, duration: 5.0 },
@@ -339,6 +361,17 @@ function FullCarDashboard() {
   );
   const r = activeResult;
 
+  // V2 verdict, ledger and pinned PDF rows.
+  const verdict = verdictStatus({ isRunning, error: simError, hasResults, validityTier: validity ? resolveValidityTier(validity) : null });
+  const ledgerSource = (r as any)?.run_id ? `solver run ${(r as any).run_id}` : "this session's solver run";
+  const ledgerRows = useMemo(
+    () => (hasResults ? fullCarLedgerRows(r as any, params as any, verdict.status, ledgerSource) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hasResults, r, params, verdict.status, ledgerSource],
+  );
+  const [pinnedPdfRows, setPinnedPdfRows] = useState<PinnedLedgerRow[]>([]);
+  const handlePinned = useCallback((rows: LedgerRow[]) => setPinnedPdfRows(toPinnedPdfRows(rows)), []);
+
   return (
     <div className="h-full flex flex-col p-5 pt-3 gap-3 min-h-0">
       {toast && (
@@ -391,7 +424,7 @@ function FullCarDashboard() {
           <button onClick={saveProfile} disabled={isSaving} className="px-3 py-1.5 bg-[#141416] border border-[#252525] hover:bg-[#1e1e20] rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40">
             <Save size={13} className="text-ansys-yellow" /> Save Setup
           </button>
-          <PDFExport captureId="sim-report" fileName={`FCar_${params.m_s}`} />
+          <PDFExport captureId="sim-report" fileName={`FCar_${params.m_s}`} pinnedRows={pinnedPdfRows} />
           <DataExport results={results} fileName={`FCar_${params.m_s}`} />
 
           <button id="btn-run" onClick={runSimulation} disabled={isRunning}
@@ -410,8 +443,9 @@ function FullCarDashboard() {
           : ""}
       </div>
 
-      <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
-        <div className="w-60 shrink-0 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-y-auto custom-scrollbar">
+      <StudioShell>
+        <ShellLeft className="lg:w-60">
+        <div className="w-full lg:w-60 lg:shrink-0 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-y-auto custom-scrollbar">
           <div className="px-4 py-3 border-b border-[#1e1e1e] sticky top-0 bg-[#0d0d0f] z-10"><h2 className="text-xs font-semibold text-gray-300 flex items-center gap-2"><Settings2 size={13} className="text-ansys-yellow" /> Parameters</h2></div>
           <div className="p-4 space-y-5">
             <div className="space-y-1.5">
@@ -464,7 +498,9 @@ function FullCarDashboard() {
             </ParamSection>
           </div>
         </div>
+        </ShellLeft>
 
+        <ShellCenter>
         <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-hidden">
           {!results && !isRunning && (
             <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl flex flex-col items-center justify-center gap-4">
@@ -672,11 +708,49 @@ function FullCarDashboard() {
                     </PlotBox>
                   </div>
                 )}
+                {/* ── TAB 4: FOOTPRINTS & ATTITUDE ── */}
+                {activeTab === 4 && (() => {
+                  const n = Array.isArray(r.time) ? r.time.length : 0;
+                  const idx = Math.min(scrubIdx, Math.max(0, n - 1));
+                  const lp = runLoadParamsRef.current;
+                  return (
+                    <div className="h-full overflow-y-auto p-4 flex flex-col gap-4" data-testid="footprints-attitude-tab">
+                      <label className="text-[11px] text-[#8a909a] flex items-center gap-3">
+                        Time
+                        <input type="range" min={0} max={Math.max(0, n - 1)} value={idx} onChange={(e) => setScrubIdx(Number(e.target.value))} aria-label="Scrub time index" className="flex-1" />
+                        <span className="font-mono text-[#cfd3da]">{Array.isArray(r.time) && typeof r.time[idx] === "number" ? `${r.time[idx].toFixed(3)} s` : "n/a"}</span>
+                      </label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="hidden lg:block">
+                          {lp ? <FourFootprintsSVG result={r as any} params={lp} index={idx} /> : <EmptyState kind="unavailable" reason="Tire loads need a run in this session." />}
+                        </div>
+                        <AttitudeModel3D result={r as any} index={idx} loadParams={lp} />
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           )}
+          {hasResults && r && <LedgerDock rows={ledgerRows} caption="Full-car ledger" onPinnedChange={handlePinned} />}
         </div>
-      </div>
+        </ShellCenter>
+        <ShellRight>
+          <VerdictRail
+            status={verdict.status}
+            statusLabel={verdict.label}
+            heroes={[
+              { label: "Heave ƒₙ", value: hasResults ? (r as any)?.f_n_heave : null, unit: "Hz", decimals: 2 },
+              { label: "Roll ƒₙ", value: hasResults ? (r as any)?.f_n_roll : null, unit: "Hz", decimals: 2 },
+              { label: "Pitch ƒₙ", value: hasResults ? (r as any)?.f_n_pitch : null, unit: "Hz", decimals: 2 },
+            ]}
+            solverVersion={(r as any)?.solver_version}
+            runId={(r as any)?.run_id}
+            inputSha256={(r as any)?.input_sha256}
+            action={{ label: "Run Solver", onClick: () => runSimulation(), loading: isRunning }}
+          />
+        </ShellRight>
+      </StudioShell>
     </div>
   );
 }

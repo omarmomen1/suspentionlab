@@ -4,6 +4,7 @@ backend/api/routes/kinematics_routes.py
 SuspensionLab PRO — Kinematics API Routes
 
 POST /kinematics/solve   — Full wheel-travel sweep, returns all curves
+POST /kinematics/steer-grid — 2-D (bump, rack) grid: MR field, steer-induced camber/caster/toe, Ackermann
 GET  /kinematics/default — Default hardpoints (for UI initialisation)
 GET  /kinematics/info    — Backend info (C++ vs Python fallback)
 """
@@ -33,6 +34,15 @@ from suspensionlab.physics.kinematics_facade import solve_kinematics
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/kinematics", tags=["kinematics"])
+
+
+def _stamped_solver_version(base: str | None) -> str:
+    """Wave 6: attach the real git-commit build stamp to the solver version."""
+    try:
+        from suspensionlab.physics.provenance import build_solver_version
+        return build_solver_version(base)
+    except Exception:
+        return base or "unknown"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -190,6 +200,7 @@ class KinematicsResponse(BaseModel):
     convergence_summary:   str = Field(default="")
     physical_issues:       list[str] = Field(default_factory=list)
     run_id:                str = Field(default="")
+    input_sha256:          str = Field(default="")
     geometry_hash:         str = Field(default="")
     timestamp:             str = Field(default="")
     metadata:              dict = Field(default_factory=dict)
@@ -491,6 +502,18 @@ async def solve(
     derivatives = compute_kinematic_derivatives(d)
     geom_hash = compute_geometry_hash(hp_dict)
     run_id = f"swp-{uuid.uuid4().hex[:12]}"
+    # Wave 6: provenance input hash over the exact solver inputs. Static camber
+    # and toe live on the hardpoint set and are already inside hp_dict. A failure
+    # here must be loud: an empty hash would silently void the provenance claim.
+    from suspensionlab.physics.provenance import compute_input_sha256
+    input_sha256 = compute_input_sha256({
+        "hardpoints": hp_dict,
+        "z_min_mm": req.z_min_mm,
+        "z_max_mm": req.z_max_mm,
+        "n_steps": req.n_steps,
+        "tire_radius_m": req.tire_radius_m,
+        "backend": req.backend,
+    })
     now_iso = datetime.now(timezone.utc).isoformat()
 
     n_conv = sum(1 for c in d["converged"] if c)
@@ -545,7 +568,7 @@ async def solve(
         selected_backend      = curves.selected_backend,
         active_backend        = curves.active_backend,
         fallback_reason       = curves.fallback_reason,
-        solver_version        = curves.solver_version,
+        solver_version        = _stamped_solver_version(curves.solver_version),
         native_library_version = curves.native_library_version,
         build_identifier      = curves.build_identifier,
         all_converged         = all_conv,
@@ -574,6 +597,7 @@ async def solve(
         convergence_summary   = conv_summary,
         physical_issues       = phys_issues,
         run_id                = run_id,
+        input_sha256          = input_sha256,
         geometry_hash         = geom_hash,
         timestamp             = now_iso,
         metadata              = curves.metadata,
@@ -649,6 +673,38 @@ async def solve_point(
         geometry              = pt.geometry,
         metadata              = pt.metadata,
     )
+
+
+class SteerGridRequest(BaseModel):
+    """2-D (bump, rack travel) motion-ratio / steer sweep. Python 5-DOF solver, no C++ path."""
+    hardpoints: HardpointSetInput = Field(default_factory=HardpointSetInput)
+    z_min_mm: float = Field(-50.0, ge=-200.0, le=0.0)
+    z_max_mm: float = Field(50.0, ge=0.0, le=200.0)
+    n_bump: int = Field(11, ge=3, le=41)
+    rack_min_mm: float = Field(-5.0, ge=-100.0, le=0.0)
+    rack_max_mm: float = Field(5.0, ge=0.0, le=100.0)
+    n_steer: int = Field(5, ge=3, le=21)
+    tire_radius_m: Optional[float] = Field(None, gt=0.1, lt=1.0)
+    wheelbase_mm: Optional[float] = Field(None, gt=500.0, lt=6000.0,
+        description="Needed only for Ackermann. Omit and Ackermann is returned as NOT_MODELED.")
+
+
+@router.post("/mr-field", summary="Alias of /steer-grid (MR field MR(bump, steer))", include_in_schema=True)
+@router.post("/steer-grid", summary="2-D motion-ratio field MR(bump, steer) plus steer-induced camber/caster/toe and Ackermann")
+async def steer_grid(
+    req: SteerGridRequest,
+    user: UserContext = Depends(require_permission(Permission.SIMULATION_RUN)),
+) -> dict:
+    from suspensionlab.physics.kinematics import solve_steer_grid
+    try:
+        return solve_steer_grid(
+            req.hardpoints.to_dict(),
+            z_min_mm=req.z_min_mm, z_max_mm=req.z_max_mm, n_bump=req.n_bump,
+            rack_min_mm=req.rack_min_mm, rack_max_mm=req.rack_max_mm, n_steer=req.n_steer,
+            tire_radius=req.tire_radius_m, wheelbase_mm=req.wheelbase_mm,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
 
 
 @router.post("/validate", summary="CAE hardpoint admissibility check with diagnostic remediation")

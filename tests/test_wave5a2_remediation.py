@@ -424,15 +424,39 @@ def test_route_ai_approve_viewer_spoofed_role_gets_403(monkeypatch):
     assert seen["approver_role"] == "CHIEF_RACE_ENGINEER"  # claim only reaches the gate as untrusted input
 
     # An authorised engineer session is accepted and signed with the SESSION identity.
+    # The DB dependency is overridden and record_audit_event is mocked, so the test
+    # exercises the route and the audit metadata without a database.
+    from suspensionlab.backend.database.core import get_db_dependency
+    import suspensionlab.backend.security.audit as audit_mod
+    audit_calls = []
+
+    async def fake_record_audit_event(db, event_type, **kw):
+        audit_calls.append({"event_type": event_type, **kw})
+
+    monkeypatch.setattr(audit_mod, "record_audit_event", fake_record_audit_event)
     monkeypatch.setenv("DECISION_HMAC_SECRET", "x" * 48)
     eng = _session_user("ENGINEER")
-    client2 = TestClient(_route_app(aer.router, overrides={verify_api_key: lambda: eng}))
+    eng.organization_id = "org-wave6-test"
+
+    async def fake_db():
+        yield object()
+
+    client2 = TestClient(_route_app(aer.router, overrides={
+        verify_api_key: lambda: eng, get_db_dependency: fake_db}))
     r2 = client2.post("/api/v1/ai/approve", json={
         "decision_id": "dec-eng", "approver_name": "Spoofed Name",
         "approver_role": "VIEWER", "autonomous_request": False,
     })
     assert r2.status_code == 200, r2.text
     assert r2.json()["approver_name"] == "Route Tester"
+    assert len(audit_calls) == 1
+    md = audit_calls[0]["metadata"]
+    assert audit_calls[0]["event_type"] == "ai.decision.approved"
+    assert md["approver_name"] == "Route Tester"          # session identity, not the claim
+    assert md["approver_role"]                              # non-null
+    assert md["hmac_signature"] and len(md["hmac_signature"]) == 64
+    assert md["approved_at"]
+    assert audit_calls[0]["organization_id"] == "org-wave6-test"
 
 
 def test_route_quarter_car_overdamped_serializes_200(monkeypatch):

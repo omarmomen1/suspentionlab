@@ -19,7 +19,17 @@ interface PlotData {
   gg_envelope?: { boundary_lat_g: number[]; boundary_long_g: number[]; sim_lat_g: number[]; sim_long_g: number[] };
 }
 
+export interface PinnedLedgerRow {
+  parameter: string;
+  /** Preformatted value; missing values arrive as "Not available". */
+  value: string;
+  unit: string;
+  source: string;
+}
+
 interface PDFExportProps {
+  /** Rows pinned from the V2 Ledger. When present they print on an appendix page. */
+  pinnedRows?: PinnedLedgerRow[];
   captureId?: string;
   fileName?: string;
   title?: string;
@@ -70,6 +80,7 @@ async function computeWebCryptoSha256(data: unknown): Promise<string> {
 }
 
 export default function PDFExport({
+  pinnedRows,
   captureId,
   fileName = "SuspensionLab-PRO-Engineering-Report",
 
@@ -158,7 +169,7 @@ export default function PDFExport({
       };
 
       const drawFooter = (pageNum: number, totalPages: number) => {
-        const footY = pageH - 12;
+        const footY = pageH - 15; // Wave 6: raised for the provenance badge line
         pdf.setDrawColor(226, 232, 240);
         pdf.setLineWidth(0.3);
         pdf.line(margin, footY - 2, pageW - margin, footY - 2);
@@ -176,6 +187,17 @@ export default function PDFExport({
           margin,
           footY + 6
         );
+
+        // Wave 6: solver provenance Trust Badge in every PDF footer.
+        pdf.setTextColor(5, 150, 105);
+        pdf.setFont("helvetica", "bold");
+        const badgeBits = [
+          "VERIFIED PROVENANCE",
+          solverVersion_ ? `solver ${solverVersion_}` : null,
+          effectiveInputHash ? `input ${String(effectiveInputHash).substring(0, 16)}…` : null,
+        ].filter(Boolean).join("  |  ");
+        pdf.text(badgeBits, margin, footY + 10);
+        pdf.setFont("helvetica", "normal");
       };
 
       // ── PAGE 1: EXECUTIVE ENGINEERING RECORD ───────────────────────────
@@ -763,6 +785,41 @@ export default function PDFExport({
 
       drawFooter(3, 3);
 
+      // Appendix: rows pinned from the V2 Ledger (only when something is pinned).
+      if (pinnedRows && pinnedRows.length > 0) {
+        const pageH = pdf.internal.pageSize.getHeight();
+        const drawHeader = () => {
+          pdf.setTextColor(15, 23, 42);
+          pdf.setFontSize(10);
+          pdf.setFont("helvetica", "bold");
+          pdf.text("Appendix A. Pinned ledger rows", margin, 20);
+          pdf.setFontSize(7);
+          pdf.setTextColor(100, 116, 139);
+          pdf.text("Parameter", margin, 30);
+          pdf.text("Value", margin + 70, 30);
+          pdf.text("Unit", margin + 100, 30);
+          pdf.text("Source", margin + 120, 30);
+        };
+        pdf.addPage();
+        drawHeader();
+        let ay = 36;
+        pinnedRows.forEach((row) => {
+          if (ay > pageH - 20) {
+            pdf.addPage();
+            drawHeader();
+            ay = 36;
+          }
+          pdf.setFont("helvetica", "normal");
+          pdf.setFontSize(7);
+          pdf.setTextColor(15, 23, 42);
+          pdf.text(String(row.parameter).slice(0, 40), margin, ay);
+          pdf.text(String(row.value), margin + 70, ay);
+          pdf.text(String(row.unit), margin + 100, ay);
+          pdf.text(String(row.source).slice(0, 50), margin + 120, ay);
+          ay += 6;
+        });
+      }
+
       pdf.save(`${fileName}-${docId}.pdf`);
     } catch (err) {
       console.error("Vector PDF export failed:", err);
@@ -773,7 +830,7 @@ export default function PDFExport({
   }, [
     fileName, title, docId, vehicleRef, setupRef, trackRef, tireRef, telemetryRef,
     solverVersion, physicsVersion, inputHash, resultHash, artifactHash,
-    validationStatus, correlationPct, comfortCategory, metrics, paramChanges, plotData, approval
+    validationStatus, correlationPct, comfortCategory, metrics, paramChanges, plotData, approval, pinnedRows
   ]);
 
   return (

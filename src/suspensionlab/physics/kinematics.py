@@ -638,6 +638,7 @@ def _solve_py(
     brake_bias: Optional[float] = None,
     drive_bias: Optional[float] = None,
     axle: Optional[str] = None,
+    rack_travel_mm: float = 0.0,
 ) -> KinematicsCurves:
     if cg_height_mm is None:
         cg_height_mm = float(hp_raw.get("cg_height_mm", hp_raw.get("h_cg", 350.0)))
@@ -685,6 +686,12 @@ def _solve_py(
         "L_LWO_aft_sq": float(np.sum((np.array(hp_raw["LWO"]) - np.array(hp_raw["LWI_aft"]))**2)),
         "L_TRO_sq":     float(np.sum((np.array(hp_raw["TRO"]) - np.array(hp_raw["TRI"]))**2)),
     }
+    # Rack translation (V2 Phase 3): the rack moves the inboard tie-rod pivot along the
+    # lateral axis (Y). The tie-rod LENGTH stays fixed (L_TRO_sq was computed above from
+    # the unshifted TRI), so a shifted TRI is what forces the upright to steer.
+    # rack_travel_mm == 0.0 leaves TRI untouched: identical to the plain bump sweep.
+    if rack_travel_mm != 0.0:
+        hp["TRI"] = hp["TRI"] + np.array([0.0, float(rack_travel_mm), 0.0], dtype=np.float64)
 
     dz_step = (z_max - z_min) / max(n - 1, 1)
 
@@ -1910,6 +1917,131 @@ def solve_kinematics(
             py_curves.metadata = dict(py_curves.metadata or {})
             py_curves.metadata.setdefault("warnings", []).append(_tr_warning)
         return py_curves
+
+
+STEER_GRID_STATUS_NOT_MODELED = "NOT_MODELED"
+
+
+def solve_steer_grid(
+    hardpoints: dict,
+    z_min_mm: float = -50.0,
+    z_max_mm: float = 50.0,
+    n_bump: int = 11,
+    rack_min_mm: float = -5.0,
+    rack_max_mm: float = 5.0,
+    n_steer: int = 5,
+    tire_radius: Optional[float] = None,
+    wheelbase_mm: Optional[float] = None,
+) -> dict:
+    """Exact 5-DOF upright pose over a 2-D (bump, rack travel) grid.
+
+    The rack translates the inboard tie-rod pivot (TRI) along Y by ``rack_travel_mm``.
+    Every grid cell is a full Newton solve of the same five rigid-link constraints used by
+    the 1-D bump sweep, warm-started along bump and re-started per rack line. Cells that do
+    not converge (rack travel the linkage cannot physically reach) are reported as null with
+    ``converged = False`` and are never filled in.
+
+    Always uses the Python solver: the compiled core has no rack input in this build.
+
+    Returns steer-induced channels relative to the zero-rack solution at the SAME bump:
+      steer_angle_deg = toe(bump, rack) - toe(bump, 0)
+      d_camber_deg    = camber(bump, rack) - camber(bump, 0)
+      d_caster_deg    = caster(bump, rack) - caster(bump, 0)
+    MR(bump, steer) is |d pushrod length / d wheel travel| along each constant-rack line.
+
+    Ackermann needs the wheelbase. It is only computed when ``wheelbase_mm`` is passed
+    explicitly, and assumes left-right symmetric hardpoints (the other corner is the mirror
+    image, moved by the same rack in the opposite local direction). Otherwise it is returned
+    as NOT_MODELED. No rim, chassis or tie-rod clearance is evaluated: that needs CAD
+    geometry the hardpoint set does not contain.
+    """
+    if z_min_mm >= z_max_mm:
+        raise ValueError("z_min_mm must be strictly less than z_max_mm")
+    if rack_min_mm >= rack_max_mm:
+        raise ValueError("rack_min_mm must be strictly less than rack_max_mm")
+    if n_bump < 3 or n_steer < 3:
+        raise ValueError("n_bump and n_steer must each be at least 3")
+    tire_radius, _w = _resolve_tire_radius(hardpoints, tire_radius)
+
+    racks = [rack_min_mm + i * (rack_max_mm - rack_min_mm) / (n_steer - 1) for i in range(n_steer)]
+    # Guarantee that exactly zero is on the grid when the range straddles it, so the
+    # zero-steer line can be compared with the 1-D sweep without interpolation.
+    if rack_min_mm < 0.0 < rack_max_mm and not any(abs(r) < 1e-12 for r in racks):
+        racks.append(0.0)
+        racks.sort()
+
+    def line(rack: float):
+        return _solve_py(hardpoints, z_min_mm, z_max_mm, n_bump, tire_radius=tire_radius, rack_travel_mm=rack)
+
+    lines = {r: line(r) for r in racks}
+    base = lines[0.0] if 0.0 in lines else line(0.0)
+
+    def grid(attr: str, rel: bool):
+        out = []
+        for r in racks:
+            row = []
+            for i, pt in enumerate(lines[r].points):
+                if not pt.converged:
+                    row.append(None)
+                    continue
+                v = float(getattr(pt, attr))
+                if rel:
+                    b = base.points[i]
+                    v = v - float(getattr(b, attr)) if b.converged else None
+                row.append(v)
+            out.append(row)
+        return out
+
+    travel = [pt.wheel_travel_mm for pt in base.points]
+    result = {
+        "bump_mm": travel,
+        "rack_travel_mm": racks,
+        "converged": [[bool(pt.converged) for pt in lines[r].points] for r in racks],
+        "motion_ratio": grid("motion_ratio", False),
+        "steer_angle_deg": grid("toe_deg", True),
+        "d_camber_deg": grid("camber_deg", True),
+        "d_caster_deg": grid("caster_deg", True),
+        "camber_deg": grid("camber_deg", False),
+        "caster_deg": grid("caster_deg", False),
+        "kpi_deg": grid("kpi_deg", False),
+        "solver": "python-5dof-newton (rack-translated TRI, fixed tie-rod length)",
+        "clearances": {"status": STEER_GRID_STATUS_NOT_MODELED,
+                       "reason": "No rim, chassis or tie-rod envelope geometry is in the hardpoint set."},
+        "ackermann": {"status": STEER_GRID_STATUS_NOT_MODELED,
+                      "reason": "wheelbase_mm was not supplied."},
+    }
+
+    if wheelbase_mm is not None and wheelbase_mm > 0:
+        wc_y = abs(float(hardpoints["WC"][1]))
+        track = 2.0 * wc_y
+        # left corner at +rack: toe_L(+s). Mirror (right) corner = left-frame solve at -s,
+        # sign flipped. For a symmetric car this is the true other-side steer angle.
+        i0 = min(range(len(travel)), key=lambda k: abs(travel[k]))
+        pos = [r for r in racks if r > 1e-12 and -r in lines]
+        ack = []
+        for r in pos:
+            tl = lines[r].points[i0]
+            tm = lines[-r].points[i0]
+            t0 = base.points[i0]
+            if not (tl.converged and tm.converged and t0.converged):
+                continue
+            d_a = math.radians(tl.toe_deg - t0.toe_deg)           # this corner, rack +r
+            d_b = -math.radians(tm.toe_deg - t0.toe_deg)          # mirror corner, same rack
+            d_in, d_out = (d_a, d_b) if abs(d_a) >= abs(d_b) else (d_b, d_a)
+            sgn = 1.0 if d_in >= 0 else -1.0
+            di, do = abs(d_in), abs(d_out)
+            if do < 1e-9:
+                continue
+            radius = wheelbase_mm / math.tan(do) - track / 2.0
+            ideal_in = math.atan(wheelbase_mm / (radius - track / 2.0)) if radius > track / 2.0 else float("nan")
+            pct = (di - do) / (ideal_in - do) * 100.0 if math.isfinite(ideal_in) and abs(ideal_in - do) > 1e-12 else None
+            ack.append({"rack_travel_mm": r, "inner_deg": math.degrees(di) * sgn, "outer_deg": math.degrees(do) * sgn,
+                        "ideal_inner_deg": math.degrees(ideal_in) * sgn if math.isfinite(ideal_in) else None,
+                        "ackermann_pct": pct})
+        result["ackermann"] = {"status": "COMPUTED", "wheelbase_mm": wheelbase_mm, "track_mm": track,
+                               "bump_mm": travel[i0], "points": ack,
+                               "assumptions": "Left-right symmetric hardpoints; track = 2|WC.y|; static (nearest-zero bump) pose."}
+    return result
 
 
 def solve_single_point(

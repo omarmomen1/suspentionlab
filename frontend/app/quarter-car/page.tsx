@@ -1,7 +1,7 @@
 // TypeScript type safety fully enabled — @ts-nocheck removed (was CRIT-05)
 
 "use client";
-import { useState, useEffect, Suspense, useMemo } from "react";
+import { useState, useEffect, Suspense, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
 import {
@@ -9,7 +9,17 @@ import {
   Activity, Save, Sparkles, X, TrendingUp, BarChart3,
   Zap, GitBranch, Crosshair, RefreshCw,
 } from "lucide-react";
-import PDFExport from "../../components/PDFExport";
+import PDFExport, { type PinnedLedgerRow } from "../../components/PDFExport";
+import DamperScope from "../../components/v2/instruments/DamperScope";
+import type { LedgerRow } from "../../components/v2/instruments/LedgerTable";
+import { quarterCarLedgerRows } from "../../lib/v2/ledgers";
+import StudioShell, { ShellLeft, ShellCenter, ShellRight } from "../../components/v2/StudioShell";
+import VerdictRail from "../../components/v2/VerdictRail";
+import LedgerDock from "../../components/v2/instruments/LedgerDock";
+import { verdictStatus } from "../../lib/v2/status";
+import { toPinnedPdfRows } from "../../lib/v2/ledgers";
+
+import TrustBadge from "../../components/TrustBadge";
 import NextStepLink from "../../components/NextStepLink";
 import DataExport from "../../components/DataExport";
 import VehiclePresets from "../../components/VehiclePresets";
@@ -24,14 +34,13 @@ import DamperLUTInput from "../../components/DamperLUTInput";
 import RoadProfileUpload from "../../components/RoadProfileUpload";
 import { useAuth } from "../../contexts/AuthContext";
 import SuspensionRig3D from "../../components/SuspensionRig3D";
-import Rig3DPlayer from "../../components/Rig3DPlayer";
 import KPIRibbon from "../../components/quarter-car/KPIRibbon";
 import SetupScoreBadge from "../../components/SetupScoreBadge";
 import { ParamSection, ParameterInput } from "../../components/sim/ParameterControls";
 import { useQuarterCarSimulation } from "../../hooks/useQuarterCarSimulation";
 import SmartInsights from "../../components/SmartInsights";
 import SensitivityTornado from "../../components/SensitivityTornado";
-import ModelValidity, { ValidityReport } from "../../components/ModelValidity";
+import ModelValidity, { ValidityReport, resolveValidityTier } from "../../components/ModelValidity";
 import EngineeringDecisionCard from "../../components/sim/EngineeringDecisionCard";
 import EngineeringErrorDisplay from "../../components/sim/EngineeringErrorDisplay";
 import { SyncChartProvider, useSyncChart } from "../../components/sim/SyncChartContext";
@@ -312,6 +321,17 @@ function QuarterCarDashboard() {
     peak_susp_travel: number; comfort_rating: string; k_w: number;
   } | null;
 
+  // V2 verdict, ledger and pinned PDF rows.
+  const verdict = verdictStatus({ isRunning, error: simError, hasResults, validityTier: validity ? resolveValidityTier(validity) : null });
+  const ledgerSource = (results as any)?.run_id ? `solver run ${(results as any).run_id}` : "this session's solver run";
+  const ledgerRows = useMemo(
+    () => (hasResults ? quarterCarLedgerRows(r as any, (simParams ?? params) as any, verdict.status, ledgerSource) : []),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [hasResults, r, simParams, params, verdict.status, ledgerSource],
+  );
+  const [pinnedPdfRows, setPinnedPdfRows] = useState<PinnedLedgerRow[]>([]);
+  const handlePinned = useCallback((rows: LedgerRow[]) => setPinnedPdfRows(toPinnedPdfRows(rows)), []);
+
   return (
     <div className="h-full flex flex-col p-5 pt-3 gap-3 min-h-0">
 
@@ -362,7 +382,7 @@ function QuarterCarDashboard() {
             <Save size={13} className="text-ansys-yellow" />
             {isSaving ? "Saving…" : "Save Setup"}
           </button>
-          <PDFExport captureId="sim-report" fileName={`QCar_${Math.round(params.k_s)}_${Math.round(params.c)}`} />
+          <PDFExport captureId="sim-report" fileName={`QCar_${Math.round(params.k_s)}_${Math.round(params.c)}`} pinnedRows={pinnedPdfRows} />
           <DataExport results={results} fileName={`QCar_${Math.round(params.k_s)}_${Math.round(params.c)}`} />
 
           <button id="btn-run" onClick={() => runSimulation()} disabled={isRunning}
@@ -448,10 +468,11 @@ function QuarterCarDashboard() {
       ) : null}
 
       {/* Body */}
-      <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
+      <StudioShell>
 
         {/* Left Panel */}
-        <div className="w-60 shrink-0 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-y-auto custom-scrollbar">
+        <ShellLeft className="lg:w-60">
+        <div className="w-full lg:w-60 lg:shrink-0 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-y-auto custom-scrollbar">
           <div className="px-4 py-3 border-b border-[#1e1e1e] sticky top-0 bg-[#0d0d0f] z-10">
             <h2 className="text-xs font-semibold text-gray-300 flex items-center gap-2">
               <Settings2 size={13} className="text-ansys-yellow" /> Parameters
@@ -571,8 +592,10 @@ function QuarterCarDashboard() {
             </ParamSection>
           </div>
         </div>
+        </ShellLeft>
 
         {/* Main Content */}
+        <ShellCenter>
         <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-hidden">
 
           {/* Instant Analytical Modal Strip */}
@@ -1031,8 +1054,8 @@ function QuarterCarDashboard() {
                         <div className="space-y-3 font-mono text-xs">
                           {[
                             { label: "Sprung ωₙ",   val: `${r.omega_n_s.toFixed(4)} rad/s`, color: "#f2a900" },
-                            { label: "Sprung ζ",    val: r.zeta_s.toFixed(4),              color: getDampingStatus(r.zeta_s) === "good" ? "#34d399" : "#f59e0b" },
-                            { label: "Sprung ωd",   val: `${(r.omega_n_s * Math.sqrt(Math.max(0, 1 - r.zeta_s**2))).toFixed(4)} rad/s`, color: "#aaa" },
+                            { label: "Sprung ζ",    val: typeof r.zeta_s === "number" ? r.zeta_s.toFixed(4) : "Not available (overdamped)", color: typeof r.zeta_s === "number" && getDampingStatus(r.zeta_s) === "good" ? "#34d399" : "#f59e0b" },
+                            { label: "Sprung ωd",   val: typeof r.zeta_s === "number" ? `${(r.omega_n_s * Math.sqrt(Math.max(0, 1 - r.zeta_s**2))).toFixed(4)} rad/s` : "Not available (overdamped)", color: "#aaa" },
                             { label: "Unsprung ωₙ", val: `${(r.f_n_u * 2 * Math.PI).toFixed(4)} rad/s`, color: "#00aeff" },
                             { label: "Unsprung ζ",  val: (r.zeta_u as number).toFixed(4),  color: "#aaa" },
                             { label: "k_w",          val: `${r.k_w.toFixed(0)} N/m`,        color: "#aaa" },
@@ -1217,25 +1240,56 @@ function QuarterCarDashboard() {
                 )}
 
               </div>
+
+              {/* Wave 6: solver provenance Trust Badge (footer of the results view) */}
+              <TrustBadge
+                solverVersion={(results as any)?.solver_version}
+                runId={(results as any)?.run_id}
+                inputSha256={(results as any)?.input_sha256}
+                className="px-1 pb-1"
+              />
             </div>
           )}
 
-          {/* 3D Viewport Split */}
+          {/* V2 Damper Scope (replaces the unlit 2-DOF block car) and Ledger */}
           {hasResults && r && (
-            <div className="h-64 shrink-0 bg-[#0d0d0f] border border-[#1e1e1e] rounded-xl overflow-hidden relative">
-               <div className="absolute top-2 left-3 z-10 text-[10px] font-mono text-gray-500 uppercase tracking-widest flex items-center gap-2">
-                 <span>Live Telemetry</span>
-                 <span className="text-gray-700">·</span>
-                 <span className="text-ansys-yellow/80">2-DOF Corner (Symmetric Visualization)</span>
-               </div>
-               {/* Live Telemetry: Quarter-car has ONE unsprung mass (z_u).
-                   All 4 corners receive the same z_u since the model is 2-DOF.
-                   This is a symmetric approximation for visualization only. */}
-               <Rig3DPlayer z_s={r.z_s as number[]} z_u={r.z_u as number[]} />
+            <div className="space-y-3 shrink-0">
+              <DamperScope
+                time={r.time}
+                zS={r.z_s}
+                zU={r.z_u}
+                dzS={(r as any).dz_s}
+                dzU={(r as any).dz_u}
+                suspTravelM={r.susp_travel}
+                damper={{
+                  c: (simParams ?? params).c,
+                  MR: (simParams ?? params).MR,
+                  curve_v: (simParams ?? params).damper_curve_v,
+                  curve_f: (simParams ?? params).damper_curve_f,
+                }}
+              />
+              <LedgerDock rows={ledgerRows} caption="Quarter-car ledger" onPinnedChange={handlePinned} />
             </div>
           )}
         </div>
-      </div>
+        </ShellCenter>
+        <ShellRight>
+          <VerdictRail
+            status={verdict.status}
+            statusLabel={verdict.label}
+            heroes={[
+              { label: "Sprung ƒₙ", value: hasResults ? (r as any)?.f_n_s : null, unit: "Hz", decimals: 2 },
+              { label: "Sprung ζ", value: hasResults && typeof (r as any)?.zeta_s === "number" ? (r as any).zeta_s : null, decimals: 3 },
+              { label: "RMS body accel (Wk)", value: hasResults ? ((r as any)?.rms_body_accel_wk ?? (r as any)?.rms_body_accel) : null, unit: "m/s²", decimals: 3 },
+              { label: "Peak suspension travel", value: hasResults && typeof (r as any)?.peak_susp_travel === "number" ? (r as any).peak_susp_travel * 1000 : null, unit: "mm", decimals: 1 },
+            ]}
+            solverVersion={(results as any)?.solver_version}
+            runId={(results as any)?.run_id}
+            inputSha256={(results as any)?.input_sha256}
+            action={{ label: "Run Solver", onClick: () => runSimulation(), loading: isRunning }}
+          />
+        </ShellRight>
+      </StudioShell>
     </div>
   );
 }

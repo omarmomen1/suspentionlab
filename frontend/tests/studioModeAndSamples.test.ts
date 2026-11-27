@@ -29,7 +29,7 @@ import MobileNav from "../components/MobileNav";
 import SampleDemoTelemetryBadge from "../components/engineering/SampleDemoTelemetryBadge";
 import TelemetryChart from "../components/engineering/TelemetryChart";
 import {
-  STUDIO_TOOLS,
+  NAV_V2,
   isStudioModeEnabled,
   isToolGroupActive,
 } from "../lib/navigation";
@@ -64,125 +64,62 @@ describe("NEXT_PUBLIC_STUDIO_MODE Navigation Feature Flag", () => {
     expect(isStudioModeEnabled()).toBe(true);
   });
 
-  it("defines the exact Studio engineering tools and routes", () => {
-    expect(STUDIO_TOOLS.length).toBeGreaterThanOrEqual(6);
-    const routeList = STUDIO_TOOLS.flatMap((t) => t.routes.map((r) => r.href));
-    expect(routeList).toContain("/kinematics");
-    expect(routeList).toContain("/quarter-car");
-    expect(routeList).toContain("/full-car");
-    expect(routeList).toContain("/handling");
-    expect(routeList).toContain("/correlation");
-    expect(routeList).toContain("/compare");
-    expect(routeList).toContain("/setup-sensitivity");
-    expect(routeList).toContain("/optimize");
-    expect(routeList).toContain("/engineering-memory");
-    expect(routeList).toContain("/report");
-    expect(
-      isToolGroupActive("/timeline", STUDIO_TOOLS[5].routes)
-    ).toBe(true);
-    expect(
-      isToolGroupActive("/engineering-memory", STUDIO_TOOLS[5].routes)
-    ).toBe(true);
-  });
+  const V2_GROUP_LABELS = ["Overview", "Studios", "ApexSim", "Telemetry", "Optimize", "Reports", "AI Engineer"];
+  const groupOf = (href: string) => NAV_V2.find((g) => g.routes.some((r) => r.href === href))?.label;
 
-  it("renders only the 6 Studio tools in Navbar when NEXT_PUBLIC_STUDIO_MODE=true", () => {
-    process.env.NEXT_PUBLIC_STUDIO_MODE = "true";
-    const html = renderToStaticMarkup(React.createElement(Navbar));
-
-    expect(html).toContain('data-studio-mode="true"');
-    expect(html).toContain("3D Kinematics");
-    expect(html).toContain("Hardpoints");
-    expect(html).toContain("Quarter-Car");
-    expect(html).toContain("Damper Studio");
-    expect(html).toContain("Full-Car");
-    expect(html).toContain("Handling");
-    expect(html).toContain("Correlation");
-    expect(html).toContain("Optimizer");
-    expect(html).toContain("Engineering");
-    expect(html).toContain("Reports");
-
-    expect(html).toContain('href="/kinematics"');
-    expect(html).toContain('href="/quarter-car"');
-    expect(html).toContain('href="/full-car"');
-    expect(html).toContain('href="/correlation"');
-    expect(html).toContain('href="/setup-sensitivity"');
-    expect(html).toContain('href="/engineering-memory"');
-
-    // Legacy & non-studio nav links must be hidden, while /pricing remains visible as an upgrade CTA
-    expect(html).not.toContain('href="/garage"');
-    expect(html).not.toContain('href="/experiment"');
-    expect(html).not.toContain('href="/docs"');
-    expect(html).toContain('href="/pricing"');
-    expect(html).toContain("bg-ansys-yellow");
-    expect(html).not.toContain('id="analyze-solvers-dropdown-btn"');
-    expect(html).not.toContain('id="validation-dropdown-btn"');
-  });
-
-  it("renders full 7-stage executive navigation in Navbar when Studio Mode is disabled", () => {
-    delete process.env.NEXT_PUBLIC_STUDIO_MODE;
-    const html = renderToStaticMarkup(React.createElement(Navbar));
-
-    expect(html).not.toContain('data-studio-mode="true"');
-    expect(html).toContain('href="/garage"');
-    expect(html).toContain('href="/experiment"');
-    expect(html).toContain('id="analyze-solvers-dropdown-btn"');
-    expect(html).toContain('id="validation-dropdown-btn"');
-    expect(html).toContain('href="/docs"');
-    expect(html).toContain('href="/pricing"');
-  });
-
-  it("renders only the 6 Studio tools (all 10 routes) in MobileNav when NEXT_PUBLIC_STUDIO_MODE=true", () => {
-    process.env.NEXT_PUBLIC_STUDIO_MODE = "true";
-    const html = renderToStaticMarkup(
-      React.createElement(MobileNav, { defaultOpen: true })
-    );
-
-    expect(html).toContain('data-studio-mode="true"');
-    expect(html).toContain("3D Kinematics &amp; Hardpoints");
-    expect(html).toContain("Quarter-Car &amp; Damper Studio");
-    expect(html).toContain("Full-Car &amp; Handling");
-    expect(html).toContain("Telemetry &amp; Setup Correlation");
-    expect(html).toContain("Setup Sensitivity &amp; Optimizer");
-    expect(html).toContain("Engineering Memory &amp; Reports");
-
+  it("defines the 7 V2 workspace groups and keeps every Wave 5 route reachable", () => {
+    expect(NAV_V2.map((g) => g.label)).toEqual(V2_GROUP_LABELS);
+    const routeList = NAV_V2.flatMap((g) => g.routes.map((r) => r.href));
+    expect(new Set(routeList).size).toBe(routeList.length); // no duplicate entries
     for (const href of [
-      "/kinematics",
-      "/quarter-car",
-      "/full-car",
-      "/handling",
-      "/correlation",
-      "/compare",
-      "/setup-sensitivity",
-      "/optimize",
-      "/engineering-memory",
-      "/report",
+      "/kinematics", "/quarter-car", "/half-car", "/full-car", "/handling", "/yaw-dynamics", "/active",
+      "/nvh", "/lap-sim", "/correlation", "/investigate", "/digital-twin", "/experiment", "/optimize",
+      "/compare", "/setup-sensitivity", "/report", "/cae", "/engineering-memory", "/vnv", "/audit",
+      "/ai-engineer", "/garage", "/docs", "/pricing",
     ]) {
-      expect(html).toContain(`href="${href}"`);
+      expect(routeList, href).toContain(href);
     }
-
-    // Upgrade / Pricing CTA remains visible in Studio Mode
-    expect(html).toContain('href="/pricing"');
-    expect(html).toContain("Upgrade / Pricing");
-    expect(html).toContain("bg-ansys-yellow");
-
-    // Legacy drawer links must be omitted in Studio Mode
-    expect(html).not.toContain('href="/garage"');
-    // /cae is intentionally present: Wave 5B adds CAE Interop to the memory-reports studio group
-    expect(html).not.toContain('href="/nvh"');
-    expect(html).not.toContain('href="/durability"');
+    for (const href of routeList) {
+      expect(fs.existsSync(path.join(FRONTEND_ROOT, "app", href, "page.tsx")), href).toBe(true);
+    }
   });
 
-  it("renders full MobileNav sections when Studio Mode is disabled", () => {
-    delete process.env.NEXT_PUBLIC_STUDIO_MODE;
-    const html = renderToStaticMarkup(
-      React.createElement(MobileNav, { defaultOpen: true })
-    );
+  it("keeps Investigation Room under Telemetry and CAE Interop under Reports", () => {
+    expect(groupOf("/investigate")).toBe("Telemetry");
+    expect(groupOf("/cae")).toBe("Reports");
+    const reports = NAV_V2.find((g) => g.label === "Reports")!;
+    expect(isToolGroupActive("/timeline", reports.routes)).toBe(true);
+    expect(isToolGroupActive("/engineering-memory", reports.routes)).toBe(true);
+  });
 
-    expect(html).not.toContain('data-studio-mode="true"');
-    expect(html).toContain('href="/garage"');
+  it("renders the V2 groups in Navbar in both modes, with overflow-visible dropdowns", () => {
+    for (const mode of [undefined, "true"]) {
+      if (mode === undefined) delete process.env.NEXT_PUBLIC_STUDIO_MODE;
+      else process.env.NEXT_PUBLIC_STUDIO_MODE = mode;
+      const html = renderToStaticMarkup(React.createElement(Navbar));
+      expect(html).toContain('data-nav-version="v2"');
+      expect(html).toContain("overflow-visible");
+      for (const label of V2_GROUP_LABELS) expect(html).toContain(label);
+      for (const href of ["/garage", "/kinematics", "/lap-sim", "/correlation", "/optimize", "/report", "/ai-engineer", "/pricing"]) {
+        expect(html).toContain(`href="${href}"`);
+      }
+      expect(html).not.toContain('id="analyze-solvers-dropdown-btn"');
+      expect(html).not.toContain('id="validation-dropdown-btn"');
+    }
+  });
+
+  it("keeps the search trigger and the mobile drawer mounted in the Navbar", () => {
+    const src = fs.readFileSync(path.join(FRONTEND_ROOT, "components", "Navbar.tsx"), "utf-8");
+    expect(src).toContain("<GlobalSearchTrigger />");
+    expect(src).toContain("<MobileNav />");
+  });
+
+  it("renders every V2 route in MobileNav", () => {
+    const html = renderToStaticMarkup(React.createElement(MobileNav, { defaultOpen: true }));
+    for (const g of NAV_V2) for (const r of g.routes) expect(html, r.href).toContain(`href="${r.href}"`);
+    expect(html).toContain("Upgrade / Pricing");
+    expect(html).toContain('href="/investigate"');
     expect(html).toContain('href="/cae"');
-    expect(html).toContain('href="/half-car"');
-    expect(html).toContain('href="/nvh"');
   });
 });
 
@@ -243,5 +180,36 @@ describe("Sample Telemetry Renames, Badge & Legacy Route Cleanup", () => {
         }),
       ])
     );
+  });
+});
+
+describe("NAV_V2 route integrity (data, not markup)", () => {
+  const all = NAV_V2.flatMap((g) => g.routes.map((r) => ({ group: g.id, ...r })));
+  it("every group and route has a non-empty label and an absolute href", () => {
+    for (const g of NAV_V2) {
+      expect(g.label.trim().length, g.id).toBeGreaterThan(0);
+      expect(g.href.startsWith("/"), g.id).toBe(true);
+    }
+    for (const r of all) {
+      expect(r.label.trim().length, r.href).toBeGreaterThan(0);
+      expect(r.href.startsWith("/"), r.label).toBe(true);
+    }
+  });
+  it("has no duplicate route hrefs and no duplicate group ids", () => {
+    const hrefs = all.map((r) => r.href);
+    expect(new Set(hrefs).size).toBe(hrefs.length);
+    const ids = NAV_V2.map((g) => g.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+  it("/investigate sits under Telemetry and /cae under Reports, with real page files", () => {
+    const inv = all.find((r) => r.href === "/investigate");
+    const cae = all.find((r) => r.href === "/cae");
+    expect(inv?.group).toBe("telemetry");
+    expect(cae?.group).toBe("reports");
+    for (const r of all) {
+      if (r.href === "/") continue;
+      const page = path.join(FRONTEND_ROOT, "app", ...r.href.split("/").filter(Boolean), "page.tsx");
+      expect(fs.existsSync(page), `${r.href} has no app page`).toBe(true);
+    }
   });
 });

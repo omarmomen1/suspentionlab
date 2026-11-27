@@ -11,7 +11,7 @@ const PLANS = [
     planKey: "FREE",
     price: "Free",
     billing: "forever",
-    description: "3D Kinematics & Quarter-Car Preview.",
+    description: "3D Kinematics & Quarter-Car Preview. Free account required.",
     color: "border-[#252525]",
     badge: null,
     features: [
@@ -20,6 +20,7 @@ const PLANS = [
       "Transmissibility & Bode plots",
       "ISO 2631-1 comfort analysis",
       "Community support",
+      "Requires a free account (signed-out solves are rejected)",
     ],
     cta: "Get Started Free",
     ctaHref: "/quarter-car",
