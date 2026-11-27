@@ -88,8 +88,18 @@ def run() -> dict:
     }
 
 
+def _norm_val(v):
+    if isinstance(v, float) and abs(v) < 1e-12:
+        return 0.0
+    if isinstance(v, dict):
+        return {k: _norm_val(val) for k, val in v.items()}
+    if isinstance(v, list):
+        return [_norm_val(val) for val in v]
+    return v
+
+
 def _stable(d: dict):
-    return [(t["id"], t["verdict"], [(c["test"], c["verdict"], c["measured"]) for c in t["checks"]]) for t in d["benchmarks"]]
+    return [(t["id"], t["verdict"], [(c["test"], c["verdict"], _norm_val(c["measured"])) for c in t["checks"]]) for t in d["benchmarks"]]
 
 
 def main() -> int:
