@@ -397,6 +397,7 @@ async def test_verify_license_keeps_gumroad_flow_for_non_slpro_keys(
     assert call_args.kwargs["data"] == {
         "product_permalink": settings.gumroad_product_permalink,
         "license_key": "ABCD1234-EFGH5678-IJKL9012-MNOP3456",
+        "increment_uses_count": "false",
     }
     await db_session.refresh(user)
     assert user.plan == "PRO"
@@ -445,6 +446,7 @@ async def test_verify_license_uses_gumroad_product_id_and_team_product_id(
     assert mock_client.post.call_args.kwargs["data"] == {
         "product_id": "prod_pro_123",
         "license_key": "PROKEY-1111-2222-3333",
+        "increment_uses_count": "false",
     }
     await db_session.refresh(pro_user)
     assert pro_user.plan == "PRO"
@@ -486,10 +488,12 @@ async def test_verify_license_uses_gumroad_product_id_and_team_product_id(
     assert mock_client_team.post.call_args_list[0].kwargs["data"] == {
         "product_id": "prod_pro_123",
         "license_key": "TEAMKEY-4444-5555-6666",
+        "increment_uses_count": "false",
     }
     assert mock_client_team.post.call_args_list[1].kwargs["data"] == {
         "product_id": "prod_team_999",
         "license_key": "TEAMKEY-4444-5555-6666",
+        "increment_uses_count": "false",
     }
     await db_session.refresh(team_user)
     assert team_user.plan == "ENTERPRISE"
