@@ -241,7 +241,9 @@ async def create_shared_report(
         params_hash = canonical_hash(params)
         result_hash = canonical_hash(result)
 
-    signature = _sign(token, params_hash, result_hash)
+    # Only server-executed verified reports receive a valid HMAC attestation;
+    # client-asserted shares are never cryptographically endorsed as engine output.
+    signature = _sign(token, params_hash, result_hash) if provenance == "verified" else None
 
     report = SharedReport(
         token=token,
@@ -345,12 +347,14 @@ async def get_shared_report(
     tamper_detected = not payload_verified
 
     signature_valid: bool | None = None
-    if report.signature and report.params_hash and report.result_hash:
+    if report.provenance == "verified" and report.signature and report.params_hash and report.result_hash:
         if payload_verified:
             expected = _sign(report.token, report.params_hash, report.result_hash)
             signature_valid = _hmac.compare_digest(expected, report.signature)
         else:
             signature_valid = False
+    elif report.provenance != "verified":
+        signature_valid = False if report.signature else None
 
     return ReportResponse(
         token=report.token,
@@ -383,7 +387,7 @@ async def get_shared_report(
             input_hash=report.input_hash,
             artifact_hash=report.artifact_hash,
             approval_status=report.status,
-            approved_by_email=report.approved_by_email,
+            approved_by_email=None,  # PII redacted on unauthenticated public share links
             approved_by_role=report.approved_by_role,
             approved_at=report.approved_at.isoformat() if report.approved_at else None,
             approval_signature=report.approval_signature,

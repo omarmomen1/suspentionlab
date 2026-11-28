@@ -729,17 +729,18 @@ async def hydrate_engineering_report(
     time_series = list(result.get("time") or [])
     z_s_series = list(result.get("z_s") or [])
     z_u_series = list(result.get("z_u") or [])
-    accel_series = list(result.get("body_accel") or [])
+    accel_series = list(result.get("ddz_s") or result.get("body_accel") or result.get("ddz_s_fl") or [])
 
     rms_body_accel = float(result.get("rms_body_accel") or 0.0)
     rms_body_accel_wk = float(result.get("rms_body_accel_wk") or rms_body_accel * 0.88)
     rms_susp_travel = float(result.get("rms_susp_travel") or 0.0)
     peak_susp_travel = float(result.get("peak_susp_travel") or 0.0)
 
-    # Compute real VDV
-    vdv = calculate_vdv(accel_series if accel_series else z_s_series, time_series)
-    if vdv <= 0.0:
-        vdv = round(rms_body_accel_wk * (float(time_series[-1]) ** 0.25 if time_series else 1.5), 3)
+    # Compute real VDV strictly from vertical body acceleration (never displacement z_s)
+    vdv = calculate_vdv(accel_series, time_series) if accel_series else 0.0
+    if vdv <= 0.0 and rms_body_accel_wk > 0.0:
+        duration_s = float(time_series[-1] - time_series[0]) if len(time_series) > 1 else 2.0
+        vdv = round(rms_body_accel_wk * 1.4 * (max(duration_s, 0.1) ** 0.25), 3)
 
     comfort_category = (
         "NOT UNCOMFORTABLE" if rms_body_accel_wk < 0.315

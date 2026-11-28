@@ -132,6 +132,24 @@ def decode_refresh_token(token: str) -> dict[str, Any] | None:
     return payload
 
 
+def create_password_reset_token(user_id: str, expires_delta: timedelta | None = None) -> str:
+    """Create a dedicated single-purpose password reset JWT (cannot be used as an access token)."""
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(hours=1))
+    jti = str(uuid.uuid4())
+    to_encode = {"sub": user_id, "exp": expire, "type": "password_reset", "jti": jti}
+    headers = {"kid": JWT_ACTIVE_KEY}
+    keys = get_jwt_keys()
+    return jwt.encode(to_encode, keys[JWT_ACTIVE_KEY], algorithm=ALGORITHM, headers=headers)
+
+
+def decode_password_reset_token(token: str) -> dict[str, Any] | None:
+    """Decode and validate a password_reset token strictly."""
+    payload = _decode_token_with_rotation(token)
+    if not payload or payload.get("type") != "password_reset":
+        return None
+    return payload
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Session Revocation & JWKS Key Management (Finding 50)
 # ─────────────────────────────────────────────────────────────────────────────

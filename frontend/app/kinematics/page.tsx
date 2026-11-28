@@ -618,6 +618,33 @@ export default function KinematicsPage() {
     }));
   }, []);
 
+  // MR(bump, steer): real 2-D solve, python 5-DOF solver on the backend.
+  const computeMrField = useCallback(async () => {
+    setMrFieldBusy(true);
+    setMrFieldError(null);
+    try {
+      const res = await fetchWithAuth("/api/v1/kinematics/mr-field", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hardpoints: { ...hp, ...staticAlignmentFor(selectedPreset) },
+          ...(Number.isFinite(Number(mrWheelbase)) && Number(mrWheelbase) > 500 && Number(mrWheelbase) < 6000 && mrWheelbase.trim() !== ""
+            ? { wheelbase_mm: Number(mrWheelbase) } : {}),
+        }),
+      });
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(typeof d.detail === "string" ? d.detail : `HTTP ${res.status}`);
+      }
+      setMrField((await res.json()) as SteerGridResponse);
+    } catch (err: any) {
+      setMrField(null);
+      setMrFieldError(formatApiError(err, "Failed to compute the MR field"));
+    } finally {
+      setMrFieldBusy(false);
+    }
+  }, [fetchWithAuth, hp, selectedPreset, mrWheelbase]);
+
   // Solve Sweep Function for Setup A
   const solve = useCallback(async () => {
     setLoading(true);
@@ -655,39 +682,14 @@ export default function KinematicsPage() {
       // Find neutral static step (closest to dz = 0)
       const zeroIdx = data.wheel_travel_mm.findIndex((z) => Math.abs(z) < 1.0);
       setTravelIdx(zeroIdx >= 0 ? zeroIdx : Math.floor(data.n_points / 2));
+      // Surface Motion Ratio heatmap directly in primary workspace after solve
+      computeMrField();
     } catch (err: any) {
       setError(formatApiError(err, "Failed to solve suspension kinematics"));
     } finally {
       setLoading(false);
     }
-  }, [fetchWithAuth, hp, selectedPreset, zMin, zMax, nSteps]);
-
-  // MR(bump, steer): real 2-D solve, python 5-DOF solver on the backend.
-  const computeMrField = useCallback(async () => {
-    setMrFieldBusy(true);
-    setMrFieldError(null);
-    try {
-      const res = await fetchWithAuth("/api/v1/kinematics/mr-field", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          hardpoints: { ...hp, ...staticAlignmentFor(selectedPreset) },
-          ...(Number.isFinite(Number(mrWheelbase)) && Number(mrWheelbase) > 500 && Number(mrWheelbase) < 6000 && mrWheelbase.trim() !== ""
-            ? { wheelbase_mm: Number(mrWheelbase) } : {}),
-        }),
-      });
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(typeof d.detail === "string" ? d.detail : `HTTP ${res.status}`);
-      }
-      setMrField((await res.json()) as SteerGridResponse);
-    } catch (err: any) {
-      setMrField(null);
-      setMrFieldError(formatApiError(err, "Failed to compute the MR field"));
-    } finally {
-      setMrFieldBusy(false);
-    }
-  }, [fetchWithAuth, hp, selectedPreset, mrWheelbase]);
+  }, [fetchWithAuth, hp, selectedPreset, zMin, zMax, nSteps, computeMrField]);
 
   // Solve Sweep for Setup B (for comparison overlay)
   const solveSetupB = useCallback(async () => {
@@ -1446,7 +1448,7 @@ export default function KinematicsPage() {
                   onClick={() => setActiveTab(tab.id as ViewTab)}
                   className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors border-b-2 ${
                     isActive
-                      ? "border-cyan-500 text-cyan-300 bg-[#0f111a]"
+                      ? "border-signal text-signal bg-[#0f111a]"
                       : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[#0c0d14]"
                   }`}
                 >
@@ -1507,7 +1509,7 @@ export default function KinematicsPage() {
 
                 <div className="p-3 bg-[#0a0c12] border border-[#1c1f2e] rounded-xl flex flex-wrap items-center justify-between gap-4 text-xs">
                   <div className="flex items-center gap-2 text-gray-400">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
+                    <span className="w-2 h-2 rounded-full bg-signal inline-block" />
                     <span>Rigid-Body Kinematic Parity: C++ Newton-Raphson & Python fallback matched.</span>
                   </div>
                   <div className="flex items-center gap-4 text-gray-500 font-mono text-[11px]">
@@ -1515,6 +1517,21 @@ export default function KinematicsPage() {
                     <span>Right Drag: Pan</span>
                     <span>Wheel: Zoom</span>
                   </div>
+                </div>
+
+                <div className="bg-[#13181D] border border-white/10 p-4" data-testid="workspace-mr-field-card">
+                  <div className="flex flex-wrap items-center gap-3 mb-2">
+                    <h3 className="text-xs uppercase tracking-wide text-[#8a909a] m-0">Motion-ratio field MR(bump, steer)</h3>
+                    <button type="button" onClick={computeMrField} disabled={mrFieldBusy} className="text-[11px] px-2.5 py-1 border border-signal bg-signal text-carbon font-semibold hover:bg-[#d6f56e] disabled:opacity-40">
+                      {mrFieldBusy ? "Computing" : "Compute MR Field"}
+                    </button>
+                    <label className="text-[11px] text-[#8a909a] flex items-center gap-1">
+                      Wheelbase (mm, optional, enables Ackermann)
+                      <input type="number" inputMode="decimal" value={mrWheelbase} onChange={(e) => setMrWheelbase(e.target.value)} className="v2-num w-20 bg-[#0C0F12] border border-white/10 px-1 py-0.5 text-zinc-200" aria-label="Wheelbase mm" />
+                    </label>
+                  </div>
+                  {mrFieldError && <p role="alert" className="text-[11px] text-[#d9534f] m-0 mb-2">{mrFieldError}</p>}
+                  <MotionRatioField data={mrField} />
                 </div>
               </div>
             )}
@@ -1738,65 +1755,65 @@ export default function KinematicsPage() {
 
             {/* Tab 5: Motion Ratio */}
             {activeTab === "mr" && (
-              <div className="bg-[#080a10] border border-[#1c1f2e] rounded-xl p-4 h-[520px]">
-                <Plot
-                  data={[
-                    {
-                      x: dz,
-                      y: maskDiverged(result?.motion_ratio, result?.converged),
-                      name: isComparisonMode ? "Setup A — Motion Ratio" : "Motion Ratio",
-                      type: "scatter",
-                      mode: "lines",
-                      line: { color: COLORS.emerald, width: 2.5 },
-                    },
-                    ...(isComparisonMode && resultB
-                      ? [
-                          {
-                            x: dzB,
-                            y: maskDiverged(resultB.motion_ratio, resultB.converged),
-                            name: "Setup B — Motion Ratio",
-                            type: "scatter" as const,
-                            mode: "lines" as const,
-                            line: { color: COLORS.candidateAmber, width: 2.5, dash: "dot" as const },
-                          },
-                        ]
-                      : []),
-                    ...failureTrace((idx) => result?.motion_ratio?.[idx] ?? 0),
-                  ]}
-                  layout={{
-                    ...plotLayout(
-                      "Damper Motion Ratio (Spring / Wheel Deflection Rate) vs Wheel Travel",
-                      zMin,
-                      zMax,
-                      currentTravel,
-                      { title: { text: "Wheel Travel [mm]", font: { size: 11, color: "#94A3B8" } } },
-                      { title: { text: "Motion Ratio [mm/mm]", font: { size: 11, color: "#94A3B8" } } },
-                      undefined,
-                      targetBands.motion_ratio
-                    ),
-                  }}
-                  config={{ responsive: true, displaylogo: false }}
-                  style={{ width: "100%", height: "100%" }}
-                  useResizeHandler
-                  onClick={handlePlotClick}
-                />
-              </div>
-            )}
-
-            {activeTab === "mr" && (
-              <div className="bg-[#13181D] border border-white/10 p-4" data-testid="mr-field-card">
-                <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-xs uppercase tracking-wide text-[#8a909a] m-0">Motion-ratio field MR(bump, steer)</h3>
-                  <button type="button" onClick={computeMrField} disabled={mrFieldBusy} className="text-[11px] px-2 py-1 border border-[#3a3f48] text-[#cfd3da] disabled:opacity-40">
-                    {mrFieldBusy ? "Computing" : "Compute MR Field"}
-                  </button>
-                  <label className="text-[11px] text-[#8a909a] flex items-center gap-1">
-                    Wheelbase (mm, optional, enables Ackermann)
-                    <input type="number" inputMode="decimal" value={mrWheelbase} onChange={(e) => setMrWheelbase(e.target.value)} className="v2-num w-20 bg-[#0C0F12] border border-white/10 px-1 py-0.5 text-zinc-200" aria-label="Wheelbase mm" />
-                  </label>
+              <div className="space-y-4">
+                <div className="bg-[#13181D] border border-white/10 p-4" data-testid="mr-field-card">
+                  <div className="flex flex-wrap items-center gap-3 mb-2">
+                    <h3 className="text-xs uppercase tracking-wide text-[#8a909a] m-0">Motion-ratio field MR(bump, steer)</h3>
+                    <button type="button" onClick={computeMrField} disabled={mrFieldBusy} className="text-[11px] px-2.5 py-1 border border-signal bg-signal text-carbon font-semibold hover:bg-[#d6f56e] disabled:opacity-40">
+                      {mrFieldBusy ? "Computing" : "Compute MR Field"}
+                    </button>
+                    <label className="text-[11px] text-[#8a909a] flex items-center gap-1">
+                      Wheelbase (mm, optional, enables Ackermann)
+                      <input type="number" inputMode="decimal" value={mrWheelbase} onChange={(e) => setMrWheelbase(e.target.value)} className="v2-num w-20 bg-[#0C0F12] border border-white/10 px-1 py-0.5 text-zinc-200" aria-label="Wheelbase mm" />
+                    </label>
+                  </div>
+                  {mrFieldError && <p role="alert" className="text-[11px] text-[#d9534f] m-0 mb-2">{mrFieldError}</p>}
+                  <MotionRatioField data={mrField} />
                 </div>
-                {mrFieldError && <p role="alert" className="text-[11px] text-[#d9534f] m-0 mb-2">{mrFieldError}</p>}
-                <MotionRatioField data={mrField} />
+
+                <div className="bg-[#080a10] border border-[#1c1f2e] rounded-xl p-4 h-[520px]">
+                  <Plot
+                    data={[
+                      {
+                        x: dz,
+                        y: maskDiverged(result?.motion_ratio, result?.converged),
+                        name: isComparisonMode ? "Setup A — Motion Ratio" : "Motion Ratio",
+                        type: "scatter",
+                        mode: "lines",
+                        line: { color: COLORS.emerald, width: 2.5 },
+                      },
+                      ...(isComparisonMode && resultB
+                        ? [
+                            {
+                              x: dzB,
+                              y: maskDiverged(resultB.motion_ratio, resultB.converged),
+                              name: "Setup B — Motion Ratio",
+                              type: "scatter" as const,
+                              mode: "lines" as const,
+                              line: { color: COLORS.candidateAmber, width: 2.5, dash: "dot" as const },
+                            },
+                          ]
+                        : []),
+                      ...failureTrace((idx) => result?.motion_ratio?.[idx] ?? 0),
+                    ]}
+                    layout={{
+                      ...plotLayout(
+                        "Damper Motion Ratio (Spring / Wheel Deflection Rate) vs Wheel Travel",
+                        zMin,
+                        zMax,
+                        currentTravel,
+                        { title: { text: "Wheel Travel [mm]", font: { size: 11, color: "#94A3B8" } } },
+                        { title: { text: "Motion Ratio [mm/mm]", font: { size: 11, color: "#94A3B8" } } },
+                        undefined,
+                        targetBands.motion_ratio
+                      ),
+                    }}
+                    config={{ responsive: true, displaylogo: false }}
+                    style={{ width: "100%", height: "100%" }}
+                    useResizeHandler
+                    onClick={handlePlotClick}
+                  />
+                </div>
               </div>
             )}
 

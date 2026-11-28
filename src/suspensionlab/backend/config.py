@@ -119,7 +119,8 @@ class Settings(BaseSettings):
     app_base_url: str = "http://localhost:3000"
     sentry_dsn: str = ""
 
-    # ── Enterprise SSO (OIDC) ──────────────────────────────────────────────
+    # ── Enterprise SSO (OIDC / SAML) ────────────────────────────────────────
+    enable_saml_sso: bool = False
     oidc_enabled: bool = False
     oidc_issuer: str = ""                 # e.g. https://idp.example.com/realms/suspensionlab
     oidc_client_id: str = ""

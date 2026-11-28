@@ -158,7 +158,7 @@ export default function PDFExport({
         pdf.setFontSize(8);
         pdf.setFont("helvetica", "normal");
         pdf.setTextColor(148, 163, 184);
-        pdf.text("Authoritative Engineering Artifact & Compliance Certificate", margin, 15);
+        pdf.text("SuspensionLab Engineering Simulation Artifact", margin, 15);
 
         pdf.setFontSize(7.5);
         pdf.setTextColor(100, 116, 139);
@@ -188,13 +188,20 @@ export default function PDFExport({
           footY + 6
         );
 
-        // Wave 6: solver provenance Trust Badge in every PDF footer.
-        pdf.setTextColor(5, 150, 105);
+        // Wave 6: honest provenance badge line tied to verification & signature state.
+        const signedProvenance = Boolean(approval?.status === "APPROVED" && approval?.signature && approval.signature.trim().length > 0);
+        const provenanceLabel =
+          signedProvenance && typeof correlationPct === "number"
+            ? "SIGNED PROVENANCE"
+            : signedProvenance
+            ? "SIGNED SIMULATION PROVENANCE"
+            : "SIMULATION PROVENANCE (UNVALIDATED)";
+        pdf.setTextColor(signedProvenance ? 5 : 100, signedProvenance ? 150 : 116, signedProvenance ? 105 : 139);
         pdf.setFont("helvetica", "bold");
         const badgeBits = [
-          "VERIFIED PROVENANCE",
+          provenanceLabel,
           solverVersion_ ? `solver ${solverVersion_}` : null,
-          effectiveInputHash ? `input ${String(effectiveInputHash).substring(0, 16)}…` : null,
+          effectiveInputHash ? `input ${String(effectiveInputHash).substring(0, 16)}...` : null,
         ].filter(Boolean).join("  |  ");
         pdf.text(badgeBits, margin, footY + 10);
         pdf.setFont("helvetica", "normal");
@@ -468,9 +475,18 @@ export default function PDFExport({
       pdf.setFontSize(7);
       pdf.setFont("helvetica", "normal");
       pdf.setTextColor(71, 85, 105);
-      pdf.text(`Principal Frequency Weighting: Wk (Vertical Seat Vibration)  ·  Comfort Rating: ${comfortCategory}`, margin + 4, y + 12);
-      pdf.text("Continuous Exposure 8-Hour Daily Limit: PASS  ·  Crest Factor: 2.14  ·  Kurtosis: 3.08", margin + 4, y + 17);
-      pdf.text("Residual Mean Absolute Error (MAE): 1.41 mm  ·  R² Correlation vs Physical Rig: 0.9945", margin + 4, y + 22);
+      const pdfWkRms = metrics?.["Wk-Weighted RMS Accel"] || "N/A";
+      const pdfVdvStr = metrics?.["Vibration Dose Value (VDV)"] || "N/A";
+      const pdfVdvNum = typeof pdfVdvStr === "string" ? parseFloat(pdfVdvStr) : Number.NaN;
+      const eavStatus = Number.isFinite(pdfVdvNum) && pdfVdvNum > 0
+        ? (pdfVdvNum <= 9.1 ? "Below ISO 2631-1 Action Value (9.1)" : pdfVdvNum <= 17.0 ? "Caution: Above Action Value (9.1-17.0)" : "Exceeds Exposure Limit (> 17.0)")
+        : "Not evaluated";
+      const rigCorrelationText = typeof correlationPct === "number"
+        ? `Telemetry Correlation: ${correlationPct.toFixed(2)}% (${validationStatus_})`
+        : "Telemetry Correlation vs Physical Rig: UNVALIDATED (No empirical dataset)";
+      pdf.text(`Principal Frequency Weighting: Wk  |  Comfort Rating: ${comfortCategory}  |  RMS: ${pdfWkRms}  |  VDV: ${pdfVdvStr}`, margin + 4, y + 12);
+      pdf.text(`ISO 2631-1 Daily Exposure Check: ${eavStatus}`, margin + 4, y + 17);
+      pdf.text(rigCorrelationText, margin + 4, y + 22);
 
       y += 32;
 
@@ -736,9 +752,9 @@ export default function PDFExport({
 
       pdf.setTextColor(217, 119, 6);
       pdf.setFontSize(6);
-      pdf.text("— Tire Friction Boundary", ggX + 10, ggY + 5);
+      pdf.text("-- Tire Friction Boundary", ggX + 10, ggY + 5);
       pdf.setTextColor(37, 99, 235);
-      pdf.text("● Simulated Operating Points", ggX + 50, ggY + 5);
+      pdf.text("* Simulated Operating Points", ggX + 50, ggY + 5);
 
       y += 66;
 

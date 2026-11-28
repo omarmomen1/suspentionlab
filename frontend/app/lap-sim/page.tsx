@@ -1187,8 +1187,8 @@ export default function LapSimPage() {
   // 3-Tab Track Input Selector: preset (Championship), custom (Architect), csv (Telemetry)
   const [trackInputTab, setTrackInputTab] = useState<TrackInputTab>("preset");
   const [selectedCircuitId, setSelectedCircuitId] = useState<string>("spa");
-  // Opt-in Spa elevation profile (coarse official-map stations). Off by default so results do not change.
-  const [includeElevation, setIncludeElevation] = useState<boolean>(false);
+  // Spa elevation profile ON by default for high-relief 3D terrain visualization.
+  const [includeElevation, setIncludeElevation] = useState<boolean>(true);
 
   // Manual Vehicle Overrides Lock (Toggle: 🔒 Overrides Locked / 🔓 Auto-Preset: On)
   const [manualOverridesLocked, setManualOverridesLocked] = useState<boolean>(false);
@@ -2623,20 +2623,20 @@ export default function LapSimPage() {
                   </div>
                 </div>
 
+                <section data-testid="terrain-section" className="border border-white/10 bg-[#13181D] p-3 flex flex-col gap-2">
+                  <label className="flex items-center gap-2 text-xs text-zinc-300">
+                    <input type="checkbox" checked={includeElevation} disabled={selectedCircuitId !== "spa"} onChange={(e) => setIncludeElevation(e.target.checked)} className="accent-[#C8F04B]" />
+                    Include Elevation (Spa)
+                    <span className="text-[10px] text-zinc-500">{selectedCircuitId !== "spa" ? "Only Spa has elevation data." : "Applies on the next run. Also changes the grade term, so lap time changes."}</span>
+                  </label>
+                  <TerrainElevation3D trace={result.trace as any} />
+                </section>
+
                 <EnvelopePlot
                   latG={result.trace.lat_g}
                   longG={result.trace.long_g}
                   limits={envelopeLimits(result.ggv_envelope)}
                 />
-
-                <section data-testid="terrain-section" className="border border-white/10 bg-[#13181D] p-3 flex flex-col gap-2">
-                  <label className="flex items-center gap-2 text-xs text-zinc-300">
-                    <input type="checkbox" checked={includeElevation} disabled={selectedCircuitId !== "spa"} onChange={(e) => setIncludeElevation(e.target.checked)} />
-                    Include Elevation (Spa)
-                    <span className="text-[10px] text-zinc-500">{selectedCircuitId !== "spa" ? "Only Spa has elevation data. Other circuits stay flat (z = 0)." : "Applies on the next run. Also changes the grade term, so lap time changes."}</span>
-                  </label>
-                  <TerrainElevation3D trace={result.trace as any} />
-                </section>
 
                 {/* LapDeltaView (Setup A vs Setup B comparison) */}
                 <LapDeltaView

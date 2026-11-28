@@ -6,6 +6,7 @@ Enterprise SAML 2.0 Single Sign-On Routes (SP-Initiated, ACS, Metadata, IdP-Init
 from __future__ import annotations
 
 import logging
+import os
 import secrets
 import uuid
 from datetime import datetime, timezone
@@ -35,6 +36,16 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/auth/saml", tags=["SAML 2.0 SSO"])
 
 
+def _require_saml_enabled() -> None:
+    """Fail-closed gate for hand-rolled SAML login/ACS routes until python3-saml/signxml migration."""
+    enabled = settings.enable_saml_sso or os.getenv("ENABLE_SAML_SSO", "false").lower() in ("1", "true", "yes")
+    if not enabled:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="SAML SSO is currently disabled",
+        )
+
+
 @router.get("/metadata", response_class=PlainResponse)
 async def get_saml_metadata(
     org_slug: Optional[str] = Query(None),
@@ -62,6 +73,7 @@ async def saml_login(
     db: AsyncSession = Depends(get_db_dependency),
 ):
     """SP-Initiated SAML Login redirect."""
+    _require_saml_enabled()
     org = (
         await db.execute(select(Organization).where(Organization.slug == org_slug.lower(), Organization.deleted_at == None))
     ).scalar_one_or_none()
@@ -98,6 +110,7 @@ async def saml_acs(
     db: AsyncSession = Depends(get_db_dependency),
 ):
     """Assertion Consumer Service (ACS) endpoint handling SAMLResponse POST."""
+    _require_saml_enabled()
     org: Optional[Organization] = None
     target_return_to = "/dashboard"
 

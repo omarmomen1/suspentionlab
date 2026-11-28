@@ -4,6 +4,7 @@ import json
 import asyncio
 import os
 import math
+import numpy as np
 from datetime import datetime, timezone
 from opentelemetry import trace
 from opentelemetry.propagate import extract
@@ -49,7 +50,6 @@ def _serialize_for_json(obj, seen=None):
     if obj_id in seen:
         return None
 
-    import numpy as np
     from enum import Enum
     from dataclasses import is_dataclass, asdict
 
@@ -91,7 +91,6 @@ def _serialize_for_json(obj, seen=None):
 
 def _check_has_nan_or_inf(obj) -> bool:
     """Recursively checks if any numerical value in a data structure contains NaN or Inf."""
-    import numpy as np
     if isinstance(obj, (float, int)):
         return math.isnan(obj) or math.isinf(obj)
     if isinstance(obj, np.ndarray):
@@ -273,7 +272,6 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
                         backend_name = "scipy"
                         from suspensionlab.physics.full_car import FullCarParams, run_full_car_analysis, FourCornerRoadProfile
                         from suspensionlab.physics.quarter_car import _road_profile_fn
-                        import numpy as np
 
                         pdump = payload["params"].copy()
                         asymmetry = pdump.pop("road_asymmetry", 0.3)
@@ -354,8 +352,7 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
                         solver_name = "BDF"
                         backend_name = "scipy"
                         from suspensionlab.physics.handling_model import HandlingParams, simulate_maneuver
-                        import numpy as np
-                        
+
                         pdump = payload["params"].copy()
                         if pdump.get("tire_coeffs"):
                             from suspensionlab.physics.magic_formula import TireCoeffs
@@ -699,11 +696,11 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
             
             await db.execute(update(JobRecord).where(JobRecord.id == job_uuid).values(
                 status="FAILED",
-                error=f"Transient Error: {str(e)}"
+                error=f"Simulation execution failed (job {job_id}). Please inspect server logs for details."
             ))
             await db.commit()
-            
-            logger.warning(f"Transient error in job {job_id}: {str(e)}")
+
+            logger.warning(f"Transient error in job {job_id}: {str(e)}", exc_info=True)
             span.record_exception(e)
             WORKER_JOBS_TOTAL.labels(queue="default", status="failed_transient").inc()
             WORKER_JOB_DURATION.labels(queue="default").observe(time.time() - start_time)
@@ -781,7 +778,6 @@ def run_job(job_id: str, payload: dict, trace_carrier: dict = None):
 
 
 def perform_monte_carlo_sync(payload_dict: dict) -> dict:
-    import numpy as np
     from suspensionlab.physics.quarter_car import QuarterCarParams, RoadProfile, run_quarter_car_analysis
     
     iters = payload_dict["iterations"]

@@ -19,7 +19,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from suspensionlab.backend.database.core import get_db_dependency
 from suspensionlab.backend.database.models.user import User
 from suspensionlab.backend.security.jwt_utils import (
-    hash_password, verify_password, create_access_token, create_refresh_token, decode_access_token, decode_refresh_token
+    hash_password,
+    verify_password,
+    create_access_token,
+    create_refresh_token,
+    decode_access_token,
+    decode_refresh_token,
+    create_password_reset_token,
+    decode_password_reset_token,
 )
 from suspensionlab.backend.database.models.user_session import UserSession
 from suspensionlab.backend.core.redis_client import get_async_redis_conn
@@ -87,26 +94,55 @@ async def refresh_token_endpoint(
         raise HTTPException(status_code=401, detail="Refresh token is invalid or expired.")
         
     if await _is_revoked(payload.get("jti")):
+        # Reuse detection: revoke all sessions if an already-rotated refresh token is replayed
+        if db and payload.get("sub"):
+            try:
+                from sqlalchemy import delete
+                uid = uuid.UUID(str(payload["sub"]))
+                await db.execute(delete(UserSession).where(UserSession.user_id == uid))
+                await db.commit()
+            except Exception:
+                await db.rollback()
         raise HTTPException(status_code=401, detail="Refresh token has been revoked.")
-        
+
+    # Load live user record so deleted users are rejected and plan/email reflect DB state
+    try:
+        user_uuid = uuid.UUID(str(payload["sub"]))
+    except (ValueError, KeyError):
+        raise HTTPException(status_code=401, detail="Invalid token subject.")
+
+    user_res = await db.execute(
+        select(User).where(User.id == user_uuid, User.deleted_at.is_(None))
+    )
+    user: User | None = user_res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=401, detail="Account does not exist or has been deactivated.")
+
+    if user.plan == PlanTier.PRO and user.trial_ends_at:
+        trial_end = user.trial_ends_at
+        if trial_end.tzinfo is None:
+            trial_end = trial_end.replace(tzinfo=timezone.utc)
+        if datetime.now(timezone.utc) > trial_end:
+            user.plan = PlanTier.FREE
+            await db.commit()
+            await db.refresh(user)
+
     # Rotate: Blacklist old refresh token
     await _blacklist_jti(payload, reason="rotation")
-    
+
     if db:
         from sqlalchemy import delete
         await db.execute(delete(UserSession).where(UserSession.jti == payload.get("jti")))
-        # FIXED: Added missing commit — without this, the DELETE was never persisted,
-        # causing revoked session records to persist in the database.
         await db.commit()
     new_access_token = create_access_token({
-        "sub": payload["sub"],
-        "email": payload.get("email", ""),
-        "plan": payload.get("plan", "FREE"),
+        "sub": str(user.id),
+        "email": user.email,
+        "plan": user.plan,
     })
     new_refresh_token = create_refresh_token({
-        "sub": payload["sub"],
-        "email": payload.get("email", ""),
-        "plan": payload.get("plan", "FREE"),
+        "sub": str(user.id),
+        "email": user.email,
+        "plan": user.plan,
     })
     
     new_payload = decode_refresh_token(new_refresh_token)
@@ -206,53 +242,64 @@ async def clear_cookie(request: Request, response: Response, db: AsyncSession = 
 
 class ResetPasswordRequest(BaseModel):
     token: str
-    new_password: str
+    new_password: str = Field(..., min_length=12, max_length=128)
+
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
+
 @router.post("/forgot-password", dependencies=[Depends(RateLimiter("rate_limit_login"))])
 async def forgot_password(req: ForgotPasswordRequest, db: AsyncSession = Depends(get_db_dependency)):
     """Generate a signed, time-limited reset token and send via email."""
-    # FIXED: Accept email in request body (not query param) to prevent PII leaking
-    # into server access logs, browser history, and proxy/CDN logs.
-    result = await db.execute(select(User).where(User.email == req.email.lower()))
+    result = await db.execute(
+        select(User).where(User.email == req.email.lower(), User.deleted_at.is_(None))
+    )
     user = result.scalar_one_or_none()
-    
+
     if user:
         from suspensionlab.backend.services.email import send_password_reset_email
         from datetime import timedelta
-        reset_token = create_access_token({"sub": str(user.id), "type": "password_reset"}, 
-                                          expires_delta=timedelta(hours=1))
+        reset_token = create_password_reset_token(str(user.id), expires_delta=timedelta(hours=1))
         await send_password_reset_email(user.email, reset_token)
     return {"status": "ok", "message": "If an account with that email exists, a reset link has been sent."}
 
-@router.post("/reset-password")
+
+@router.post("/reset-password", dependencies=[Depends(RateLimiter("rate_limit_login"))])
 async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(get_db_dependency)):
-    """Consume reset token and update password."""
-    payload = decode_access_token(req.token)
-    if not payload or payload.get("type") != "password_reset":
-        from fastapi import HTTPException
+    """Consume reset token, update password, and revoke all existing sessions."""
+    payload = decode_password_reset_token(req.token)
+    if not payload:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token.")
-    
+
+    if await _is_revoked(payload.get("jti")):
+        raise HTTPException(status_code=400, detail="Reset token has already been used.")
+
     import uuid as _uuid
     try:
         user_uuid = _uuid.UUID(str(payload["sub"]))
     except (ValueError, KeyError):
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="Invalid token subject.")
-    
-    result = await db.execute(select(User).where(User.id == user_uuid))
+
+    result = await db.execute(
+        select(User).where(User.id == user_uuid, User.deleted_at.is_(None))
+    )
     user = result.scalar_one_or_none()
     if not user:
-        from fastapi import HTTPException
         raise HTTPException(status_code=404, detail="User not found.")
-        
+
     loop = asyncio.get_running_loop()
     user.password_hash = await loop.run_in_executor(None, hash_password, req.new_password)
+
+    # Invalidate every active session and blacklist their JTIs upon password reset
+    from sqlalchemy import delete
+    sessions_res = await db.execute(select(UserSession).where(UserSession.user_id == user.id))
+    for sess in sessions_res.scalars().all():
+        if getattr(sess, "jti", None):
+            await _blacklist_jti({"jti": sess.jti, "exp": payload.get("exp")}, reason="password_reset_session_invalidation")
+    await db.execute(delete(UserSession).where(UserSession.user_id == user.id))
     await db.commit()
-    # FIXED: Blacklist the reset token immediately after use to prevent link reuse.
-    # Without this, the reset link could be used multiple times within its 1-hour window.
+
     await _blacklist_jti(payload, reason="password_reset_used")
     return {"status": "ok"}
 
@@ -350,47 +397,23 @@ async def login(request: Request, req: LoginRequest, response: Response, db: Asy
         if isinstance(e, HTTPException) or e.__class__.__name__ == "RateLimitExceededError":
             raise HTTPException(status_code=429, detail=str(e))
 
-    result = await db.execute(select(User).where(User.email == req.email.lower()))
+    result = await db.execute(
+        select(User).where(User.email == req.email.lower(), User.deleted_at.is_(None))
+    )
     user: User | None = result.scalar_one_or_none()
 
     loop = asyncio.get_running_loop()
     if not user:
-        if req.email.lower() == "testuser@suspensionlab.com":
-            user_id = uuid.uuid4()
-            hashed = await loop.run_in_executor(None, hash_password, req.password)
-            user = User(
-                id=user_id,
-                email=req.email.lower(),
-                password_hash=hashed,
-                name="Test User",
-                plan=PlanTier.PRO.value,
-                trial_ends_at=None,
-                api_key=hashlib.sha256(f"sk_{secrets.token_urlsafe(32)}".encode()).hexdigest(),
-                onboarding_complete=True,
-            )
-            db.add(user)
-            await db.commit()
-            await db.refresh(user)
-        else:
-            await record_login_failure(request, req.email)
-            raise HTTPException(status_code=401, detail="Incorrect email or password.")
-        
+        await record_login_failure(request, req.email)
+        raise HTTPException(status_code=401, detail="Incorrect email or password.")
+
     is_valid, needs_rehash = await loop.run_in_executor(None, verify_password, req.password, user.password_hash)
     if not is_valid:
-        if req.email.lower() == "testuser@suspensionlab.com" and req.password in ("SuspensionLab2026!#", "TestPass123!", "password123", "Testuser123!", "Password123!"):
-            is_valid = True
-            needs_rehash = True
-        else:
-            await record_login_failure(request, req.email)
-            raise HTTPException(status_code=401, detail="Incorrect email or password.")
-        
+        await record_login_failure(request, req.email)
+        raise HTTPException(status_code=401, detail="Incorrect email or password.")
+
     if needs_rehash:
         user.password_hash = await loop.run_in_executor(None, hash_password, req.password)
-        await db.commit()
-
-    if user.email.lower() == "testuser@suspensionlab.com":
-        user.plan = PlanTier.PRO.value
-        user.onboarding_complete = True
         await db.commit()
 
     # Downgrade from trial if expired

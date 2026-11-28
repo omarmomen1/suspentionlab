@@ -1213,7 +1213,7 @@ function CorrelationCockpitContent() {
                   <div className="flex items-center justify-between text-xs font-mono">
                     <div className="flex items-center gap-4">
                       <span className="flex items-center gap-1 text-cyan-400">
-                        <span className="w-3 h-0.5 bg-cyan-400 inline-block" /> MEASURED (DAQ)
+                        <span className="w-3 h-0.5 bg-cyan-400 inline-block" /> {isSampleDataset ? "SAMPLE (Demo CSV)" : "UPLOADED CSV"}
                       </span>
                       <span className="flex items-center gap-1 text-amber-400">
                         <span className="w-3 h-0.5 bg-amber-400 inline-block border-t border-dashed" /> MODEL (ODE)

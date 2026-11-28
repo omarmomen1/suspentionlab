@@ -725,7 +725,13 @@ function ReportContent() {
                   <p className="text-xl font-bold font-mono text-blue-400 print:text-blue-700 mt-1">
                     {metrics["Vibration Dose Value (VDV)"] || "—"}
                   </p>
-                  <p className="text-[10px] text-gray-400 print:text-gray-600 mt-0.5">8-Hour Daily Limit: PASS</p>
+                  <p className="text-[10px] text-gray-400 print:text-gray-600 mt-0.5">
+                    {(() => {
+                      const v = parseFloat(String(metrics["Vibration Dose Value (VDV)"] || ""));
+                      if (!Number.isFinite(v) || v <= 0) return "ISO 2631-1 Daily Check: Not evaluated";
+                      return v <= 9.1 ? "ISO 2631-1 Daily Check: Below EAV (<= 9.1)" : v <= 17.0 ? "ISO 2631-1 Daily Check: Caution (9.1-17.0)" : "ISO 2631-1 Daily Check: Above ELV (> 17.0)";
+                    })()}
+                  </p>
                 </div>
                 <div className="p-4 bg-black/40 print:bg-gray-100 rounded-xl border border-[#1f1f26] print:border-gray-200">
                   <p className="text-[10px] text-gray-500 print:text-gray-600 font-bold uppercase">Heave Natural Frequency</p>
