@@ -45,6 +45,7 @@ build/
 .agents/
 .claude/
 scratch/
+incoming_waves/
 .pytest_cache/
 .hypothesis/
 deploy_hf/
