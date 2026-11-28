@@ -74,8 +74,8 @@ export function ElevationProfile2D({ trace }: { trace: TerrainTrace | null | und
 /** Track ribbon lifted by z(s), drawn x5 vertically (labelled). One canvas, hidden below 640 px. */
 export default function TerrainElevation3D({ trace }: { trace: TerrainTrace | null | undefined }) {
   const wide = useWideViewport();
-  const pts = useMemo(() => {
-    if (!trace || !fin(trace.x_m) || !fin(trace.y_m) || !fin(trace.z_m)) return null;
+  const { pts, basePts } = useMemo(() => {
+    if (!trace || !fin(trace.x_m) || !fin(trace.y_m) || !fin(trace.z_m)) return { pts: null, basePts: null };
     const n = Math.min(trace.x_m.length, trace.y_m.length, trace.z_m.length);
     const step = Math.max(1, Math.floor(n / 800));
     const cx = (range(trace.x_m).min + range(trace.x_m).max) / 2;
@@ -83,19 +83,30 @@ export default function TerrainElevation3D({ trace }: { trace: TerrainTrace | nu
     const z0 = range(trace.z_m).min;
     const span = Math.max(range(trace.x_m).max - range(trace.x_m).min, range(trace.y_m).max - range(trace.y_m).min, 1);
     const out: number[] = [];
+    const base: number[] = [];
     for (let i = 0; i < n; i += step) {
-      out.push((trace.x_m[i] - cx) / span * 6, ((trace.z_m[i] - z0) * TERRAIN_Z_EXAGGERATION) / span * 6, (trace.y_m[i] - cy) / span * 6);
+      const px = (trace.x_m[i] - cx) / span * 6;
+      const pz = (trace.y_m[i] - cy) / span * 6;
+      out.push(px, ((trace.z_m[i] - z0) * TERRAIN_Z_EXAGGERATION) / span * 6, pz);
+      base.push(px, 0, pz);
     }
-    return new Float32Array(out);
+    return { pts: new Float32Array(out), basePts: new Float32Array(base) };
   }, [trace]);
   const readout = <TerrainReadout trace={trace} />;
-  if (!pts || !hasElevationData(trace)) return readout;
+  if (!pts || !basePts || !hasElevationData(trace)) return readout;
   return (
     <div data-testid="terrain-3d">
       {wide ? (
-        <div className="h-[240px] border border-white/10">
-          <Canvas camera={{ position: [5, 4, 5], fov: 35 }} dpr={[1, 1.5]}>
-            <gridHelper args={[8, 16, "#2a3036", "#1a2026"]} />
+        <div className="h-[360px] lg:h-[420px] border border-white/15 bg-[#0C0F12]">
+          <Canvas camera={{ position: [4.8, 3.8, 4.8], fov: 35 }} dpr={[1, 1.75]}>
+            <color attach="background" args={["#0C0F12"]} />
+            <gridHelper args={[8, 16, "#36414f", "#1e252e"]} />
+            <line>
+              <bufferGeometry>
+                <bufferAttribute attach="attributes-position" count={basePts.length / 3} array={basePts} itemSize={3} />
+              </bufferGeometry>
+              <lineBasicMaterial color="#4e5d2a" />
+            </line>
             <line>
               <bufferGeometry>
                 <bufferAttribute attach="attributes-position" count={pts.length / 3} array={pts} itemSize={3} />

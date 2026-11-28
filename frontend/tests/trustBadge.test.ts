@@ -39,8 +39,12 @@ describe("Wave 6 Trust Badge & Solver Provenance", () => {
     expect(block).toContain("solver_version: string");
   });
 
-  it("exported PDF footer carries the provenance badge line", () => {
+  it("exported PDF footer carries the honest provenance badge line", () => {
     const src = read("components/PDFExport.tsx");
-    expect(src).toContain("VERIFIED PROVENANCE");
+    expect(src).toContain("SIMULATION PROVENANCE");
+    expect(src).toContain("SIGNED PROVENANCE");
+    expect(src).not.toContain("Compliance Certificate");
+    expect(src).not.toContain("0.9945");
+    expect(src).not.toContain("8-Hour Daily Limit: PASS");
   });
 });

@@ -147,42 +147,56 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db_dep
                 user = res.scalar_one_or_none()
 
         if user:
+            obj_status = (obj.get("status") if isinstance(obj, dict) else getattr(obj, "status", None)) or ""
+            payment_status = (obj.get("payment_status") if isinstance(obj, dict) else getattr(obj, "payment_status", None)) or ""
+            sub_ref = (obj.get("subscription") if isinstance(obj, dict) else getattr(obj, "subscription", None)) if event_type == "checkout.session.completed" else sub_id
+
+            if event_type == "checkout.session.completed":
+                is_entitled = str(payment_status).lower() in ("paid", "no_payment_required")
+            else:
+                is_entitled = str(obj_status).lower() in ("active", "trialing")
+
             # Persist billing_customer_id on first subscription event
             if customer_id and not user.billing_customer_id:
                 user.billing_customer_id = str(customer_id)
 
-            # Extract items list
-            data_items = []
-            if isinstance(items_obj, dict):
-                data_items = items_obj.get("data", [])
-            elif hasattr(items_obj, "data"):
-                data_items = items_obj.data
-            elif isinstance(items_obj, list):
-                data_items = items_obj
-
-            price_id = None
-            if data_items and len(data_items) > 0:
-                first_item = data_items[0]
-                if isinstance(first_item, dict):
-                    price_val = first_item.get("price")
-                    price_id = price_val.get("id") if isinstance(price_val, dict) else getattr(price_val, "id", None)
-                else:
-                    price_val = getattr(first_item, "price", None) or (first_item.get("price") if hasattr(first_item, "get") else None)
-                    price_id = getattr(price_val, "id", None) if not isinstance(price_val, dict) else price_val.get("id")
-
-            if sub_id:
-                user.billing_subscription_id = str(sub_id)
-
-            if price_id == STRIPE_ENTERPRISE_PRICE_ID:
-                user.plan = PlanTier.ENTERPRISE
-            elif price_id == STRIPE_PRO_PRICE_ID:
-                user.plan = PlanTier.PRO
-            else:
+            if not is_entitled:
                 logger.warning(
-                    "Stripe webhook: unknown price_id '%s' for customer %s — plan unchanged.",
-                    price_id, customer_id
+                    "Stripe webhook: skipping plan grant for user %s due to status='%s' payment_status='%s'",
+                    user.id, obj_status, payment_status,
                 )
-            await db.commit()
+            else:
+                # Extract items list
+                data_items = []
+                if isinstance(items_obj, dict):
+                    data_items = items_obj.get("data", [])
+                elif hasattr(items_obj, "data"):
+                    data_items = items_obj.data
+                elif isinstance(items_obj, list):
+                    data_items = items_obj
+
+                price_id = None
+                if data_items and len(data_items) > 0:
+                    first_item = data_items[0]
+                    if isinstance(first_item, dict):
+                        price_val = first_item.get("price")
+                        price_id = price_val.get("id") if isinstance(price_val, dict) else getattr(price_val, "id", None)
+                    else:
+                        price_val = getattr(first_item, "price", None) or (first_item.get("price") if hasattr(first_item, "get") else None)
+                        price_id = getattr(price_val, "id", None) if not isinstance(price_val, dict) else price_val.get("id")
+
+                if sub_ref:
+                    user.billing_subscription_id = str(sub_ref)
+
+                if price_id == STRIPE_ENTERPRISE_PRICE_ID:
+                    user.plan = PlanTier.ENTERPRISE
+                elif price_id == STRIPE_PRO_PRICE_ID:
+                    user.plan = PlanTier.PRO
+                else:
+                    logger.warning(
+                        "Stripe webhook: unknown price_id '%s' for customer %s — plan unchanged.",
+                        price_id, customer_id
+                    )
 
     elif event_type == "customer.subscription.deleted":
         user = None
@@ -201,15 +215,12 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db_dep
         if user:
             user.plan = PlanTier.FREE
             user.billing_subscription_id = None
-            await db.commit()
-            if user:
-                user.plan = PlanTier.FREE
-                user.billing_subscription_id = None
-                await db.commit()
 
     try:
         await db.commit()
-    except Exception:
+    except Exception as exc:
         await db.rollback()
-            
+        logger.exception("Stripe webhook DB commit failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Webhook persistence failed; please retry.")
+
     return {"received": True}

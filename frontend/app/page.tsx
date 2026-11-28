@@ -2,11 +2,17 @@
 
 import React from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useAuth } from "../contexts/AuthContext";
 import { NAV_V2 } from "../lib/navigation";
 import CommandCenterWorkspace from "../components/CommandCenterWorkspace";
 import BenchmarkWall from "../components/v2/BenchmarkWall";
 import StatusPill from "../components/v2/StatusPill";
+
+const LandingHero3D = dynamic(() => import("../components/v2/LandingHero3D"), {
+  ssr: false,
+  loading: () => <div className="h-[360px] border border-hairline bg-panel" />,
+});
 
 // Claims ledger. Every row names its evidence.
 // No benchmark in this repository compares against measured vehicle data.
@@ -91,23 +97,48 @@ export default function HomePage() {
             )}
           </div>
 
-          {/* Real app proof: what the app actually runs today, with the evidence pointer for each. */}
-          <aside aria-label="What runs today" className="rounded border border-hairline bg-panel p-5 lg:col-span-5">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">What runs today</p>
-            <ul className="mt-3 space-y-3 text-sm">
-              {[
-                ["3D double-wishbone kinematics", "Camber gain, bump steer, roll center from hardpoints"],
-                ["Quarter-car, half-car and 7-DOF full-car", "Modal frequencies, Bode plots, ISO 2631 comfort"],
-                ["ApexSim lap studio", "Closed-loop multi-pass solver with bottoming detection"],
-                ["Telemetry correlation and investigation", "Measured data against simulation, stage by stage"],
-              ].map(([t, d]) => (
-                <li key={t} className="border-t border-hairline pt-3 first:border-t-0 first:pt-0">
-                  <p className="font-semibold text-white">{t}</p>
-                  <p className="text-xs text-gray-400">{d}</p>
-                </li>
-              ))}
-            </ul>
-            <p className="mt-4 text-[11px] text-gray-500">Live checks are on the Benchmark Wall below.</p>
+          {/* Interactive 3D double-wishbone schematic on desktop; flat proof card below lg */}
+          <aside aria-label="What runs today" className="lg:col-span-5">
+            <div className="hidden lg:block">
+              <LandingHero3D />
+              <details className="mt-3 rounded border border-hairline bg-panel px-4 py-3 text-xs">
+                <summary className="cursor-pointer font-semibold uppercase tracking-[0.14em] text-gray-300 hover:text-signal">
+                  What runs today — solver capabilities
+                </summary>
+                <ul className="mt-3 space-y-2.5 text-xs">
+                  {[
+                    ["3D double-wishbone kinematics", "Camber gain, bump steer, roll center from hardpoints"],
+                    ["Quarter-car, half-car and 7-DOF full-car", "Modal frequencies, Bode plots, ISO 2631 comfort"],
+                    ["ApexSim lap studio", "Closed-loop multi-pass solver with bottoming detection"],
+                    ["Telemetry correlation and investigation", "Measured data against simulation, stage by stage"],
+                  ].map(([t, d]) => (
+                    <li key={t} className="border-t border-hairline pt-2 first:border-t-0 first:pt-0">
+                      <p className="font-semibold text-white">{t}</p>
+                      <p className="text-gray-400">{d}</p>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-3 text-[11px] text-gray-500">Live checks are on the Benchmark Wall below.</p>
+              </details>
+            </div>
+
+            <div className="lg:hidden rounded border border-hairline bg-panel p-5">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">What runs today</p>
+              <ul className="mt-3 space-y-3 text-sm">
+                {[
+                  ["3D double-wishbone kinematics", "Camber gain, bump steer, roll center from hardpoints"],
+                  ["Quarter-car, half-car and 7-DOF full-car", "Modal frequencies, Bode plots, ISO 2631 comfort"],
+                  ["ApexSim lap studio", "Closed-loop multi-pass solver with bottoming detection"],
+                  ["Telemetry correlation and investigation", "Measured data against simulation, stage by stage"],
+                ].map(([t, d]) => (
+                  <li key={t} className="border-t border-hairline pt-3 first:border-t-0 first:pt-0">
+                    <p className="font-semibold text-white">{t}</p>
+                    <p className="text-xs text-gray-400">{d}</p>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-4 text-[11px] text-gray-500">Live checks are on the Benchmark Wall below.</p>
+            </div>
           </aside>
         </div>
       </section>

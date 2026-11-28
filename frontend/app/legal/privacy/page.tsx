@@ -47,8 +47,8 @@ export default function PrivacyPage() {
             <h2 className="text-lg font-semibold text-white mb-3">4. Data Sharing</h2>
             <p>We share data only with the following trusted service providers, solely to operate the Service:</p>
             <ul className="list-disc list-inside space-y-2 mt-2">
-              <li><strong className="text-white">Gumroad</strong> — Payment processing.</li>
-              <li><strong className="text-white">Railway.app</strong> — Cloud infrastructure and hosting.</li>
+              <li><strong className="text-white">Gumroad / Stripe</strong> — Payment processing.</li>
+              <li><strong className="text-white">Vercel</strong> — Frontend and serverless API hosting.</li>
               <li><strong className="text-white">Sentry.io</strong> — Error monitoring (data is anonymized).</li>
             </ul>
           </section>

@@ -51,11 +51,11 @@ const AttitudeModel3D = dynamic(() => import("../../components/v2/instruments/At
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 const TABS = [
-  { label: "Time Domain",       icon: TrendingUp  },
-  { label: "Pitch & Roll",      icon: GitBranch   },
-  { label: "Load Transfer",     icon: BarChart3   },
-  { label: "PSD Analysis",      icon: Crosshair   },
   { label: "Footprints & Attitude", icon: GitBranch },
+  { label: "Time Domain",           icon: TrendingUp },
+  { label: "Pitch & Roll",          icon: GitBranch },
+  { label: "Load Transfer",         icon: BarChart3 },
+  { label: "PSD Analysis",          icon: Crosshair },
 ];
 
 // ─── Plotly dark-theme base ──────────────────────────────────────────────────
@@ -504,7 +504,7 @@ function FullCarDashboard() {
         <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-hidden">
           {!results && !isRunning && (
             <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl flex flex-col items-center justify-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-ansys-yellow/5 border border-ansys-yellow/10 flex items-center justify-center"><Activity size={32} strokeWidth={1} className="text-ansys-yellow/40" /></div>
+              <div className="w-16 h-16 rounded-2xl bg-signal/5 border border-signal/15 flex items-center justify-center"><Activity size={32} strokeWidth={1} className="text-signal/60" /></div>
               <div className="text-center"><p className="text-sm font-semibold text-gray-400 mb-1">Configure parameters and click <span className="text-ansys-yellow">Run Solver</span></p><p className="text-xs text-gray-400">7-DOF full car · LTI State-Space · Pitch & Roll</p></div>
             </div>
           )}
@@ -575,7 +575,7 @@ function FullCarDashboard() {
                       onClick={() => setActiveTab(i)}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                         activeTab === i
-                          ? "bg-ansys-yellow text-black shadow-[0_0_12px_rgba(242,169,0,0.2)]"
+                          ? "bg-signal text-carbon border border-signal"
                           : "bg-[#111113] border border-[#1e1e1e] text-gray-400 hover:text-white hover:border-[#2a2a2a]"
                       }`}
                     >
@@ -586,8 +586,30 @@ function FullCarDashboard() {
               </div>
 
               <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-hidden min-h-0">
-                {/* ── TAB 0: TIME DOMAIN ── */}
-                {activeTab === 0 && (
+                {/* ── TAB 0: FOOTPRINTS & ATTITUDE (Primary View) ── */}
+                {activeTab === 0 && (() => {
+                  const n = Array.isArray(r.time) ? r.time.length : 0;
+                  const idx = Math.min(scrubIdx, Math.max(0, n - 1));
+                  const lp = runLoadParamsRef.current;
+                  return (
+                    <div className="h-full overflow-y-auto p-4 flex flex-col gap-4" data-testid="footprints-attitude-tab">
+                      <label className="text-[11px] text-[#8a909a] flex items-center gap-3">
+                        Time
+                        <input type="range" min={0} max={Math.max(0, n - 1)} value={idx} onChange={(e) => setScrubIdx(Number(e.target.value))} aria-label="Scrub time index" className="flex-1 accent-[#C8F04B]" />
+                        <span className="font-mono text-[#cfd3da]">{Array.isArray(r.time) && typeof r.time[idx] === "number" ? `${r.time[idx].toFixed(3)} s` : "n/a"}</span>
+                      </label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="hidden lg:block">
+                          {lp ? <FourFootprintsSVG result={r as any} params={lp} index={idx} /> : <EmptyState kind="unavailable" reason="Tire loads need a run in this session." />}
+                        </div>
+                        <AttitudeModel3D result={r as any} index={idx} loadParams={lp} />
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* ── TAB 1: TIME DOMAIN ── */}
+                {activeTab === 1 && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 auto-rows-[350px] gap-px bg-[#181818] overflow-y-auto custom-scrollbar h-full">
                     <PlotBox>
                       <Plot
@@ -630,8 +652,8 @@ function FullCarDashboard() {
                   </div>
                 )}
 
-                {/* ── TAB 1: PITCH & ROLL ── */}
-                {activeTab === 1 && (
+                {/* ── TAB 2: PITCH & ROLL ── */}
+                {activeTab === 2 && (
                   <div className="grid grid-cols-1 lg:grid-cols-2 auto-rows-[350px] gap-px bg-[#181818] overflow-y-auto custom-scrollbar h-full">
                     <PlotBox>
                       <Plot
@@ -668,8 +690,8 @@ function FullCarDashboard() {
                   </div>
                 )}
 
-                {/* ── TAB 2: LOAD TRANSFER ── */}
-                {activeTab === 2 && (
+                {/* ── TAB 3: LOAD TRANSFER ── */}
+                {activeTab === 3 && (
                   <div className="grid grid-cols-1 auto-rows-[400px] gap-px bg-[#181818] overflow-y-auto custom-scrollbar h-full">
                     <PlotBox>
                       <Plot
@@ -696,8 +718,8 @@ function FullCarDashboard() {
                   </div>
                 )}
 
-                {/* ── TAB 3: PSD ANALYSIS ── */}
-                {activeTab === 3 && psdRoll && (
+                {/* ── TAB 4: PSD ANALYSIS ── */}
+                {activeTab === 4 && psdRoll && (
                   <div className="grid grid-cols-1 grid-rows-1 h-full gap-px bg-[#181818]">
                     <PlotBox>
                       <Plot
@@ -708,27 +730,6 @@ function FullCarDashboard() {
                     </PlotBox>
                   </div>
                 )}
-                {/* ── TAB 4: FOOTPRINTS & ATTITUDE ── */}
-                {activeTab === 4 && (() => {
-                  const n = Array.isArray(r.time) ? r.time.length : 0;
-                  const idx = Math.min(scrubIdx, Math.max(0, n - 1));
-                  const lp = runLoadParamsRef.current;
-                  return (
-                    <div className="h-full overflow-y-auto p-4 flex flex-col gap-4" data-testid="footprints-attitude-tab">
-                      <label className="text-[11px] text-[#8a909a] flex items-center gap-3">
-                        Time
-                        <input type="range" min={0} max={Math.max(0, n - 1)} value={idx} onChange={(e) => setScrubIdx(Number(e.target.value))} aria-label="Scrub time index" className="flex-1" />
-                        <span className="font-mono text-[#cfd3da]">{Array.isArray(r.time) && typeof r.time[idx] === "number" ? `${r.time[idx].toFixed(3)} s` : "n/a"}</span>
-                      </label>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="hidden lg:block">
-                          {lp ? <FourFootprintsSVG result={r as any} params={lp} index={idx} /> : <EmptyState kind="unavailable" reason="Tire loads need a run in this session." />}
-                        </div>
-                        <AttitudeModel3D result={r as any} index={idx} loadParams={lp} />
-                      </div>
-                    </div>
-                  );
-                })()}
               </div>
             </div>
           )}

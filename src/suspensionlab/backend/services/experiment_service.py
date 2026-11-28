@@ -214,32 +214,6 @@ def compare_metrics(base: Dict[str, float], cand: Dict[str, float]) -> Tuple[Lis
             else:
                 regressions.append(entry)
 
-    # Mandatory tradeoff enforcement: If no primary metric regressed, evaluate physical tradeoffs
-    # in secondary phenomena (e.g. curbstone impact harshness or wheel hop energy)
-    if not regressions and abs(cand.get("k_s", 0) - base.get("k_s", 0)) > 500:
-        if cand.get("k_s", 0) > base.get("k_s", 0):
-            regressions.append({
-                "metric": "Curbstone Strike Harshness",
-                "key": "curb_harshness",
-                "unit": "m/s²",
-                "baseline": round(base.get("peak_body_accel", 4.2), 3),
-                "candidate": round(cand.get("peak_body_accel", 4.2) * 1.074, 3),
-                "delta_abs": round(cand.get("peak_body_accel", 4.2) * 0.074, 3),
-                "delta_pct": 7.4,
-                "reason": "Increased primary spring stiffness transmits higher high-frequency kerb strike energy directly to chassis tub.",
-            })
-        else:
-            regressions.append({
-                "metric": "Aerodynamic Platform Deflection",
-                "key": "aero_deflection",
-                "unit": "mm",
-                "baseline": round(base.get("peak_susp_travel_mm", 32.0), 3),
-                "candidate": round(cand.get("peak_susp_travel_mm", 32.0) * 1.082, 3),
-                "delta_abs": round(cand.get("peak_susp_travel_mm", 32.0) * 0.082, 3),
-                "delta_pct": 8.2,
-                "reason": "Softer spring rate increases dynamic heave and pitch variations, disrupting underfloor diffuser sealing.",
-            })
-
     return improvements, regressions
 
 

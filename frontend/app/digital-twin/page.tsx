@@ -382,7 +382,7 @@ export default function DigitalTwinPage() {
                   <thead>
                     <tr className="border-b border-slate-800 text-[11px] font-mono uppercase text-slate-400">
                       <th className="py-3 px-4">Primary State</th>
-                      <th className="py-3 px-4">Measured (DAQ)</th>
+                      <th className="py-3 px-4">{isSampleDemo ? "Sample Reference (SAMPLE)" : "Uploaded Telemetry"}</th>
                       <th className="py-3 px-4">Estimated (Observer)</th>
                       <th className="py-3 px-4">Simulated (Forward Model)</th>
                       <th className="py-3 px-4">Residual (y_m - y_s)</th>
@@ -946,8 +946,8 @@ export default function DigitalTwinPage() {
                       {isReplaying
                         ? "Replaying sample 100 Hz GT3 dataset through Ingestion Gateway"
                         : isStreaming
-                        ? "Ingesting live DAQ stream with Pacejka Digital Twin calibration"
-                        : "Ready to stream high-frequency telemetry"}
+                        ? "Sample Synthetic Replay Stream (DEMO)"
+                        : "Ready for CSV telemetry ingestion or sample demo replay"}
                     </span>
                     {isReplaying && <SampleDemoTelemetryBadge size="xs" />}
                   </div>

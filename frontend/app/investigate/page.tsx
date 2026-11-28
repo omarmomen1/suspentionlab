@@ -354,7 +354,16 @@ function InvestigateContent() {
 
             <div className="flex flex-col items-end gap-2 shrink-0">
               <ValidationBadge status={question.severity === "CRITICAL" ? "CONDITIONAL" : "VALIDATED"} score={question.severity === "CRITICAL" ? 78 : 91} size="sm" />
-              <ConfidenceIndicator confidence={0.88} sourceTag="Active Telemetry R²" size="sm" />
+              {(() => {
+                const qConf = (question as { confidence?: number }).confidence;
+                return typeof qConf === "number" && qConf > 0 ? (
+                  <ConfidenceIndicator confidence={qConf} sourceTag="Backend Correlation Confidence" size="sm" />
+                ) : (
+                  <span className="px-2 py-1 rounded border border-amber-500/40 bg-amber-500/10 text-amber-300 text-[10px] font-mono uppercase">
+                    SAMPLE / UNVALIDATED
+                  </span>
+                );
+              })()}
             </div>
           </div>
 
@@ -371,7 +380,7 @@ function InvestigateContent() {
                 onClick={() => setActiveStage(st.id as any)}
                 className={`p-3 rounded-2xl border text-left transition-all font-mono ${
                   activeStage === st.id
-                    ? "bg-ansys-yellow/15 border-ansys-yellow text-white shadow-[0_0_15px_rgba(242,169,0,0.15)]"
+                    ? "bg-signal/15 border-signal text-white"
                     : "bg-white/[0.02] border-white/[0.06] text-gray-400 hover:border-white/20 hover:text-white"
                 }`}
               >
@@ -424,13 +433,13 @@ function InvestigateContent() {
                     delta={ev.residual ? { value: parseFloat(ev.residual) || 0, label: ev.residual, beneficial: false } : undefined}
                     provenance={ev.provenance || {
                       result: ev.value || "N/A",
-                      source: `Telemetry Ingestion for ${question.question_id}`,
-                      method: "Synchronous Accelerometer & Potentiometer Ingestion",
+                      source: `Sample Investigation Context (${question.question_id})`,
+                      method: "Sample Telemetry & ODE Residual Inspection",
                       modelVersion: modelVersion,
                       solver: "scipy.integrate.solve_ivp (RK45)",
                       backend: "NumPy / SciPy C-Extension",
-                      validation: "MEASURED",
-                      confidence: 0.90,
+                      validation: "SAMPLE",
+                      confidence: typeof ev.confidence === "number" ? ev.confidence : 0,
                     }}
                   />
                 ))}
