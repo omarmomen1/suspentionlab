@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import datetime
+import difflib
 import json
 import os
 import pathlib
@@ -84,7 +85,7 @@ def run() -> dict:
         "scope_note": ("Solver self-consistency benchmarks against exact analytical references. "
                        "Not a validation against measured vehicle data."),
         "benchmarks": tiles,
-        "_pytest_tail": proc.stdout[-600:] if proc.returncode else "",
+        "_pytest_tail": (((proc.stdout or "") + ("\nSTDERR:\n" + proc.stderr if proc.stderr else ""))[-2000:]) if proc.returncode else "",
     }
 
 
@@ -115,12 +116,25 @@ def main() -> int:
         if not OUT.exists():
             print("benchmark-status.json missing; run scripts/generate_benchmark_status.py")
             return 1
-        if _stable(json.loads(OUT.read_text(encoding="utf-8"))) != _stable(data):
+        saved_json = json.loads(OUT.read_text(encoding="utf-8"))
+        s_saved = _stable(saved_json)
+        s_data = _stable(data)
+        if s_saved != s_data:
             print("benchmark-status.json is stale; run scripts/generate_benchmark_status.py and commit it")
+            diff = difflib.unified_diff(
+                json.dumps(s_saved, indent=2).splitlines(keepends=True),
+                json.dumps(s_data, indent=2).splitlines(keepends=True),
+                fromfile="committed",
+                tofile="fresh_run",
+            )
+            sys.stdout.writelines(diff)
+            if tail:
+                print("\n--- pytest tail ---")
+                print(tail)
             return 1
         print("benchmark-status.json matches a fresh run")
         return 1 if failed else 0
-    OUT.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+    OUT.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8", newline="\n")
     print(f"wrote {OUT.relative_to(ROOT)}: " + ", ".join(f"{t['id']}={t['verdict']}" for t in data["benchmarks"]))
     if tail:
         print(tail)
