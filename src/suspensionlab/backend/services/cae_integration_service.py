@@ -228,6 +228,54 @@ class CaeIntegrationService:
         )
 
     @classmethod
+    def _resolve_external_excitation(cls, external_dataset: "NormalizedCaeDataset") -> Optional[Dict[str, Any]]:
+        """Return the road excitation the external run actually used, when the dataset declares it.
+
+        Wave 10 item 2: an R2 only means something when both sides were driven by the
+        same road input. The import payload's inputs_meta is the only place an external
+        run can declare its excitation, so it is the only source accepted here.
+        """
+        inputs = getattr(external_dataset.identity, "inputs", None)
+        if not isinstance(inputs, dict):
+            return None
+
+        flat: Dict[str, Any] = {}
+        for key in ("road_profile", "road", "excitation", "road_input", "inputs"):
+            nested = inputs.get(key)
+            if isinstance(nested, dict):
+                flat.update(nested)
+        for key, value in inputs.items():
+            flat.setdefault(key, value)
+
+        profile_type = str(flat.get("profile_type") or flat.get("road_type") or "").strip().lower()
+        if profile_type not in ("step", "sine", "pothole", "random", "impulse", "iso8608", "bump"):
+            return None
+
+        amplitude = flat.get("amplitude", flat.get("amplitude_m"))
+        frequency = flat.get("frequency", flat.get("frequency_hz"))
+        if amplitude is None and frequency is None and profile_type != "iso8608":
+            return None
+
+        try:
+            road = RoadProfile(
+                profile_type=profile_type,
+                iso_class=str(flat.get("iso_class") or "A")[:1].upper() if flat.get("iso_class") else "A",
+                amplitude=float(amplitude) if amplitude is not None else 0.015,
+                frequency=float(frequency) if frequency is not None else 1.8,
+                duration=float(flat.get("duration") or external_dataset.kpis.get("duration_s", 5.0)),
+                speed_mps=float(flat.get("speed_mps") or 20.0),
+            )
+        except (TypeError, ValueError):
+            return None
+
+        description = profile_type
+        if amplitude is not None:
+            description += f", amplitude {float(amplitude):.4g} m"
+        if frequency is not None:
+            description += f", {float(frequency):.4g} Hz"
+        return {"road": road, "description": description}
+
+    @classmethod
     def compare_external_vs_native(
         cls,
         external_dataset: NormalizedCaeDataset,
@@ -247,10 +295,26 @@ class CaeIntegrationService:
             MR=float(external_dataset.identity.parameters.get("MR", 0.85)),
         )
 
-        # Run matching native forward simulation
+        # Run the native forward simulation on the external run's own excitation when the
+        # dataset declares one. Otherwise the fixed 1.8 Hz / 15 mm sine is NOT a matching
+        # excitation and the comparison cannot carry a correlation verdict (Wave 10 item 2).
         duration = external_dataset.kpis.get("duration_s", 5.0)
         dt = (external_dataset.time_s[1] - external_dataset.time_s[0]) if len(external_dataset.time_s) > 1 else 0.005
-        road = RoadProfile(profile_type="sine", amplitude=0.015, frequency=1.8, duration=duration)
+        excitation = cls._resolve_external_excitation(external_dataset)
+        excitation_match = excitation is not None
+        if excitation_match:
+            road = excitation["road"]
+            excitation_source = "external_dataset"
+            comparison_label = (
+                "Same excitation replayed: the native solver ran the external dataset's own road input "
+                f"({excitation['description']})."
+            )
+        else:
+            road = RoadProfile(profile_type="sine", amplitude=0.015, frequency=1.8, duration=duration)
+            excitation_source = "native_default"
+            comparison_label = (
+                "Different excitation: native 1.8 Hz sine vs external run input - R2 not comparable"
+            )
         native_sim = run_quarter_car_analysis(p, road)
 
         # Interp or slice to matching lengths
@@ -270,7 +334,10 @@ class CaeIntegrationService:
         else:
             r2 = 1.0
 
-        if r2 >= 0.90:
+        if not excitation_match:
+            # Wave 10 item 2(b): R2 across two different excitations is not a correlation.
+            agreement_status = "NOT_COMPARABLE"
+        elif r2 >= 0.90:
             agreement_status = "STRONG_CORRELATION"
         elif r2 >= 0.70:
             agreement_status = "MODERATE_CORRELATION"
@@ -308,21 +375,39 @@ class CaeIntegrationService:
                 "max_absolute_error": round(max_err, 4),
                 "mean_percentage_error": round(mean_pct_err, 2),
                 "agreement_status": agreement_status,
+                "r2_comparable": excitation_match,
             }
         }
 
-        interpretation = (
-            f"External solver ({external_dataset.identity.source_tool} {external_dataset.identity.solver}) "
-            f"and SuspensionLab native forward ODE demonstrate {agreement_status.lower().replace('_', ' ')} "
-            f"(R²={round(r2, 3)}, RMS residual={round(rms_err, 3)} m/s²)."
-        )
+        if excitation_match:
+            interpretation = (
+                f"External solver ({external_dataset.identity.source_tool} {external_dataset.identity.solver}) "
+                f"and SuspensionLab native forward ODE demonstrate {agreement_status.lower().replace('_', ' ')} "
+                f"(R²={round(r2, 3)}, RMS residual={round(rms_err, 3)} m/s²)."
+            )
+        else:
+            interpretation = (
+                "Different excitation: the native solver ran its default 1.8 Hz / 15 mm sine road while the "
+                f"external run used a different, undeclared input. R2={round(r2, 3)} is shown for reference only "
+                "and is not a correlation verdict."
+            )
 
         return {
             "external_identity": ext_id,
             "native_identity": nat_id,
             "channel_metrics": channel_metrics,
             "engineering_interpretation": interpretation,
-            "boundary_notes": "Benchmark evaluated under matching road profile excitation without parameter leakage.",
+            "boundary_notes": (
+                "Benchmark evaluated under matching road profile excitation without parameter leakage."
+                if excitation_match
+                else "NOT COMPARABLE: the native solver ran its default 1.8 Hz / 15 mm sine road while the "
+                     "external run used a different input. The R2 above is reference only."
+            ),
+            "excitation_match": excitation_match,
+            "excitation_source": excitation_source,
+            "excitation_description": excitation["description"] if excitation_match else "native 1.8 Hz sine, 15 mm",
+            "comparison_label": comparison_label,
+            "verdict_suppressed": (not excitation_match),
             "external_solver": {
                 "source_tool": external_dataset.identity.source_tool,
                 "version": external_dataset.identity.version,
@@ -340,6 +425,8 @@ class CaeIntegrationService:
                 "rms_residual_mps2": round(rms_err, 3),
                 "max_residual_mps2": round(max_err, 3),
                 "agreement_status": agreement_status,
+                "r2_comparable": excitation_match,
+                "verdict_suppressed": (not excitation_match),
             },
             "sample_count_compared": n_pts,
             "time_start": round(time_start, 6),

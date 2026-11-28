@@ -45,6 +45,15 @@ ISO_8608_LABELS = {
     "H": "Extreme Terrain",
 }
 
+# Wave 18: the ranking index saturates here and is labeled ">= max".
+MAX_LIFE_INDEX = 1_000_000.0
+
+LIFE_INDEX_DISCLAIMER = (
+    "Ranking only: generic S-N exponents (shock 3.5, spring 8, bushings 2.5, bearing 3.0) with body "
+    "acceleration as the load proxy. Not a predicted service life. Valid for comparing setups on the "
+    "same road class and speed."
+)
+
 # Component fatigue SN-curve slope (Wöhler exponent m)
 # and reference stress/load for each component
 COMPONENT_DATA = {
@@ -70,6 +79,10 @@ class DurabilityRequest(BaseModel):
 class ComponentLifeResult(BaseModel):
     name: str
     display_name: str
+    # Wave 18: this is a relative ranking index, not a predicted service life.
+    life_index: float
+    life_index_label: str
+    # Deprecated alias kept for one release; same number, no longer a km claim.
     life_km: float
     life_label: str
     condition: str  # "Excellent" | "Good" | "Fair" | "Poor" | "Critical"
@@ -96,7 +109,12 @@ class DurabilityResult(BaseModel):
     # Summary
     summary: str
     worst_component: str
+    # Wave 18: the limiting figure is a ranking index, not a distance.
+    best_range_index: float
+    # Deprecated alias kept for one release.
     best_range_km: float
+    life_index_disclaimer: str
+    life_index_unit: str
 
 
 def _compute_durability(req: DurabilityRequest) -> DurabilityResult:
@@ -177,7 +195,10 @@ def _compute_durability(req: DurabilityRequest) -> DurabilityResult:
         # Convert to km: 1 cycle ≈ speed_mps / (dominant_freq ≈ 2 Hz) meters
         meters_per_cycle = speed_mps / max(result.f_n_s, 0.1)
         life_km = (life_cycles * meters_per_cycle) / 1000.0
-        life_km = min(life_km, 999_999)  # Cap at ~1M km
+        # Wave 18 item 3: cap at a labeled maximum instead of printing a suspicious 999,999.
+        life_index = min(life_km, MAX_LIFE_INDEX)
+        capped = life_km >= MAX_LIFE_INDEX
+        life_km = life_index
 
         if life_km < worst_km:
             worst_km = life_km
@@ -195,10 +216,12 @@ def _compute_durability(req: DurabilityRequest) -> DurabilityResult:
         else:
             condition, color = "Critical", "#ef4444"
 
-        if life_km >= 1000:
-            life_label = f"{life_km/1000:.0f}k km"
+        if capped:
+            life_label = ">= max"
+        elif life_index >= 1000:
+            life_label = f"index {life_index/1000:.0f}k"
         else:
-            life_label = f"{life_km:.0f} km"
+            life_label = f"index {life_index:.0f}"
 
         display_names = {
             "shock_absorber": "Shock Absorber",
@@ -210,6 +233,8 @@ def _compute_durability(req: DurabilityRequest) -> DurabilityResult:
         components.append(ComponentLifeResult(
             name=comp_key,
             display_name=display_names[comp_key],
+            life_index=round(life_index, 1),
+            life_index_label=life_label,
             life_km=round(life_km, 1),
             life_label=life_label,
             condition=condition,
@@ -250,7 +275,11 @@ def _compute_durability(req: DurabilityRequest) -> DurabilityResult:
         components=components,
         summary=summary,
         worst_component=components[0].display_name,
+        best_range_index=round(best_range_km, 1),
+        # Deprecated alias kept for one release.
         best_range_km=round(best_range_km, 1),
+        life_index_disclaimer=LIFE_INDEX_DISCLAIMER,
+        life_index_unit="relative index (higher = longer life)",
     )
 
 
@@ -259,7 +288,7 @@ async def road_durability_analysis(req: DurabilityRequest):
     """
     ISO 8608 Road Profile Durability Analyzer.
     Generates realistic stochastic road profiles and calculates:
-    - Component fatigue life (km) using Palmgren-Miner rule
+    - Component fatigue ranking index (relative, not a predicted service life)
     - ISO 2631-1 vibration comfort classification
     - Vibration Dose Value (VDV)
     - Overall suspension durability score (0-100)

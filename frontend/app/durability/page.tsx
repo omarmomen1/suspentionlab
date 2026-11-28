@@ -23,6 +23,9 @@ const ROAD_CLASSES = [
 interface ComponentLife {
   name: string;
   display_name: string;
+  life_index: number;
+  life_index_label: string;
+  /** @deprecated alias of life_index */
   life_km: number;
   life_label: string;
   condition: string;
@@ -45,7 +48,10 @@ interface DurabilityResult {
   components: ComponentLife[];
   summary: string;
   worst_component: string;
+  best_range_index: number;
+  /** @deprecated alias of best_range_index */
   best_range_km: number;
+  life_index_disclaimer?: string;
 }
 
 const COMPONENT_ICONS: Record<string, typeof Wrench> = {
@@ -237,7 +243,7 @@ export default function DurabilityPage() {
                   { label: "Comfort Rating", value: result.comfort_rating, sub: result.iso_2631_class },
                   { label: "Body Accel (Wk-weighted)", value: `${result.rms_body_accel_wk.toFixed(3)} m/s²`, sub: "ISO 2631-1" },
                   { label: "Vibration Dose Value", value: `${result.vdv.toFixed(3)} m/s¹·⁷⁵`, sub: "VDV" },
-                  { label: "Limiting Component Life", value: result.best_range_km >= 1000 ? `${(result.best_range_km/1000).toFixed(0)}k km` : `${result.best_range_km} km`, sub: result.worst_component },
+                  { label: "Limiting Component (ranking index)", value: result.best_range_index >= 1000 ? `${(result.best_range_index/1000).toFixed(0)}k` : `${result.best_range_index}`, sub: result.worst_component },
                 ].map(({ label, value, sub }) => (
                   <div key={label} className="space-y-1">
                     <p className="text-xs text-zinc-300 uppercase tracking-wider">{label}</p>
@@ -252,18 +258,25 @@ export default function DurabilityPage() {
             <div className="rounded-2xl border border-[#1a1a1a] bg-[#0a0a0a] p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-zinc-200">Component Life &amp; Fatigue Estimates</h3>
+                  <h3 className="text-sm font-semibold text-zinc-200">Relative durability index (higher = longer life)</h3>
                   <p className="text-xs text-zinc-400">Palmgren-Miner cumulative damage proxy (D = Σ nᵢ/Nᵢ) using schematic body-RMS scaling constants</p>
                 </div>
                 <span className="text-xs font-mono text-amber-300 bg-amber-950/50 px-2.5 py-1 rounded border border-amber-500/40">
                   SCHEMATIC / PLACEHOLDER CONSTANTS
                 </span>
               </div>
+
+              {/* Wave 18 item 2: say what drives the ranking. */}
+              <p className="text-[10px] leading-relaxed text-gray-500" data-testid="durability-ranking-disclaimer">
+                Ranking only: generic S-N exponents (shock 3.5, spring 8, bushings 2.5, bearing 3.0) with body
+                acceleration as the load proxy. Not a predicted service life. Valid for comparing setups on the
+                same road class and speed.
+              </p>
               <div className="space-y-3.5">
                 {result.components.map(comp => {
                   const Icon = COMPONENT_ICONS[comp.name] || Wrench;
-                  const barPct = Math.min(100, (comp.life_km / 200000) * 100);
-                  const damageFraction = Math.min(1.0, Math.max(0.01, 100000 / Math.max(comp.life_km, 1000)));
+                  const barPct = Math.min(100, (comp.life_index / 200000) * 100);
+                  const damageFraction = Math.min(1.0, Math.max(0.01, 100000 / Math.max(comp.life_index, 1000)));
                   return (
                     <div key={comp.name} className="space-y-1.5 p-2.5 rounded-xl bg-[#0e0e10] border border-[#1c1c1f]">
                       <div className="flex items-center justify-between">
@@ -275,7 +288,7 @@ export default function DurabilityPage() {
                           <span className="text-xs font-mono text-zinc-300">
                             Schematic Proxy D (100k ref): <strong className="text-white">{damageFraction.toFixed(3)}/1.0</strong>
                           </span>
-                          <span className="text-sm font-bold text-white">{comp.life_label}</span>
+                          <span className="text-sm font-bold text-white">{comp.life_index_label}</span>
                           <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ color: comp.condition_color, backgroundColor: comp.condition_color + "15" }}>
                             {comp.condition}
                           </span>

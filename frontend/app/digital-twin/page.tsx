@@ -108,14 +108,18 @@ export default function DigitalTwinPage() {
   // Live Telemetry Production WebSocket Hook (Replaces Math.random())
   const {
     status: streamStatus,
+    mode: streamMode,
     isStreaming,
     isReplaying,
+    streamSource,
+    isSampleReplay,
+    pollingNotice,
     telemetry: liveTelemetry,
     twin: liveTwin,
     metrics: streamMetrics,
     startStream,
     stopStream,
-    triggerReplay,
+    startSampleReplay,
   } = useLiveTelemetry(token);
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -938,18 +942,29 @@ export default function DigitalTwinPage() {
                       {streamStatus === "DISCONNECTED" && "STREAM DISCONNECTED"}
                     </span>
                     <span className="text-xs px-2 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
-                      SLTP v1 Binary
+                      {streamMode === "polling" ? "HTTP polling (no socket)" : "SLTP v1 JSON (labeled)"}
                     </span>
                   </div>
                   <div className="text-xs text-zinc-400 mt-0.5 flex flex-wrap items-center gap-2">
+                    {/* Wave 15 items 1-2: never call a bundled file "live". */}
                     <span>
-                      {isReplaying
-                        ? "Replaying sample 100 Hz GT3 dataset through Ingestion Gateway"
-                        : isStreaming
-                        ? "Sample Synthetic Replay Stream (DEMO)"
-                        : "Ready for CSV telemetry ingestion or sample demo replay"}
+                      {!isStreaming && !isReplaying
+                        ? "No live source. Upload a session, pick a stored dataset, or connect a DAQ gateway."
+                        : isSampleReplay
+                        ? "SAMPLE REPLAY - bundled Spa session, not your car"
+                        : streamSource
+                        ? `DATASET REPLAY - ${streamSource}`
+                        : "Connecting to live source..."}
                     </span>
-                    {isReplaying && <SampleDemoTelemetryBadge size="xs" />}
+                    {(isReplaying || isSampleReplay) && <SampleDemoTelemetryBadge size="xs" />}
+                    {pollingNotice && (
+                      <span className="text-amber-400 font-mono" data-testid="polling-mode-notice">
+                        {pollingNotice}
+                      </span>
+                    )}
+                    <Link href="/telemetry" className="text-cyan-400 hover:text-cyan-300 underline">
+                      Open Telemetry Sessions
+                    </Link>
                   </div>
                 </div>
               </div>
@@ -966,11 +981,12 @@ export default function DigitalTwinPage() {
                 ) : (
                   <>
                     <button
-                      onClick={() => triggerReplay(100.0)}
+                      onClick={() => startSampleReplay(100.0)}
                       className="flex items-center space-x-2 px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm transition-all"
                     >
                       <Play className="w-4 h-4 fill-current" />
-                      <span>Start 100 Hz Replay</span>
+                      <span>Play sample replay</span>
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/25">SAMPLE</span>
                     </button>
                     <button
                       onClick={startStream}

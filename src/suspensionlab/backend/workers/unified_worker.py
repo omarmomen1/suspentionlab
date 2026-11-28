@@ -274,7 +274,7 @@ async def _run_job_async(job_id: str, payload: dict, ctx, span, start_time: floa
                         from suspensionlab.physics.quarter_car import _road_profile_fn
 
                         pdump = payload["params"].copy()
-                        asymmetry = pdump.pop("road_asymmetry", 0.3)
+                        asymmetry = pdump.pop("road_asymmetry", 1.0)
                         if "lateral_accel_mps2" in pdump and "lateral_accel_g" not in pdump:
                             pdump["lateral_accel_g"] = float(pdump.pop("lateral_accel_mps2")) / 9.81
                         else:

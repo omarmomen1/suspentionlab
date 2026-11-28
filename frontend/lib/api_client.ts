@@ -1726,6 +1726,13 @@ export class DigitalTwinApi {
     return apiJson<DigitalTwinState>(`/api/v1/twins/${encodeURIComponent(twinId)}`);
   }
 
+  static async createTwin(name: string): Promise<any> {
+    return apiJson(`/api/v1/twins`, {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    });
+  }
+
   static async getDynoReport(twinId: string): Promise<any> {
     return apiJson(`/api/v1/twins/${encodeURIComponent(twinId)}/report`);
   }

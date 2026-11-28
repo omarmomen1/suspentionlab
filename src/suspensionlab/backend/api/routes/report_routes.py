@@ -261,12 +261,12 @@ async def generate_engineering_decision_report(
 
     if run:
         sim_id = run.label
-        vehicle = html.escape(run.vehicle_ref or "CAR-07")
-        setup = html.escape(run.setup_ref or "REV-48")
-        track = html.escape(run.track_ref or "SPA-FRANCORCHAMPS 2026")
-        tire = html.escape(run.tire_ref or "TIRE-MF52-COMPOUND-SOFT")
-        aero_ver = "AERO-POLAR-v2.3"
-        dataset_ref = html.escape(run.telemetry_ref or "TELEMETRY-SYNC-SPA-Q2")
+        vehicle = html.escape(run.vehicle_ref or "NOT SET")
+        setup = html.escape(run.setup_ref or "NOT SET")
+        track = html.escape(run.track_ref or "NOT SET")
+        tire = html.escape(run.tire_ref or "NOT SET")
+        aero_ver = html.escape(str(report_data.get("aero_version") or "NOT SET"))
+        dataset_ref = html.escape(run.telemetry_ref or "NOT SET")
         vehicle_model_ver = html.escape(run.physics_version or "7-DOF Full Car / 2-DOF Quarter Car Suite")
         tire_model_ver = "Pacejka MF 5.2 / Similarity"
         solver_ver = html.escape(run.solver_version or "RK45 / BDF Adaptive Stiff")
@@ -290,28 +290,13 @@ async def generate_engineering_decision_report(
         if not validation_state:
             validation_state = "VALIDATED" if (correlation_pct and correlation_pct >= 85.0) else "UNVALIDATED"
     else:
-        sim_id = html.escape(str(report_data.get("simulation_id") or f"SIM-{_uuid.uuid4().hex[:8].upper()}"))
-        vehicle = html.escape(report_data.get("vehicle", "CAR-07"))
-        setup = html.escape(report_data.get("setup", "REV-48"))
-        track = html.escape(report_data.get("track", "SPA-FRANCORCHAMPS 2026"))
-        tire = html.escape(report_data.get("tire", "TIRE-MF52-COMPOUND-SOFT"))
-        aero_ver = html.escape(report_data.get("aero_version", "AERO-POLAR-v2.3"))
-        dataset_ref = html.escape(report_data.get("dataset_ref", "TELEMETRY-SYNC-SPA-Q2"))
-        vehicle_model_ver = html.escape(report_data.get("vehicle_model_version", "7-DOF Full Car / 2-DOF Quarter Car Suite"))
-        tire_model_ver = html.escape(report_data.get("tire_model_version", "Pacejka MF 5.2 / Similarity"))
-        solver_ver = html.escape(report_data.get("solver_version", "RK45 / BDF Adaptive Stiff"))
-        software_build = html.escape(report_data.get("software_build") or os.getenv("GIT_COMMIT", "BUILD-REL-2026.1"))
-
-        input_payload = report_data.get("input_parameters", {})
-        result_payload = report_data.get("simulation_results", {})
-        input_hash = canonical_hash(input_payload)
-        result_hash = canonical_hash(result_payload)
-
-        validation_state = html.escape(str(report_data.get("validation_state") or "UNVALIDATED"))
-        try:
-            correlation_pct = float(report_data["correlation_pct"]) if report_data.get("correlation_pct") is not None else None
-        except (ValueError, TypeError):
-            correlation_pct = None
+        # Wave 9 item 2: a decision report without a persisted run is refused.
+        # No unbacked fallback path may print invented vehicle, track, tire or
+        # telemetry references.
+        raise HTTPException(
+            status_code=422,
+            detail="report requires a persisted simulation run",
+        )
 
     # Chief Engineer Approval verification & Anti-Spoofing
     approval = report_data.get("approval")
@@ -371,6 +356,15 @@ async def generate_engineering_decision_report(
     approver_role = html.escape(authenticated_role)
     approver_email = html.escape(authenticated_email)
     approval_decision = html.escape(approval.get("decision") or ("APPROVED_FOR_TRACK" if wants_approval else "PROPOSED"))
+    # Wave 9 item 1: only a persisted APPROVED decision may print a sign-off.
+    _APPROVED_DECISIONS = {"APPROVED_FOR_TRACK", "APPROVED_FOR_TEST_TRACK", "APPROVED"}
+    _REJECTED_DECISIONS = {"REJECTED", "REJECTED_FOR_TRACK", "DECLINED", "NOT_APPROVED"}
+    if decision_raw in _APPROVED_DECISIONS:
+        approval_state = "APPROVED"
+    elif decision_raw in _REJECTED_DECISIONS:
+        approval_state = "REJECTED"
+    else:
+        approval_state = "PROPOSED"
     approval_comment = html.escape(approval.get("comment") or "Signed off with server-authenticated cryptographic identity.")
     approval_time = html.escape(datetime.datetime.now(datetime.timezone.utc).isoformat())
 
@@ -434,6 +428,16 @@ async def generate_engineering_decision_report(
         validation_state=validation_state,
     )
 
+    # Wave 9 item 1: no approval signature exists unless the decision is APPROVED.
+    if approval_state != "APPROVED":
+        ed25519_sig = ""
+        approval_signature = ""
+        authority_pubkey = ""
+
+    # Wave 9 item 3: the auto-computed default-vehicle baseline must be unmistakable.
+    _mv = run.model_validity if (run is not None and isinstance(run.model_validity, dict)) else {}
+    is_default_vehicle_baseline = bool(_mv.get("is_default_vehicle_baseline"))
+
     date_str = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
 
     template_str = """
@@ -460,6 +464,11 @@ async def generate_engineering_decision_report(
         </style>
     </head>
     <body>
+        {% if is_default_vehicle_baseline %}
+        <div style="border:2px solid #f59e0b; background:#fffbeb; color:#92400e; padding:12px 16px; border-radius:6px; margin-bottom:20px; font-size:13px; font-weight:600;">
+            Reference baseline on the default vehicle - not your car. Run a simulation on your own parameters first.
+        </div>
+        {% endif %}
         <div class="header-banner">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <h1 style="margin:0; font-size:22px; color:#0f172a;">Engineering Decision &amp; Compliance Report</h1>
@@ -497,6 +506,7 @@ async def generate_engineering_decision_report(
             <div style="margin-top:10px;"><strong style="font-size:12px; color:#334155;">Simulation Result Hash (SHA-256):</strong><div class="hash-block">{{ result_hash }}</div></div>
         </div>
 
+        {% if approval_state == 'APPROVED' %}
         <div class="approval-box">
             <div class="approval-title">
                 <span>CHIEF ENGINEER DECISION SIGN-OFF</span>
@@ -514,6 +524,29 @@ async def generate_engineering_decision_report(
                 <span style="font-size:10px; color:#64748b;">Authority Public Key: {{ authority_pubkey }}</span>
             </div>
         </div>
+        {% elif approval_state == 'REJECTED' %}
+        <div class="approval-box" style="border-color:#dc2626; background:#fef2f2;">
+            <div class="approval-title" style="color:#991b1b;">
+                <span>CHIEF ENGINEER DECISION</span>
+                <span style="font-size:13px; font-weight:bold; color:#b91c1c;">{{ approval_decision }}</span>
+            </div>
+            <p style="margin:12px 0 6px 0; font-size:14px; color:#7f1d1d;"><em>"{{ approval_comment }}"</em></p>
+            <div style="margin-top:14px; font-size:13px; color:#991b1b;">
+                Rejected by <strong>{{ approver_name }}</strong> ({{ approver_role }}) on <strong>{{ approval_time }}</strong>
+            </div>
+        </div>
+        {% else %}
+        <div class="approval-box" style="border-color:#94a3b8; background:#f8fafc;">
+            <div class="approval-title" style="color:#334155;">
+                <span>CHIEF ENGINEER DECISION SIGN-OFF</span>
+                <span style="font-size:13px; font-weight:bold; color:#b45309;">PROPOSED - AWAITING CHIEF ENGINEER DECISION</span>
+            </div>
+            <p style="margin:12px 0 6px 0; font-size:14px; color:#334155;"><em>"{{ approval_comment }}"</em></p>
+            <div style="margin-top:14px; font-size:12px; color:#64748b;">
+                No approval has been recorded for this report. Nothing here is signed.
+            </div>
+        </div>
+        {% endif %}
     </body>
     </html>
     """
@@ -539,6 +572,8 @@ async def generate_engineering_decision_report(
         approval_comment=approval_comment,
         approval_time=approval_time,
         approval_signature=approval_signature,
+        approval_state=approval_state,
+        is_default_vehicle_baseline=is_default_vehicle_baseline,
         ed25519_sig=ed25519_sig,
         authority_pubkey=authority_pubkey,
         input_hash=input_hash,
@@ -570,23 +605,27 @@ async def generate_engineering_decision_report(
         except Exception:
             pass
 
+    response_headers = {
+        "Content-Disposition": "inline; filename=engineering_decision_report.html",
+        "X-Simulation-ID": sim_id,
+        "X-Input-Hash": input_hash,
+        "X-Result-Hash": result_hash,
+        "X-Approval-Time": approval_time,
+        "X-Approver-Email": approver_email,
+        "X-Approver-Role": approver_role,
+        "X-Approval-Decision": approval_decision,
+        "X-Approval-State": approval_state,
+        "X-Governance-Attributes": "13",
+    }
+    # Wave 9 item 1: signature headers exist only for an APPROVED decision.
+    if approval_state == "APPROVED":
+        response_headers["X-Approval-Signature"] = approval_signature
+        response_headers["X-Ed25519-Signature"] = ed25519_sig
+        response_headers["X-Authority-Public-Key"] = authority_pubkey
     return Response(
         content=html_content,
         media_type="text/html",
-        headers={
-            "Content-Disposition": "inline; filename=engineering_decision_report.html",
-            "X-Simulation-ID": sim_id,
-            "X-Input-Hash": input_hash,
-            "X-Result-Hash": result_hash,
-            "X-Approval-Signature": approval_signature,
-            "X-Ed25519-Signature": ed25519_sig,
-            "X-Authority-Public-Key": authority_pubkey,
-            "X-Approval-Time": approval_time,
-            "X-Approver-Email": approver_email,
-            "X-Approver-Role": approver_role,
-            "X-Approval-Decision": approval_decision,
-            "X-Governance-Attributes": "13",
-        }
+        headers=response_headers,
     )
 
 
@@ -789,9 +828,9 @@ async def verify_decision_report_signature_endpoint(
                 elif not team and getattr(user, "team_id", None):
                     team = str(user.team_id)
                 if not setup_ver:
-                    setup_ver = run.setup_ref or "REV-48"
+                    setup_ver = run.setup_ref or "NOT SET"
                 if not veh_ver:
-                    veh_ver = run.vehicle_ref or "CAR-07"
+                    veh_ver = run.vehicle_ref or "NOT SET"
                 if not rep_ver:
                     rep_ver = run.git_build_id or os.getenv("GIT_COMMIT", "BUILD-REL-2026.1")
                 if not val_state and run.model_validity:
@@ -803,8 +842,8 @@ async def verify_decision_report_signature_endpoint(
     org = org or "NO_ORG"
     team = team or "NO_TEAM"
     rep_ver = rep_ver or os.getenv("GIT_COMMIT", "BUILD-REL-2026.1")
-    setup_ver = setup_ver or "REV-48"
-    veh_ver = veh_ver or "CAR-07"
+    setup_ver = setup_ver or "NOT SET"
+    veh_ver = veh_ver or "NOT SET"
     val_state = val_state or "VALIDATED"
 
     # Canonical 13-attribute governance payload

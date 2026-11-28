@@ -414,6 +414,13 @@ function ReportContent() {
           </div>
         </div>
 
+        {/* Wave 9 item 3: the auto-computed default-vehicle baseline is labeled on screen. */}
+        {report && (report as any).is_default_vehicle_baseline && (
+          <div className="rounded-xl border-2 border-amber-500/60 bg-amber-500/10 px-4 py-3 text-xs font-semibold text-amber-300">
+            Reference baseline on the default vehicle - not your car. Run a simulation on your own parameters first.
+          </div>
+        )}
+
         {/* ── REPORT VIEW SELECTOR TABS ── */}
         <div className="no-print flex items-center gap-2 border-b border-[#18181c] pb-2 overflow-x-auto">
           {[
