@@ -1,0 +1,7 @@
+.env*
+*.env
+*.pyd
+*.dll
+__pycache__/
+*.pyc
+src/kinematics_core/

@@ -48,7 +48,17 @@ scratch/
 .pytest_cache/
 .hypothesis/
 deploy_hf/
-backend_vercel/
+# backend_vercel configuration and entrypoint (keep secrets, caches, and mirrored src ignored)
+backend_vercel/.vercel/
+backend_vercel/.env*
+backend_vercel/**/__pycache__/
+backend_vercel/**/*.pyc
+backend_vercel/**/*.pyd
+backend_vercel/**/*.so
+backend_vercel/**/*.dll
+backend_vercel/src/
+backend_vercel/sample_data/
+backend_vercel/*.fmu
 .neon
 .neon/
 .env.production.secret
