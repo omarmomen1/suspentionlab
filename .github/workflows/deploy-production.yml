@@ -1,0 +1,152 @@
+name: Deploy Production
+
+"on":
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ── Job 1: Verification Suite ────────────────────────────────────────────────
+  verify:
+    name: Verify (Benchmarks, Core Backend Tests, Frontend Type-Check & Build)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev,prod]"
+
+      - name: Run benchmark status check
+        run: python scripts/generate_benchmark_status.py --check
+
+      - name: Run core backend tests
+        run: pytest tests/test_golden_file_physics_regression.py tests/test_enterprise_cleanup_p1.py tests/test_enterprise_cleanup_pass_b.py tests/test_sprint2_p0_fixes.py -q
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Frontend type-check
+        working-directory: frontend
+        run: npm run type-check
+
+      - name: Frontend unit tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Frontend production build
+        working-directory: frontend
+        run: npm run build
+
+  # ── Job 2: Database Migration & Production Deploy ────────────────────────────
+  deploy:
+    name: Deploy (Neon Migration, Backend & Frontend Vercel Sync)
+    runs-on: ubuntu-latest
+    needs: verify
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Python dependencies for migrations
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[prod]"
+
+      - name: Run Alembic migrations on Neon
+        env:
+          RAW_DATABASE_URL: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          # Strip &channel_binding=require defensively if present as asyncpg does not support it
+          CLEAN_URL=$(python3 -c '
+          import os, re
+          raw = os.environ.get("RAW_DATABASE_URL", "")
+          cleaned = re.sub(r"[?&]channel_binding=require", "", raw)
+          if "?" not in cleaned and "&" in cleaned:
+              cleaned = cleaned.replace("&", "?", 1)
+          print(cleaned)
+          ')
+          DATABASE_URL="$CLEAN_URL" python -m alembic upgrade head
+
+      - name: Mirror src/suspensionlab/ to backend_vercel/
+        run: |
+          mkdir -p backend_vercel/src/suspensionlab/
+          rsync -a --delete --exclude='__pycache__' --exclude='*.pyc' --exclude='*.pyd' --exclude='*.so' --exclude='*.dll' --exclude='.env*' src/suspensionlab/ backend_vercel/src/suspensionlab/
+
+      - name: Deploy backend_vercel to Vercel
+        working-directory: backend_vercel
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_BACKEND_PROJECT_ID }}
+        run: |
+          npx vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+          npx vercel build --prod --token=$VERCEL_TOKEN
+          npx vercel deploy --prebuilt --prod --yes --token=$VERCEL_TOKEN
+
+      - name: Deploy frontend to Vercel
+        working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_FRONTEND_PROJECT_ID }}
+        run: |
+          npx vercel pull --yes --environment=production --token=$VERCEL_TOKEN
+          npx vercel build --prod --token=$VERCEL_TOKEN
+          npx vercel deploy --prebuilt --prod --yes --token=$VERCEL_TOKEN
+
+      - name: Verify Backend API Health
+        run: |
+          echo "Verifying backend API health at https://suspensionlab-api.vercel.app/health..."
+          HEALTH_URL="https://suspensionlab-api.vercel.app/health"
+          for i in {1..5}; do
+            echo "Attempt $i of 5: Polling $HEALTH_URL..."
+            RESPONSE=$(curl -sS -w "\n%{http_code}" "$HEALTH_URL" || true)
+            HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+            BODY=$(echo "$RESPONSE" | sed '$d')
+            echo "HTTP Status: $HTTP_CODE"
+            echo "Response: $BODY"
+            if [ "$HTTP_CODE" = "200" ] && echo "$BODY" | grep -q '"alive"'; then
+              echo "Backend API is healthy and reporting 'alive'!"
+              exit 0
+            fi
+            if [ "$i" -lt 5 ]; then
+              echo "Health check condition not met. Waiting 5 seconds before retry..."
+              sleep 5
+            fi
+          done
+          echo "ERROR: Backend API health check failed after 5 attempts."
+          exit 1
