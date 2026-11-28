@@ -127,9 +127,9 @@ export default function ModelValidity({ report }: { report: ValidityReport | nul
           </div>
 
           <div className="min-w-0">
-            <div className="text-[10px] uppercase font-mono tracking-widest text-gray-400 font-bold flex items-center gap-2">
+            <div className="text-xs uppercase font-mono tracking-widest text-gray-400 font-bold flex items-center gap-2">
               <span>Model Validity Status</span>
-              <span className={`px-2 py-0.2 rounded-full border text-[9px] font-extrabold ${cfg.bg} ${cfg.border}`} style={{ color: cfg.color }}>
+              <span className={`px-2 py-0.2 rounded-full border text-xs font-extrabold ${cfg.bg} ${cfg.border}`} style={{ color: cfg.color }}>
                 {cfg.label}
               </span>
             </div>
@@ -179,22 +179,22 @@ export default function ModelValidity({ report }: { report: ValidityReport | nul
                 {STATUS_ICONS[check.status]}
                 <div className="min-w-0">
                   <span className="text-white font-bold">{check.label}</span>
-                  <p className="text-gray-400 text-[11px] mt-0.5">{check.detail}</p>
+                  <p className="text-gray-400 text-xs mt-0.5">{check.detail}</p>
                 </div>
               </li>
             ))}
           </ul>
 
           {report.summary && (
-            <div className="text-[11px] text-gray-400 italic px-1">
+            <div className="text-xs text-gray-400 italic px-1">
               {report.summary}
             </div>
           )}
 
           {/* Provenance Metadata */}
-          <div className="p-3 rounded-xl bg-black/50 border border-white/5 text-[10px] font-mono text-gray-400 flex flex-wrap items-center justify-between gap-2">
+          <div className="p-3 rounded-xl bg-black/50 border border-white/5 text-xs font-mono text-gray-400 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <Cpu size={12} className="text-ansys-yellow" />
+              <Cpu size={12} className="text-signal" />
               <span>Solver: {report.provenance?.solver || "—"}</span>
             </div>
             <div>

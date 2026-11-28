@@ -89,15 +89,15 @@ export default function VnVPage() {
     <div className="w-full bg-[#08080a] text-white min-h-screen pt-20 pb-16 px-4 sm:px-6 font-sans">
       <div className="max-w-[1440px] mx-auto">
         {/* Breadcrumbs & Header */}
-        <div className="flex items-center gap-2 text-xs font-mono text-gray-500 mb-2">
+        <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 mb-2">
           <Link href="/" className="hover:text-gray-300">HOME</Link>
           <ChevronRight size={12} />
-          <span className="text-ansys-yellow font-bold">VERIFICATION & VALIDATION (V&V)</span>
+          <span className="text-signal font-bold">VERIFICATION & VALIDATION (V&V)</span>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-4 mb-8 pb-6 border-b border-white/[0.08]">
           <div>
-            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-ansys-yellow mb-1">
+            <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-signal mb-1">
               <ShieldCheck size={16} />
               Numerical & Physical Rigor Compliance Suite
             </div>
@@ -114,7 +114,7 @@ export default function VnVPage() {
             <select
               value={modelFilter}
               onChange={(e) => setModelFilter(e.target.value)}
-              className="bg-[#141418] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-gray-200 focus:outline-none focus:border-ansys-yellow"
+              className="bg-[#141418] border border-white/10 rounded-xl px-3 py-2 text-xs font-mono text-gray-200 focus:outline-none focus:border-signal"
             >
               <option value="all">All Physics Models</option>
               <option value="quarter_car">Quarter Car (2-DOF Ride)</option>
@@ -127,7 +127,7 @@ export default function VnVPage() {
             <button
               onClick={runVnSuite}
               disabled={loading}
-              className="px-4 py-2 bg-ansys-yellow text-black font-bold text-xs rounded-xl hover:brightness-110 flex items-center gap-2 disabled:opacity-50 transition-all"
+              className="px-4 py-2 bg-signal text-carbon font-bold text-xs rounded-xl hover:brightness-110 flex items-center gap-2 disabled:opacity-50 transition-all"
             >
               {loading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
               Run V&V Suite
@@ -156,7 +156,7 @@ export default function VnVPage() {
             <div className="flex items-center gap-2 mt-2 sm:mt-0 shrink-0">
               <button
                 onClick={runVnSuite}
-                className="px-3 py-1.5 bg-ansys-yellow text-black font-bold text-xs rounded-lg hover:brightness-110 flex items-center gap-1.5 transition-all"
+                className="px-3 py-1.5 bg-signal text-carbon font-bold text-xs rounded-lg hover:brightness-110 flex items-center gap-1.5 transition-all"
               >
                 <RefreshCw size={12} />
                 Retry Suite
@@ -174,33 +174,33 @@ export default function VnVPage() {
         {/* Summary Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
-            <div className="text-[11px] text-gray-400 uppercase font-mono">Total Test Cases</div>
+            <div className="text-xs text-gray-400 uppercase font-mono">Total Test Cases</div>
             <div className="text-2xl font-extrabold font-mono text-white mt-1">
               {suite?.summary.total ?? "—"}
             </div>
-            <div className="text-[10px] text-gray-500 mt-0.5">Automated benchmark cases</div>
+            <div className="text-xs text-zinc-400 mt-0.5">Automated benchmark cases</div>
           </div>
 
           <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
-            <div className="text-[11px] text-gray-400 uppercase font-mono">Passing Cases</div>
+            <div className="text-xs text-gray-400 uppercase font-mono">Passing Cases</div>
             <div className="text-2xl font-extrabold font-mono text-emerald-400 mt-1 flex items-center gap-1.5">
               <CheckCircle2 size={20} />
               {suite?.summary.passed ?? "—"}
             </div>
-            <div className="text-[10px] text-gray-500 mt-0.5">Within numerical tolerance</div>
+            <div className="text-xs text-zinc-400 mt-0.5">Within numerical tolerance</div>
           </div>
 
           <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
-            <div className="text-[11px] text-gray-400 uppercase font-mono">Failed Cases</div>
+            <div className="text-xs text-gray-400 uppercase font-mono">Failed Cases</div>
             <div className="text-2xl font-extrabold font-mono text-rose-400 mt-1 flex items-center gap-1.5">
               <XCircle size={20} />
               {suite?.summary.failed ?? "0"}
             </div>
-            <div className="text-[10px] text-gray-500 mt-0.5">Exceeding tolerance bounds</div>
+            <div className="text-xs text-zinc-400 mt-0.5">Exceeding tolerance bounds</div>
           </div>
 
           <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/[0.06]">
-            <div className="text-[11px] text-gray-400 uppercase font-mono">Suite Compliance</div>
+            <div className="text-xs text-gray-400 uppercase font-mono">Suite Compliance</div>
             <div className="text-sm font-extrabold font-mono mt-1">
               {suite?.summary.all_passed ? (
                 <span className="px-2.5 py-1 rounded-full bg-emerald-950/60 border border-emerald-500/40 text-emerald-400">
@@ -212,7 +212,7 @@ export default function VnVPage() {
                 </span>
               )}
             </div>
-            <div className="text-[10px] text-gray-500 mt-1">ISO 16331 / DIN 70000</div>
+            <div className="text-xs text-zinc-400 mt-1">Internal Numerical &amp; Physics Benchmark Suite</div>
           </div>
         </div>
 
@@ -220,7 +220,7 @@ export default function VnVPage() {
         <div className="rounded-2xl bg-[#111116] border border-white/[0.08] overflow-hidden shadow-2xl">
           <div className="px-6 py-4 border-b border-white/[0.06] flex items-center justify-between">
             <div className="flex items-center gap-2 font-bold text-sm text-white">
-              <Cpu size={16} className="text-ansys-yellow" />
+              <Cpu size={16} className="text-signal" />
               Benchmark Case Execution Log
             </div>
             <div className="text-xs font-mono text-gray-400">
@@ -230,7 +230,7 @@ export default function VnVPage() {
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-white/[0.02] border-b border-white/[0.06] text-gray-400 uppercase text-[10px] tracking-wider">
+              <thead className="bg-white/[0.02] border-b border-white/[0.06] text-gray-400 uppercase text-xs tracking-wider">
                 <tr>
                   <th className="py-3 px-4">Test Case & Target</th>
                   <th className="py-3 px-4">Model & Solver</th>
@@ -243,14 +243,14 @@ export default function VnVPage() {
               <tbody className="divide-y divide-white/[0.04]">
                 {loading ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-gray-500">
-                      <Loader2 size={24} className="animate-spin mx-auto mb-2 text-ansys-yellow" />
+                    <td colSpan={6} className="py-12 text-center text-zinc-400">
+                      <Loader2 size={24} className="animate-spin mx-auto mb-2 text-signal" />
                       Executing mathematical verification benchmarks...
                     </td>
                   </tr>
                 ) : filteredCases.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-12 text-center text-gray-500">
+                    <td colSpan={6} className="py-12 text-center text-zinc-400">
                       No test cases found for the selected model filter.
                     </td>
                   </tr>
@@ -265,7 +265,7 @@ export default function VnVPage() {
                           <div className="flex items-center gap-2">
                             <ChevronDown
                               size={13}
-                              className={`text-gray-500 transition-transform ${
+                              className={`text-zinc-400 transition-transform ${
                                 expandedCase === (c.name || (c as any).id) ? "rotate-180" : ""
                               }`}
                             />
@@ -274,7 +274,7 @@ export default function VnVPage() {
                         </td>
                         <td className="py-3 px-4 text-gray-400">
                           <div>{c.model}</div>
-                          <div className="text-[10px] text-gray-600">{c.solver || (c as any).solver_version || "RK45"}</div>
+                          <div className="text-xs text-zinc-300">{c.solver || (c as any).solver_version || "RK45"}</div>
                         </td>
                         <td className="py-3 px-4 text-right text-gray-400 font-mono">
                           ±{(((c.tolerance !== undefined ? c.tolerance : ((c as any).tolerance_pct ? (c as any).tolerance_pct / 100 : 0.05))) * 100).toFixed(2)}%
@@ -291,7 +291,7 @@ export default function VnVPage() {
                         </td>
                         <td className="py-3 px-4 text-center">
                           <span
-                            className={`px-2 py-0.5 rounded-full text-[10px] font-bold border ${
+                            className={`px-2 py-0.5 rounded-full text-xs font-bold border ${
                               c.status === "PASS"
                                 ? "bg-emerald-950/60 border-emerald-500/40 text-emerald-400"
                                 : "bg-rose-950/60 border-rose-500/40 text-rose-400"
@@ -300,9 +300,9 @@ export default function VnVPage() {
                             {c.status}
                           </span>
                         </td>
-                        <td className="py-3 px-4 text-right text-gray-500 text-[10px]">
+                        <td className="py-3 px-4 text-right text-zinc-400 text-xs">
                           <div>{c.provenance?.dataset || (c as any).reference_source || "ANALYTICAL"}</div>
-                          <div className="text-gray-600">{c.provenance?.build || (c as any).physics_version || "PROD"}</div>
+                          <div className="text-zinc-300">{c.provenance?.build || (c as any).physics_version || "PROD"}</div>
                         </td>
                       </tr>
 
@@ -311,11 +311,11 @@ export default function VnVPage() {
                           <td colSpan={6} className="py-3 px-8 text-xs text-gray-400 border-t border-white/[0.02]">
                             <div className="p-3 rounded-xl bg-black/40 border border-white/[0.04] space-y-1">
                               <div className="text-white font-bold flex items-center gap-1.5">
-                                <Info size={13} className="text-ansys-yellow" />
+                                <Info size={13} className="text-signal" />
                                 Engineering Explanation & Benchmark Ground Truth:
                               </div>
                               <p className="text-gray-300 font-sans">{c.explanation || `Validated against ${(c as any).reference_source || 'ground truth'}`}</p>
-                              <div className="pt-2 text-[10px] text-gray-500 flex gap-4">
+                              <div className="pt-2 text-xs text-zinc-400 flex gap-4">
                                 <span>Dataset: {c.provenance?.dataset || (c as any).reference_source || "ANALYTICAL"}</span>
                                 <span>Execution Date: {c.provenance?.date || "2026-03-01"}</span>
                                 <span>Software Build: {c.provenance?.build || (c as any).physics_version || "PROD"}</span>
@@ -345,10 +345,10 @@ export default function VnVPage() {
             <div className="flex items-center justify-between pb-4 border-b border-white/10 mb-4">
               <div>
                 <h2 className="text-lg font-bold text-white flex items-center gap-2">
-                  <FileText size={16} className="text-ansys-yellow" />
-                  Evidence Report (Markdown) · ISO 16331 / DIN 70000
+                  <FileText size={16} className="text-signal" />
+                  Evidence Report (Markdown) · Internal Benchmark Suite
                 </h2>
-                <p className="text-xs text-gray-400">Standard evidence format for certification and compliance audits.</p>
+                <p className="text-sm text-zinc-300">Analytical benchmark verification log generated from repo regression cases.</p>
               </div>
               <button
                 onClick={() => setShowMarkdownModal(false)}
@@ -373,7 +373,7 @@ export default function VnVPage() {
                   a.download = `SuspensionLab_VnV_Evidence_Report_${Date.now()}.md`;
                   a.click();
                 }}
-                className="px-4 py-2 bg-ansys-yellow text-black font-bold text-xs rounded-xl hover:brightness-110 flex items-center gap-1.5"
+                className="px-4 py-2 bg-signal text-carbon font-bold text-xs rounded-xl hover:brightness-110 flex items-center gap-1.5"
               >
                 <Download size={13} />
                 Download Markdown (.md)

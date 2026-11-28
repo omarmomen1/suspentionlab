@@ -56,6 +56,10 @@ interface TransientResult {
   settled_at_t: number;
   r_steady_state: number;
   delta_steer_deg: number;
+  ay_required_g?: number;
+  mu_limit_g?: number;
+  infeasible?: boolean;
+  feasibility_warning?: string;
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -69,7 +73,7 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <div className="text-[9px] font-bold text-gray-600 uppercase tracking-[0.16em] mb-3">{children}</div>;
+  return <div className="text-xs font-bold text-zinc-300 uppercase tracking-[0.16em] mb-3">{children}</div>;
 }
 
 function MetricRow({ label, value, unit = "", highlight = false }: {
@@ -77,9 +81,9 @@ function MetricRow({ label, value, unit = "", highlight = false }: {
 }) {
   return (
     <div className="flex items-center justify-between py-1.5 border-b border-[#1a1a1c] last:border-0">
-      <span className="text-[10px] text-gray-500">{label}</span>
-      <span className={`text-[12px] font-mono ${highlight ? "text-[#f2a900] font-bold" : "text-white"}`}>
-        {value}{unit && <span className="text-gray-600 text-[9px] ml-0.5">{unit}</span>}
+      <span className="text-xs text-zinc-400">{label}</span>
+      <span className={`text-xs font-mono ${highlight ? "text-amber-400 font-bold" : "text-white"}`}>
+        {value}{unit && <span className="text-zinc-400 text-xs ml-0.5">{unit}</span>}
       </span>
     </div>
   );
@@ -91,15 +95,15 @@ function ParamInput({ label, value, onChange, min, max, step = 0.1, unit = "" }:
 }) {
   return (
     <div className="flex items-center justify-between gap-2">
-      <label className="text-[10px] text-gray-500 flex-1 leading-tight">{label}</label>
+      <label className="text-xs text-zinc-400 flex-1 leading-tight">{label}</label>
       <div className="flex items-center gap-1">
         <input
           type="number" value={value} min={min} max={max} step={step}
           onChange={e => onChange(parseFloat(e.target.value) || 0)}
-          className="w-[72px] bg-[#0d0d0d] border border-[#252525] text-[11px] rounded px-2 py-1
-            text-white focus:outline-none focus:border-[#f2a900]/50 text-right font-mono"
+          className="w-[72px] bg-[#0d0d0d] border border-[#252525] text-xs rounded px-2 py-1
+            text-white focus:outline-none focus:border-[#C8F04B]/50 text-right font-mono"
         />
-        {unit && <span className="text-[9px] text-gray-700 w-9">{unit}</span>}
+        {unit && <span className="text-xs text-zinc-300 w-9">{unit}</span>}
       </div>
     </div>
   );
@@ -136,8 +140,8 @@ export default function YawDynamicsPage() {
   }, [vehicle]);
 
   const [simParams, setSimParams] = useState({
-    v_ms:      60.0,
-    radius_m:  60.0,
+    v_ms:      27.78,
+    radius_m:  100.0,
     t_total_s: 3.0,
   });
 
@@ -194,7 +198,7 @@ export default function YawDynamicsPage() {
         y:     mmmResult.Mz_total_nm.map(row => row[j]),
         line:  {
           color: j === Math.floor(mmmResult.delta_deg.length / 2)
-            ? "#f2a900"
+            ? "#C8F04B"
             : `hsl(${200 + j * 25}, 60%, 55%)`,
           width: j === Math.floor(mmmResult.delta_deg.length / 2) ? 2.5 : 1.5,
         },
@@ -222,7 +226,7 @@ export default function YawDynamicsPage() {
         {
           type: "scatter" as const, mode: "lines" as const, name: "Sideslip β [deg]",
           x: transient.t, y: transient.beta_deg,
-          line: { color: "#f2a900", width: 2 }, yaxis: "y",
+          line: { color: "#C8F04B", width: 2 }, yaxis: "y",
         },
         {
           type: "scatter" as const, mode: "lines" as const, name: "Yaw rate r [deg/s]",
@@ -232,6 +236,10 @@ export default function YawDynamicsPage() {
       ]
     : [];
 
+  const ayReqG = (simParams.v_ms ** 2) / (Math.max(Math.abs(simParams.radius_m), 0.1) * 9.81);
+  const muLimitG = transient?.mu_limit_g ?? 1.35;
+  const isInfeasible = Boolean(transient?.infeasible) || ayReqG > muLimitG;
+
   const handleClass = metrics?.handling_class;
   const handleColor = handleClass === "understeer"
     ? "text-red-400"
@@ -240,23 +248,23 @@ export default function YawDynamicsPage() {
       : "text-emerald-400";
 
   return (
-    <div className="min-h-screen bg-[#0a0a0b] text-white px-4 py-6">
+    <div className="min-h-screen bg-[#0C0F12] text-white px-4 py-6">
       <div className="max-w-[1600px] mx-auto">
 
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-lg font-bold text-white flex items-center gap-2">
-              <Activity size={18} className="text-[#f2a900]" />
+              <Activity size={18} className="text-signal" />
               Yaw Dynamics / MMM
             </h1>
-            <p className="text-[11px] text-gray-500 mt-0.5">
+            <p className="text-xs text-zinc-400 mt-0.5 leading-relaxed">
               Milliken Moment Method diagram + 2-DOF transient bicycle model
             </p>
           </div>
           <div className="flex items-center gap-3">
             {error && (
-              <span className="text-[10px] text-red-400 flex items-center gap-1">
+              <span className="text-xs text-red-400 flex items-center gap-1">
                 <AlertCircle size={11} /> {error}
               </span>
             )}
@@ -271,6 +279,21 @@ export default function YawDynamicsPage() {
             </button>
           </div>
         </div>
+
+        {isInfeasible && (
+          <div
+            data-testid="yaw-infeasible-warning"
+            role="alert"
+            className="mb-4 rounded-xl border border-amber-500/40 bg-amber-950/30 px-4 py-3 text-xs text-amber-200 flex items-center gap-2.5"
+          >
+            <AlertCircle size={15} className="text-amber-400 shrink-0" />
+            <span>
+              <strong className="text-amber-300">INFEASIBLE — EXCEEDS TIRE GRIP:</strong>{" "}
+              {transient?.feasibility_warning ||
+                `${ayReqG.toFixed(2)} g required lateral acceleration (v=${(simParams.v_ms * 3.6).toFixed(0)} km/h, R=${simParams.radius_m.toFixed(0)} m) exceeds ${muLimitG.toFixed(2)} g tire grip limit; linear bicycle model saturates.`}
+            </span>
+          </div>
+        )}
 
         <div className="grid grid-cols-[280px_1fr] gap-4">
 
@@ -293,7 +316,7 @@ export default function YawDynamicsPage() {
             <Card>
               <SectionTitle>Simulation Parameters</SectionTitle>
               <div className="space-y-2.5">
-                <ParamInput label="Analysis speed"  value={simParams.v_ms * 3.6}
+                <ParamInput label="Analysis speed"  value={Number((simParams.v_ms * 3.6).toFixed(1))}
                   onChange={v => setSimParams(p => ({ ...p, v_ms: v / 3.6 }))} unit="km/h" step={5} />
                 <ParamInput label="Corner radius"   value={simParams.radius_m}
                   onChange={v => setSimParams(p => ({ ...p, radius_m: v }))} unit="m" step={5} />
@@ -310,7 +333,7 @@ export default function YawDynamicsPage() {
                   <div className={`text-sm font-bold capitalize ${handleColor}`}>
                     {metrics.handling_class}
                   </div>
-                  <div className="text-[9px] text-gray-600 mt-0.5">
+                  <div className="text-xs text-zinc-300 mt-0.5">
                     at {simParams.v_ms.toFixed(0)} m/s
                   </div>
                 </div>
@@ -391,9 +414,9 @@ export default function YawDynamicsPage() {
                   style={{ width: "100%", height: 340 }}
                 />
               ) : (
-                <div className="h-80 flex flex-col items-center justify-center gap-2 text-gray-600">
+                <div className="h-80 flex flex-col items-center justify-center gap-2 text-zinc-300">
                   <BarChart3 size={24} />
-                  <span className="text-[11px]">Click &quot;Compute MMM&quot; to run analysis</span>
+                  <span className="text-xs">Click &quot;Compute MMM&quot; to run analysis</span>
                 </div>
               )}
             </Card>
@@ -415,7 +438,7 @@ export default function YawDynamicsPage() {
                     },
                     yaxis: {
                       ...PLOTLY_BASE.yaxis,
-                      title: { text: "Sideslip β [deg]", font: { size: 10, color: "#f2a900" } },
+                      title: { text: "Sideslip β [deg]", font: { size: 10, color: "#C8F04B" } },
                     },
                     yaxis2: {
                       title: { text: "Yaw rate [deg/s]", font: { size: 10, color: "#3b82f6" } },
@@ -447,7 +470,7 @@ export default function YawDynamicsPage() {
                   style={{ width: "100%", height: 260 }}
                 />
               ) : (
-                <div className="h-60 flex items-center justify-center text-gray-600 text-[11px]">
+                <div className="h-60 flex items-center justify-center text-zinc-300 text-xs">
                   Run analysis to see transient response
                 </div>
               )}

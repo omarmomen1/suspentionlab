@@ -174,7 +174,7 @@ export default function CaeInteroperabilityPage() {
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
                 Incumbent CAE Interoperability Hub
               </h1>
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-purple-950/40 text-purple-300 border border-purple-500/30">
+              <span className="px-2 py-0.5 rounded text-xs font-mono uppercase bg-purple-950/40 text-purple-300 border border-purple-500/30">
                 ADAMS • SIMULINK • CARMAKER • FMI
               </span>
             </div>
@@ -204,7 +204,7 @@ export default function CaeInteroperabilityPage() {
                   : "text-zinc-400 hover:text-white"
               }`}
             >
-              <GitCompare className="w-3.5 h-3.5 text-ansys-yellow" />
+              <GitCompare className="w-3.5 h-3.5 text-signal" />
               <span>Solver Benchmark</span>
             </button>
             <button
@@ -235,7 +235,7 @@ export default function CaeInteroperabilityPage() {
                     <Database className="w-4 h-4 text-purple-400" />
                     External CAE Tool Source
                   </h2>
-                  <span className="text-[10px] font-mono text-zinc-500">Pillar 2 Interop</span>
+                  <span className="text-xs font-mono text-zinc-400">Pillar 2 Interop</span>
                 </div>
 
                 {/* Tool Selector */}
@@ -295,7 +295,7 @@ export default function CaeInteroperabilityPage() {
                   <label className="text-xs font-mono text-zinc-400 block mb-1">Vehicle Setup Baseline</label>
                   <div className="grid grid-cols-3 gap-2 text-xs font-mono">
                     <div className="bg-zinc-950 p-2 rounded border border-zinc-850">
-                      <span className="text-[10px] text-zinc-500 block">m_s (kg)</span>
+                      <span className="text-xs text-zinc-400 block">m_s (kg)</span>
                       <input
                         type="number"
                         value={params.m_s}
@@ -304,7 +304,7 @@ export default function CaeInteroperabilityPage() {
                       />
                     </div>
                     <div className="bg-zinc-950 p-2 rounded border border-zinc-850">
-                      <span className="text-[10px] text-zinc-500 block">k_s (N/m)</span>
+                      <span className="text-xs text-zinc-400 block">k_s (N/m)</span>
                       <input
                         type="number"
                         value={params.k_s}
@@ -313,7 +313,7 @@ export default function CaeInteroperabilityPage() {
                       />
                     </div>
                     <div className="bg-zinc-950 p-2 rounded border border-zinc-850">
-                      <span className="text-[10px] text-zinc-500 block">c (Ns/m)</span>
+                      <span className="text-xs text-zinc-400 block">c (Ns/m)</span>
                       <input
                         type="number"
                         value={params.c}
@@ -331,7 +331,7 @@ export default function CaeInteroperabilityPage() {
                     <button
                       type="button"
                       onClick={() => setCsvTrace(SAMPLE_ADAMS_CSV)}
-                      className="text-[10px] font-mono text-purple-400 hover:underline"
+                      className="text-xs font-mono text-purple-400 hover:underline"
                     >
                       Reset Preset
                     </button>
@@ -342,7 +342,7 @@ export default function CaeInteroperabilityPage() {
                     onChange={(e) => setCsvTrace(e.target.value)}
                     className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-xs text-zinc-300 font-mono focus:border-purple-500 outline-none custom-scrollbar"
                   />
-                  <p className="text-[10px] text-zinc-500 mt-1">
+                  <p className="text-xs text-zinc-400 mt-1">
                     Accepts ISO 8855 channels or vendor synonyms (time, vert_g, ddz_s, susp_travel, tire_load).
                   </p>
                 </div>
@@ -385,7 +385,7 @@ export default function CaeInteroperabilityPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <h3 className="font-bold text-sm text-white">Normalized External Dataset</h3>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                        <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1">
                           <ShieldAlert className="w-3 h-3" />
                           ORIGIN: EXTERNAL_CAE
                         </span>
@@ -397,7 +397,7 @@ export default function CaeInteroperabilityPage() {
                     </div>
 
                     <div className="text-right">
-                      <div className="text-[10px] text-zinc-500 font-mono">SHA-256 Artifact Hash</div>
+                      <div className="text-xs text-zinc-400 font-mono">SHA-256 Artifact Hash</div>
                       <div className="text-xs font-mono text-zinc-300 flex items-center justify-end gap-1">
                         <Hash className="w-3 h-3 text-purple-400" />
                         <span>{normalizedData.identity.artifact_hash.slice(0, 16)}...</span>
@@ -408,23 +408,23 @@ export default function CaeInteroperabilityPage() {
                   {/* Summary Metrics */}
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800">
-                      <span className="text-[10px] text-zinc-500 font-mono uppercase block">Samples Ingested</span>
+                      <span className="text-xs text-zinc-400 font-mono uppercase block">Samples Ingested</span>
                       <span className="text-base font-bold text-white font-mono">{normalizedData.sample_count}</span>
                     </div>
                     <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800">
-                      <span className="text-[10px] text-zinc-500 font-mono uppercase block">Time Window</span>
+                      <span className="text-xs text-zinc-400 font-mono uppercase block">Time Window</span>
                       <span className="text-base font-bold text-white font-mono">
                         {fmt(normalizedData.time_start, 2, "s")} - {fmt(normalizedData.time_end, 2, "s")}
                       </span>
                     </div>
                     <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800">
-                      <span className="text-[10px] text-zinc-500 font-mono uppercase block">Mean Timestep</span>
+                      <span className="text-xs text-zinc-400 font-mono uppercase block">Mean Timestep</span>
                       <span className="text-base font-bold text-emerald-400 font-mono">
                         {fmt(normalizedData.dt_mean != null ? normalizedData.dt_mean * 1000 : null, 1, " ms")}
                       </span>
                     </div>
                     <div className="p-3 rounded-xl bg-zinc-950/80 border border-zinc-800">
-                      <span className="text-[10px] text-zinc-500 font-mono uppercase block">Channels Mapped</span>
+                      <span className="text-xs text-zinc-400 font-mono uppercase block">Channels Mapped</span>
                       <span className="text-base font-bold text-cyan-400 font-mono">
                         {normalizedData.channels_present.length} ISO
                       </span>
@@ -450,21 +450,21 @@ export default function CaeInteroperabilityPage() {
                   {/* Anti-Tautology Notice */}
                   <div className="p-3.5 rounded-xl bg-zinc-950/60 border border-zinc-800/80 space-y-1 text-xs">
                     <span className="font-bold text-zinc-300 flex items-center gap-1.5">
-                      <ShieldAlert className="w-3.5 h-3.5 text-ansys-yellow" />
+                      <ShieldAlert className="w-3.5 h-3.5 text-signal" />
                       Anti-Tautology &amp; Verification Rule
                     </span>
-                    <p className="text-zinc-400 text-[11px] leading-relaxed">
+                    <p className="text-zinc-400 text-xs leading-relaxed">
                       SuspensionLab strictly separates external CAE data from native forward calculations. This ingested artifact is flagged as <strong className="text-zinc-200">EXTERNAL_CAE</strong> with an immutable cryptographic digest. It will never be passed off as native forward-model truth.
                     </p>
                   </div>
                 </div>
               ) : (
                 <div className="p-12 rounded-2xl bg-zinc-900/30 border border-dashed border-zinc-800 text-center space-y-3">
-                  <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto text-zinc-500">
+                  <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto text-zinc-400">
                     <Upload className="w-6 h-6" />
                   </div>
                   <h3 className="text-sm font-semibold text-zinc-300">No External Dataset Ingested Yet</h3>
-                  <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+                  <p className="text-xs text-zinc-400 max-w-sm mx-auto">
                     Select a CAE tool, verify the vehicle setup, and click &quot;Normalize &amp; Ingest Dataset&quot; to inspect normalized telemetry.
                   </p>
                 </div>
@@ -483,7 +483,7 @@ export default function CaeInteroperabilityPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <h2 className="text-base font-bold text-white">Solver Correlation &amp; Verification Report</h2>
-                      <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-emerald-950/40 text-emerald-300 border border-emerald-500/30">
+                      <span className="px-2 py-0.5 rounded text-xs font-mono uppercase bg-emerald-950/40 text-emerald-300 border border-emerald-500/30">
                         Independent Forward Solvers
                       </span>
                     </div>
@@ -507,27 +507,27 @@ export default function CaeInteroperabilityPage() {
                   {/* External */}
                   <div className="p-4 rounded-xl bg-zinc-950/80 border border-zinc-800 space-y-2">
                     <div className="flex items-center justify-between text-zinc-400">
-                      <span className="uppercase text-[10px] text-zinc-500">External Model Deck</span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] bg-zinc-900 border border-zinc-800 text-zinc-400">
+                      <span className="uppercase text-xs text-zinc-400">External Model Deck</span>
+                      <span className="px-1.5 py-0.5 rounded text-xs bg-zinc-900 border border-zinc-800 text-zinc-400">
                         ORIGIN: EXTERNAL_CAE
                       </span>
                     </div>
                     <div className="text-sm font-bold text-white">{comparisonResult.external_identity.source_tool}</div>
                     <div className="text-zinc-400 text-xs">Solver: {comparisonResult.external_identity.solver}</div>
-                    <div className="text-[11px] text-zinc-500 truncate">Hash: {comparisonResult.external_identity.artifact_hash}</div>
+                    <div className="text-xs text-zinc-400 truncate">Hash: {comparisonResult.external_identity.artifact_hash}</div>
                   </div>
 
                   {/* Native */}
                   <div className="p-4 rounded-xl bg-zinc-950/80 border border-zinc-800 space-y-2">
                     <div className="flex items-center justify-between text-zinc-400">
-                      <span className="uppercase text-[10px] text-zinc-500">SuspensionLab PRO Native</span>
-                      <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                      <span className="uppercase text-xs text-zinc-400">SuspensionLab PRO Native</span>
+                      <span className="px-1.5 py-0.5 rounded text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
                         ORIGIN: NATIVE_SIMULATION
                       </span>
                     </div>
                     <div className="text-sm font-bold text-emerald-400">{comparisonResult.native_identity.solver}</div>
                     <div className="text-zinc-400 text-xs">Model Version: {comparisonResult.native_identity.model_version}</div>
-                    <div className="text-[11px] text-zinc-500">Backend: {comparisonResult.native_identity.backend}</div>
+                    <div className="text-xs text-zinc-400">Backend: {comparisonResult.native_identity.backend}</div>
                   </div>
                 </div>
 
@@ -549,7 +549,7 @@ export default function CaeInteroperabilityPage() {
                           <div className="flex items-center justify-between">
                             <span className="font-semibold text-zinc-200 text-xs font-mono">{channel}</span>
                             <span
-                              className={`px-1.5 py-0.5 rounded text-[9px] font-mono font-bold uppercase ${
+                              className={`px-1.5 py-0.5 rounded text-xs font-mono font-bold uppercase ${
                                 isStrong
                                   ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
                                   : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
@@ -561,19 +561,19 @@ export default function CaeInteroperabilityPage() {
 
                           <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                             <div className="bg-zinc-900/60 p-2 rounded border border-zinc-800">
-                              <span className="text-[10px] text-zinc-500 block">R² Correlation</span>
+                              <span className="text-xs text-zinc-400 block">R² Correlation</span>
                               <span className="font-bold text-white">{fmt(metric.r_squared, 3)}</span>
                             </div>
                             <div className="bg-zinc-900/60 p-2 rounded border border-zinc-800">
-                              <span className="text-[10px] text-zinc-500 block">RMS Residual</span>
+                              <span className="text-xs text-zinc-400 block">RMS Residual</span>
                               <span className="font-bold text-white">{fmt(metric.rms_residual, 4)}</span>
                             </div>
                             <div className="bg-zinc-900/60 p-2 rounded border border-zinc-800">
-                              <span className="text-[10px] text-zinc-500 block">Max Abs Error</span>
+                              <span className="text-xs text-zinc-400 block">Max Abs Error</span>
                               <span className="font-bold text-zinc-300">{fmt(metric.max_absolute_error, 4)}</span>
                             </div>
                             <div className="bg-zinc-900/60 p-2 rounded border border-zinc-800">
-                              <span className="text-[10px] text-zinc-500 block">Mean Error %</span>
+                              <span className="text-xs text-zinc-400 block">Mean Error %</span>
                               <span className="font-bold text-zinc-300">{fmt(metric.mean_percentage_error, 1, "%")}</span>
                             </div>
                           </div>
@@ -592,18 +592,18 @@ export default function CaeInteroperabilityPage() {
                   <p className="text-xs text-zinc-300 leading-relaxed font-sans">
                     {comparisonResult.engineering_interpretation}
                   </p>
-                  <p className="text-[11px] text-zinc-400 mt-2 font-mono">
+                  <p className="text-xs text-zinc-400 mt-2 font-sans leading-relaxed">
                     Boundary Notes: {comparisonResult.boundary_notes}
                   </p>
                 </div>
               </div>
             ) : (
               <div className="p-12 rounded-2xl bg-zinc-900/30 border border-dashed border-zinc-800 text-center space-y-3">
-                <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto text-zinc-500">
-                  <GitCompare className="w-6 h-6 text-ansys-yellow" />
+                <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto text-zinc-400">
+                  <GitCompare className="w-6 h-6 text-signal" />
                 </div>
                 <h3 className="text-sm font-semibold text-zinc-300">No Active Solver Benchmark</h3>
-                <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+                <p className="text-xs text-zinc-400 max-w-sm mx-auto">
                   Click &quot;Compare Solvers&quot; in the Import panel to run the native RK45 ODE solver side-by-side with your external CAE trace.
                 </p>
                 <button
@@ -647,14 +647,14 @@ export default function CaeInteroperabilityPage() {
                       }`}
                     >
                       <div className="font-semibold text-xs text-white">{deck.label}</div>
-                      <div className="text-[11px] text-zinc-500 mt-0.5">{deck.desc}</div>
+                      <div className="text-xs text-zinc-400 mt-0.5">{deck.desc}</div>
                     </button>
                   ))}
                 </div>
 
                 {/* Setup Parameters Snapshot */}
                 <div className="pt-2 border-t border-zinc-800 space-y-2">
-                  <span className="text-[10px] font-mono uppercase text-zinc-500 block">Exported Parameters</span>
+                  <span className="text-xs font-mono uppercase text-zinc-400 block">Exported Parameters</span>
                   <div className="grid grid-cols-2 gap-2 text-xs font-mono text-zinc-300">
                     <div className="bg-zinc-950 p-2 rounded border border-zinc-850">m_s: {params.m_s} kg</div>
                     <div className="bg-zinc-950 p-2 rounded border border-zinc-850">k_s: {params.k_s} N/m</div>
@@ -674,7 +674,7 @@ export default function CaeInteroperabilityPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-sm font-bold text-white font-mono">{exportedDeck.filename}</span>
                         {exportedDeck.syntax_validated && (
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                          <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" /> SYNTAX VALIDATED
                           </span>
                         )}
@@ -700,11 +700,11 @@ export default function CaeInteroperabilityPage() {
                 </div>
               ) : (
                 <div className="p-12 rounded-2xl bg-zinc-900/30 border border-dashed border-zinc-800 text-center space-y-3">
-                  <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto text-zinc-500">
+                  <div className="w-12 h-12 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto text-zinc-400">
                     <FileCode className="w-6 h-6" />
                   </div>
                   <h3 className="text-sm font-semibold text-zinc-300">Select a deck format to generate</h3>
-                  <p className="text-xs text-zinc-500 max-w-sm mx-auto">
+                  <p className="text-xs text-zinc-400 max-w-sm mx-auto">
                     Export your suspension model parameters into MSC Adams dataset decks or MATLAB simulation files.
                   </p>
                 </div>

@@ -270,7 +270,7 @@ export default function DigitalTwinPage() {
             onClick={() => setActiveTab("operational")}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
               activeTab === "operational"
-                ? "bg-amber-500/10 text-amber-500 shadow-sm border border-amber-500/30"
+                ? "bg-signal/10 text-amber-500 shadow-sm border border-amber-500/30"
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
             }`}
           >
@@ -283,7 +283,7 @@ export default function DigitalTwinPage() {
             onClick={() => setActiveTab("sync")}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
               activeTab === "sync"
-                ? "bg-amber-500/10 text-amber-500 shadow-sm"
+                ? "bg-signal/10 text-amber-500 shadow-sm"
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
             }`}
           >
@@ -296,7 +296,7 @@ export default function DigitalTwinPage() {
             onClick={() => setActiveTab("analysis")}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
               activeTab === "analysis"
-                ? "bg-amber-500/10 text-amber-500 shadow-sm"
+                ? "bg-signal/10 text-amber-500 shadow-sm"
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
             }`}
           >
@@ -309,7 +309,7 @@ export default function DigitalTwinPage() {
             onClick={() => setActiveTab("live")}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
               activeTab === "live"
-                ? "bg-amber-500/10 text-amber-500 shadow-sm"
+                ? "bg-signal/10 text-amber-500 shadow-sm"
                 : "text-slate-400 hover:text-slate-200 hover:bg-slate-800/50"
             }`}
           >
@@ -335,7 +335,7 @@ export default function DigitalTwinPage() {
                       <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-400">
                         Model / Measurement Divergence Alert
                       </span>
-                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
+                      <span className="text-xs font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300">
                         {operationalState.model_divergence.severity}
                       </span>
                     </div>
@@ -365,7 +365,7 @@ export default function DigitalTwinPage() {
                     <Compass className="w-5 h-5 text-cyan-400" />
                     <span>Virtual Vehicle Belief State</span>
                   </h2>
-                  <p className="text-xs text-slate-400 font-mono mt-0.5">
+                  <p className="text-xs text-slate-400 font-sans leading-relaxed mt-0.5">
                     What does the virtual vehicle currently believe is happening to the real vehicle?
                   </p>
                 </div>
@@ -380,7 +380,7 @@ export default function DigitalTwinPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
-                    <tr className="border-b border-slate-800 text-[11px] font-mono uppercase text-slate-400">
+                    <tr className="border-b border-slate-800 text-xs font-mono uppercase text-slate-400">
                       <th className="py-3 px-4">Primary State</th>
                       <th className="py-3 px-4">{isSampleDemo ? "Sample Reference (SAMPLE)" : "Uploaded Telemetry"}</th>
                       <th className="py-3 px-4">Estimated (Observer)</th>
@@ -396,13 +396,13 @@ export default function DigitalTwinPage() {
                           {st.name}
                         </td>
                         <td className="py-3.5 px-4 text-blue-300 font-semibold">
-                          {st.measured.toFixed(1)} <span className="text-[10px] text-slate-500">{st.unit}</span>
+                          {st.measured.toFixed(1)} <span className="text-xs text-zinc-400">{st.unit}</span>
                         </td>
                         <td className="py-3.5 px-4 text-emerald-300">
-                          {st.estimated.toFixed(1)} <span className="text-[10px] text-slate-500">{st.unit}</span>
+                          {st.estimated.toFixed(1)} <span className="text-xs text-zinc-400">{st.unit}</span>
                         </td>
                         <td className="py-3.5 px-4 text-purple-300 font-semibold">
-                          {st.simulated.toFixed(1)} <span className="text-[10px] text-slate-500">{st.unit}</span>
+                          {st.simulated.toFixed(1)} <span className="text-xs text-zinc-400">{st.unit}</span>
                         </td>
                         <td className="py-3.5 px-4">
                           <span className={Math.abs(st.residual) < 10 ? "text-slate-300" : "text-amber-400"}>
@@ -411,7 +411,7 @@ export default function DigitalTwinPage() {
                         </td>
                         <td className="py-3.5 px-4">
                           <span
-                            className={`uppercase text-[10px] px-2 py-0.5 rounded font-semibold ${
+                            className={`uppercase text-xs px-2 py-0.5 rounded font-semibold ${
                               st.status === "nominal"
                                 ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
                                 : st.status === "warning"
@@ -438,7 +438,7 @@ export default function DigitalTwinPage() {
                     <span className="text-cyan-400">{operationalState.model_health.model_confidence}%</span>
                     <span className="text-xs text-slate-400 font-sans">empirical</span>
                   </div>
-                  <p className="text-[11px] text-slate-400 font-mono">
+                  <p className="text-xs text-slate-400 font-sans leading-relaxed">
                     Based on Welch PSD peak prominence and sample density.
                   </p>
                 </div>
@@ -456,7 +456,7 @@ export default function DigitalTwinPage() {
                       {operationalState.model_health.operating_envelope.status}
                     </span>
                   </div>
-                  <div className="text-[11px] text-slate-400 font-mono">
+                  <div className="text-xs text-slate-400 font-mono">
                     Lim: {operationalState.model_health.operating_envelope.min_ride_height_limit} &bull; {operationalState.model_health.operating_envelope.max_vertical_accel_limit}
                   </div>
                 </div>
@@ -466,7 +466,7 @@ export default function DigitalTwinPage() {
                   <div className="text-lg font-bold text-white font-mono">
                     Revision {operationalState.model_health.calibration_count}
                   </div>
-                  <div className="text-[11px] text-slate-400 font-mono truncate">
+                  <div className="text-xs text-slate-400 font-mono truncate">
                     Updated: {operationalState.model_health.last_calibration_at || "Initial handbook"}
                   </div>
                 </div>
@@ -516,29 +516,29 @@ export default function DigitalTwinPage() {
               {/* Visual 5 Stages */}
               <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 pt-2">
                 <div className="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 space-y-1">
-                  <span className="text-[10px] font-mono text-cyan-400 font-bold">STAGE 1</span>
+                  <span className="text-xs font-mono text-cyan-400 font-bold">STAGE 1</span>
                   <div className="text-xs font-medium text-white">Telemetry Dataset</div>
-                  <div className="text-[11px] text-slate-400">100 Hz MoTeC SLTP Ingestion</div>
+                  <div className="text-xs text-slate-400">100 Hz MoTeC SLTP Ingestion</div>
                 </div>
                 <div className="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 space-y-1">
-                  <span className="text-[10px] font-mono text-cyan-400 font-bold">STAGE 2</span>
+                  <span className="text-xs font-mono text-cyan-400 font-bold">STAGE 2</span>
                   <div className="text-xs font-medium text-white">Preprocessing</div>
-                  <div className="text-[11px] text-slate-400">Butterworth zero-phase filter</div>
+                  <div className="text-xs text-slate-400">Butterworth zero-phase filter</div>
                 </div>
                 <div className="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 space-y-1">
-                  <span className="text-[10px] font-mono text-cyan-400 font-bold">STAGE 3</span>
+                  <span className="text-xs font-mono text-cyan-400 font-bold">STAGE 3</span>
                   <div className="text-xs font-medium text-white">Identification</div>
-                  <div className="text-[11px] text-slate-400">Welch PSD peak &amp; &zeta; extraction</div>
+                  <div className="text-xs text-slate-400">Welch PSD peak &amp; &zeta; extraction</div>
                 </div>
                 <div className="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 space-y-1">
-                  <span className="text-[10px] font-mono text-cyan-400 font-bold">STAGE 4</span>
+                  <span className="text-xs font-mono text-cyan-400 font-bold">STAGE 4</span>
                   <div className="text-xs font-medium text-white">Setup Parameters</div>
-                  <div className="text-[11px] text-slate-400">Inverse k_s, c, MR updating</div>
+                  <div className="text-xs text-slate-400">Inverse k_s, c, MR updating</div>
                 </div>
                 <div className="bg-slate-950/60 border border-slate-800/80 rounded-lg p-3 space-y-1">
-                  <span className="text-[10px] font-mono text-cyan-400 font-bold">STAGE 5</span>
+                  <span className="text-xs font-mono text-cyan-400 font-bold">STAGE 5</span>
                   <div className="text-xs font-medium text-white">Holdout Validation</div>
-                  <div className="text-[11px] text-slate-400">20% temporal holdout R&sup2; check</div>
+                  <div className="text-xs text-slate-400">20% temporal holdout R&sup2; check</div>
                 </div>
               </div>
             </div>
@@ -581,7 +581,7 @@ export default function DigitalTwinPage() {
                     </p>
                     {file && isSampleFile && <SampleDemoTelemetryBadge size="sm" />}
                   </div>
-                  <p className="text-sm text-slate-500 mt-1">
+                  <p className="text-sm text-zinc-400 mt-1">
                     Supports AiM, MoTeC, Pi System, and generic headers
                   </p>
                 </div>
@@ -591,9 +591,9 @@ export default function DigitalTwinPage() {
             {/* Friendly Error Banner */}
             {error && (
               error.isAuth ? (
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 p-4 rounded-xl bg-signal/10 border border-signal/30 text-amber-200">
                   <div className="flex items-center gap-3">
-                    <div className="p-2 rounded-lg bg-amber-500/20 text-amber-400 shrink-0">
+                    <div className="p-2 rounded-lg bg-signal/20 text-signal shrink-0">
                       <Lock size={18} />
                     </div>
                     <div>
@@ -608,7 +608,7 @@ export default function DigitalTwinPage() {
                       type="button"
                       onClick={handleQuickDemoLogin}
                       disabled={isLoggingIn}
-                      className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
+                      className="px-3 py-1.5 rounded-lg bg-signal hover:bg-[#d6f56e] text-carbon text-xs font-bold transition flex items-center gap-1.5 shadow-sm">
                       {isLoggingIn ? <Loader2 size={13} className="animate-spin" /> : <Zap size={13} />}
                       {isLoggingIn ? "Signing In…" : "Quick Demo Sign-In"}
                     </button>
@@ -637,7 +637,7 @@ export default function DigitalTwinPage() {
                       type="button"
                       onClick={() => handleLoadDemoSession(ds)}
                       disabled={isAnalysing}
-                      className="px-3 py-2 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-semibold flex items-center gap-1.5 transition"
+                      className="px-3 py-2 rounded-lg bg-signal/10 hover:bg-signal/20 border border-amber-500/30 text-amber-400 text-xs font-semibold flex items-center gap-1.5 transition"
                       title={ds.formatNote}
                     >
                       <Zap size={14} /> Load {ds.label}
@@ -675,7 +675,7 @@ export default function DigitalTwinPage() {
             {/* Dyno Day in a Box */}
             <div className="rounded-xl border border-slate-800 bg-slate-900/20 p-5">
               <h3 className="text-sm font-semibold text-slate-200 mb-1">Dyno Day in a Box</h3>
-              <p className="text-xs text-slate-500 mb-4">
+              <p className="text-xs text-zinc-400 mb-4">
                 Generate the printable identification report — ride frequency, damping ratio,
                 confidence and provenance hash — for any of your calibrated twins.
               </p>
@@ -691,7 +691,7 @@ export default function DigitalTwinPage() {
                       <SampleDemoTelemetryBadge size="sm" />
                       <span className="font-mono">{file?.name}</span>
                     </div>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-xs text-slate-400">
                       Synthetic demo telemetry fixture — upload a real track log CSV to analyze car data.
                     </span>
                   </div>
@@ -699,38 +699,38 @@ export default function DigitalTwinPage() {
                 {/* QA Summary */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                   <div className="bg-slate-900/40 border border-slate-800/80 p-4 rounded-xl">
-                    <p className="text-xs text-slate-500 font-medium">Session Duration</p>
+                    <p className="text-xs text-zinc-400 font-medium">Session Duration</p>
                     <p className="text-xl font-semibold text-white mt-1">
                       {(analysisResult.qa?.duration_s || analysisResult.summary?.duration_s || 0).toFixed(1)}s
                     </p>
-                    <p className="text-[10px] text-slate-500 mt-1">
+                    <p className="text-xs text-zinc-400 mt-1">
                       {analysisResult.qa?.n_samples || analysisResult.summary?.n_samples || 0} data points
                     </p>
                   </div>
                   <div className="bg-slate-900/40 border border-slate-800/80 p-4 rounded-xl">
-                    <p className="text-xs text-slate-500 font-medium">Sampling Rate</p>
+                    <p className="text-xs text-zinc-400 font-medium">Sampling Rate</p>
                     <p className="text-xl font-semibold text-amber-500 mt-1">
                       {(analysisResult.qa?.sample_rate_hz || analysisResult.qa?.sampling_rate_hz || 100).toFixed(0)} Hz
                     </p>
-                    <p className="text-[10px] text-slate-500 mt-1">
+                    <p className="text-xs text-zinc-400 mt-1">
                       {analysisResult.qa?.rate_is_uniform !== false ? "Uniform logging" : "Variable rate"}
                     </p>
                   </div>
                   <div className="bg-slate-900/40 border border-slate-800/80 p-4 rounded-xl">
-                    <p className="text-xs text-slate-500 font-medium">Identified Channels</p>
+                    <p className="text-xs text-zinc-400 font-medium">Identified Channels</p>
                     <p className="text-xl font-semibold text-emerald-400 mt-1">
                       {Object.keys(analysisResult.channel_map || {}).length}
                     </p>
-                    <p className="text-[10px] text-slate-500 mt-1">
+                    <p className="text-xs text-zinc-400 mt-1">
                       Canonical mapping active
                     </p>
                   </div>
                   <div className="bg-slate-900/40 border border-slate-800/80 p-4 rounded-xl">
-                    <p className="text-xs text-slate-500 font-medium">Lap / Corner Segments</p>
+                    <p className="text-xs text-zinc-400 font-medium">Lap / Corner Segments</p>
                     <p className="text-xl font-semibold text-blue-400 mt-1">
                       {analysisResult.segments?.length || "Auto"}
                     </p>
-                    <p className="text-[10px] text-slate-500 mt-1">
+                    <p className="text-xs text-zinc-400 mt-1">
                       Kinematics segmented
                     </p>
                   </div>
@@ -753,7 +753,7 @@ export default function DigitalTwinPage() {
                       y: speedData.length > 0 ? speedData : [0],
                       name: "Speed [km/h]",
                       type: "scatter", mode: "lines",
-                      line: { color: "#f2a900", width: 2 }
+                      line: { color: "#C8F04B", width: 2 }
                     }
                   ];
                   if (throttleData.length > 0) {
@@ -789,7 +789,7 @@ export default function DigitalTwinPage() {
                                 x: [0, 0.6, 1.3, 1.7, 1.8, 1.4, 0.7, 0, -0.7, -1.4, -1.8, -1.7, -1.3, -0.6, 0],
                                 y: [0.6, 0.5, 0.2, -0.2, -0.9, -1.5, -1.8, -1.9, -1.8, -1.5, -0.9, -0.2, 0.2, 0.5, 0.6],
                                 type: "scatter", mode: "lines", name: "Friction Envelope",
-                                line: { color: "#f2a900", width: 1.5, dash: "dot" }
+                                line: { color: "#C8F04B", width: 1.5, dash: "dot" }
                               },
                               {
                                 x: hasGgData ? latGData : [0],
@@ -855,11 +855,11 @@ export default function DigitalTwinPage() {
                           >
                             <div className="flex items-center gap-2">
                               <span className="font-mono text-amber-400 font-bold">{canon}</span>
-                              {unit && <span className="text-[10px] text-gray-500 font-mono">[{unit}]</span>}
+                              {unit && <span className="text-xs text-zinc-400 font-mono">[{unit}]</span>}
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="text-slate-300 font-mono text-[11px]">{rawName}</span>
-                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{conf} match</span>
+                              <span className="text-slate-300 font-mono text-xs">{rawName}</span>
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">{conf} match</span>
                             </div>
                           </div>
                         );
@@ -899,7 +899,7 @@ export default function DigitalTwinPage() {
                   <Activity className="w-6 h-6" />
                 </div>
                 <h3 className="text-base font-semibold text-slate-200 mb-1">No Telemetry Session Loaded</h3>
-                <p className="text-sm text-slate-500 max-w-md mx-auto mb-4">
+                <p className="text-sm text-zinc-400 max-w-md mx-auto mb-4">
                   Upload a CSV telemetry log above or load a sample dataset (Spa / Silverstone GT3) to inspect real G-G friction exploitation, speed profiles, and channel mappings.
                 </p>
               </div>
@@ -941,7 +941,7 @@ export default function DigitalTwinPage() {
                       SLTP v1 Binary
                     </span>
                   </div>
-                  <div className="text-xs text-slate-500 mt-0.5 flex flex-wrap items-center gap-2">
+                  <div className="text-xs text-zinc-400 mt-0.5 flex flex-wrap items-center gap-2">
                     <span>
                       {isReplaying
                         ? "Replaying sample 100 Hz GT3 dataset through Ingestion Gateway"
@@ -987,31 +987,31 @@ export default function DigitalTwinPage() {
             {/* Diagnostics & Stream Quality Bar */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 bg-slate-900/20 border border-slate-800/60 p-3.5 rounded-xl text-xs">
               <div>
-                <span className="text-slate-500 block">Sustained Rate</span>
+                <span className="text-zinc-400 block">Sustained Rate</span>
                 <span className="font-mono font-semibold text-emerald-400 text-sm">
                   {streamMetrics.rateHz.toFixed(1)} Hz
                 </span>
               </div>
               <div>
-                <span className="text-slate-500 block">Sequence Number</span>
+                <span className="text-zinc-400 block">Sequence Number</span>
                 <span className="font-mono font-semibold text-slate-300 text-sm">
                   #{streamMetrics.sequenceNumber}
                 </span>
               </div>
               <div>
-                <span className="text-slate-500 block">Dropped Packets</span>
+                <span className="text-zinc-400 block">Dropped Packets</span>
                 <span className={`font-mono font-semibold text-sm ${streamMetrics.droppedPackets > 0 ? "text-amber-400" : "text-slate-300"}`}>
                   {streamMetrics.droppedPackets} ({streamMetrics.lossRatePct}%)
                 </span>
               </div>
               <div>
-                <span className="text-slate-500 block">Network Latency</span>
+                <span className="text-zinc-400 block">Network Latency</span>
                 <span className="font-mono font-semibold text-slate-300 text-sm">
                   {streamMetrics.latencyMs > 0 ? `${streamMetrics.latencyMs} ms` : "< 5 ms"}
                 </span>
               </div>
               <div>
-                <span className="text-slate-500 block">Data Integrity</span>
+                <span className="text-zinc-400 block">Data Integrity</span>
                 <span className="font-semibold text-emerald-400 text-sm flex items-center gap-1">
                   <CheckCircle className="w-3.5 h-3.5 inline" /> Validated
                 </span>
@@ -1021,21 +1021,21 @@ export default function DigitalTwinPage() {
             {/* Primary Live HUD Cards (Preserved User-Facing Capability) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-slate-900/40 border border-slate-800/80 p-4 rounded-xl shadow-sm">
-                <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
                   <span>Vehicle Speed</span>
-                  <Gauge className="w-4 h-4 text-slate-600" />
+                  <Gauge className="w-4 h-4 text-zinc-300" />
                 </div>
                 <p className="text-3xl font-semibold text-white tracking-tight">
                   {(liveTelemetry.speed_ms * 3.6).toFixed(1)}{" "}
                   <span className="text-xs text-slate-400 font-normal">km/h</span>
                 </p>
-                <p className="text-xs text-slate-500 mt-1 font-mono">
+                <p className="text-xs text-zinc-400 mt-1 font-mono">
                   {liveTelemetry.speed_ms.toFixed(1)} m/s
                 </p>
               </div>
 
               <div className="bg-slate-900/40 border border-slate-800/80 p-4 rounded-xl shadow-sm">
-                <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
                   <span>Lateral Acceleration</span>
                   <Activity className="w-4 h-4 text-amber-500/70" />
                 </div>
@@ -1043,13 +1043,13 @@ export default function DigitalTwinPage() {
                   {liveTelemetry.lat_g.toFixed(2)}{" "}
                   <span className="text-xs text-slate-400 font-normal">g</span>
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-zinc-400 mt-1">
                   Limit: {liveTwin ? liveTwin.theoreticalMaxLatG.toFixed(2) : "1.25"} g
                 </p>
               </div>
 
               <div className="bg-slate-900/40 border border-slate-800/80 p-4 rounded-xl shadow-sm">
-                <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
                   <span>Longitudinal Accel</span>
                   <Zap className="w-4 h-4 text-blue-400/70" />
                 </div>
@@ -1057,13 +1057,13 @@ export default function DigitalTwinPage() {
                   {liveTelemetry.long_g.toFixed(2)}{" "}
                   <span className="text-xs text-slate-400 font-normal">g</span>
                 </p>
-                <p className="text-xs text-slate-500 mt-1">
+                <p className="text-xs text-zinc-400 mt-1">
                   {liveTelemetry.long_g >= 0 ? "Acceleration" : "Braking zone"}
                 </p>
               </div>
 
               <div className="bg-slate-900/40 border border-slate-800/80 p-4 rounded-xl shadow-sm">
-                <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+                <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
                   <span>Steering Angle</span>
                   <Compass className="w-4 h-4 text-purple-400/70" />
                 </div>
@@ -1071,7 +1071,7 @@ export default function DigitalTwinPage() {
                   {(liveTelemetry.steer_rad * (180 / Math.PI)).toFixed(1)}{" "}
                   <span className="text-xs text-slate-400 font-normal">deg</span>
                 </p>
-                <p className="text-xs text-slate-500 mt-1 font-mono">
+                <p className="text-xs text-zinc-400 mt-1 font-mono">
                   {liveTelemetry.steer_rad.toFixed(3)} rad
                 </p>
               </div>
@@ -1084,12 +1084,12 @@ export default function DigitalTwinPage() {
                   <h3 className="text-sm font-semibold text-slate-200">
                     Digital Twin Pacejka Grip Calibration
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-zinc-400">
                     Real-time comparison between measured lateral load and theoretical quasi-steady physical limit
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-300 font-medium">
+                  <span className="text-xs px-2.5 py-1 rounded-full bg-signal/10 border border-signal/30 text-signal font-medium">
                     {liveTwin?.gripStatusLabel ?? "Optimal Traction Limit"}
                   </span>
                 </div>
@@ -1097,19 +1097,19 @@ export default function DigitalTwinPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
                 <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/60">
-                  <span className="text-slate-500 block mb-1">Pacejka Theoretical Max Lat G</span>
+                  <span className="text-zinc-400 block mb-1">Pacejka Theoretical Max Lat G</span>
                   <span className="text-xl font-mono font-bold text-white">
                     {liveTwin ? liveTwin.theoreticalMaxLatG.toFixed(3) : "1.250"} g
                   </span>
                 </div>
                 <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/60">
-                  <span className="text-slate-500 block mb-1">Measured Abs Lat G</span>
+                  <span className="text-zinc-400 block mb-1">Measured Abs Lat G</span>
                   <span className="text-xl font-mono font-bold text-amber-400">
                     {Math.abs(liveTelemetry.lat_g).toFixed(3)} g
                   </span>
                 </div>
                 <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/60">
-                  <span className="text-slate-500 block mb-1">Divergence / Grip Reserve</span>
+                  <span className="text-zinc-400 block mb-1">Divergence / Grip Reserve</span>
                   <span className="text-xl font-mono font-bold text-emerald-400">
                     {liveTwin ? `${liveTwin.divergencePct.toFixed(1)}%` : "0.0%"}
                   </span>
@@ -1120,31 +1120,31 @@ export default function DigitalTwinPage() {
             {/* 4 Corner Damper / Suspension Travel */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               <div className="bg-slate-900/30 border border-slate-800/60 p-3.5 rounded-xl">
-                <p className="text-xs text-slate-500">Damper FL</p>
-                <p className="text-xl font-mono font-semibold text-slate-200 mt-1">
+                <p className="text-xs text-zinc-400">Damper FL</p>
+                <p className="text-xl font-sans leading-relaxed font-semibold text-slate-200 mt-1">
                   {liveTelemetry.susp_travel_fl.toFixed(1)}{" "}
-                  <span className="text-xs text-slate-500 font-normal">mm</span>
+                  <span className="text-xs text-zinc-400 font-normal">mm</span>
                 </p>
               </div>
               <div className="bg-slate-900/30 border border-slate-800/60 p-3.5 rounded-xl">
-                <p className="text-xs text-slate-500">Damper FR</p>
-                <p className="text-xl font-mono font-semibold text-slate-200 mt-1">
+                <p className="text-xs text-zinc-400">Damper FR</p>
+                <p className="text-xl font-sans leading-relaxed font-semibold text-slate-200 mt-1">
                   {liveTelemetry.susp_travel_fr.toFixed(1)}{" "}
-                  <span className="text-xs text-slate-500 font-normal">mm</span>
+                  <span className="text-xs text-zinc-400 font-normal">mm</span>
                 </p>
               </div>
               <div className="bg-slate-900/30 border border-slate-800/60 p-3.5 rounded-xl">
-                <p className="text-xs text-slate-500">Damper RL</p>
-                <p className="text-xl font-mono font-semibold text-slate-200 mt-1">
+                <p className="text-xs text-zinc-400">Damper RL</p>
+                <p className="text-xl font-sans leading-relaxed font-semibold text-slate-200 mt-1">
                   {liveTelemetry.susp_travel_rl.toFixed(1)}{" "}
-                  <span className="text-xs text-slate-500 font-normal">mm</span>
+                  <span className="text-xs text-zinc-400 font-normal">mm</span>
                 </p>
               </div>
               <div className="bg-slate-900/30 border border-slate-800/60 p-3.5 rounded-xl">
-                <p className="text-xs text-slate-500">Damper RR</p>
-                <p className="text-xl font-mono font-semibold text-slate-200 mt-1">
+                <p className="text-xs text-zinc-400">Damper RR</p>
+                <p className="text-xl font-sans leading-relaxed font-semibold text-slate-200 mt-1">
                   {liveTelemetry.susp_travel_rr.toFixed(1)}{" "}
-                  <span className="text-xs text-slate-500 font-normal">mm</span>
+                  <span className="text-xs text-zinc-400 font-normal">mm</span>
                 </p>
               </div>
             </div>

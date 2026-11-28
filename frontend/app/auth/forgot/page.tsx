@@ -72,7 +72,7 @@ export default function ForgotPasswordPage() {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="w-full bg-zinc-900 border border-zinc-700 rounded-md px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:ring-1 focus:ring-ansys-gold"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded-md px-3 py-2 text-sm text-white placeholder:text-zinc-400 focus:outline-none focus:ring-1 focus:ring-ansys-gold"
             placeholder="name@example.com"
           />
         </div>
@@ -88,7 +88,7 @@ export default function ForgotPasswordPage() {
 
       <div className="text-center text-sm">
         <span className="text-zinc-400">Remembered your password? </span>
-        <Link href="/auth/login" className="text-ansys-gold hover:text-ansys-yellow transition-colors font-medium">
+        <Link href="/auth/login" className="text-ansys-gold hover:text-signal transition-colors font-medium">
           Sign in
         </Link>
       </div>

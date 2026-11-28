@@ -30,7 +30,7 @@ export default function EnvelopePlot({ latG, longG, limits, title = "G-G envelop
 
   return (
     <figure data-testid="envelope-plot" className="rounded border border-hairline bg-panel p-3">
-      <figcaption className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{title}</figcaption>
+      <figcaption className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">{title}</figcaption>
       {pts.length === 0 ? (
         <EmptyState kind="not_run" reason="No G samples" />
       ) : (
@@ -50,8 +50,8 @@ export default function EnvelopePlot({ latG, longG, limits, title = "G-G envelop
           <text x={10} y={S / 2} textAnchor="middle" fontSize={9} fill="#8b97a3" transform={`rotate(-90 10 ${S / 2})`}>Longitudinal (g)</text>
         </svg>
       )}
-      {ell.lat.length === 0 && pts.length > 0 && <p className="mt-1 text-[11px] text-gray-500"><EmptyState reason="Model limit ellipse (no envelope data)" /></p>}
-      <p data-testid="envelope-disclaimer" className="mt-2 text-[10px] leading-relaxed text-gray-500">
+      {ell.lat.length === 0 && pts.length > 0 && <p className="mt-1 text-xs text-zinc-400"><EmptyState reason="Model limit ellipse (no envelope data)" /></p>}
+      <p data-testid="envelope-disclaimer" className="mt-2 text-xs leading-relaxed text-zinc-400">
         Model limit, optimistic: the ellipse axes are the envelope maxima across speed from the solver&apos;s tire and aero model.
         The ellipse shape is an approximation, and real tire and driver limits are usually lower.
       </p>

@@ -102,7 +102,7 @@ export default function TraceManager({ currentResult, currentParams, traces, set
         className="flex items-center gap-1.5 px-3 py-1.5 bg-[#141416] border border-[#252525]
           hover:bg-[#1e1e20] rounded-lg text-xs font-medium transition-colors">
         <SplitSquareHorizontal size={13} className="text-[#0af]" />
-        Traces {traces.length > 0 && <span className="ml-1 bg-[#0af]/20 text-[#0af] px-1.5 py-0.5 rounded-full text-[9px] font-bold">{traces.length}</span>}
+        Traces {traces.length > 0 && <span className="ml-1 bg-[#0af]/20 text-[#0af] px-1.5 py-0.5 rounded-full text-xs font-bold">{traces.length}</span>}
       </button>
     );
   }
@@ -112,9 +112,9 @@ export default function TraceManager({ currentResult, currentParams, traces, set
     const diff = current - pinned;
     const pct = pinned !== 0 ? (diff / Math.abs(pinned)) * 100 : 0;
     const better = isMetricImprovement(metricKey, diff, pinned);
-    if (Math.abs(pct) < 0.1) return <span className="text-gray-600 ml-1">(=)</span>;
+    if (Math.abs(pct) < 0.1) return <span className="text-zinc-300 ml-1">(=)</span>;
     return (
-      <span className={`ml-1 text-[9px] font-bold ${better ? 'text-emerald-400' : 'text-red-400'}`}>
+      <span className={`ml-1 text-xs font-bold ${better ? 'text-emerald-400' : 'text-red-400'}`}>
         {diff > 0 ? '+' : ''}{pct.toFixed(1)}%
       </span>
     );
@@ -178,7 +178,7 @@ export default function TraceManager({ currentResult, currentParams, traces, set
 
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
         {traces.length === 0 && (
-          <p className="text-xs text-gray-600 text-center mt-4">No pinned traces yet. Click &quot;Pin Current Run&quot; to compare setups.</p>
+          <p className="text-xs text-zinc-300 text-center mt-4">No pinned traces yet. Click &quot;Pin Current Run&quot; to compare setups.</p>
         )}
         
         {traces.map(t => (
@@ -201,7 +201,7 @@ export default function TraceManager({ currentResult, currentParams, traces, set
                   </span>
                 )}
               </div>
-              <div className="flex items-center gap-1 shrink-0 text-gray-500">
+              <div className="flex items-center gap-1 shrink-0 text-zinc-400">
                 <button onClick={() => toggleVisibility(t.id)} className="p-1 hover:text-white transition-colors" title={t.visible ? "Hide Trace" : "Show Trace"}>
                   {t.visible ? <Eye size={12} /> : <EyeOff size={12} />}
                 </button>
@@ -212,7 +212,7 @@ export default function TraceManager({ currentResult, currentParams, traces, set
             </div>
             
             {/* Metric Deltas */}
-            <div className="text-[10px] text-gray-500 font-mono grid grid-cols-2 gap-x-2 gap-y-1 mt-1">
+            <div className="text-xs text-zinc-400 font-mono grid grid-cols-2 gap-x-2 gap-y-1 mt-1">
               <span className="col-span-2 text-[#0af] font-bold mb-1">Δ Current vs This Run</span>
               <div className="flex items-center justify-between">
                 <span>Accel:</span>
@@ -237,13 +237,13 @@ export default function TraceManager({ currentResult, currentParams, traces, set
               <div className="mt-1 pt-1.5 border-t border-[#1a1a1c]">
                 <button
                   onClick={() => toggleParamExpand(t.id)}
-                  className="w-full text-left text-[9px] text-gray-400 hover:text-gray-200 flex items-center justify-between font-mono"
+                  className="w-full text-left text-xs text-gray-400 hover:text-gray-200 flex items-center justify-between font-mono"
                 >
                   <span>{expandedParams[t.id] ? "Hide Setup Parameters" : "Inspect Setup Parameters"}</span>
                   <span className="text-[#0af]">{expandedParams[t.id] ? "▲" : "▼"}</span>
                 </button>
                 {expandedParams[t.id] && (
-                  <div className="mt-1.5 p-2 bg-[#09090b] rounded-lg border border-white/5 space-y-1 font-mono text-[9px] text-gray-400">
+                  <div className="mt-1.5 p-2 bg-[#09090b] rounded-lg border border-white/5 space-y-1 font-mono text-xs text-gray-400">
                     <div className="flex justify-between">
                       <span>Spring k_s:</span>
                       <span className="text-white">{Math.round(t.params.k_s ?? 0)} N/m</span>

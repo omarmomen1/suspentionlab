@@ -110,7 +110,7 @@ export default function KinematicsExportModal({
           <p>
             Export complete high-resolution kinematic sweep dataset for <strong>{setupName}</strong>.
           </p>
-          <div className="p-3 bg-slate-800/60 rounded-lg border border-slate-700/60 font-mono text-[11px] text-slate-300 space-y-1">
+          <div className="p-3 bg-slate-800/60 rounded-lg border border-slate-700/60 font-mono text-xs text-slate-300 space-y-1">
             <div>• Travel Range: [{zMin} mm, {zMax} mm] ({nSteps} points)</div>
             <div>• Quantities: Camber, Toe, Roll Center (Z & Y), Track, KPI, Caster, MR</div>
             <div>• Derivatives: Camber Gain (°/100mm & °/m), Toe Gain, RC Migration Rate</div>
@@ -137,7 +137,7 @@ export default function KinematicsExportModal({
                 <div className="text-xs font-semibold text-slate-200">
                   {downloadingCsv ? "Generating..." : "Download CSV"}
                 </div>
-                <div className="text-[10px] text-slate-400">Excel / MATLAB / MoTeC</div>
+                <div className="text-xs text-slate-400">Excel / MATLAB / MoTeC</div>
               </div>
             </button>
 
@@ -151,7 +151,7 @@ export default function KinematicsExportModal({
                 <div className="text-xs font-semibold text-slate-200">
                   {downloadingJson ? "Generating..." : "Download JSON"}
                 </div>
-                <div className="text-[10px] text-slate-400">CAE / Python / REST API</div>
+                <div className="text-xs text-slate-400">CAE / Python / REST API</div>
               </div>
             </button>
           </div>

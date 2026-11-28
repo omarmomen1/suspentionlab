@@ -28,7 +28,7 @@ export default function DifferenceRibbon({ deltas, className = "" }: DifferenceR
   return (
     <div data-testid="difference-ribbon" className={`rounded border border-hairline bg-panel p-3 ${className}`}>
       <div className="mb-2 flex items-center justify-between">
-        <p className="text-[10px] font-semibold uppercase tracking-wider text-gray-400">Difference ribbon (B vs A, per corner zone)</p>
+        <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Difference ribbon (B vs A, per corner zone)</p>
         <p className="v2-num text-xs text-white" data-testid="ribbon-total">{`${total > 0 ? "+" : ""}${total.toFixed(3)} s`}</p>
       </div>
       <ul className="space-y-1">
@@ -36,7 +36,7 @@ export default function DifferenceRibbon({ deltas, className = "" }: DifferenceR
           const w = (Math.abs(d.delta_s) / max) * 50;
           const faster = d.delta_s < 0;
           return (
-            <li key={d.corner} data-corner={d.corner} className="grid grid-cols-[7rem_1fr_4.5rem] items-center gap-2 text-[11px]">
+            <li key={d.corner} data-corner={d.corner} className="grid grid-cols-[7rem_1fr_4.5rem] items-center gap-2 text-xs">
               <span className="truncate text-gray-300">{d.corner}</span>
               <span className="relative h-3 border-x border-hairline">
                 <span className="absolute inset-y-0 left-1/2 w-px bg-gray-600" />
@@ -50,7 +50,7 @@ export default function DifferenceRibbon({ deltas, className = "" }: DifferenceR
           );
         })}
       </ul>
-      <p className="mt-2 text-[10px] text-gray-500">
+      <p className="mt-2 text-xs text-zinc-400">
         Zones run from the midpoint to the previous corner apex to the midpoint to the next. Deltas come from the two speed traces
         (integral of ds/v), so they approximate, and need not match, the solver lap-time difference.
       </p>

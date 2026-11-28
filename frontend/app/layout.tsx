@@ -31,13 +31,13 @@ import WorkspaceStatusBar from "../components/WorkspaceStatusBar";
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${archivo.variable} ${inter.variable} ${jetbrainsMono.variable}`}>
-      <body suppressHydrationWarning className="font-sans bg-black text-gray-100 antialiased selection:bg-ansys-yellow selection:text-black flex flex-col h-screen overflow-hidden">
+      <body suppressHydrationWarning className="font-sans bg-carbon text-gray-100 antialiased selection:bg-signal selection:text-carbon flex flex-col h-screen overflow-hidden">
           <AuthProvider>
             <WorkspaceProvider>
               {/* WCAG 2.4.1 Bypass Blocks: Skip to main content link */}
               <a
                 href="#main-content"
-                className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-ansys-yellow focus:text-black focus:font-bold focus:rounded-lg focus:shadow-xl focus:ring-2 focus:ring-white"
+                className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[100] focus:px-4 focus:py-2 focus:bg-signal focus:text-carbon focus:font-bold focus:rounded-lg focus:shadow-xl focus:ring-2 focus:ring-white"
               >
                 Skip to main content
               </a>
@@ -63,7 +63,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
                   {children}
                 </div>
               </main>
-              <footer role="contentinfo" aria-label="Site Footer" className="border-t border-[#1a1a1a] py-4 px-6 flex flex-wrap items-center justify-center gap-4 text-[11px] text-gray-400 shrink-0">
+              <footer role="contentinfo" aria-label="Site Footer" className="border-t border-[#1a1a1a] py-4 px-6 flex flex-wrap items-center justify-center gap-4 text-xs text-zinc-300 leading-relaxed shrink-0">
                 <span>© {new Date().getFullYear()} SuspensionLab. All rights reserved.</span>
                 <Link href="/legal/terms" className="hover:text-gray-300 transition-colors">Terms of Service</Link>
                 <Link href="/legal/privacy" className="hover:text-gray-300 transition-colors">Privacy Policy</Link>

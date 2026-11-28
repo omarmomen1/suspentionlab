@@ -32,7 +32,7 @@ export default function StatusPill({ status, label, detail, className = "" }: St
       data-testid="status-pill"
       data-status={state}
       title={title || undefined}
-      className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${s.fg} ${s.border} ${s.bg} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded border px-2 py-0.5 text-xs font-semibold uppercase tracking-wider ${s.fg} ${s.border} ${s.bg} ${className}`}
     >
       <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-current" />
       {label ?? V2_LABEL[state]}

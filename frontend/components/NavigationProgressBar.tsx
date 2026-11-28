@@ -33,7 +33,7 @@ export default function NavigationProgressBar() {
 
   return (
     <div className="fixed top-0 left-0 right-0 z-[100] h-[2px] bg-black/20 pointer-events-none overflow-hidden">
-      <div className="h-full w-full bg-gradient-to-r from-ansys-yellow via-[#ffd000] to-ansys-yellow shadow-[0_0_12px_rgba(242,169,0,0.8)] animate-pulse" />
+      <div className="h-full w-full bg-gradient-to-r from-signal via-[#ffd000] to-signal shadow-[0_0_12px_rgba(242,169,0,0.8)] animate-pulse" />
     </div>
   );
 }

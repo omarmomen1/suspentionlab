@@ -100,7 +100,7 @@ export default function EngineeringDecisionCard({
   const isOutOfDomain = validityTier === "OUT-OF-DOMAIN";
 
   let verdict = "NEUTRAL / BASELINE";
-  let verdictColor = "text-ansys-yellow border-ansys-yellow/40 bg-ansys-yellow/10";
+  let verdictColor = "text-signal border-signal/40 bg-signal/10";
   let verdictDesc = "Baseline parameters active.";
 
   if (accelRms !== null) {
@@ -164,27 +164,27 @@ export default function EngineeringDecisionCard({
       {/* Header */}
       <div className="flex items-center justify-between border-b border-white/[0.06] pb-2.5">
         <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-ansys-yellow/15 border border-ansys-yellow/30 flex items-center justify-center">
-            <Zap size={15} className="text-ansys-yellow" />
+          <div className="w-7 h-7 rounded-lg bg-signal/15 border border-signal/30 flex items-center justify-center">
+            <Zap size={15} className="text-signal" />
           </div>
           <div>
             <h3 className="font-extrabold text-xs text-white uppercase tracking-wider">
               Engineering Decision Engine
             </h3>
-            <p className="text-[10px] text-gray-400">
+            <p className="text-xs text-gray-400">
               Causal dynamics synthesis for vehicle suspension sign-off
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${verdictColor}`}>
+          <span className={`px-2.5 py-0.5 rounded-full text-xs font-mono font-bold border ${verdictColor}`}>
             {verdict}
           </span>
           <button
             type="button"
             onClick={() => setIsCollapsed(!isCollapsed)}
-            className="text-[10px] font-semibold text-zinc-400 hover:text-white px-2 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] flex items-center gap-1 transition-colors cursor-pointer"
+            className="text-xs font-semibold text-zinc-400 hover:text-white px-2 py-0.5 rounded bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] flex items-center gap-1 transition-colors cursor-pointer"
             aria-label={isCollapsed ? "Expand Engineering Decision Matrix" : "Collapse Engineering Decision Matrix"}
           >
             <span>{isCollapsed ? "Expand" : "Collapse"}</span>
@@ -195,8 +195,8 @@ export default function EngineeringDecisionCard({
 
       {isCollapsed ? (
         <div className="flex items-center justify-between gap-3 px-3.5 py-2 rounded-xl bg-emerald-950/25 border border-emerald-500/30 text-xs">
-          <span className="text-emerald-300 font-semibold text-[11px] truncate flex-1">{recommendation}</span>
-          <div className="flex items-center gap-2 text-[10px] font-mono text-zinc-400 shrink-0">
+          <span className="text-emerald-300 font-semibold text-xs truncate flex-1">{recommendation}</span>
+          <div className="flex items-center gap-2 text-xs font-mono text-zinc-400 shrink-0">
             {accelRms !== null && <span>ISO RMS: <strong className="text-white">{accelRms.toFixed(3)}</strong> m/s²</span>}
             {travelMaxMm !== null && <span>| Travel: <strong className="text-white">{travelMaxMm.toFixed(1)}</strong> mm</span>}
           </div>
@@ -206,11 +206,11 @@ export default function EngineeringDecisionCard({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5 text-xs">
           {/* Q1: What changed? */}
           <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-1.5">
-            <span className="text-[10px] uppercase font-bold text-gray-400 flex items-center gap-1">
+            <span className="text-xs uppercase font-bold text-gray-400 flex items-center gap-1">
               <Sliders size={12} className="text-cyan-400" /> 1. What Changed?
             </span>
             {paramDeltas.length > 0 ? (
-              <div className="space-y-1 text-[11px] font-mono">
+              <div className="space-y-1 text-xs font-mono">
                 {paramDeltas.map((d) => (
                   <div key={d.label} className="flex justify-between items-center text-gray-300">
                     <span>{d.label}:</span>
@@ -221,7 +221,7 @@ export default function EngineeringDecisionCard({
                 ))}
               </div>
             ) : (
-              <p className="text-gray-400 text-[11px]">
+              <p className="text-gray-400 text-xs">
                 Nominal benchmark baseline setup active. No parameter delta recorded.
               </p>
             )}
@@ -229,23 +229,23 @@ export default function EngineeringDecisionCard({
 
           {/* Q2: Why? */}
           <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-1.5">
-            <span className="text-[10px] uppercase font-bold text-gray-400 flex items-center gap-1">
-              <HelpCircle size={12} className="text-ansys-yellow" /> 2. Why? (Physics Mechanism)
+            <span className="text-xs uppercase font-bold text-gray-400 flex items-center gap-1">
+              <HelpCircle size={12} className="text-signal" /> 2. Why? (Physics Mechanism)
             </span>
-            <p className="text-gray-300 text-[11px] leading-relaxed">
+            <p className="text-gray-300 text-xs leading-relaxed">
               {physicalMechanism}
             </p>
           </div>
 
           {/* Q3: Is it better? */}
           <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-1.5">
-            <span className="text-[10px] uppercase font-bold text-gray-400 flex items-center gap-1">
+            <span className="text-xs uppercase font-bold text-gray-400 flex items-center gap-1">
               <TrendingUp size={12} className="text-emerald-400" /> 3. Is It Better?
             </span>
-            <p className="text-gray-200 text-[11px] leading-relaxed font-semibold">
+            <p className="text-gray-200 text-xs leading-relaxed font-semibold">
               {verdictDesc}
             </p>
-            <div className="flex gap-2 text-[10px] font-mono text-gray-400 pt-1">
+            <div className="flex gap-2 text-xs font-mono text-gray-400 pt-1">
               {accelRms !== null && <span>ISO RMS: <strong className="text-white">{accelRms.toFixed(3)}</strong> m/s²</span>}
               {travelMaxMm !== null && <span>| Travel: <strong className="text-white">{travelMaxMm.toFixed(1)}</strong> mm</span>}
             </div>
@@ -254,33 +254,33 @@ export default function EngineeringDecisionCard({
           {/* Q4: Can I trust it? (Rule 12) */}
           <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05] space-y-1.5 md:col-span-2 lg:col-span-1">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase font-bold text-gray-400 flex items-center gap-1">
+              <span className="text-xs uppercase font-bold text-gray-400 flex items-center gap-1">
                 <ShieldCheck size={12} className="text-blue-400" /> 4. Can I Trust It?
               </span>
               <button
                 type="button"
                 onClick={() => setShowProvenance(!showProvenance)}
-                className="text-[10px] text-blue-400 hover:underline flex items-center gap-0.5"
+                className="text-xs text-blue-400 hover:underline flex items-center gap-0.5"
               >
                 Rule 12 Provenance
                 <ChevronDown size={11} className={`transition-transform ${showProvenance ? "rotate-180" : ""}`} />
               </button>
             </div>
             {isOutOfDomain ? (
-              <p className="text-rose-300 text-[11px]">
+              <p className="text-rose-300 text-xs">
                 ⚠ OUT-OF-DOMAIN ({validity?.score ?? 0}%): Parameters exceed validated domain bounds. Treat predictions as uncalibrated.
               </p>
             ) : validityTier !== "VALIDATED" ? (
-              <p className="text-amber-300 text-[11px]">
+              <p className="text-amber-300 text-xs">
                 ! {validityTier} ({validity?.score ?? 0}%): Directionally valid; verify boundary checks before track sign-off.
               </p>
             ) : (
-              <p className="text-emerald-300 text-[11px]">
+              <p className="text-emerald-300 text-xs">
                 ✓ High-fidelity physics solver verified within physical boundary constraints ({validity?.score ?? 100}%).
               </p>
             )}
             {showProvenance && (
-              <div className="mt-2 p-2 rounded bg-black/50 border border-white/[0.06] text-[10px] font-mono space-y-0.5 text-gray-400">
+              <div className="mt-2 p-2 rounded bg-black/50 border border-white/[0.06] text-xs font-mono space-y-0.5 text-gray-400">
                 <div>Model: <span className="text-gray-200">{backendModel} ({modelVersion})</span></div>
                 <div>Solver: <span className="text-gray-200">{solverName}</span></div>
                 <div>Build: <span className="text-gray-200">{buildHash}</span></div>
@@ -295,12 +295,12 @@ export default function EngineeringDecisionCard({
               ? "bg-amber-950/20 border border-amber-500/30"
               : "bg-emerald-950/20 border border-emerald-500/30"
           }`}>
-            <span className={`text-[10px] uppercase font-bold flex items-center gap-1 ${
+            <span className={`text-xs uppercase font-bold flex items-center gap-1 ${
               hasActionableWarning ? "text-amber-400" : "text-emerald-400"
             }`}>
               {hasActionableWarning ? <AlertTriangle size={12} /> : <CheckCircle2 size={12} />} 5. What Should I Do? (Actionable Recommendation)
             </span>
-            <p className={`${hasActionableWarning ? "text-amber-100" : "text-emerald-100"} text-[11px] leading-relaxed font-semibold`}>
+            <p className={`${hasActionableWarning ? "text-amber-100" : "text-emerald-100"} text-xs leading-relaxed font-semibold`}>
               {recommendation}
             </p>
           </div>

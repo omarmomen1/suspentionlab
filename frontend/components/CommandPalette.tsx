@@ -181,11 +181,11 @@ export default function CommandPalette() {
             className="flex h-14 w-full rounded-md bg-transparent text-sm text-zinc-100 placeholder-zinc-500 outline-none focus:ring-0 border-none"
             autoFocus
           />
-          {loading && <Loader2 className="h-4 w-4 text-ansys-yellow animate-spin ml-2" />}
+          {loading && <Loader2 className="h-4 w-4 text-signal animate-spin ml-2" />}
         </div>
 
         <Command.List className="max-h-[380px] overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-zinc-700 scrollbar-track-transparent">
-          <Command.Empty className="py-8 text-center text-sm text-zinc-500">
+          <Command.Empty className="py-8 text-center text-sm text-zinc-400">
             {loading ? "Searching across engineering domains..." : "No engineering artifacts found."}
           </Command.Empty>
 
@@ -216,7 +216,7 @@ export default function CommandPalette() {
                           <div className="font-medium truncate text-zinc-100 text-xs">
                             {item.title}
                           </div>
-                          <div className="text-[11px] text-zinc-400 truncate">
+                          <div className="text-xs text-zinc-400 truncate">
                             {item.subtitle}
                           </div>
                         </div>
@@ -224,11 +224,11 @@ export default function CommandPalette() {
 
                       <div className="flex items-center gap-2 shrink-0">
                         {item.status && (
-                          <span className="px-1.5 py-0.5 rounded text-[10px] font-mono uppercase bg-zinc-900 border border-zinc-800 text-zinc-400">
+                          <span className="px-1.5 py-0.5 rounded text-xs font-mono uppercase bg-zinc-900 border border-zinc-800 text-zinc-400">
                             {item.status}
                           </span>
                         )}
-                        <span className="text-[10px] font-mono text-zinc-500">
+                        <span className="text-xs font-mono text-zinc-400">
                           {item.id}
                         </span>
                       </div>
@@ -244,56 +244,56 @@ export default function CommandPalette() {
               <Command.Group heading="Engineering Workflow Hubs" className="px-2 py-1 text-xs font-semibold text-zinc-400">
                 <Command.Item
                   onSelect={() => runCommand(() => router.push("/quarter-car"))}
-                  className="flex items-center gap-2.5 px-3 py-2.5 my-0.5 text-xs text-zinc-200 rounded-lg cursor-pointer aria-selected:bg-zinc-800 aria-selected:text-ansys-yellow transition-colors"
+                  className="flex items-center gap-2.5 px-3 py-2.5 my-0.5 text-xs text-zinc-200 rounded-lg cursor-pointer aria-selected:bg-zinc-800 aria-selected:text-signal transition-colors"
                 >
                   <Calculator size={15} className="text-zinc-400" />
                   <div>
                     <span className="font-medium">Quarter Car Decision Sandbox</span>
-                    <span className="text-[11px] text-zinc-500 block">Interactive forward ODE solver &amp; ride/handling analysis</span>
+                    <span className="text-xs text-zinc-400 block">Interactive forward ODE solver &amp; ride/handling analysis</span>
                   </div>
                 </Command.Item>
 
                 <Command.Item
                   onSelect={() => runCommand(() => router.push("/digital-twin"))}
-                  className="flex items-center gap-2.5 px-3 py-2.5 my-0.5 text-xs text-zinc-200 rounded-lg cursor-pointer aria-selected:bg-zinc-800 aria-selected:text-ansys-yellow transition-colors"
+                  className="flex items-center gap-2.5 px-3 py-2.5 my-0.5 text-xs text-zinc-200 rounded-lg cursor-pointer aria-selected:bg-zinc-800 aria-selected:text-signal transition-colors"
                 >
                   <Radio size={15} className="text-cyan-400" />
                   <div>
                     <span className="font-medium">Digital Twin &amp; Telemetry Cockpit</span>
-                    <span className="text-[11px] text-zinc-500 block">Measured vs simulated forward correlation &amp; model drift</span>
+                    <span className="text-xs text-zinc-400 block">Measured vs simulated forward correlation &amp; model drift</span>
                   </div>
                 </Command.Item>
 
                 <Command.Item
                   onSelect={() => runCommand(() => router.push("/timeline"))}
-                  className="flex items-center gap-2.5 px-3 py-2.5 my-0.5 text-xs text-zinc-200 rounded-lg cursor-pointer aria-selected:bg-zinc-800 aria-selected:text-ansys-yellow transition-colors"
+                  className="flex items-center gap-2.5 px-3 py-2.5 my-0.5 text-xs text-zinc-200 rounded-lg cursor-pointer aria-selected:bg-zinc-800 aria-selected:text-signal transition-colors"
                 >
                   <ShieldCheck size={15} className="text-emerald-400" />
                   <div>
                     <span className="font-medium">Engineering Timeline &amp; Decision OS</span>
-                    <span className="text-[11px] text-zinc-500 block">Trace institutional memory: Question → Evidence → Approval</span>
+                    <span className="text-xs text-zinc-400 block">Trace institutional memory: Question → Evidence → Approval</span>
                   </div>
                 </Command.Item>
 
                 <Command.Item
                   onSelect={() => runCommand(() => router.push("/cae"))}
-                  className="flex items-center gap-2.5 px-3 py-2.5 my-0.5 text-xs text-zinc-200 rounded-lg cursor-pointer aria-selected:bg-zinc-800 aria-selected:text-ansys-yellow transition-colors"
+                  className="flex items-center gap-2.5 px-3 py-2.5 my-0.5 text-xs text-zinc-200 rounded-lg cursor-pointer aria-selected:bg-zinc-800 aria-selected:text-signal transition-colors"
                 >
                   <Layers size={15} className="text-purple-400" />
                   <div>
                     <span className="font-medium">Incumbent CAE Interoperability Hub</span>
-                    <span className="text-[11px] text-zinc-500 block">MSC Adams, MATLAB/Simulink &amp; CarMaker solver comparison</span>
+                    <span className="text-xs text-zinc-400 block">MSC Adams, MATLAB/Simulink &amp; CarMaker solver comparison</span>
                   </div>
                 </Command.Item>
 
                 <Command.Item
                   onSelect={() => runCommand(() => router.push("/ai-engineer"))}
-                  className="flex items-center gap-2.5 px-3 py-2.5 my-0.5 text-xs text-zinc-200 rounded-lg cursor-pointer aria-selected:bg-zinc-800 aria-selected:text-ansys-yellow transition-colors"
+                  className="flex items-center gap-2.5 px-3 py-2.5 my-0.5 text-xs text-zinc-200 rounded-lg cursor-pointer aria-selected:bg-zinc-800 aria-selected:text-signal transition-colors"
                 >
                   <Sparkles size={15} className="text-amber-400" />
                   <div>
                     <span className="font-medium">Engineering AI Copilot</span>
-                    <span className="text-[11px] text-zinc-500 block">5-part evidence-backed root cause investigation</span>
+                    <span className="text-xs text-zinc-400 block">5-part evidence-backed root cause investigation</span>
                   </div>
                 </Command.Item>
               </Command.Group>
@@ -333,17 +333,17 @@ export default function CommandPalette() {
           )}
         </Command.List>
 
-        <div className="flex items-center justify-between border-t border-zinc-800 bg-zinc-900/60 px-4 py-2.5 text-xs text-zinc-500 font-mono">
+        <div className="flex items-center justify-between border-t border-zinc-800 bg-zinc-900/60 px-4 py-2.5 text-xs text-zinc-400 font-mono">
           <div className="flex items-center gap-2">
             <span>Navigate:</span>
-            <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-300">↑</kbd>
-            <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-300">↓</kbd>
+            <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-300">↑</kbd>
+            <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-300">↓</kbd>
           </div>
           <div className="flex items-center gap-2">
             <span>Select:</span>
-            <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-300">Enter</kbd>
+            <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-300">Enter</kbd>
             <span>Close:</span>
-            <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 text-[10px] text-zinc-300">Esc</kbd>
+            <kbd className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-300">Esc</kbd>
           </div>
         </div>
       </Command>

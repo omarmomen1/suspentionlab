@@ -33,7 +33,7 @@ export default function ErrorBoundary({
         </div>
       )}
       {error?.digest && (
-        <p className="text-xs font-mono text-slate-500 mb-4">
+        <p className="text-xs font-mono text-zinc-400 mb-4">
           Error reference: {error.digest}
         </p>
       )}

@@ -46,7 +46,7 @@ export default function ConstraintWarning({
           </span>
         </div>
         <span
-          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
+          className={`px-2 py-0.5 rounded text-xs font-bold uppercase border ${
             isCritical
               ? "bg-rose-950/60 border-rose-500/50 text-rose-300"
               : "bg-amber-950/60 border-amber-500/50 text-amber-300"
@@ -56,7 +56,7 @@ export default function ConstraintWarning({
         </span>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 my-2 p-2 rounded-xl bg-black/40 border border-white/5 text-[11px]">
+      <div className="grid grid-cols-2 gap-2 my-2 p-2 rounded-xl bg-black/40 border border-white/5 text-xs">
         <div>
           <span className="text-gray-400">Observed Value:</span>{" "}
           <strong className="text-white font-bold">{currentValue} {unit}</strong>
@@ -68,14 +68,14 @@ export default function ConstraintWarning({
       </div>
 
       {subsystem && (
-        <div className="text-[10px] text-gray-400 mb-1">
+        <div className="text-xs text-gray-400 mb-1">
           Affected Subsystem: <span className="text-gray-300">{subsystem}</span>
         </div>
       )}
 
       {recommendation && (
-        <div className="text-[11px] text-gray-300 font-sans mt-2 pt-2 border-t border-white/10 leading-relaxed">
-          <strong className="text-ansys-yellow font-mono text-[10px] uppercase mr-1">Corrective Action:</strong>
+        <div className="text-xs text-gray-300 font-sans mt-2 pt-2 border-t border-white/10 leading-relaxed">
+          <strong className="text-signal font-mono text-xs uppercase mr-1">Corrective Action:</strong>
           {recommendation}
         </div>
       )}

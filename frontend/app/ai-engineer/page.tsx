@@ -360,7 +360,7 @@ export default function AIEngineerPage() {
               <div>
                 <h1 className="text-xl font-bold text-white tracking-tight flex items-center gap-2">
                   AI Race Engineer
-                  <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  <span className="text-xs uppercase font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                     Grounded Architecture
                   </span>
                 </h1>
@@ -374,10 +374,10 @@ export default function AIEngineerPage() {
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 text-xs font-mono">
               <Lock size={12} className="text-zinc-400" />
-              <span className="text-zinc-500">TENANT:</span>
+              <span className="text-zinc-400">TENANT:</span>
               <span className="text-zinc-300">{user?.team_id || "Production Squad"}</span>
-              <span className="text-zinc-600">|</span>
-              <span className="text-zinc-500">ROLE:</span>
+              <span className="text-zinc-300">|</span>
+              <span className="text-zinc-400">ROLE:</span>
               <span className="text-emerald-400 font-semibold">
                 {user?.plan === "PRO" || user?.plan === "ENTERPRISE" || user?.is_admin || !user?.team_role || user?.team_role === "ENGINEER" || user?.team_role === "MEMBER"
                   ? "Race Engineer"
@@ -396,33 +396,33 @@ export default function AIEngineerPage() {
       <div className="max-w-6xl mx-auto px-6 py-8">
         {/* Core Architecture Pipeline Stepper */}
         <div className="mb-8 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
-          <div className="text-[11px] font-mono text-zinc-500 uppercase mb-3 flex items-center gap-2">
+          <div className="text-xs font-mono text-zinc-400 uppercase mb-3 flex items-center gap-2">
             <Activity size={13} className="text-indigo-400" />
             Execution Pipeline: User → LLM Planner → Deterministic Solvers → Evidence Grounding → Explanation
           </div>
           <div className="grid grid-cols-2 md:grid-cols-6 gap-2 text-center text-xs font-mono">
             <div className="p-2 rounded bg-zinc-900/90 border border-zinc-800">
-              <span className="text-zinc-500 block text-[10px]">STAGE 1</span>
+              <span className="text-zinc-400 block text-xs">STAGE 1</span>
               <span className="text-zinc-300 font-semibold">Attack Filter</span>
             </div>
             <div className="p-2 rounded bg-zinc-900/90 border border-zinc-800">
-              <span className="text-zinc-500 block text-[10px]">STAGE 2</span>
+              <span className="text-zinc-400 block text-xs">STAGE 2</span>
               <span className="text-zinc-300 font-semibold">Tool Planner</span>
             </div>
             <div className="p-2 rounded bg-zinc-900/90 border border-zinc-800">
-              <span className="text-zinc-500 block text-[10px]">STAGE 3</span>
+              <span className="text-zinc-400 block text-xs">STAGE 3</span>
               <span className="text-zinc-300 font-semibold">RBAC Gate</span>
             </div>
             <div className="p-2 rounded bg-zinc-900/90 border border-zinc-800">
-              <span className="text-zinc-500 block text-[10px]">STAGE 4</span>
+              <span className="text-zinc-400 block text-xs">STAGE 4</span>
               <span className="text-zinc-300 font-semibold">11 Physics Tools</span>
             </div>
             <div className="p-2 rounded bg-zinc-900/90 border border-zinc-800">
-              <span className="text-zinc-500 block text-[10px]">STAGE 5</span>
+              <span className="text-zinc-400 block text-xs">STAGE 5</span>
               <span className="text-zinc-300 font-semibold">Citation Store</span>
             </div>
             <div className="p-2 rounded bg-zinc-900/90 border border-zinc-800">
-              <span className="text-zinc-500 block text-[10px]">STAGE 6</span>
+              <span className="text-zinc-400 block text-xs">STAGE 6</span>
               <span className="text-zinc-300 font-semibold">SHA-256 Provenance</span>
             </div>
           </div>
@@ -435,7 +435,7 @@ export default function AIEngineerPage() {
               <Sparkles size={14} className="text-indigo-400" />
               Target Engineering Workflows
             </span>
-            <span className="text-[11px] text-zinc-500 font-mono">Real deterministic evidence &amp; solvers</span>
+            <span className="text-xs text-zinc-400 font-mono">Real deterministic evidence &amp; solvers</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {TARGET_WORKFLOWS.map((wf) => (
@@ -453,15 +453,15 @@ export default function AIEngineerPage() {
                     <span className="text-xs font-bold text-zinc-200 group-hover:text-indigo-300 font-sans transition">
                       {wf.title}
                     </span>
-                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/25 shrink-0">
+                    <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/25 shrink-0">
                       {wf.badge}
                     </span>
                   </div>
-                  <p className="text-[11px] text-zinc-400 leading-snug font-sans">
+                  <p className="text-xs text-zinc-400 leading-snug font-sans">
                     {wf.desc}
                   </p>
                 </div>
-                <span className="mt-2 text-[10px] font-mono text-zinc-500 group-hover:text-zinc-400 truncate">
+                <span className="mt-2 text-xs font-mono text-zinc-400 group-hover:text-zinc-400 truncate">
                   → &ldquo;{wf.prompt}&rdquo;
                 </span>
               </button>
@@ -481,7 +481,7 @@ export default function AIEngineerPage() {
               Attack Prompts &amp; Red-Team Testing
             </span>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-zinc-500">
+              <span className="text-xs text-zinc-400">
                 {attackDrawerOpen ? "Hide safety tests" : "Expand safety tests"}
               </span>
               {attackDrawerOpen ? (
@@ -493,7 +493,7 @@ export default function AIEngineerPage() {
           </button>
           {attackDrawerOpen && (
             <div className="px-4 pb-3 pt-1 border-t border-zinc-800/60">
-              <p className="text-[11px] text-zinc-500 mb-2">Tests system refusal against rule violations</p>
+              <p className="text-xs text-zinc-400 mb-2">Tests system refusal against rule violations</p>
               <div className="flex flex-wrap gap-2">
                 {ATTACK_PRESETS.map((attack) => (
                   <button
@@ -521,12 +521,12 @@ export default function AIEngineerPage() {
               Vehicle Handling Query or Natural Language Report
             </label>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] text-zinc-500">Standard Presets:</span>
+              <span className="text-xs text-zinc-400">Standard Presets:</span>
               {STANDARD_PROBLEMS.slice(0, 2).map((p, i) => (
                 <button
                   key={i}
                   onClick={() => setProblem(p)}
-                  className="text-[11px] text-indigo-400 hover:text-indigo-300 underline font-mono truncate max-w-[180px]"
+                  className="text-xs text-indigo-400 hover:text-indigo-300 underline font-mono truncate max-w-[180px]"
                 >
                   Preset #{i + 1}
                 </button>
@@ -544,7 +544,7 @@ export default function AIEngineerPage() {
               className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-3 text-sm text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-indigo-500 font-sans resize-none"
             />
             <div className="mt-3 flex items-center justify-between">
-              <span className="text-[11px] text-zinc-500 font-mono">
+              <span className="text-xs text-zinc-400 font-mono">
                 Active Setup: {workspace.setup.name} ({workspace.track.name})
               </span>
               <button
@@ -593,14 +593,14 @@ export default function AIEngineerPage() {
                   Attack Type: {result.attack_defense.attack_type}
                 </span>
               </div>
-              <span className="ml-auto px-2.5 py-1 rounded bg-rose-500/20 text-rose-300 font-mono text-[11px] font-bold border border-rose-500/40">
+              <span className="ml-auto px-2.5 py-1 rounded bg-rose-500/20 text-rose-300 font-mono text-xs font-bold border border-rose-500/40">
                 REFUSED
               </span>
             </div>
             <p className="text-xs text-zinc-200 leading-relaxed font-sans mb-3 bg-zinc-950/60 p-3 rounded-lg border border-zinc-800">
               {result.attack_defense.message}
             </p>
-            <div className="text-[11px] font-mono text-zinc-400 flex items-center gap-4">
+            <div className="text-xs font-mono text-zinc-400 flex items-center gap-4">
               <span>Tool Invoked for Verification: <strong className="text-zinc-200">{result.attack_defense.tool_executed}</strong></span>
               <span>•</span>
               <span>Grounding Status: <strong className="text-emerald-400">Enforced</strong></span>
@@ -617,7 +617,7 @@ export default function AIEngineerPage() {
                 className={`pb-3 text-xs font-mono font-semibold transition border-b-2 ${
                   activeTab === "analysis"
                     ? "text-indigo-400 border-indigo-500"
-                    : "text-zinc-500 border-transparent hover:text-zinc-300"
+                    : "text-zinc-400 border-transparent hover:text-zinc-300"
                 }`}
               >
                 Physical Diagnosis & Recommendations
@@ -627,11 +627,11 @@ export default function AIEngineerPage() {
                 className={`pb-3 text-xs font-mono font-semibold transition border-b-2 flex items-center gap-2 ${
                   activeTab === "citations"
                     ? "text-indigo-400 border-indigo-500"
-                    : "text-zinc-500 border-transparent hover:text-zinc-300"
+                    : "text-zinc-400 border-transparent hover:text-zinc-300"
                 }`}
               >
                 Grounded Citations Store
-                <span className="px-1.5 py-0.2 rounded bg-zinc-800 text-[10px] text-zinc-300">
+                <span className="px-1.5 py-0.2 rounded bg-zinc-800 text-xs text-zinc-300">
                   {result.citations?.length ?? 0}
                 </span>
               </button>
@@ -640,7 +640,7 @@ export default function AIEngineerPage() {
                 className={`pb-3 text-xs font-mono font-semibold transition border-b-2 flex items-center gap-2 ${
                   activeTab === "tools"
                     ? "text-indigo-400 border-indigo-500"
-                    : "text-zinc-500 border-transparent hover:text-zinc-300"
+                    : "text-zinc-400 border-transparent hover:text-zinc-300"
                 }`}
               >
                 11 Deterministic Tools Registry
@@ -653,11 +653,11 @@ export default function AIEngineerPage() {
                 {Array.isArray(result.epistemic_badges) && result.epistemic_badges.length > 0 && (
                   <div className="p-4 rounded-xl bg-zinc-900/40 border border-zinc-800 space-y-2">
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
+                      <span className="text-xs font-mono font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1.5">
                         <Sparkles size={13} className="text-indigo-400" />
                         Scientific Epistemic Evidence Classification (Rule 14)
                       </span>
-                      <span className="text-[10px] font-mono text-zinc-500">
+                      <span className="text-xs font-mono text-zinc-400">
                         Rigorous Grounding Verification
                       </span>
                     </div>
@@ -672,10 +672,10 @@ export default function AIEngineerPage() {
                           <span className="font-bold uppercase tracking-wide">
                             {b?.epistemic_status}
                           </span>
-                          <span className="text-zinc-500">|</span>
+                          <span className="text-zinc-400">|</span>
                           <span className="text-zinc-300">{b?.tool}</span>
                           {b?.provenance_sha256 && (
-                            <span className="text-[10px] text-zinc-500 font-mono">
+                            <span className="text-xs text-zinc-400 font-mono">
                               ({b.provenance_sha256.slice(0, 8)})
                             </span>
                           )}
@@ -712,23 +712,23 @@ export default function AIEngineerPage() {
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 font-mono text-xs">
                         <div className="bg-zinc-900 p-3 rounded border border-zinc-800">
-                          <span className="text-zinc-500 text-[10px] block uppercase">Proposed Action</span>
+                          <span className="text-zinc-400 text-xs block uppercase">Proposed Action</span>
                           <span className="text-zinc-200 font-bold block mt-1">
                             {asText(result.setup_summary) || asText(result.approval_gate.change_summary) || asText(result.approval_gate.action_type) || "Setup Modification Proposal"}
                           </span>
                         </div>
                         <div className="bg-zinc-900 p-3 rounded border border-zinc-800">
-                          <span className="text-zinc-500 text-[10px] block uppercase">Target &amp; Required Role</span>
+                          <span className="text-zinc-400 text-xs block uppercase">Target &amp; Required Role</span>
                           <span className="text-zinc-200 font-bold block mt-1">
                             Target: {asText(result.approval_gate.decision_type) || asText(result.approval_gate.target_id) || "SETUP_MODIFICATION"}
                           </span>
-                          <span className="text-emerald-400 block text-[11px] mt-1">
+                          <span className="text-emerald-400 block text-xs mt-1">
                             Required Role: {asText(result.approval_gate.role_required) || asText(result.approval_gate.required_role) || "Race Engineer"}
                           </span>
                         </div>
                       </div>
                       <div className="mt-3 bg-zinc-900 p-3 rounded border border-zinc-800 font-mono text-xs">
-                        <span className="text-zinc-500 text-[10px] block uppercase">Impact Assessment</span>
+                        <span className="text-zinc-400 text-xs block uppercase">Impact Assessment</span>
                         <span className="text-cyan-300 block mt-1">
                           {asText(result.predicted_effects) ||
                             asText(result.approval_gate.impact_assessment) ||
@@ -788,12 +788,12 @@ export default function AIEngineerPage() {
                   /* Standard Human Governance Gate Banner */
                   <div className="p-4 rounded-xl bg-amber-950/30 border border-amber-500/40 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg">
                     <div className="flex items-center gap-2.5">
-                      <ShieldAlert className="w-5 h-5 text-ansys-yellow shrink-0" />
+                      <ShieldAlert className="w-5 h-5 text-signal shrink-0" />
                       <div>
-                        <span className="font-bold text-amber-300 uppercase tracking-wide block font-mono text-[11px]">
+                        <span className="font-bold text-amber-300 uppercase tracking-wide block font-mono text-xs">
                           Mandatory Human Governance Gate (Engineering Rule 8 &amp; 14)
                         </span>
-                        <span className="text-zinc-300 text-[11px]">
+                        <span className="text-zinc-300 text-xs">
                           AI recommendations are uncertified engineering hypotheses. They must NEVER be automatically applied to vehicle setups or certified as track-ready without explicit human approval from an authorized engineer.
                         </span>
                       </div>
@@ -801,7 +801,7 @@ export default function AIEngineerPage() {
                     <div className="flex items-center gap-2 shrink-0">
                       <a
                         href="/timeline"
-                        className="px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-750 hover:border-zinc-600 text-[11px] font-mono font-semibold text-zinc-200 transition-colors flex items-center gap-1.5"
+                        className="px-3 py-1.5 rounded-lg bg-zinc-900 border border-zinc-750 hover:border-zinc-600 text-xs font-mono font-semibold text-zinc-200 transition-colors flex items-center gap-1.5"
                       >
                         <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                         Sign-off Decision
@@ -817,7 +817,7 @@ export default function AIEngineerPage() {
                       <Sparkles className="w-4 h-4" />
                       1. Answer (Authoritative Grounded Statement)
                     </span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-bold">
+                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-300 border border-indigo-500/20 font-bold">
                       GROUNDED STATEMENT
                     </span>
                   </div>
@@ -833,8 +833,8 @@ export default function AIEngineerPage() {
                       <ShieldCheck className="w-4 h-4" />
                       2. Evidence (Telemetry, Simulations &amp; Provenance)
                     </span>
-                    <div className="flex items-center gap-2 font-mono text-[11px]">
-                      <span className="text-zinc-500">SHA-256:</span>
+                    <div className="flex items-center gap-2 font-mono text-xs">
+                      <span className="text-zinc-400">SHA-256:</span>
                       <span className="text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
                         {result.provenance?.result_hash?.slice(0, 16) || "EVID-VERIFIED"}...
                       </span>
@@ -843,19 +843,19 @@ export default function AIEngineerPage() {
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs font-mono">
                     <div className="bg-zinc-950 p-2.5 rounded border border-zinc-800/80">
-                      <span className="text-zinc-500 block text-[10px]">SIMULATIONS EXECUTED</span>
+                      <span className="text-zinc-400 block text-xs">SIMULATIONS EXECUTED</span>
                       <span className="text-zinc-200 font-bold">{result.evidence?.simulations_run ?? result.provenance?.simulation_count ?? 0} sweeps</span>
                     </div>
                     <div className="bg-zinc-950 p-2.5 rounded border border-zinc-800/80">
-                      <span className="text-zinc-500 block text-[10px]">CONSTRAINTS SATISFIED</span>
+                      <span className="text-zinc-400 block text-xs">CONSTRAINTS SATISFIED</span>
                       <span className="text-emerald-400 font-bold">✅ {asText(result.provenance?.constraint_status) || "VERIFIED"}</span>
                     </div>
                     <div className="bg-zinc-950 p-2.5 rounded border border-zinc-800/80">
-                      <span className="text-zinc-500 block text-[10px]">SOLVER MODEL</span>
+                      <span className="text-zinc-400 block text-xs">SOLVER MODEL</span>
                       <span className="text-zinc-200 truncate block">{asText(result.provenance?.model_version) || "Not reported"}</span>
                     </div>
                     <div className="bg-zinc-950 p-2.5 rounded border border-zinc-800/80">
-                      <span className="text-zinc-500 block text-[10px]">CALCULATED CONFIDENCE</span>
+                      <span className="text-zinc-400 block text-xs">CALCULATED CONFIDENCE</span>
                       <span className="text-indigo-400 font-bold">
                         {typeof result.confidence === "number" ? `${(result.confidence * 100).toFixed(1)}%` : "Not scored"}
                       </span>
@@ -864,7 +864,7 @@ export default function AIEngineerPage() {
 
                   {/* Predicted Effects with Exact Numerical Deltas */}
                   <div className="space-y-2">
-                    <span className="text-[11px] font-mono text-zinc-400 uppercase tracking-wider block">
+                    <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider block">
                       Validated KPI Evidence Deltas
                     </span>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -872,13 +872,13 @@ export default function AIEngineerPage() {
                         result.predicted_effects.map((effect, i) => (
                           <div key={i} className="p-3 rounded-lg bg-zinc-950 border border-zinc-800/80">
                             <div className="flex items-center justify-between mb-1">
-                              <span className="text-[11px] text-zinc-400 font-sans truncate">{effect?.metric}</span>
-                              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                              <span className="text-xs text-zinc-400 font-sans truncate">{effect?.metric}</span>
+                              <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
                                 SIMULATED
                               </span>
                             </div>
                             <div className="flex items-baseline justify-between mt-2 font-mono">
-                              <span className="text-xs text-zinc-500">
+                              <span className="text-xs text-zinc-400">
                                 {effect?.baseline} → <strong className="text-zinc-200">{effect?.predicted}</strong> {effect?.unit}
                               </span>
                               <span className={`text-xs font-bold ${(effect?.change_pct ?? 0) < 0 ? "text-emerald-400" : "text-amber-400"}`}>
@@ -909,13 +909,13 @@ export default function AIEngineerPage() {
                   )}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="p-4 rounded-xl bg-zinc-950/80 border border-zinc-850">
-                      <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1">
+                      <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider block mb-1">
                         Observable Dynamic Behavior
                       </span>
                       <p className="text-xs text-zinc-300 leading-relaxed font-sans">{asText(result.diagnosis) || "No diagnosis returned."}</p>
                     </div>
                     <div className="p-4 rounded-xl bg-zinc-950/80 border border-zinc-850">
-                      <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block mb-1">
+                      <span className="text-xs font-mono text-zinc-400 uppercase tracking-wider block mb-1">
                         Causal Root Cause in State Space
                       </span>
                       <p className="text-xs text-zinc-300 leading-relaxed font-sans">{asText(result.root_cause) || "No root cause returned."}</p>
@@ -936,15 +936,15 @@ export default function AIEngineerPage() {
                   )}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
                     <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-850">
-                      <span className="text-[10px] text-zinc-500 block uppercase mb-1">Model Limitations</span>
+                      <span className="text-xs text-zinc-400 block uppercase mb-1">Model Limitations</span>
                       <span className="text-zinc-300">Quarter-car 2-DOF assumes rigid body chassis without chassis torsional flex.</span>
                     </div>
                     <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-850">
-                      <span className="text-[10px] text-zinc-500 block uppercase mb-1">Sensor &amp; Road Noise</span>
+                      <span className="text-xs text-zinc-400 block uppercase mb-1">Sensor &amp; Road Noise</span>
                       <span className="text-zinc-300">Predicted damping assumes ISO 8608 Class B profile; curb impact may cause non-linear bottoming.</span>
                     </div>
                     <div className="bg-zinc-950 p-3 rounded-lg border border-zinc-850">
-                      <span className="text-[10px] text-zinc-500 block uppercase mb-1">Unmodeled Coupling</span>
+                      <span className="text-xs text-zinc-400 block uppercase mb-1">Unmodeled Coupling</span>
                       <span className="text-zinc-300">Front/rear pitch center coupling not resolved until validated in Half-Car / Full-Car solver.</span>
                     </div>
                   </div>
@@ -957,7 +957,7 @@ export default function AIEngineerPage() {
                       <Send className="w-4 h-4" />
                       5. Next Action (Prescriptive Experiment &amp; Parameter Adjustment)
                     </span>
-                    <span className="text-[11px] font-mono text-zinc-500">
+                    <span className="text-xs font-mono text-zinc-400">
                       Tested Candidates: {result.tested_setups}
                     </span>
                   </div>
@@ -969,7 +969,7 @@ export default function AIEngineerPage() {
                   )}
 
                   {!Array.isArray(result.best_feasible) || result.best_feasible.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-zinc-500 font-mono">
+                    <div className="p-4 text-center text-xs text-zinc-400 font-mono">
                       Current setup is already optimal within the tested parameter bounds.
                     </div>
                   ) : (
@@ -983,7 +983,7 @@ export default function AIEngineerPage() {
                             <span className="text-xs font-semibold text-zinc-200 block font-sans">
                               {PARAM_LABELS[param?.parameter] || param?.parameter}
                             </span>
-                            <span className="text-[10px] text-zinc-500 font-mono">
+                            <span className="text-xs text-zinc-400 font-mono">
                               Current: {param?.current_value} {PARAM_UNITS[param?.parameter] || ""}
                             </span>
                           </div>
@@ -992,7 +992,7 @@ export default function AIEngineerPage() {
                             <span className="text-xs font-mono font-bold text-emerald-400 block">
                               {param?.recommended_value} {PARAM_UNITS[param?.parameter] || ""}
                             </span>
-                            <span className="text-[10px] font-mono text-cyan-400 font-semibold">
+                            <span className="text-xs font-mono text-cyan-400 font-semibold">
                               {(param?.change_pct ?? 0) > 0 ? `+${param?.change_pct}%` : `${param?.change_pct}%`}
                             </span>
                           </div>
@@ -1014,7 +1014,7 @@ export default function AIEngineerPage() {
                       href="/compare"
                       className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-200 font-semibold text-xs transition flex items-center gap-2"
                     >
-                      <GitCompare className="w-3.5 h-3.5 text-ansys-yellow" />
+                      <GitCompare className="w-3.5 h-3.5 text-signal" />
                       <span>Compare Baseline vs Proposed</span>
                     </a>
                   </div>
@@ -1043,11 +1043,11 @@ export default function AIEngineerPage() {
                         className="p-3 rounded-lg bg-zinc-950 border border-zinc-800/80 flex items-center justify-between text-xs font-mono"
                       >
                         <div className="flex items-center gap-3">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getSourceBadgeColor(asText(cite?.source_type) || "SIMULATION")}`}>
+                          <span className={`px-2 py-0.5 rounded text-xs font-bold border ${getSourceBadgeColor(asText(cite?.source_type) || "SIMULATION")}`}>
                             {asText(cite?.source_type) || "SOLVER"}
                           </span>
                           <span className="text-zinc-300 font-semibold">{asText(cite?.field_path) || asText((cite as any)?.title) || asText((cite as any)?.source) || "Modal Metric"}</span>
-                          <span className="text-zinc-600">via</span>
+                          <span className="text-zinc-300">via</span>
                           <span className="text-zinc-400">{asText(cite?.tool_name) || asText((cite as any)?.source) || asText((cite as any)?.id) || "scipy-ode"}</span>
                         </div>
                         <div className="text-right">
@@ -1056,7 +1056,7 @@ export default function AIEngineerPage() {
                       </div>
                     ))
                   ) : (
-                    <div className="p-4 text-center text-xs text-zinc-500 font-mono">
+                    <div className="p-4 text-center text-xs text-zinc-400 font-mono">
                       Analytical ODE sensitivities directly solved via Scipy RK45.
                     </div>
                   )}
@@ -1085,12 +1085,12 @@ export default function AIEngineerPage() {
                     >
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold font-mono text-zinc-200">{tool.name}()</span>
-                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${getSourceBadgeColor(tool.source_tag)}`}>
+                        <span className={`text-xs font-mono px-2 py-0.5 rounded border ${getSourceBadgeColor(tool.source_tag)}`}>
                           {tool.source_tag}
                         </span>
                       </div>
                       <p className="text-xs text-zinc-400 font-sans">{tool.description}</p>
-                      <div className="text-[10px] font-mono text-zinc-500 pt-1 border-t border-zinc-900 flex justify-between">
+                      <div className="text-xs font-mono text-zinc-400 pt-1 border-t border-zinc-900 flex justify-between">
                         <span>Permission: <code className="text-zinc-400">{tool.required_permission}</code></span>
                       </div>
                     </div>

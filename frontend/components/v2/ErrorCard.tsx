@@ -28,7 +28,7 @@ export default function ErrorCard({ error, context, onRetry, className = "" }: E
   return (
     <div role="alert" data-testid="error-card" className={`rounded border border-fault/50 bg-fault/10 p-3 text-sm ${className}`}>
       <p className="text-fault font-semibold">{message}</p>
-      <div className="mt-2 flex items-center gap-3 text-[11px]">
+      <div className="mt-2 flex items-center gap-3 text-xs">
         {onRetry && (
           <button type="button" onClick={onRetry} className="rounded border border-white/20 px-2 py-1 text-gray-200 hover:bg-white/5">
             Retry
@@ -41,7 +41,7 @@ export default function ErrorCard({ error, context, onRetry, className = "" }: E
         )}
       </div>
       {isDev() && showRaw && (
-        <pre data-testid="error-card-raw" className="mt-2 max-h-48 overflow-auto text-[10px] text-gray-400 v2-num">{rawTrace(error)}</pre>
+        <pre data-testid="error-card-raw" className="mt-2 max-h-48 overflow-auto text-xs text-gray-400 v2-num">{rawTrace(error)}</pre>
       )}
     </div>
   );

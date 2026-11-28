@@ -175,18 +175,30 @@ def compare_metrics(base: Dict[str, float], cand: Dict[str, float]) -> Tuple[Lis
     MANDATORY: What got worse is strictly separated from what improved.
     """
     METRIC_SPECS = [
-        ("rms_body_accel", "Ride RMS Acceleration", "m/s²", True, "Lower ride vibration enhances driver endurance and platform stability"),
-        ("peak_susp_travel_mm", "Peak Suspension Travel", "mm", True, "Reduced travel preserves bump stop clearance"),
-        ("tire_load_variation_n", "Tire Load Variation", "N", True, "Consistent contact patch force maximizes available grip"),
-        ("settling_time_s", "Transient Settling Time", "s", True, "Faster decay attenuates post-kerb oscillations"),
-        ("peak_body_accel", "Curbstone Impact Harshness", "m/s²", True, "Lower peak acceleration prevents chassis shock"),
-        ("peak_transmissibility", "Resonance Transmissibility", "-", True, "Lower peak amplification prevents heave resonance"),
+        ("rms_body_accel", "Ride RMS Acceleration", "m/s²", True,
+         "Lower ride vibration enhances driver endurance and platform stability",
+         "Higher ride vibration degrades driver comfort and platform stability"),
+        ("peak_susp_travel_mm", "Peak Suspension Travel", "mm", True,
+         "Reduced travel preserves bump stop clearance",
+         "Increased suspension travel reduces bump stop margin"),
+        ("tire_load_variation_n", "Tire Load Variation", "N", True,
+         "Consistent contact patch force maximizes available grip",
+         "Higher tire load variation reduces mechanical grip consistency"),
+        ("settling_time_s", "Transient Settling Time", "s", True,
+         "Faster decay attenuates post-kerb oscillations",
+         "Longer settling time prolongs post-kerb body oscillations"),
+        ("peak_body_accel", "Curbstone Impact Harshness", "m/s²", True,
+         "Lower peak acceleration prevents chassis shock",
+         "Higher peak acceleration increases kerb-strike harshness"),
+        ("peak_transmissibility", "Resonance Transmissibility", "-", True,
+         "Lower peak amplification prevents heave resonance",
+         "Higher transmissibility increases heave resonance amplification"),
     ]
 
     improvements = []
     regressions = []
 
-    for key, label, unit, lower_is_better, reason in METRIC_SPECS:
+    for key, label, unit, lower_is_better, improve_reason, regress_reason in METRIC_SPECS:
         b_val = base.get(key)
         c_val = cand.get(key)
         if b_val is None or c_val is None:
@@ -205,7 +217,7 @@ def compare_metrics(base: Dict[str, float], cand: Dict[str, float]) -> Tuple[Lis
             "candidate": round(c_val, 3),
             "delta_abs": round(delta_abs, 3),
             "delta_pct": round(delta_pct, 1),
-            "reason": reason,
+            "reason": improve_reason if is_improvement else regress_reason,
         }
 
         if abs(delta_pct) >= 0.2:
@@ -671,6 +683,32 @@ class ExperimentService:
                     "delta_abs": round(delta_abs, 4),
                     "delta_pct": round(delta_pct, 2),
                 })
+
+        if not param_changes:
+            base_kpis = evaluate_simulation_kpis(base, road_profile)
+            constraints_passed, constraint_details = check_engineering_constraints(base, base_kpis)
+            return {
+                "setup_a": base,
+                "setup_b": cand,
+                "what_changed": [],
+                "what_improved": [],
+                "what_got_worse": [],
+                "engineering_causality": ["Setup A and Setup B have identical numeric parameters; no delta computed."],
+                "constraints_passed": constraints_passed,
+                "constraint_details": constraint_details,
+                "verdict": "NO_CHANGE",
+                "verdict_summary": "No change — Setup A and Setup B are identical.",
+                "validation_state": "UNVALIDATED",
+                "confidence": 0.0,
+                "evidence": {
+                    "solver": "scipy.integrate.solve_ivp(RK45, rtol=1e-6)",
+                    "correlation_r2": None,
+                    "benchmarks": "Identical setup comparison",
+                    "limitations": [
+                        "No setup perturbation supplied between Setup A and Setup B.",
+                    ],
+                },
+            }
 
         # Run real simulations
         base_kpis = evaluate_simulation_kpis(base, road_profile)

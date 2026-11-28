@@ -858,8 +858,8 @@ export default function PDFExport({
           hover:bg-[#1e1e20] rounded-lg text-xs font-medium transition-colors text-white disabled:opacity-40 shadow-sm"
       >
         {exporting
-          ? <><Loader2 size={13} className="animate-spin text-ansys-yellow" /> Generating 3-Page Vector PDF…</>
-          : <><FileDown size={13} className="text-ansys-yellow" /> Export 3-Page Vector PDF</>}
+          ? <><Loader2 size={13} className="animate-spin text-signal" /> Generating 3-Page Vector PDF…</>
+          : <><FileDown size={13} className="text-signal" /> Export 3-Page Vector PDF</>}
       </button>
     </PlanGate>
   );

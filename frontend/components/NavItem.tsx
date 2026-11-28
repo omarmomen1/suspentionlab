@@ -22,7 +22,7 @@ export default function NavItem({ href, label }: NavItemProps) {
     >
       {label}
       <span
-        className={`absolute -bottom-1 left-0 h-px w-full bg-ansys-yellow transition-all duration-200 ${
+        className={`absolute -bottom-1 left-0 h-px w-full bg-signal transition-all duration-200 ${
           isActive ? "opacity-100 scale-x-100" : "opacity-0 scale-x-50 group-hover:opacity-40 group-hover:scale-x-100"
         }`}
       />

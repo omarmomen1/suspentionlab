@@ -35,7 +35,7 @@ function scale(vals: number[], pad = 0.06): [number, number] {
 function Frame({ title, xLabel, yLabel, children }: { title: string; xLabel: string; yLabel: string; children: React.ReactNode }) {
   return (
     <figure className="rounded border border-hairline bg-panel p-2">
-      <figcaption className="px-1 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">{title}</figcaption>
+      <figcaption className="px-1 pb-1 text-xs font-semibold uppercase tracking-wider text-gray-400">{title}</figcaption>
       <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label={title}>
         <rect x={PAD} y={8} width={W - PAD - 8} height={H - PAD - 8} fill="none" stroke="#2a313a" strokeWidth={1} />
         {children}
@@ -82,7 +82,7 @@ export default function DamperScope({ time, zS, zU, dzS, dzU, suspTravelM, dampe
   return (
     <div data-testid="damper-scope" className="grid grid-cols-1 gap-3 md:grid-cols-2">
       {loop.fromCurve && (
-        <p data-testid="damper-curve-note" className="md:col-span-2 text-[11px] text-warning">
+        <p data-testid="damper-curve-note" className="md:col-span-2 text-xs text-warning">
           <StatusPill status="WARNING" label="LUT" /> Force comes from the tabulated damper curve by linear interpolation, assuming
           shaft velocity (m/s) against shaft force (N). The backend convention was not verified.
         </p>
@@ -106,7 +106,7 @@ export default function DamperScope({ time, zS, zU, dzS, dzU, suspTravelM, dampe
       </Frame>
 
       <div className="rounded border border-hairline bg-panel p-3 text-xs">
-        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-gray-400">Travel budget and energy</p>
+        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-gray-400">Travel budget and energy</p>
         <dl className="space-y-1.5">
           <div className="flex justify-between"><dt className="text-gray-400">Energy dissipated, ∮F dx over the run</dt>
             <dd className="v2-num text-white" data-testid="work-loop-energy">{loop.energy_J === null ? "Not available" : `${loop.energy_J.toFixed(1)} J`}</dd></div>
@@ -119,7 +119,7 @@ export default function DamperScope({ time, zS, zU, dzS, dzU, suspTravelM, dampe
             </>
           ) : <div><EmptyState reason="Travel budget" /></div>}
         </dl>
-        <p className="mt-3 text-[10px] leading-relaxed text-gray-500">
+        <p className="mt-3 text-xs leading-relaxed text-zinc-400">
           The area enclosed by one closed cycle of the work loop is the energy dissipated per cycle. For a random road
           trace the loop does not close, so the figure above is the integral over the whole run. The {travelLimitMm} mm limit is the
           shared design travel limit, not a modelled bump stop.

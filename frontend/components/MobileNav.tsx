@@ -107,8 +107,8 @@ export default function MobileNav({ defaultOpen = false }: { defaultOpen?: boole
           {/* Panel */}
           <div className="absolute left-0 top-0 h-full w-[280px] bg-[#0d0d0f] border-r border-white/10 shadow-2xl overflow-y-auto custom-scrollbar">
             <div className="flex items-center justify-between px-4 h-[44px] border-b border-white/8">
-              <span className="text-[11px] font-bold text-white tracking-tight">
-                Suspension<span className="text-ansys-yellow">Lab</span>
+              <span className="text-xs font-bold text-white tracking-tight">
+                Suspension<span className="text-signal">Lab</span>
               </span>
               <button
                 ref={closeButtonRef}
@@ -127,7 +127,7 @@ export default function MobileNav({ defaultOpen = false }: { defaultOpen?: boole
             >
               {(
                 <div className="space-y-1">
-                  <div className="px-4 pt-3 pb-1 text-[9px] font-bold uppercase tracking-[0.18em] text-ansys-yellow">
+                  <div className="px-4 pt-3 pb-1 text-xs font-bold uppercase tracking-[0.18em] text-signal">
                     Workspace
                   </div>
                   {getNavGroups().map((tool) => {
@@ -142,12 +142,12 @@ export default function MobileNav({ defaultOpen = false }: { defaultOpen?: boole
                           aria-current={active ? "page" : undefined}
                           className={`block px-4 py-2.5 text-sm transition-colors ${
                             active
-                              ? "text-ansys-yellow bg-ansys-yellow/5 border-l-2 border-ansys-yellow font-semibold"
+                              ? "text-signal bg-signal/5 border-l-2 border-signal font-semibold"
                               : "text-gray-300 hover:text-white hover:bg-white/5 border-l-2 border-transparent"
                           }`}
                         >
                           <div>{tool.label}</div>
-                          <div className="text-[10px] text-gray-400 mt-0.5 leading-tight">
+                          <div className="text-xs text-gray-400 mt-0.5 leading-tight">
                             {route.desc}
                           </div>
                         </Link>
@@ -156,7 +156,7 @@ export default function MobileNav({ defaultOpen = false }: { defaultOpen?: boole
 
                     return (
                       <div key={tool.id} className="pt-2">
-                        <div className="px-4 pt-2 pb-1 text-[10px] font-bold uppercase tracking-[0.14em] text-gray-400">
+                        <div className="px-4 pt-2 pb-1 text-xs font-bold uppercase tracking-[0.14em] text-gray-400">
                           {tool.label}
                         </div>
                         {tool.routes.map((route) => {
@@ -169,7 +169,7 @@ export default function MobileNav({ defaultOpen = false }: { defaultOpen?: boole
                               aria-current={active ? "page" : undefined}
                               className={`block pl-6 pr-4 py-2 text-sm transition-colors ${
                                 active
-                                  ? "text-ansys-yellow bg-ansys-yellow/5 border-l-2 border-ansys-yellow font-semibold"
+                                  ? "text-signal bg-signal/5 border-l-2 border-signal font-semibold"
                                   : "text-gray-300 hover:text-white hover:bg-white/5 border-l-2 border-transparent"
                               }`}
                             >
@@ -194,7 +194,7 @@ export default function MobileNav({ defaultOpen = false }: { defaultOpen?: boole
                       <Sparkles size={13} className="shrink-0" />
                       <span>{STUDIO_PRICING_CTA.mobileLabel}</span>
                     </Link>
-                    <p className="text-[10px] text-gray-400 text-center mt-1.5">
+                    <p className="text-xs text-gray-400 text-center mt-1.5">
                       {STUDIO_PRICING_CTA.subtitle}
                     </p>
                   </div>

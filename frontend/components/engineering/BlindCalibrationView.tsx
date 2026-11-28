@@ -100,7 +100,7 @@ export function BlindCalibrationView({ onSelectSession }: BlindCalibrationViewPr
         </div>
 
         {summary?.aggregate_hash && (
-          <div className="mt-3 pt-3 border-t border-slate-800/80 flex items-center gap-2 text-[11px] text-slate-500 font-mono">
+          <div className="mt-3 pt-3 border-t border-slate-800/80 flex items-center gap-2 text-xs text-zinc-400 font-mono">
             <Hash className="h-3 w-3" />
             <span>Aggregate Hash: {summary.aggregate_hash.slice(0, 16)}...</span>
           </div>
@@ -137,7 +137,7 @@ export function BlindCalibrationView({ onSelectSession }: BlindCalibrationViewPr
                     {(summary.outcome_statistics.observed_accuracy * 100).toFixed(1)}%
                   </span>
                 ) : (
-                  <span className="text-lg font-semibold text-slate-500">N/A</span>
+                  <span className="text-lg font-semibold text-zinc-400">N/A</span>
                 )}
                 <span className="text-xs text-slate-400">
                   ({summary?.outcome_statistics.correct_outcomes ?? 0} /{" "}
@@ -145,13 +145,13 @@ export function BlindCalibrationView({ onSelectSession }: BlindCalibrationViewPr
                 </span>
               </div>
               {summary?.outcome_statistics.observed_accuracy_ci && (
-                <div className="text-[11px] text-slate-400 mt-1">
+                <div className="text-xs text-slate-400 mt-1">
                   95% CI: [
                   {(summary.outcome_statistics.observed_accuracy_ci[0] * 100).toFixed(1)}%,{" "}
                   {(summary.outcome_statistics.observed_accuracy_ci[1] * 100).toFixed(1)}%]
                 </div>
               )}
-              <div className="text-[11px] text-slate-500 mt-2">
+              <div className="text-xs text-zinc-400 mt-2">
                 Denominator: Binary correct + incorrect outcomes only.
               </div>
             </div>
@@ -171,17 +171,17 @@ export function BlindCalibrationView({ onSelectSession }: BlindCalibrationViewPr
                     {(summary.outcome_statistics.comparison_coverage * 100).toFixed(1)}%
                   </span>
                 ) : (
-                  <span className="text-lg font-semibold text-slate-500">N/A</span>
+                  <span className="text-lg font-semibold text-zinc-400">N/A</span>
                 )}
                 <span className="text-xs text-slate-400">
                   ({summary?.outcome_statistics.comparable_evaluations ?? 0} /{" "}
                   {summary?.outcome_statistics.total_completed_evaluations ?? 0} completed)
                 </span>
               </div>
-              <div className="text-[11px] text-slate-400 mt-1">
+              <div className="text-xs text-slate-400 mt-1">
                 Uncomparable: {summary?.outcome_statistics.uncomparable_evaluations ?? 0} (excluded from error)
               </div>
-              <div className="text-[11px] text-slate-500 mt-2">
+              <div className="text-xs text-zinc-400 mt-2">
                 Uncomparable outcomes are never counted as incorrect.
               </div>
             </div>
@@ -210,10 +210,10 @@ export function BlindCalibrationView({ onSelectSession }: BlindCalibrationViewPr
                   (N = {summary?.brier_score.eligible_sample_size ?? 0})
                 </span>
               </div>
-              <div className="text-[11px] text-slate-400 mt-1">
+              <div className="text-xs text-slate-400 mt-1">
                 Lower = better probabilistic calibration.
               </div>
-              <div className="text-[11px] text-slate-500 mt-2">
+              <div className="text-xs text-zinc-400 mt-2">
                 Requires explicit PROBABILITY_PREDICTION_CORRECT semantics.
               </div>
             </div>
@@ -285,7 +285,7 @@ export function BlindCalibrationView({ onSelectSession }: BlindCalibrationViewPr
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="py-4 text-center text-slate-500">
+                      <td colSpan={6} className="py-4 text-center text-zinc-400">
                         No calibration curve observations recorded.
                       </td>
                     </tr>
@@ -307,29 +307,29 @@ export function BlindCalibrationView({ onSelectSession }: BlindCalibrationViewPr
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
                 <div className="bg-slate-800/50 border border-slate-700/60 rounded p-2.5">
-                  <div className="text-[11px] text-slate-400">Unspecified Confidence Semantics</div>
+                  <div className="text-xs text-slate-400">Unspecified Confidence Semantics</div>
                   <div className="text-base font-bold text-slate-200 mt-0.5">
                     {summary.outcome_statistics.excluded_counts["NOT_ELIGIBLE_SEMANTICS_UNSPECIFIED"] ?? 0}
                   </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">
+                  <div className="text-xs text-zinc-400 mt-0.5">
                     Historical submissions without declared probability semantics.
                   </div>
                 </div>
                 <div className="bg-slate-800/50 border border-slate-700/60 rounded p-2.5">
-                  <div className="text-[11px] text-slate-400">Uncomparable Evaluations</div>
+                  <div className="text-xs text-slate-400">Uncomparable Evaluations</div>
                   <div className="text-base font-bold text-slate-200 mt-0.5">
                     {summary.outcome_statistics.excluded_counts["NOT_ELIGIBLE_UNCOMPARABLE"] ?? 0}
                   </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">
+                  <div className="text-xs text-zinc-400 mt-0.5">
                     Missing targets or mismatched unit dimensions.
                   </div>
                 </div>
                 <div className="bg-slate-800/50 border border-slate-700/60 rounded p-2.5">
-                  <div className="text-[11px] text-slate-400">Metrics-Only Evaluations</div>
+                  <div className="text-xs text-slate-400">Metrics-Only Evaluations</div>
                   <div className="text-base font-bold text-slate-200 mt-0.5">
                     {summary.outcome_statistics.excluded_counts["NOT_ELIGIBLE_METRICS_ONLY"] ?? 0}
                   </div>
-                  <div className="text-[10px] text-slate-500 mt-0.5">
+                  <div className="text-xs text-zinc-400 mt-0.5">
                     Continuous quantitative evaluations without declared tolerance bands.
                   </div>
                 </div>
@@ -363,11 +363,11 @@ export function BlindCalibrationView({ onSelectSession }: BlindCalibrationViewPr
                         <span className="text-xs font-medium text-white">
                           {item.session_name}
                         </span>
-                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 font-mono">
                           {item.comparison_type}
                         </span>
                         <span
-                          className={`text-[11px] px-1.5 py-0.5 rounded font-semibold ${
+                          className={`text-xs px-1.5 py-0.5 rounded font-semibold ${
                             item.verdict === "CORRECT" ||
                             item.verdict === "SUPPORTED" ||
                             item.verdict === "WITHIN_TOLERANCE" ||
@@ -384,7 +384,7 @@ export function BlindCalibrationView({ onSelectSession }: BlindCalibrationViewPr
                       <div className="text-xs text-slate-400 mt-1">
                         {item.interpretation}
                       </div>
-                      <div className="text-[10px] text-slate-500 font-mono mt-0.5 flex gap-3">
+                      <div className="text-xs text-zinc-400 font-mono mt-0.5 flex gap-3">
                         <span>Comparison: {item.comparison_id.slice(0, 8)}...</span>
                         <span>Hash: {item.comparison_hash.slice(0, 8)}...</span>
                         <span>Date: {item.computed_at ? item.computed_at.split("T")[0] : "—"}</span>
@@ -402,7 +402,7 @@ export function BlindCalibrationView({ onSelectSession }: BlindCalibrationViewPr
                   </div>
                 ))
               ) : (
-                <div className="py-6 text-center text-slate-500 text-xs">
+                <div className="py-6 text-center text-zinc-400 text-xs">
                   No completed blind evaluations recorded.
                 </div>
               )}

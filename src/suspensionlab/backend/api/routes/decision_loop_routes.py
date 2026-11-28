@@ -54,7 +54,7 @@ class DetectAnomalyRequest(BaseModel):
 class CreateLoopQuestionRequest(BaseModel):
     investigation_code: str = Field("INV-91", description="Linked investigation code")
     question_number: int = Field(17, description="Question sequence number")
-    question_text: str = Field("Why did front axle lateral performance decrease in Session 381?")
+    question_text: str = Field("", description="Engineering question for the current session")
     vehicle_id: Optional[str] = "CAR-2026-07"
     setup_id: Optional[str] = "SETUP-91"
 
@@ -100,16 +100,16 @@ class ExecuteBlindValidationRequest(BaseModel):
 class CreateLoopDecisionRequest(BaseModel):
     decision_number: int = Field(12)
     selected_setup_id: str = Field("SETUP-92")
-    question: Optional[str] = "Why did front axle lateral performance decrease in Session 381?"
+    question: Optional[str] = ""
     model_version: Optional[str] = "QCAR-ODE-RK45-v2.8"
 
 
 class ApproveLoopDecisionRequest(BaseModel):
     decision_code: str = Field("DEC-12")
     approval_number: int = Field(8)
-    approver_name: str = Field("James Wilson")
+    approver_name: str = Field("", description="Approver full name")
     approver_role: str = Field("Chief Race Engineer")
-    notes: Optional[str] = "Approved following blind holdout validation (R²=0.938)."
+    notes: Optional[str] = ""
 
 
 class NextTrackSessionRequest(BaseModel):

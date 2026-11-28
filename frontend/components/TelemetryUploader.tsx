@@ -47,20 +47,20 @@ export default function TelemetryUploader({ onParsed, onClear, hasData }: Teleme
   return (
     <div className="flex flex-col gap-1.5 mt-2 p-2 bg-[#0d0d0f] border border-[#252525] rounded-lg">
       <div className="flex justify-between items-center">
-        <label className="text-[11px] text-gray-400 flex items-center gap-1.5 font-semibold">
-          <Activity size={12} className={hasData ? "text-blue-400" : "text-gray-500"} />
+        <label className="text-xs text-gray-400 flex items-center gap-1.5 font-semibold">
+          <Activity size={12} className={hasData ? "text-blue-400" : "text-zinc-400"} />
           Telemetry Overlay (CSV)
           {hasData && <Check size={10} className="text-blue-400" />}
         </label>
         
         {hasData ? (
           <button onClick={onClear}
-            className="text-[10px] bg-red-950/30 text-red-400 border border-red-900/40 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-red-900/50 transition-colors">
+            className="text-xs bg-red-950/30 text-red-400 border border-red-900/40 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-red-900/50 transition-colors">
             <X size={10} /> Clear
           </button>
         ) : (
           <button onClick={() => fileInputRef.current?.click()} disabled={isUploading}
-            className="text-[10px] bg-ansys-yellow text-black px-2 py-0.5 rounded flex items-center gap-1 font-bold hover:brightness-110 disabled:opacity-50 transition-all shadow-[0_0_10px_rgba(242,169,0,0.2)]">
+            className="text-xs bg-signal text-carbon px-2 py-0.5 rounded flex items-center gap-1 font-bold hover:brightness-110 disabled:opacity-50 transition-all shadow-[0_0_10px_rgba(242,169,0,0.2)]">
             {isUploading ? "..." : <><Upload size={10} /> Upload</>}
           </button>
         )}
@@ -69,15 +69,15 @@ export default function TelemetryUploader({ onParsed, onClear, hasData }: Teleme
       <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleUpload} />
       
       {uploadError && (
-        <p className="text-[9px] text-red-400 leading-tight mt-1">{uploadError}</p>
+        <p className="text-xs text-red-400 leading-tight mt-1">{uploadError}</p>
       )}
 
       {hasData ? (
-        <p className="text-[9px] text-blue-500/70 leading-tight">
+        <p className="text-xs text-blue-500/70 leading-tight">
           MoTeC/AiM telemetry loaded. View in plots.
         </p>
       ) : (
-        <p className="text-[9px] text-gray-600 leading-tight">
+        <p className="text-xs text-zinc-300 leading-tight">
           Upload a MoTeC or AiM CSV file to correlate real-world data with the simulation.
         </p>
       )}

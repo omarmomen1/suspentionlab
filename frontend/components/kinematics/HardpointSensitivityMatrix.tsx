@@ -249,7 +249,7 @@ export default function HardpointSensitivityMatrix({
   if (!data) {
     return (
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
-        <Activity className="w-10 h-10 text-slate-500 mx-auto mb-3" />
+        <Activity className="w-10 h-10 text-zinc-400 mx-auto mb-3" />
         <h4 className="text-base font-semibold text-slate-200">No Sensitivity Matrix Available</h4>
         <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto mb-4">
           Compute the real Jacobian sensitivity matrix to see how every millimeter of chassis/upright adjustment impacts camber gain, bump steer, and roll center height.
@@ -276,7 +276,7 @@ export default function HardpointSensitivityMatrix({
           <div>
             <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
               Hardpoint Sensitivity Matrix (Finite Difference Jacobian J)
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+              <span className="text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 {data.total_solver_runs} REAL SOLVER SWEEPS
               </span>
             </h3>
@@ -368,7 +368,7 @@ export default function HardpointSensitivityMatrix({
         </div>
 
         {/* Color Legend */}
-        <div className="flex items-center gap-2 text-[11px] text-slate-400">
+        <div className="flex items-center gap-2 text-xs text-slate-400">
           <span className="flex items-center gap-1">
             <span className="w-3 h-3 rounded bg-cyan-500/30 border border-cyan-500/40 inline-block" /> Negative Rate (Decrease)
           </span>
@@ -398,8 +398,8 @@ export default function HardpointSensitivityMatrix({
                   return (
                     <th key={col} className="p-3 text-right font-medium min-w-[145px]">
                       <div className="font-mono text-cyan-400 font-bold text-[12px]">{derivSymbol}</div>
-                      <div className="text-[11px] text-slate-200 font-sans">{info?.label || col}<span className="text-cyan-300/80 font-mono text-[10px]">{kinSymbol}</span></div>
-                      <div className="text-[10px] text-slate-400 font-mono font-normal">
+                      <div className="text-xs text-slate-200 font-sans">{info?.label || col}<span className="text-cyan-300/80 font-mono text-xs">{kinSymbol}</span></div>
+                      <div className="text-xs text-slate-400 font-mono font-normal">
                         [{unitStr}]
                       </div>
                     </th>
@@ -418,7 +418,7 @@ export default function HardpointSensitivityMatrix({
                       <div className="flex items-center justify-between">
                         <span className="text-slate-200 font-bold">{hp}</span>
                         <span
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          className={`px-1.5 py-0.5 rounded text-xs font-bold ${
                             axis === "Z"
                               ? "bg-purple-500/20 text-purple-300 border border-purple-500/30"
                               : axis === "Y"
@@ -459,7 +459,7 @@ export default function HardpointSensitivityMatrix({
                     <td className="p-2.5 text-center">
                       <button
                         onClick={() => onSelectCandidate && onSelectCandidate(hp, axis)}
-                        className="px-2 py-1 bg-slate-800 hover:bg-cyan-600 hover:text-white text-slate-300 rounded text-[11px] font-sans font-medium transition"
+                        className="px-2 py-1 bg-slate-800 hover:bg-cyan-600 hover:text-white text-slate-300 rounded text-xs font-sans font-medium transition"
                         title="Send this coordinate to Engineering Question / Optimizer"
                       >
                         Target
@@ -482,7 +482,7 @@ export default function HardpointSensitivityMatrix({
                 <span className="px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-mono text-xs font-bold border border-cyan-500/40">
                   {activeCellDetail.hp} (Axis {activeCellDetail.axis})
                 </span>
-                <ArrowRight className="w-4 h-4 text-slate-500" />
+                <ArrowRight className="w-4 h-4 text-zinc-400" />
                 <span className="text-slate-200 text-sm font-semibold">
                   {activeCellDetail.metricName}
                 </span>
@@ -492,7 +492,7 @@ export default function HardpointSensitivityMatrix({
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-4 text-xs font-mono text-slate-300">
                 <div>
-                  <span className="text-slate-500">Derivative ∂({activeCellDetail.kinematicSymbol})/∂p:</span>{" "}
+                  <span className="text-zinc-400">Derivative ∂({activeCellDetail.kinematicSymbol})/∂p:</span>{" "}
                   <span className={`font-bold text-sm ${activeCellDetail.gradient >= 0 ? "text-amber-400" : "text-cyan-400"}`}>
                     {activeCellDetail.gradient >= 0 ? `+${activeCellDetail.gradient.toFixed(5)}` : activeCellDetail.gradient.toFixed(5)}{" "}
                     {activeCellDetail.unit}
@@ -500,12 +500,12 @@ export default function HardpointSensitivityMatrix({
                 </div>
                 {activeCellDetail.baseline !== undefined && (
                   <div>
-                    <span className="text-slate-500">Baseline Value:</span>{" "}
+                    <span className="text-zinc-400">Baseline Value:</span>{" "}
                     <span className="text-slate-200 font-semibold">{activeCellDetail.baseline.toFixed(3)}</span>
                   </div>
                 )}
                 <div>
-                  <span className="text-slate-500">Expected 5mm Shift Effect:</span>{" "}
+                  <span className="text-zinc-400">Expected 5mm Shift Effect:</span>{" "}
                   <span className="text-slate-200 font-semibold">
                     {(activeCellDetail.gradient * 5.0).toFixed(3)}
                   </span>

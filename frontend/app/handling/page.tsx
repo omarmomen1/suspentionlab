@@ -41,7 +41,8 @@ import SimHistory, { saveSimulationToHistory } from "../../components/SimHistory
 import TirUploader from "../../components/TirUploader";
 import TelemetryUploader from "../../components/TelemetryUploader";
 import { useAuth } from "../../contexts/AuthContext";
-import { HandlingApi } from "../../lib/api_client";
+import { apiFetch } from "../../lib/api";
+import { HandlingApi, formatApiError } from "../../lib/api_client";
 
 import Plot from "../../components/sim/Plot";
 import KPICard from "../../components/sim/KPICard";
@@ -76,6 +77,7 @@ function HandlingDashboard() {
   const [sweepData, setSweepData] = useState<any | null>(null);
   const [validityData, setValidityData] = useState<any | null>(null);
   const [provenanceData, setProvenanceData] = useState<any | null>(null);
+  const [assumptionsWarnings, setAssumptionsWarnings] = useState<string[]>([]);
   const [showValidityModal, setShowValidityModal] = useState(false);
   const [isCreatingQuestion, setIsCreatingQuestion] = useState(false);
 
@@ -104,6 +106,9 @@ function HandlingDashboard() {
     K_arb_r: 10000.0,
     tw_f: 1.6,
     tw_r: 1.6,
+    C_l: 1.65,
+    C_d: 0.30,
+    frontal_area: 2.2,
     tire_coeffs: null as Record<string, number> | null,
   });
 
@@ -181,6 +186,9 @@ function HandlingDashboard() {
           K_arb_r: params.K_arb_r,
           tw_f: params.tw_f,
           tw_r: params.tw_r,
+          C_l: params.C_l,
+          C_d: params.C_d,
+          frontal_area: params.frontal_area,
           tire_coeffs: params.tire_coeffs,
         },
         speed_kph: params.v_init_kph,
@@ -191,6 +199,7 @@ function HandlingDashboard() {
       setDiagramData(diagRes.diagram);
       setValidityData(diagRes.validity);
       setProvenanceData(diagRes.provenance);
+      setAssumptionsWarnings(Array.isArray(diagRes.assumptions_warnings) ? diagRes.assumptions_warnings : []);
 
       // 2. Fetch Dynamic Scenario
       const scenRes = await HandlingApi.runHandlingScenario({
@@ -204,6 +213,9 @@ function HandlingDashboard() {
           K_arb_r: params.K_arb_r,
           tw_f: params.tw_f,
           tw_r: params.tw_r,
+          C_l: params.C_l,
+          C_d: params.C_d,
+          frontal_area: params.frontal_area,
           tire_coeffs: params.tire_coeffs,
         },
         scenario_type: params.maneuver_type,
@@ -225,6 +237,9 @@ function HandlingDashboard() {
           K_arb_r: params.K_arb_r,
           tw_f: params.tw_f,
           tw_r: params.tw_r,
+          C_l: params.C_l,
+          C_d: params.C_d,
+          frontal_area: params.frontal_area,
           tire_coeffs: params.tire_coeffs,
         },
         setup_b: {
@@ -307,15 +322,20 @@ function HandlingDashboard() {
     if (!name) return;
     setIsSaving(true);
     try {
-      const r = await fetchWithAuth("/api/v1/profiles/", {
+      const r = await apiFetch("/api/v1/profiles/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, vehicle_type: "HANDLING", params }),
+        body: JSON.stringify({ name, vehicle_type: "QUARTER_CAR", params: { ...params, model_context: "HANDLING" } }),
       });
-      if (r.ok) showToast("Setup saved to Garage!", "success");
-      else showToast("Failed to save profile", "error");
-    } catch {
-      showToast("Failed to save profile", "error");
+      if (r.ok) {
+        showToast("Setup saved to Garage!", "success");
+      } else {
+        const errBody = await r.json().catch(() => null);
+        const msg = errBody?.detail ? String(errBody.detail) : formatApiError(errBody, `Failed to save (${r.status})`);
+        showToast(msg, "error");
+      }
+    } catch (err) {
+      showToast(formatApiError(err, "Failed to save profile"), "error");
     } finally {
       setIsSaving(false);
     }
@@ -360,10 +380,10 @@ function HandlingDashboard() {
       <div className="flex items-center justify-between shrink-0 pb-3 border-b border-[#1e1e1e]">
         <div className="flex flex-col">
           <div className="flex items-center gap-2">
-            <span className="text-[9px] font-bold tracking-[0.25em] text-ansys-yellow uppercase">
+            <span className="text-xs font-bold tracking-[0.25em] text-signal uppercase">
               Handling & Understeer Cockpit
             </span>
-            <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-[9px] font-semibold text-emerald-400">
+            <span className="px-1.5 py-0.5 rounded bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-400">
               Pacejka MF 5.2 Canonical
             </span>
           </div>
@@ -377,7 +397,7 @@ function HandlingDashboard() {
           {validityData && (
             <button
               onClick={() => setShowValidityModal(true)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#2a2a2e] bg-[#141416] hover:bg-[#1e1e22] text-[11px] font-medium transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#2a2a2e] bg-[#141416] hover:bg-[#1e1e22] text-xs font-medium transition-colors"
               title="Click to view full mathematical & physical validity checks"
             >
               <ShieldCheck size={13} className="text-emerald-400" />
@@ -388,9 +408,9 @@ function HandlingDashboard() {
 
           {/* Provenance Badge */}
           {provenanceData && (
-            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#222] bg-[#111] text-[10px] text-gray-400 font-mono">
+            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-[#222] bg-[#111] text-xs text-gray-400 font-mono">
               <span>LUT: {provenanceData.kinematics_study_id}</span>
-              <span className="text-gray-600">|</span>
+              <span className="text-zinc-300">|</span>
               <span>{provenanceData.solver_versions.handling_dynamics}</span>
             </div>
           )}
@@ -440,7 +460,7 @@ function HandlingDashboard() {
             disabled={isSaving}
             className="px-3 py-1.5 bg-[#141416] border border-[#252525] hover:bg-[#1e1e20] rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40"
           >
-            <Save size={13} className="text-ansys-yellow" /> Save Setup
+            <Save size={13} className="text-signal" /> Save Setup
           </button>
 
           <PDFExport captureId="sim-report" fileName={`Handling_${params.maneuver_type}`} />
@@ -451,7 +471,7 @@ function HandlingDashboard() {
             disabled={isRunning}
             className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all ${
               isRunning
-                ? "bg-[#222] text-gray-500 cursor-not-allowed"
+                ? "bg-[#222] text-zinc-400 cursor-not-allowed"
                 : "bg-signal text-carbon border border-signal hover:bg-[#d6f56e]"
             }`}
           >
@@ -476,7 +496,7 @@ function HandlingDashboard() {
         <div className="w-full lg:w-64 lg:shrink-0 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-y-auto custom-scrollbar">
           <div className="px-4 py-3 border-b border-[#1e1e1e] sticky top-0 bg-[#0d0d0f] z-10">
             <h2 className="text-xs font-semibold text-gray-300 flex items-center gap-2">
-              <Settings2 size={13} className="text-ansys-yellow" /> Vehicle Parameters
+              <Settings2 size={13} className="text-signal" /> Vehicle Parameters
             </h2>
           </div>
           <div className="p-4 space-y-5">
@@ -489,11 +509,11 @@ function HandlingDashboard() {
                 onChange={(v) => setParams({ ...params, v_init_kph: v })}
               />
               <div className="flex flex-col gap-1.5 mt-2">
-                <label className="text-[11px] text-gray-400">Dynamic Scenario</label>
+                <label className="text-xs text-gray-400">Dynamic Scenario</label>
                 <select
                   value={params.maneuver_type}
                   onChange={(e) => setParams({ ...params, maneuver_type: e.target.value })}
-                  className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-ansys-yellow/60 w-full"
+                  className="bg-[#0d0d0d] border border-[#252525] text-xs rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-signal/60 w-full"
                 >
                   <option value="step_steer">Step Steer (J-Turn 3°)</option>
                   <option value="ramp_steer">Ramp Steer (Transient)</option>
@@ -506,14 +526,14 @@ function HandlingDashboard() {
             <ParamSection title="Roll Stiffness & ARB">
               <div className="bg-[#0d0d0f] border border-[#252525] rounded-lg px-2.5 py-2 flex items-center justify-between">
                 <div>
-                  <div className="text-[11px] text-gray-300 font-medium">Front Roll Stiffness %</div>
-                  <div className="text-[9px] text-gray-500">Live from springs + ARBs</div>
+                  <div className="text-xs text-gray-300 font-medium">Front Roll Stiffness %</div>
+                  <div className="text-xs text-zinc-400">Live from springs + ARBs</div>
                 </div>
                 <div className="text-right font-mono">
-                  <div className="text-xs font-bold text-ansys-yellow">
+                  <div className="text-xs font-bold text-signal">
                     {(computedRollDist * 100).toFixed(1)}%
                   </div>
-                  <div className="text-[9px] text-gray-500">
+                  <div className="text-xs text-zinc-400">
                     ratio {computedRollDist.toFixed(3)}
                   </div>
                 </div>
@@ -616,6 +636,16 @@ function HandlingDashboard() {
             />
           </div>
 
+          {assumptionsWarnings.length > 0 && (
+            <div data-testid="handling-assumptions-warning" role="status" className="shrink-0 rounded-lg border border-amber-500/40 bg-amber-950/30 px-3 py-2 text-xs text-amber-200 flex items-start gap-2">
+              <AlertTriangle size={14} className="text-amber-400 shrink-0 mt-0.5" />
+              <div className="space-y-0.5">
+                <span className="font-semibold text-amber-300">Geometry Assumption Notice: </span>
+                <span>{assumptionsWarnings.join(" • ")}</span>
+              </div>
+            </div>
+          )}
+
           {/* Navigation Tabs */}
           <div className="flex gap-1.5 shrink-0 border-b border-[#1e1e22] pb-1.5">
             {TABS.map((tab, i) => {
@@ -626,8 +656,8 @@ function HandlingDashboard() {
                   onClick={() => setActiveTab(i)}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                     activeTab === i
-                      ? "bg-ansys-yellow text-black shadow-[0_0_12px_rgba(242,169,0,0.2)]"
-                      : "bg-[#111113] border border-[#1e1e1e] text-gray-400 hover:text-gray-200 hover:border-[#2a2a2a]"
+                      ? "bg-signal text-carbon border border-signal"
+                      : "bg-[#111113] border border-[#1e1e1e] text-zinc-300 hover:text-white hover:border-[#2a2a2a]"
                   }`}
                 >
                   <Icon size={12} /> {tab.label}
@@ -678,15 +708,24 @@ function HandlingDashboard() {
                 <PlotBox>
                   <Plot
                     data={[
-                      {
-                        x: diagramData.points.map((p: any) => p.ay_g),
-                        y: diagramData.points.map((p: any) => p.kus_deg_per_g),
-                        type: "scatter",
-                        mode: "lines+markers",
-                        name: "K_us Gradient",
-                        line: { color: "#f2a900", width: 2.5 },
-                        marker: { size: 4 },
-                      },
+                      (() => {
+                        const unsaturated = diagramData.points.filter(
+                          (p: any) =>
+                            (p.mu_util_f ?? 0) < 0.99 &&
+                            (p.mu_util_r ?? 0) < 0.99 &&
+                            p.ay_g <= (diagramData.ay_peak_g ?? Infinity) + 1e-6
+                        );
+                        const curvePts = unsaturated.length > 0 ? unsaturated : diagramData.points;
+                        return {
+                          x: curvePts.map((p: any) => p.ay_g),
+                          y: curvePts.map((p: any) => p.kus_deg_per_g),
+                          type: "scatter",
+                          mode: "lines+markers",
+                          name: "K_us Gradient (pre-saturation)",
+                          line: { color: "#C8F04B", width: 2.5 },
+                          marker: { size: 4 },
+                        };
+                      })(),
                       {
                         x: [0, 1.3],
                         y: [0, 0],
@@ -799,7 +838,7 @@ function HandlingDashboard() {
                         mode: "lines",
                         name: "Unsprung Inertial",
                         stackgroup: "one",
-                        line: { color: "#f2a900" },
+                        line: { color: "#C8F04B" },
                       },
                     ]}
                     layout={darkLayout({
@@ -878,7 +917,7 @@ function HandlingDashboard() {
 
                 {/* Engineering Insight Box */}
                 <div className="bg-[#121215] p-5 flex flex-col justify-center gap-3">
-                  <div className="flex items-center gap-2 text-ansys-yellow text-xs font-bold uppercase tracking-wider">
+                  <div className="flex items-center gap-2 text-signal text-xs font-bold uppercase tracking-wider">
                     <HelpCircle size={14} /> Race Engineer Inspection: &quot;Why Did Front Utilization Increase?&quot;
                   </div>
                   <p className="text-xs text-gray-300 leading-relaxed">
@@ -891,7 +930,7 @@ function HandlingDashboard() {
                     of overturning roll moment. Due to Pacejka tire load degressivity, the heavily loaded outer front tire loses lateral grip
                     efficiency faster than the inner tire gains, resulting in an elevated understeer gradient and earlier front axle saturation.
                   </p>
-                  <div className="flex items-center gap-4 pt-2 border-t border-[#222] text-[11px] text-gray-400">
+                  <div className="flex items-center gap-4 pt-2 border-t border-[#222] text-xs text-gray-400">
                     <span>Front Aero Downforce: <strong className="text-white">{diagramData.load_transfer_summary.front_aero_downforce_n} N</strong></span>
                     <span>Rear Aero Downforce: <strong className="text-white">{diagramData.load_transfer_summary.rear_aero_downforce_n} N</strong></span>
                   </div>
@@ -906,68 +945,68 @@ function HandlingDashboard() {
                 <div className="bg-[#121215] p-5 flex flex-col justify-between">
                   <div className="flex items-center justify-between pb-2 border-b border-[#222]">
                     <span className="text-xs font-bold text-gray-200 uppercase tracking-wider flex items-center gap-2">
-                      <Car size={14} className="text-ansys-yellow" /> 4-Corner Tire States (Operating Point @ 0.7G Ay)
+                      <Car size={14} className="text-signal" /> 4-Corner Tire States (Operating Point @ 0.7G Ay)
                     </span>
-                    <span className="text-[10px] text-emerald-400 font-mono">Pacejka MF 5.2 Combined Slip</span>
+                    <span className="text-xs text-emerald-400 font-mono">Pacejka MF 5.2 Combined Slip</span>
                   </div>
 
                   {midPt && (
                     <div className="grid grid-cols-2 gap-4 my-auto">
                       {/* Front Left */}
                       <div className="p-3 bg-[#0d0d10] border border-[#222] rounded-lg">
-                        <div className="flex justify-between text-[11px] font-bold text-gray-300 mb-1">
+                        <div className="flex justify-between text-xs font-bold text-gray-300 mb-1">
                           <span>Front Left (Inner)</span>
                           <span className="text-emerald-400 font-mono">Linear</span>
                         </div>
-                        <div className="text-[11px] text-gray-400 space-y-0.5 font-mono">
+                        <div className="text-xs text-gray-400 space-y-0.5 font-mono">
                           <div>Fz: <span className="text-white">{midPt.Fz_fl} N</span></div>
                           <div>Slip α: <span className="text-white">{midPt.alpha_f_deg}°</span></div>
-                          <div>Utilization: <span className="text-ansys-yellow">{(midPt.mu_util_f * 0.75).toFixed(2)} μ</span></div>
+                          <div>Utilization: <span className="text-signal">{(midPt.mu_util_f * 0.75).toFixed(2)} μ</span></div>
                         </div>
                       </div>
 
                       {/* Front Right */}
                       <div className="p-3 bg-[#0d0d10] border border-[#222] rounded-lg">
-                        <div className="flex justify-between text-[11px] font-bold text-gray-300 mb-1">
+                        <div className="flex justify-between text-xs font-bold text-gray-300 mb-1">
                           <span>Front Right (Outer)</span>
                           <span className="text-amber-400 font-mono">Near Saturation</span>
                         </div>
-                        <div className="text-[11px] text-gray-400 space-y-0.5 font-mono">
+                        <div className="text-xs text-gray-400 space-y-0.5 font-mono">
                           <div>Fz: <span className="text-white">{midPt.Fz_fr} N</span></div>
                           <div>Slip α: <span className="text-white">{midPt.alpha_f_deg}°</span></div>
-                          <div>Utilization: <span className="text-ansys-yellow">{(midPt.mu_util_f * 1.15).toFixed(2)} μ</span></div>
+                          <div>Utilization: <span className="text-signal">{(midPt.mu_util_f * 1.15).toFixed(2)} μ</span></div>
                         </div>
                       </div>
 
                       {/* Rear Left */}
                       <div className="p-3 bg-[#0d0d10] border border-[#222] rounded-lg">
-                        <div className="flex justify-between text-[11px] font-bold text-gray-300 mb-1">
+                        <div className="flex justify-between text-xs font-bold text-gray-300 mb-1">
                           <span>Rear Left (Inner)</span>
                           <span className="text-emerald-400 font-mono">Linear</span>
                         </div>
-                        <div className="text-[11px] text-gray-400 space-y-0.5 font-mono">
+                        <div className="text-xs text-gray-400 space-y-0.5 font-mono">
                           <div>Fz: <span className="text-white">{midPt.Fz_rl} N</span></div>
                           <div>Slip α: <span className="text-white">{midPt.alpha_r_deg}°</span></div>
-                          <div>Utilization: <span className="text-ansys-yellow">{(midPt.mu_util_r * 0.78).toFixed(2)} μ</span></div>
+                          <div>Utilization: <span className="text-signal">{(midPt.mu_util_r * 0.78).toFixed(2)} μ</span></div>
                         </div>
                       </div>
 
                       {/* Rear Right */}
                       <div className="p-3 bg-[#0d0d10] border border-[#222] rounded-lg">
-                        <div className="flex justify-between text-[11px] font-bold text-gray-300 mb-1">
+                        <div className="flex justify-between text-xs font-bold text-gray-300 mb-1">
                           <span>Rear Right (Outer)</span>
                           <span className="text-emerald-400 font-mono">Grip Margin</span>
                         </div>
-                        <div className="text-[11px] text-gray-400 space-y-0.5 font-mono">
+                        <div className="text-xs text-gray-400 space-y-0.5 font-mono">
                           <div>Fz: <span className="text-white">{midPt.Fz_rr} N</span></div>
                           <div>Slip α: <span className="text-white">{midPt.alpha_r_deg}°</span></div>
-                          <div>Utilization: <span className="text-ansys-yellow">{(midPt.mu_util_r * 1.08).toFixed(2)} μ</span></div>
+                          <div>Utilization: <span className="text-signal">{(midPt.mu_util_r * 1.08).toFixed(2)} μ</span></div>
                         </div>
                       </div>
                     </div>
                   )}
 
-                  <div className="text-[10px] text-gray-500 pt-2 border-t border-[#222]">
+                  <div className="text-xs text-zinc-400 pt-2 border-t border-[#222]">
                     *Values calculated via non-linear similarity method with degressive normal load scaling dfz = (Fz - Fz0) / Fz0.
                   </div>
                 </div>
@@ -1027,7 +1066,7 @@ function HandlingDashboard() {
                         type: "scatter",
                         mode: "lines",
                         name: "Steer Input (deg)",
-                        line: { color: "#f2a900", width: 1.5, dash: "dash" },
+                        line: { color: "#C8F04B", width: 1.5, dash: "dash" },
                       },
                     ]}
                     layout={darkLayout({
@@ -1097,31 +1136,31 @@ function HandlingDashboard() {
                 <div className="bg-[#121215] p-5 flex flex-col justify-between">
                   <div className="flex items-center justify-between pb-2 border-b border-[#222]">
                     <span className="text-xs font-bold text-gray-200 uppercase tracking-wider flex items-center gap-2">
-                      <Route size={14} className="text-ansys-yellow" /> Scenario Response Metrics
+                      <Route size={14} className="text-signal" /> Scenario Response Metrics
                     </span>
-                    <span className="text-[11px] text-gray-400">{scenarioData.scenario_type.replace('_', ' ').toUpperCase()}</span>
+                    <span className="text-xs text-gray-400">{scenarioData.scenario_type.replace('_', ' ').toUpperCase()}</span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4 my-auto">
                     <div className="p-3 bg-[#0d0d10] border border-[#222] rounded-lg">
-                      <div className="text-[10px] text-gray-400">Yaw Rate Gain</div>
-                      <div className="text-lg font-bold text-ansys-yellow">{scenarioData.metrics.yaw_rate_gain} <span className="text-xs text-gray-500">(°/s)/°</span></div>
+                      <div className="text-xs text-gray-400">Yaw Rate Gain</div>
+                      <div className="text-lg font-bold text-signal">{scenarioData.metrics.yaw_rate_gain} <span className="text-xs text-zinc-400">(°/s)/°</span></div>
                     </div>
                     <div className="p-3 bg-[#0d0d10] border border-[#222] rounded-lg">
-                      <div className="text-[10px] text-gray-400">Yaw Time Constant τ</div>
-                      <div className="text-lg font-bold text-emerald-400">{scenarioData.metrics.yaw_time_constant_ms} <span className="text-xs text-gray-500">ms</span></div>
+                      <div className="text-xs text-gray-400">Yaw Time Constant τ</div>
+                      <div className="text-lg font-bold text-emerald-400">{scenarioData.metrics.yaw_time_constant_ms} <span className="text-xs text-zinc-400">ms</span></div>
                     </div>
                     <div className="p-3 bg-[#0d0d10] border border-[#222] rounded-lg">
-                      <div className="text-[10px] text-gray-400">Yaw Rate Overshoot</div>
-                      <div className="text-lg font-bold text-white">{scenarioData.metrics.overshoot_pct} <span className="text-xs text-gray-500">%</span></div>
+                      <div className="text-xs text-gray-400">Yaw Rate Overshoot</div>
+                      <div className="text-lg font-bold text-white">{scenarioData.metrics.overshoot_pct} <span className="text-xs text-zinc-400">%</span></div>
                     </div>
                     <div className="p-3 bg-[#0d0d10] border border-[#222] rounded-lg">
-                      <div className="text-[10px] text-gray-400">Peak Sideslip Angle</div>
+                      <div className="text-xs text-gray-400">Peak Sideslip Angle</div>
                       <div className="text-lg font-bold text-white">{scenarioData.metrics.peak_sideslip_deg}°</div>
                     </div>
                   </div>
 
-                  <div className="text-[10px] text-gray-500 pt-2 border-t border-[#222]">
+                  <div className="text-xs text-zinc-400 pt-2 border-t border-[#222]">
                     Integrated with Scipy BDF stiff solver (relaxation time tau = 0.05s).
                   </div>
                 </div>
@@ -1138,9 +1177,9 @@ function HandlingDashboard() {
                       <span className="w-2 h-2 rounded-full bg-emerald-400" />
                       {comparisonData.setup_a_name}
                     </div>
-                    <span className="text-gray-500 font-bold">vs</span>
+                    <span className="text-zinc-400 font-bold">vs</span>
                     <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#141416] border border-[#252525] text-xs font-semibold">
-                      <span className="w-2 h-2 rounded-full bg-ansys-yellow" />
+                      <span className="w-2 h-2 rounded-full bg-signal" />
                       {comparisonData.setup_b_name}
                     </div>
                   </div>
@@ -1148,7 +1187,7 @@ function HandlingDashboard() {
                   <button
                     onClick={createExperimentFromComparison}
                     disabled={isCreatingQuestion}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-ansys-yellow text-black font-bold text-xs hover:brightness-110 shadow-[0_0_15px_rgba(242,169,0,0.2)] disabled:opacity-50 transition-all"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-signal text-carbon font-bold text-xs hover:brightness-110 shadow-[0_0_15px_rgba(242,169,0,0.2)] disabled:opacity-50 transition-all"
                   >
                     <FlaskConical size={14} />
                     {isCreatingQuestion ? "Creating Experiment..." : "Create Experiment from Comparison"}
@@ -1174,7 +1213,7 @@ function HandlingDashboard() {
                           type: "scatter",
                           mode: "lines",
                           name: `${comparisonData.setup_b_name}`,
-                          line: { color: "#f2a900", width: 2.5, dash: "dash" },
+                          line: { color: "#C8F04B", width: 2.5, dash: "dash" },
                         },
                       ]}
                       layout={darkLayout({
@@ -1205,7 +1244,7 @@ function HandlingDashboard() {
                           type: "scatter",
                           mode: "lines",
                           name: `K_us (${comparisonData.setup_b_name})`,
-                          line: { color: "#f2a900", width: 2.5, dash: "dash" },
+                          line: { color: "#C8F04B", width: 2.5, dash: "dash" },
                         },
                       ]}
                       layout={darkLayout({
@@ -1225,7 +1264,7 @@ function HandlingDashboard() {
                   {/* WHAT CHANGED */}
                   <div className="bg-[#121215] border border-[#222] rounded-xl p-4">
                     <h3 className="text-xs font-bold text-gray-300 uppercase tracking-wider mb-3 flex items-center gap-2">
-                      <Scale size={13} className="text-ansys-yellow" /> What Changed
+                      <Scale size={13} className="text-signal" /> What Changed
                     </h3>
                     <div className="space-y-2">
                       {comparisonData.what_changed.map((item: any, i: number) => (
@@ -1233,9 +1272,9 @@ function HandlingDashboard() {
                           <span className="text-gray-300">{item.parameter}</span>
                           <div className="flex items-center gap-2 font-mono">
                             <span className="text-gray-400">{item.setup_a}</span>
-                            <ArrowRight size={10} className="text-gray-600" />
+                            <ArrowRight size={10} className="text-zinc-300" />
                             <span className="text-white font-bold">{item.setup_b}</span>
-                            <span className="text-ansys-yellow text-[11px]">({item.delta})</span>
+                            <span className="text-signal text-xs">({item.delta})</span>
                           </div>
                         </div>
                       ))}
@@ -1245,12 +1284,12 @@ function HandlingDashboard() {
                   {/* WHY (Physics Causality) */}
                   <div className="bg-[#121215] border border-[#222] rounded-xl p-4 flex flex-col justify-between">
                     <div>
-                      <h3 className="text-xs font-bold text-ansys-yellow uppercase tracking-wider mb-2 flex items-center gap-2">
+                      <h3 className="text-xs font-bold text-signal uppercase tracking-wider mb-2 flex items-center gap-2">
                         <Activity size={13} /> Why It Happened (Physical Causality)
                       </h3>
                       <p className="text-xs text-gray-300 leading-relaxed font-sans">{comparisonData.why}</p>
                     </div>
-                    <div className="pt-3 border-t border-[#222] mt-3 text-[10px] text-gray-500">
+                    <div className="pt-3 border-t border-[#222] mt-3 text-xs text-zinc-400">
                       Confidence: <strong className="text-emerald-400">{comparisonData.confidence.score_pct}%</strong> ({comparisonData.confidence.rating})
                     </div>
                   </div>
@@ -1292,7 +1331,7 @@ function HandlingDashboard() {
                     <select
                       value={sweepParamName}
                       onChange={(e) => setSweepParamName(e.target.value)}
-                      className="bg-[#141416] border border-[#2a2a2a] text-xs rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-ansys-yellow"
+                      className="bg-[#141416] border border-[#2a2a2a] text-xs rounded-lg px-3 py-1.5 text-white focus:outline-none focus:border-signal"
                     >
                       <option value="roll_dist">Front Roll Stiffness Distribution (40% - 70%)</option>
                       <option value="h_cg">Sprung CG Height (0.30m - 0.55m)</option>
@@ -1301,7 +1340,7 @@ function HandlingDashboard() {
                   </div>
                   <button
                     onClick={runSensitivitySweep}
-                    className="px-4 py-1.5 rounded-lg bg-ansys-yellow text-black font-bold text-xs hover:brightness-110 shadow-[0_0_15px_rgba(242,169,0,0.2)]"
+                    className="px-4 py-1.5 rounded-lg bg-signal text-carbon font-bold text-xs hover:brightness-110 shadow-[0_0_15px_rgba(242,169,0,0.2)]"
                   >
                     Calculate Sweep
                   </button>
@@ -1318,7 +1357,7 @@ function HandlingDashboard() {
                             type: "scatter",
                             mode: "lines+markers",
                             name: "Understeer Gradient Kus (deg/G)",
-                            line: { color: "#f2a900", width: 2.5 },
+                            line: { color: "#C8F04B", width: 2.5 },
                             marker: { size: 6 },
                           },
                         ]}
@@ -1358,7 +1397,7 @@ function HandlingDashboard() {
                     </PlotBox>
                   </div>
                 ) : (
-                  <div className="flex-1 flex items-center justify-center text-gray-500 text-xs">
+                  <div className="flex-1 flex items-center justify-center text-zinc-400 text-xs">
                     Click &quot;Calculate Sweep&quot; to compute parameter sensitivity curves.
                   </div>
                 )}
@@ -1377,12 +1416,12 @@ function HandlingDashboard() {
         </ShellCenter>
         <ShellRight>
           <VerdictRail
-            status={verdict.status}
-            statusLabel={verdict.label}
+            status={isRunning ? "UNVERIFIED" : verdict.status}
+            statusLabel={isRunning ? "Solving..." : verdict.label}
             heroes={[
-              { label: "Understeer gradient", value: diagramData?.kus_linear_deg_per_g, unit: "deg/G", decimals: 2 },
-              { label: "Peak lateral grip", value: diagramData?.ay_peak_g, unit: "G", decimals: 2 },
-              { label: "Limiting axle", value: diagramData?.limiting_axle },
+              { label: "Understeer gradient", value: isRunning ? null : diagramData?.kus_linear_deg_per_g, unit: "deg/G", decimals: 2 },
+              { label: "Peak lateral grip", value: isRunning ? null : diagramData?.ay_peak_g, unit: "G", decimals: 2 },
+              { label: "Limiting axle", value: isRunning ? null : diagramData?.limiting_axle },
             ]}
             solverVersion={provenanceData?.solver_versions?.handling_dynamics}
             action={{ label: "Solve Handling", onClick: () => runFullAnalysis(), loading: isRunning }}
@@ -1399,13 +1438,13 @@ function HandlingDashboard() {
                 <ShieldCheck size={16} className="text-emerald-400" />
                 <h3 className="text-sm font-bold text-white">Mathematical & Physical Validity Checks</h3>
               </div>
-              <button onClick={() => setShowValidityModal(false)} className="text-gray-500 hover:text-white">
+              <button onClick={() => setShowValidityModal(false)} className="text-zinc-400 hover:text-white">
                 <X size={15} />
               </button>
             </div>
 
             <div className="p-3 bg-[#0c0c0f] border border-[#1e1e1e] rounded-lg">
-              <div className="text-[11px] text-gray-400 font-semibold mb-1">VALIDATION STATUS NOTICE</div>
+              <div className="text-xs text-gray-400 font-semibold mb-1">VALIDATION STATUS NOTICE</div>
               <p className="text-xs text-emerald-300 font-sans leading-relaxed">{validityData.summary}</p>
             </div>
 
@@ -1414,10 +1453,10 @@ function HandlingDashboard() {
                 <div key={idx} className="flex items-start justify-between text-xs p-2 rounded bg-[#161619] border border-[#202025]">
                   <div>
                     <div className="font-semibold text-gray-200">{check.label}</div>
-                    <div className="text-[11px] text-gray-400">{check.detail}</div>
+                    <div className="text-xs text-gray-400">{check.detail}</div>
                   </div>
                   <span
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                    className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${
                       check.status === "pass"
                         ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/30"
                         : "bg-amber-500/10 text-amber-400 border border-amber-500/30"
@@ -1446,7 +1485,7 @@ function HandlingDashboard() {
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-600 text-sm">Loading Handling Cockpit…</div>}>
+    <Suspense fallback={<div className="h-full flex items-center justify-center text-zinc-300 text-sm">Loading Handling Cockpit…</div>}>
       <PlanGate required="PRO" feature="Handling Dynamics & Bicycle Model">
         <HandlingDashboard />
       </PlanGate>

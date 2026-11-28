@@ -234,7 +234,7 @@ export function BlindSessionView({ sessionId, onSessionLoaded }: BlindSessionVie
             <ShieldAlert className="w-6 h-6 text-amber-400" />
             <h2 className="text-xl font-bold text-white tracking-wide">{session.name}</h2>
           </div>
-          <p className="text-xs text-gray-400 mt-1 font-mono">
+          <p className="text-xs text-gray-400 mt-1 font-sans leading-relaxed">
             SESSION HASH: {session.session_hash.substring(0, 16)}...
           </p>
         </div>
@@ -277,7 +277,7 @@ export function BlindSessionView({ sessionId, onSessionLoaded }: BlindSessionVie
               <Eye className="w-4 h-4 text-indigo-400" />
               <span>Evaluator Visible Context</span>
             </div>
-            <span className="text-xs font-mono text-gray-500">
+            <span className="text-xs font-mono text-zinc-400">
               CTX HASH: {context.visible_context_hash.substring(0, 16)}...
             </span>
           </div>
@@ -299,7 +299,7 @@ export function BlindSessionView({ sessionId, onSessionLoaded }: BlindSessionVie
                 Permitted Evidence Nodes ({context.visible_entities.length})
               </span>
               {context.visible_entities.length === 0 ? (
-                <span className="text-gray-500 italic">No additional evidence attached.</span>
+                <span className="text-zinc-400 italic">No additional evidence attached.</span>
               ) : (
                 <ul className="space-y-1.5 text-gray-300">
                   {context.visible_entities.map((ent, idx) => (
@@ -345,7 +345,7 @@ export function BlindSessionView({ sessionId, onSessionLoaded }: BlindSessionVie
                 <button
                   onClick={handleExecuteReveal}
                   disabled={revealing}
-                  className="px-4 py-2 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-400 text-black flex items-center space-x-2 disabled:opacity-50"
+                  className="px-4 py-2 text-xs font-semibold rounded bg-signal hover:bg-[#d6f56e] text-carbon flex items-center space-x-2 disabled:opacity-50"
                 >
                   <Unlock className="w-3.5 h-3.5" />
                   <span>{revealing ? "Executing Reveal..." : "Execute Controlled Reveal"}</span>
@@ -396,7 +396,7 @@ export function BlindSessionView({ sessionId, onSessionLoaded }: BlindSessionVie
                 <div className="p-4 bg-gray-950 rounded border border-gray-800 space-y-2">
                   <div className="font-bold text-gray-300 uppercase tracking-wider pb-1 border-b border-gray-800 flex items-center justify-between">
                     <span>Engineer Prediction</span>
-                    <span className="text-indigo-400 text-[10px]">{comparison.comparison_type}</span>
+                    <span className="text-indigo-400 text-xs">{comparison.comparison_type}</span>
                   </div>
                   {comparison.prediction_payload && (
                     <div className="space-y-1 text-gray-300">
@@ -422,7 +422,7 @@ export function BlindSessionView({ sessionId, onSessionLoaded }: BlindSessionVie
                 <div className="p-4 bg-gray-950 rounded border border-gray-800 space-y-2">
                   <div className="font-bold text-gray-300 uppercase tracking-wider pb-1 border-b border-gray-800 flex items-center justify-between">
                     <span>Authoritative Outcome</span>
-                    <span className="text-emerald-400 text-[10px]">REVEALED</span>
+                    <span className="text-emerald-400 text-xs">REVEALED</span>
                   </div>
                   <div className="space-y-1 text-gray-300">
                     <div>Source Entity: <span className="text-emerald-300">{comparison.outcome_identity.entity_type} ({comparison.outcome_identity.entity_id})</span></div>
@@ -438,7 +438,7 @@ export function BlindSessionView({ sessionId, onSessionLoaded }: BlindSessionVie
                     {comparison.comparison_metrics.authoritative_choice && (
                       <div>Winning Option: <span className="text-white font-bold">{comparison.comparison_metrics.authoritative_choice}</span></div>
                     )}
-                    <div className="truncate text-gray-500 text-[10px]">Outcome Hash: {comparison.outcome_identity.artifact_hash}</div>
+                    <div className="truncate text-zinc-400 text-xs">Outcome Hash: {comparison.outcome_identity.artifact_hash}</div>
                   </div>
                 </div>
               </div>
@@ -449,15 +449,15 @@ export function BlindSessionView({ sessionId, onSessionLoaded }: BlindSessionVie
                   <span className="font-semibold text-gray-300 text-xs block">Comparative Quantitative Metrics</span>
                   <div className="grid grid-cols-3 gap-3 text-xs font-mono">
                     <div className="p-2 rounded bg-gray-900 border border-gray-800">
-                      <div className="text-gray-500 text-[10px]">Signed Error</div>
+                      <div className="text-zinc-400 text-xs">Signed Error</div>
                       <div className="text-white font-bold">{comparison.comparison_metrics.signed_error !== undefined ? Number(comparison.comparison_metrics.signed_error).toFixed(4) : "N/A"} {comparison.comparison_metrics.base_unit || ""}</div>
                     </div>
                     <div className="p-2 rounded bg-gray-900 border border-gray-800">
-                      <div className="text-gray-500 text-[10px]">Absolute Error</div>
+                      <div className="text-zinc-400 text-xs">Absolute Error</div>
                       <div className="text-white font-bold">{comparison.comparison_metrics.absolute_error !== undefined ? Number(comparison.comparison_metrics.absolute_error).toFixed(4) : "N/A"} {comparison.comparison_metrics.base_unit || ""}</div>
                     </div>
                     <div className="p-2 rounded bg-gray-900 border border-gray-800">
-                      <div className="text-gray-500 text-[10px]">Relative Error</div>
+                      <div className="text-zinc-400 text-xs">Relative Error</div>
                       <div className="text-white font-bold">{comparison.comparison_metrics.relative_error !== null && comparison.comparison_metrics.relative_error !== undefined ? `${(Number(comparison.comparison_metrics.relative_error) * 100).toFixed(2)}%` : "N/A"}</div>
                     </div>
                   </div>
@@ -465,7 +465,7 @@ export function BlindSessionView({ sessionId, onSessionLoaded }: BlindSessionVie
               )}
 
               {/* Tolerance & Provenance */}
-              <div className="text-[11px] font-mono text-gray-400 space-y-1 p-3 bg-gray-950 rounded border border-gray-800">
+              <div className="text-xs font-mono text-gray-400 space-y-1 p-3 bg-gray-950 rounded border border-gray-800">
                 <div>TOLERANCE EVALUATED: {comparison.tolerance_applied ? JSON.stringify(comparison.tolerance_applied) : "None declared (raw error metrics only)"}</div>
                 <div className="truncate">COMPARISON HASH: {comparison.comparison_hash}</div>
                 {session.revealed_at && <div>REVEALED AT: {session.revealed_at}</div>}
@@ -508,7 +508,7 @@ export function BlindSessionView({ sessionId, onSessionLoaded }: BlindSessionVie
             {/* Target Specification */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-gray-950 rounded border border-gray-800">
               <div>
-                <label className="block text-[11px] font-mono text-gray-400 mb-1">
+                <label className="block text-xs font-mono text-gray-400 mb-1">
                   Target Entity
                 </label>
                 <div className="text-xs font-mono text-indigo-300 py-1.5 px-2.5 bg-gray-900 rounded border border-gray-800 truncate">
@@ -516,7 +516,7 @@ export function BlindSessionView({ sessionId, onSessionLoaded }: BlindSessionVie
                 </div>
               </div>
               <div>
-                <label className="block text-[11px] font-mono text-gray-400 mb-1">
+                <label className="block text-xs font-mono text-gray-400 mb-1">
                   Target Metric
                 </label>
                 <input
@@ -684,7 +684,7 @@ export function BlindSessionView({ sessionId, onSessionLoaded }: BlindSessionVie
             <button
               onClick={handleSubmitPrediction}
               disabled={submitting}
-              className="px-4 py-2 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-400 text-black flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-4 py-2 text-xs font-semibold rounded bg-signal hover:bg-[#d6f56e] text-carbon flex items-center space-x-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Send className="w-3.5 h-3.5" />
               <span>{submitting ? "Locking Submission..." : "Lock Prediction & Seal Session"}</span>

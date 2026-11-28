@@ -20,7 +20,8 @@ export default function DataExport({ results, fileName = "suspensionlab_export",
     
     try {
       let mScript = `% SuspensionLab Simulation Export\n`;
-      mScript += `% Generated on: ${new Date().toISOString()}\n\n`;
+      mScript += `% Generated on: ${new Date().toISOString()}\n`;
+      mScript += `% Note: f_n_s / zeta_s / omega_n_s are coupled 4-state ODE eigenvalues (distinct from uncoupled sqrt(k_w/m_s) preview).\n\n`;
       
       const arrays: Record<string, number[]> = {};
       const scalars: Record<string, number | string> = {};
@@ -103,7 +104,7 @@ export default function DataExport({ results, fileName = "suspensionlab_export",
             : <><FileCode2 size={13} /> Export MATLAB</>}
         </button>
         {exportError && (
-          <span className="text-[10px] text-rose-400 font-mono">{exportError}</span>
+          <span className="text-xs text-rose-400 font-mono">{exportError}</span>
         )}
       </div>
     </PlanGate>

@@ -85,9 +85,18 @@ export default function KinematicsModelValidity({
       : numStatus === "PASS" && physStatus === "PASS"
       ? "PASS"
       : "WARN";
-  const ovStatus: ValidityStatus = !hasSolverData
+  const passedBenchmarksCount = benchmarks.filter(b => b.status === "PASS").length;
+  const failedBenchmarksCount = benchmarks.filter(b => b.status === "FAIL").length;
+  const warnBenchmarksCount = benchmarks.filter(b => b.status === "WARN").length;
+  const rawOvStatus: ValidityStatus = !hasSolverData
     ? "UNVERIFIED"
     : overallStatus || modelValidity?.overall_status || derivedStatus;
+  const ovStatus: ValidityStatus =
+    failedBenchmarksCount > 0
+      ? "FAIL"
+      : rawOvStatus === "PASS" && warnBenchmarksCount > 0
+      ? "WARN"
+      : rawOvStatus;
   const isValid = ovStatus === "PASS";
 
   const isNumericallyConvergedPhysicallyQuestionable = numStatus === "PASS" && physStatus !== "PASS";
@@ -99,8 +108,6 @@ export default function KinematicsModelValidity({
   const isCpp = backendInfo?.backend?.toLowerCase().includes("cpp") || backendInfo?.cpp_loaded === true;
   const isFallback = backendInfo?.fallback === true || backendInfo?.backend?.toLowerCase().includes("python");
   const solverName = isCpp ? "C++ Newton-Raphson QR" : "Python Reference Fallback";
-
-  const passedBenchmarksCount = benchmarks.filter(b => b.status === "PASS").length;
 
   return (
     <div
@@ -148,7 +155,7 @@ export default function KinematicsModelValidity({
               </div>
 
               {/* Numerical Status Pill */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#141620] border border-[#232738] text-[11px] font-mono">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#141620] border border-[#232738] text-xs font-mono">
                 <span className="text-gray-400">Numerical:</span>
                 <span className={`font-bold ${numStatus === "PASS" ? "text-emerald-400" : numStatus === "WARN" ? "text-amber-400" : numStatus === "UNVERIFIED" ? "text-zinc-400" : "text-rose-400"}`}>
                   {numStatus}
@@ -156,7 +163,7 @@ export default function KinematicsModelValidity({
               </div>
 
               {/* Physical Status Pill */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#141620] border border-[#232738] text-[11px] font-mono">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#141620] border border-[#232738] text-xs font-mono">
                 <span className="text-gray-400">Physical:</span>
                 <span className={`font-bold ${physStatus === "PASS" ? "text-emerald-400" : physStatus === "WARN" ? "text-amber-400" : physStatus === "UNVERIFIED" ? "text-zinc-400" : "text-rose-400"}`}>
                   {physStatus}
@@ -164,7 +171,7 @@ export default function KinematicsModelValidity({
               </div>
 
               {/* Geometry Issues Pill */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#141620] border border-[#232738] text-[11px] font-mono">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#141620] border border-[#232738] text-xs font-mono">
                 <span className="text-gray-400">Geometry:</span>
                 <span className={`font-bold ${geometryIssuesCount === 0 ? "text-emerald-400" : "text-amber-400"}`}>
                   {geometryIssuesCount} {geometryIssuesCount === 1 ? "issue" : "issues"}
@@ -172,7 +179,7 @@ export default function KinematicsModelValidity({
               </div>
 
               {/* Fallback Pill */}
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#141620] border border-[#232738] text-[11px] font-mono">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#141620] border border-[#232738] text-xs font-mono">
                 <span className="text-gray-400">Fallback:</span>
                 <span className={`font-bold ${isFallback ? "text-amber-400" : "text-gray-300"}`}>
                   {isFallback ? "ACTIVE" : "NONE"}
@@ -204,7 +211,7 @@ export default function KinematicsModelValidity({
                 <Layers className="w-3.5 h-3.5 text-cyan-400" />
                 <div className="flex flex-col">
                   <div className="flex items-center justify-between gap-3">
-                    <span className="text-[9px] font-semibold uppercase tracking-wider text-gray-400">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-gray-400">
                       Coverage
                     </span>
                     <span className="text-xs font-mono font-bold text-cyan-300">
@@ -237,7 +244,7 @@ export default function KinematicsModelValidity({
               <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
               <div>
                 <strong className="uppercase tracking-wider">CAE AUDIT WARNING: NUMERICALLY CONVERGED, PHYSICALLY QUESTIONABLE</strong>
-                <p className="text-amber-300/80 mt-0.5 text-[11px] leading-relaxed">
+                <p className="text-amber-300/80 mt-0.5 text-xs leading-relaxed">
                   Newton-Raphson constraints converged to zero mathematical residual, but resulting camber slopes, scrub radius, or motion ratios fall outside plausible high-performance vehicle dynamics bounds. Review physical validation issues below before manufacturing or track testing.
                 </p>
               </div>
@@ -246,7 +253,7 @@ export default function KinematicsModelValidity({
 
           {/* Provenance and Reproducibility Fingerprint */}
           {reproducibility && (
-            <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-[#1a1c24] text-[10px] font-mono text-gray-400">
+            <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-[#1a1c24] text-xs font-mono text-gray-400">
               <div className="flex items-center gap-1.5 text-gray-300">
                 <Fingerprint className="w-3.5 h-3.5 text-purple-400" />
                 <span>Input SHA: <strong className="text-purple-300">{reproducibility.input_hash.slice(0, 10)}…</strong></span>
@@ -318,7 +325,7 @@ export default function KinematicsModelValidity({
                           <span className="font-semibold text-xs text-gray-100">{what}</span>
                         </div>
                         <span
-                          className={`text-[9px] font-mono px-2 py-0.5 rounded font-bold uppercase ${
+                          className={`text-xs font-mono px-2 py-0.5 rounded font-bold uppercase ${
                             isCrit
                               ? "bg-rose-900/60 text-rose-300 border border-rose-700/50"
                               : "bg-amber-900/60 text-amber-300 border border-amber-700/50"
@@ -332,36 +339,36 @@ export default function KinematicsModelValidity({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 text-xs">
                         {/* 1. What is invalid */}
                         <div className="bg-[#12141d] p-2 rounded border border-[#222533]">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">
+                          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-0.5">
                             1. What is Invalid
                           </span>
-                          <span className="text-gray-200 font-mono text-[11px]">{what}</span>
+                          <span className="text-gray-200 font-mono text-xs">{what}</span>
                         </div>
 
                         {/* 2. Why (Physical Mechanism) */}
                         <div className="bg-[#12141d] p-2 rounded border border-[#222533]">
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-wider block mb-0.5">
+                          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-0.5">
                             2. Why (Kinematic Mechanism)
                           </span>
-                          <span className="text-gray-300 text-[11px] leading-relaxed">{why}</span>
+                          <span className="text-gray-300 text-xs leading-relaxed">{why}</span>
                         </div>
 
                         {/* 3. Affected Parameter */}
                         <div className="bg-[#12141d] p-2 rounded border border-[#222533]">
-                          <span className="text-[10px] font-bold text-cyan-400 uppercase tracking-wider block mb-0.5">
+                          <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider block mb-0.5">
                             3. Affected Parameter
                           </span>
-                          <code className="text-cyan-300 font-mono text-[11px] px-1 py-0.5 rounded bg-cyan-950/40">
+                          <code className="text-cyan-300 font-mono text-xs px-1 py-0.5 rounded bg-cyan-950/40">
                             {param}
                           </code>
                         </div>
 
                         {/* 4. Safe Operating Range */}
                         <div className="bg-[#12141d] p-2 rounded border border-[#222533]">
-                          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block mb-0.5">
+                          <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider block mb-0.5">
                             4. Safe Design Range
                           </span>
-                          <span className="text-emerald-300 font-mono text-[11px]">{safeRange}</span>
+                          <span className="text-emerald-300 font-mono text-xs">{safeRange}</span>
                         </div>
                       </div>
 
@@ -370,10 +377,10 @@ export default function KinematicsModelValidity({
                         <div className="flex items-start gap-2">
                           <Wrench className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                           <div>
-                            <span className="text-[10px] font-bold text-amber-300 uppercase tracking-wider block mb-0.5">
+                            <span className="text-xs font-bold text-amber-300 uppercase tracking-wider block mb-0.5">
                               5. Actionable Engineering Change
                             </span>
-                            <p className="text-amber-100 text-[11px] leading-relaxed font-medium">
+                            <p className="text-amber-100 text-xs leading-relaxed font-medium">
                               {action}
                             </p>
                           </div>
@@ -392,7 +399,7 @@ export default function KinematicsModelValidity({
                   No solver data yet. Run the kinematic solve to verify admissibility constraints.
                 </span>
               </div>
-              <span className="text-[10px] font-mono text-zinc-300 font-bold px-2 py-0.5 rounded bg-zinc-900/60 border border-zinc-600/50">
+              <span className="text-xs font-mono text-zinc-300 font-bold px-2 py-0.5 rounded bg-zinc-900/60 border border-zinc-600/50">
                 UNVERIFIED
               </span>
             </div>
@@ -413,31 +420,31 @@ export default function KinematicsModelValidity({
                   All kinematic admissibility constraints satisfied (Wishbone triangular stability, ball-joint clearance, positive kingpin, scrub radius limits).
                 </span>
               </div>
-              <span className="text-[10px] font-mono text-emerald-400 font-bold px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50">
+              <span className="text-xs font-mono text-emerald-400 font-bold px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-700/50">
                 0 VIOLATIONS
               </span>
             </div>
           )}
 
           {/* Solver Provenance & Technical Metadata Footer */}
-          <div className="p-3 bg-[#11131a] rounded-lg border border-[#1f222e] flex flex-wrap items-center justify-between gap-3 text-[11px] text-gray-400 font-mono">
+          <div className="p-3 bg-[#11131a] rounded-lg border border-[#1f222e] flex flex-wrap items-center justify-between gap-3 text-xs text-gray-400 font-mono">
             <div className="flex items-center gap-2">
-              <span className="text-gray-500 font-sans">Topology:</span>
+              <span className="text-zinc-400 font-sans">Topology:</span>
               <span className="text-gray-200 uppercase">{report?.topology || "Double Wishbone (SLA)"}</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-gray-500 font-sans">Tolerance:</span>
+              <span className="text-zinc-400 font-sans">Tolerance:</span>
               <span className="text-cyan-400">1e-7 mm</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-gray-500 font-sans">Status:</span>
+              <span className="text-zinc-400 font-sans">Status:</span>
               <span className={!hasSolverData ? "text-zinc-400" : allConverged ? "text-emerald-400" : "text-rose-400"}>
                 {!hasSolverData ? "NO SOLVER DATA" : allConverged ? "ALL ITERATIONS CONVERGED" : "PARTIAL DRIFT"}
               </span>
             </div>
             {backendInfo?.execution_time_ms !== undefined && (
               <div className="flex items-center gap-2">
-                <span className="text-gray-500 font-sans">Solve Time:</span>
+                <span className="text-zinc-400 font-sans">Solve Time:</span>
                 <span className="text-gray-200">{backendInfo.execution_time_ms.toFixed(2)} ms</span>
               </div>
             )}

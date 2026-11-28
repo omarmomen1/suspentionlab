@@ -42,7 +42,7 @@ export function TerrainReadout({ trace }: { trace: TerrainTrace | null | undefin
   if (!hasElevationData(trace) || !r || !r.z) return <EmptyState kind="unavailable" reason="No elevation data for this run. Only Spa has an elevation profile: turn on Include Elevation (Spa) and run again." />;
   const f = (x: { min: number; max: number } | null, u: string, d = 2) => (x ? `${x.min.toFixed(d)} to ${x.max.toFixed(d)} ${u}` : "not available");
   return (
-    <dl data-testid="terrain-readout" className="v2-num text-[11px] text-zinc-200 m-0 grid grid-cols-3 gap-2">
+    <dl data-testid="terrain-readout" className="v2-num text-xs text-zinc-200 m-0 grid grid-cols-3 gap-2">
       <div><dt className="text-[#8a909a]">z</dt><dd className="m-0" data-zmin={r.z.min} data-zmax={r.z.max}>{f(r.z, "m", 1)}</dd></div>
       <div><dt className="text-[#8a909a]">Vertical g</dt><dd className="m-0">{f(r.vg, "g", 3)}</dd></div>
       <div><dt className="text-[#8a909a]">Compression</dt><dd className="m-0">{f(r.comp, "mm", 1)}</dd></div>
@@ -118,7 +118,7 @@ export default function TerrainElevation3D({ trace }: { trace: TerrainTrace | nu
       ) : (
         <div data-testid="terrain-2d-fallback"><ElevationProfile2D trace={trace} /></div>
       )}
-      <p className="text-[11px] text-[#C8F04B] m-0" data-testid="terrain-exaggeration">Height drawn ×{TERRAIN_Z_EXAGGERATION}.</p>
+      <p className="text-xs text-[#C8F04B] m-0" data-testid="terrain-exaggeration">Height drawn ×{TERRAIN_Z_EXAGGERATION}.</p>
       {readout}
     </div>
   );

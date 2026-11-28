@@ -96,7 +96,7 @@ export default function WebhooksCard() {
 
   return (
     <div>
-      <p className="text-xs text-gray-500 mb-4">
+      <p className="text-xs text-zinc-400 mb-4">
         Receive HMAC-signed <code className="text-gray-400">job.completed</code> /{" "}
         <code className="text-gray-400">job.failed</code> events the moment simulations finish —
         verify signatures with <code className="text-gray-400">X-SL-Signature</code>.
@@ -110,7 +110,7 @@ export default function WebhooksCard() {
             <p className="text-xs font-semibold text-emerald-400">Signing secret — copy it now. It won&apos;t be shown again.</p>
           </div>
           <p className="font-mono text-xs text-gray-300 break-all">{newSecret}</p>
-          <button onClick={() => setNewSecret(null)} className="mt-2 text-[10px] text-gray-600 hover:text-gray-400">
+          <button onClick={() => setNewSecret(null)} className="mt-2 text-xs text-zinc-300 hover:text-gray-400">
             I&apos;ve copied the secret
           </button>
         </div>
@@ -127,10 +127,10 @@ export default function WebhooksCard() {
           placeholder="https://your-pipeline.example.com/hooks/suspensionlab"
           aria-label="Webhook receiver URL"
           className="flex-1 bg-[#0d0d0f] border border-[#252525] rounded-xl px-3 py-2 text-sm text-white
-            placeholder:text-gray-700 focus:outline-none focus:border-ansys-yellow/60 transition-all"
+            placeholder:text-zinc-300 focus:outline-none focus:border-signal/60 transition-all"
         />
         <button onClick={create} disabled={busy || !url.trim()}
-          className="px-4 py-2 bg-ansys-yellow text-black text-xs font-bold rounded-xl
+          className="px-4 py-2 bg-signal text-carbon text-xs font-bold rounded-xl
             hover:brightness-110 transition-all disabled:opacity-40 flex items-center gap-1.5">
           {busy ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
           Add
@@ -140,10 +140,10 @@ export default function WebhooksCard() {
       {/* Endpoint list */}
       {loading ? (
         <div className="flex items-center justify-center py-6">
-          <Loader2 size={20} className="animate-spin text-gray-600" />
+          <Loader2 size={20} className="animate-spin text-zinc-300" />
         </div>
       ) : endpoints.length === 0 ? (
-        <p className="text-sm text-gray-600 text-center py-4">No webhook endpoints yet.</p>
+        <p className="text-sm text-zinc-300 text-center py-4">No webhook endpoints yet.</p>
       ) : (
         <ul className="space-y-2">
           {endpoints.map((ep) => (
@@ -151,19 +151,19 @@ export default function WebhooksCard() {
               className="flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl border border-[#252525] bg-[#0d0d0f]">
               <div className="min-w-0">
                 <p className="text-sm text-white truncate">{ep.url}</p>
-                <p className="text-[10px] text-gray-600">
+                <p className="text-xs text-zinc-300">
                   {ep.events.join(", ")} · {ep.is_active ? "active" : "inactive"}
                 </p>
               </div>
               <div className="flex items-center gap-1 shrink-0">
                 <button onClick={() => sendTest(ep.id)} disabled={busy}
                   title="Send signed test event"
-                  className="p-2 text-gray-500 hover:text-ansys-yellow transition-colors disabled:opacity-40">
+                  className="p-2 text-zinc-400 hover:text-signal transition-colors disabled:opacity-40">
                   {testedId === ep.id ? <CheckCircle2 size={14} className="text-emerald-500" /> : <Zap size={14} />}
                 </button>
                 <button onClick={() => remove(ep.id)} disabled={busy}
                   title="Delete endpoint"
-                  className="p-2 text-gray-500 hover:text-red-400 transition-colors disabled:opacity-40">
+                  className="p-2 text-zinc-400 hover:text-red-400 transition-colors disabled:opacity-40">
                   <Trash2 size={14} />
                 </button>
               </div>

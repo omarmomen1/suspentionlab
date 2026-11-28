@@ -772,7 +772,7 @@ function CorrelationCockpitContent() {
                     <span>Telemetry Ingestion &amp; Audit Trail</span>
                     {isSampleDataset && <SampleDemoTelemetryBadge size="xs" />}
                   </h2>
-                  <p className="text-xs text-neutral-400 mt-0.5 font-mono">
+                  <p className="text-xs text-neutral-400 mt-0.5 font-sans leading-relaxed">
                     Active Dataset: <span className="text-neutral-200">{activeDatasetName}</span> &bull; Parsing &rarr; Channel Mapping &rarr; Monotonic Resampling
                   </p>
                 </div>
@@ -785,7 +785,7 @@ function CorrelationCockpitContent() {
                       disabled={loadingSampleId === ds.id}
                       className={`px-2.5 py-1.5 text-xs font-mono rounded-lg border transition-colors ${
                         activeDatasetName === ds.filename
-                          ? "bg-amber-500/20 border-amber-500/50 text-amber-300"
+                          ? "bg-signal/20 border-signal/50 text-signal"
                           : "bg-neutral-950 border-neutral-800 text-neutral-300 hover:border-amber-500/40 hover:text-amber-300"
                       }`}
                       title={ds.formatNote}
@@ -820,9 +820,9 @@ function CorrelationCockpitContent() {
               {/* Ingestion Metrics Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
                 <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3">
-                  <div className="text-[10px] uppercase font-mono text-neutral-400">Raw Samples</div>
+                  <div className="text-xs uppercase font-mono text-neutral-400">Raw Samples</div>
                   <div className="text-lg font-bold font-mono text-white mt-0.5">{auditTrail.raw_line_count}</div>
-                  <div className="text-[10px] font-mono text-neutral-500">
+                  <div className="text-xs font-mono text-zinc-400">
                     {(() => {
                       const rate = Number(auditTrail.sample_rate_hz) || 100;
                       const dur =
@@ -834,21 +834,21 @@ function CorrelationCockpitContent() {
                   </div>
                 </div>
                 <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3">
-                  <div className="text-[10px] uppercase font-mono text-neutral-400">Mapped Channels</div>
+                  <div className="text-xs uppercase font-mono text-neutral-400">Mapped Channels</div>
                   <div className="text-lg font-bold font-mono text-emerald-400 mt-0.5">{auditTrail.identified_channels.length}</div>
-                  <div className="text-[10px] font-mono text-neutral-500">
+                  <div className="text-xs font-mono text-zinc-400">
                     {(auditTrail.rejected_channels?.length ?? 0)} rejected
                   </div>
                 </div>
                 <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3">
-                  <div className="text-[10px] uppercase font-mono text-neutral-400">Timestamp Quality</div>
+                  <div className="text-xs uppercase font-mono text-neutral-400">Timestamp Quality</div>
                   <div className="text-lg font-bold font-mono text-cyan-400 mt-0.5">Strictly Monotonic</div>
-                  <div className="text-[10px] font-mono text-neutral-500">0 duplicate timestamps</div>
+                  <div className="text-xs font-mono text-zinc-400">0 duplicate timestamps</div>
                 </div>
                 <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3">
-                  <div className="text-[10px] uppercase font-mono text-neutral-400">Resampling Grid</div>
+                  <div className="text-xs uppercase font-mono text-neutral-400">Resampling Grid</div>
                   <div className="text-lg font-bold font-mono text-cyan-400 mt-0.5">100.0 Hz PCHIP</div>
-                  <div className="text-[10px] font-mono text-neutral-500">Uniform &Delta;t = 10 ms</div>
+                  <div className="text-xs font-mono text-zinc-400">Uniform &Delta;t = 10 ms</div>
                 </div>
               </div>
 
@@ -884,15 +884,15 @@ function CorrelationCockpitContent() {
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3 font-mono text-xs">
                   <div className="bg-neutral-950/80 border border-rose-900/60 rounded-lg p-3">
-                    <div className="text-rose-400 font-bold uppercase text-[11px]">What Failed &amp; Why</div>
+                    <div className="text-rose-400 font-bold uppercase text-xs">What Failed &amp; Why</div>
                     <div className="text-neutral-300 mt-1">Non-monotonic timestamp jump detected at row 412 (&Delta;t = -0.04s). Raw timestamps out of order.</div>
                   </div>
                   <div className="bg-neutral-950/80 border border-amber-900/60 rounded-lg p-3">
-                    <div className="text-amber-400 font-bold uppercase text-[11px]">What Cannot Be Claimed</div>
+                    <div className="text-amber-400 font-bold uppercase text-xs">What Cannot Be Claimed</div>
                     <div className="text-neutral-300 mt-1">Transient frequency response (FFT) and damper velocity derivatives cannot be validated.</div>
                   </div>
                   <div className="bg-neutral-950/80 border border-emerald-900/60 rounded-lg p-3">
-                    <div className="text-emerald-400 font-bold uppercase text-[11px]">What To Do Next</div>
+                    <div className="text-emerald-400 font-bold uppercase text-xs">What To Do Next</div>
                     <div className="text-neutral-300 mt-1">Export MoTeC log with monotonic timestamp option enabled, or run CSV through time repair filter.</div>
                   </div>
                 </div>
@@ -910,7 +910,7 @@ function CorrelationCockpitContent() {
                   <ShieldAlert className="w-5 h-5 text-cyan-400" />
                   <span>Channel Health Matrix (VALID / WARNING / INVALID / MISSING)</span>
                 </h2>
-                <p className="text-xs text-neutral-400 font-mono">
+                <p className="text-xs text-neutral-400 font-sans leading-relaxed">
                   Full signal integrity assessment: Sampling rate &bull; Coverage &bull; Dynamic range &bull; Missingness
                 </p>
               </div>
@@ -936,7 +936,7 @@ function CorrelationCockpitContent() {
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className="border-b border-neutral-800 text-[11px] font-mono uppercase text-neutral-400">
+                  <tr className="border-b border-neutral-800 text-xs font-mono uppercase text-neutral-400">
                     <th className="py-3 px-4">Channel</th>
                     <th className="py-3 px-4">Quality State</th>
                     <th className="py-3 px-4">Units</th>
@@ -955,14 +955,14 @@ function CorrelationCockpitContent() {
                         <td className="py-3 px-4 font-sans font-medium text-white">
                           {ch.name}
                           {ch.synthetic && (
-                            <span className="ml-2 px-1.5 py-0.5 rounded text-[9px] font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/40 font-mono">
+                            <span className="ml-2 px-1.5 py-0.5 rounded text-xs font-bold bg-cyan-500/15 text-cyan-300 border border-cyan-500/40 font-mono">
                               SYNTHETIC CHANNEL
                             </span>
                           )}
                         </td>
                         <td className="py-3 px-4">
                           <span
-                            className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            className={`px-2 py-0.5 rounded text-xs font-bold ${
                               ch.state === "VALID"
                                 ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                                 : ch.state === "WARNING"
@@ -1030,7 +1030,7 @@ function CorrelationCockpitContent() {
                     <Zap className="w-4 h-4 text-amber-400" />
                     <span>Detected Events ({eventsList.length})</span>
                   </h2>
-                  <span className="text-[10px] font-mono text-neutral-400">11 Categories</span>
+                  <span className="text-xs font-mono text-neutral-400">11 Categories</span>
                 </div>
 
                 <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
@@ -1054,7 +1054,7 @@ function CorrelationCockpitContent() {
                         <div className="flex items-center justify-between text-xs font-mono">
                           <span className="font-bold text-white">{ev.event_type}</span>
                           <span
-                            className={`px-1.5 py-0.2 rounded text-[10px] font-semibold ${
+                            className={`px-1.5 py-0.2 rounded text-xs font-semibold ${
                               ev.severity === "CRITICAL"
                                 ? "bg-rose-500/20 text-rose-300"
                                 : ev.severity === "WARNING"
@@ -1065,7 +1065,7 @@ function CorrelationCockpitContent() {
                             {ev.severity}
                           </span>
                         </div>
-                        <div className="text-[11px] font-mono text-cyan-400 mt-1">
+                        <div className="text-xs font-mono text-cyan-400 mt-1">
                           t = {ev.start_time_s.toFixed(2)}s &rarr; {ev.end_time_s.toFixed(2)}s
                         </div>
                         <div className="text-xs text-neutral-400 mt-1 line-clamp-1">{ev.evidence}</div>
@@ -1081,9 +1081,9 @@ function CorrelationCockpitContent() {
                   <div className="space-y-6">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-800">
                       <div>
-                        <span className="text-[10px] uppercase font-mono text-cyan-400">Selected Event Forensic View</span>
+                        <span className="text-xs uppercase font-mono text-cyan-400">Selected Event Forensic View</span>
                         <h3 className="text-xl font-bold text-white mt-0.5">{selectedEvent.event_type}</h3>
-                        <p className="text-xs font-mono text-neutral-400">
+                        <p className="text-xs font-sans leading-relaxed text-neutral-400">
                           Channel: <strong className="text-white">{selectedEvent.dominant_channel}</strong> &bull; Time:{" "}
                           <strong className="text-cyan-300">
                             {selectedEvent.start_time_s.toFixed(2)}s – {selectedEvent.end_time_s.toFixed(2)}s
@@ -1109,7 +1109,7 @@ function CorrelationCockpitContent() {
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-3 border-t border-neutral-800/60 font-mono text-xs">
                         {Object.entries(selectedEvent.metrics || {}).map(([k, v]: [string, any]) => (
                           <div key={k}>
-                            <span className="text-[10px] text-neutral-500 uppercase">{k.replace(/_/g, " ")}:</span>
+                            <span className="text-xs text-zinc-400 uppercase">{k.replace(/_/g, " ")}:</span>
                             <div className="text-cyan-400 font-bold">{typeof v === "number" ? v.toFixed(2) : String(v)}</div>
                           </div>
                         ))}
@@ -1117,7 +1117,7 @@ function CorrelationCockpitContent() {
                     </div>
 
                     <div className="bg-blue-950/20 border border-blue-800/40 rounded-xl p-4 text-xs text-neutral-300 space-y-1">
-                      <div className="text-blue-400 font-bold uppercase text-[11px] flex items-center gap-1.5">
+                      <div className="text-blue-400 font-bold uppercase text-xs flex items-center gap-1.5">
                         <Info className="w-3.5 h-3.5" />
                         <span>Traceable Engineering Question Ingestion</span>
                       </div>
@@ -1127,7 +1127,7 @@ function CorrelationCockpitContent() {
                     </div>
                   </div>
                 ) : (
-                  <div className="py-20 text-center text-neutral-500 font-mono text-sm">
+                  <div className="py-20 text-center text-zinc-400 font-mono text-sm">
                     Select an event to view forensics and investigate.
                   </div>
                 )}
@@ -1159,7 +1159,7 @@ function CorrelationCockpitContent() {
                     onClick={() => setSelectedModel(m.id)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${
                       selectedModel === m.id
-                        ? "bg-amber-500 text-black font-bold shadow-md"
+                        ? "bg-signal text-carbon font-bold shadow-md"
                         : "bg-neutral-950 text-neutral-400 hover:text-white border border-neutral-800"
                     }`}
                   >
@@ -1174,15 +1174,15 @@ function CorrelationCockpitContent() {
               <div className="bg-neutral-900/80 border border-neutral-800 rounded-xl p-6 shadow-xl space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-neutral-800">
                   <div>
-                    <div className="flex items-center gap-2 text-[11px] font-mono">
+                    <div className="flex items-center gap-2 text-xs font-mono">
                       <span className="text-neutral-400 uppercase">Synchronized Signal Comparison</span>
                       <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                        className={`px-2 py-0.5 rounded text-xs font-bold ${
                           activeChannelData.epistemic_label === "CORRELATED" && r2Ok
                             ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                             : activeChannelData.epistemic_label === "INFERRED"
                             ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
-                            : "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                            : "bg-signal/20 text-signal border border-signal/40"
                         }`}
                       >
                         {displayEpistemicLabel}
@@ -1298,7 +1298,7 @@ function CorrelationCockpitContent() {
                       />
                     </svg>
 
-                    <div className="flex justify-between text-[10px] font-mono text-neutral-500 mt-2">
+                    <div className="flex justify-between text-xs font-mono text-zinc-400 mt-2">
                       {dynamicTimeLabels.map((lbl: string, idx: number) => (
                         <span key={idx}>{lbl}</span>
                       ))}
@@ -1311,7 +1311,7 @@ function CorrelationCockpitContent() {
                   <div className={modelComparisonData?.sensor_alignment_manifest ? "lg:col-span-8" : "lg:col-span-8 flex items-center"}>
                     {modelComparisonData?.sensor_alignment_manifest ? (
                       <div className="h-full bg-neutral-950 border border-neutral-800 rounded-xl p-4 text-xs font-mono space-y-2">
-                        <div className="text-cyan-400 font-bold uppercase text-[11px]">Sensor Alignment Manifest</div>
+                        <div className="text-cyan-400 font-bold uppercase text-xs">Sensor Alignment Manifest</div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-neutral-300">
                           <div>Resampling: {Number(auditTrail.sample_rate_hz || 100).toFixed(1)} Hz (PCHIP Monotonic Interpolation)</div>
                           <div>Spatial Resolution: 1.0 m grid</div>
@@ -1349,7 +1349,7 @@ function CorrelationCockpitContent() {
                     <BarChart3 className="w-5 h-5 text-amber-400" />
                     <span>Residual Analysis &amp; Bias Diagnosis &bull; {activeChannelData.name}</span>
                   </h2>
-                  <p className="text-xs text-neutral-400 font-mono">
+                  <p className="text-xs text-neutral-400 font-sans leading-relaxed">
                     Quantifying model discrepancies vs operating parameters &bull; Zero fabrication
                   </p>
                 </div>
@@ -1367,25 +1367,25 @@ function CorrelationCockpitContent() {
               {/* Residual Metrics Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono">
                 <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3">
-                  <div className="text-[10px] uppercase text-neutral-400">Residual RMSE</div>
+                  <div className="text-xs uppercase text-neutral-400">Residual RMSE</div>
                   <div className="text-lg font-bold text-amber-400 mt-0.5">
                     {activeChannelData.metrics.rmse} {activeChannelData.unit}
                   </div>
                 </div>
                 <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3">
-                  <div className="text-[10px] uppercase text-neutral-400">Mean Bias Offset</div>
+                  <div className="text-xs uppercase text-neutral-400">Mean Bias Offset</div>
                   <div className="text-lg font-bold text-cyan-400 mt-0.5">
                     {activeChannelData.metrics.systematic_bias?.offset} {activeChannelData.unit}
                   </div>
                 </div>
                 <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3">
-                  <div className="text-[10px] uppercase text-neutral-400">Bias Diagnosis</div>
+                  <div className="text-xs uppercase text-neutral-400">Bias Diagnosis</div>
                   <div className="text-lg font-bold text-emerald-400 mt-0.5">
                     {activeChannelData.metrics.systematic_bias?.status || "UNBIASED"}
                   </div>
                 </div>
                 <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3">
-                  <div className="text-[10px] uppercase text-neutral-400">Suggested Tuning</div>
+                  <div className="text-xs uppercase text-neutral-400">Suggested Tuning</div>
                   <div className="text-xs font-bold text-purple-400 mt-1">
                     {(modelComparisonData?.suggested_investigation_params || ["c", "k_s"]).join(", ")}
                   </div>
@@ -1396,22 +1396,22 @@ function CorrelationCockpitContent() {
               <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-4 space-y-3">
                 <div className="flex items-center justify-between text-xs font-mono">
                   <span className="text-neutral-300 font-semibold">20-Bin Residual Distribution Histogram</span>
-                  <span className="text-neutral-500">Gaussian fit overlay</span>
+                  <span className="text-zinc-400">Gaussian fit overlay</span>
                 </div>
                 <div className="h-36 bg-neutral-900/60 rounded border border-neutral-800 flex items-end gap-1.5 p-3">
                   {residualHistogramBins.map((cnt: number, i: number) => {
                     const maxBin = Math.max(...residualHistogramBins, 1);
                     const heightPct = (cnt / maxBin) * 100;
                     return (
-                      <div key={i} className="flex-1 bg-amber-500/70 hover:bg-amber-400 rounded-t transition-all relative group" style={{ height: `${heightPct}%` }}>
-                        <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-1 bg-neutral-800 text-[9px] font-mono px-1 py-0.5 rounded pointer-events-none whitespace-nowrap z-10">
+                      <div key={i} className="flex-1 bg-signal/70 hover:bg-[#d6f56e] rounded-t transition-all relative group" style={{ height: `${heightPct}%` }}>
+                        <div className="opacity-0 group-hover:opacity-100 absolute bottom-full mb-1 bg-neutral-800 text-xs font-mono px-1 py-0.5 rounded pointer-events-none whitespace-nowrap z-10">
                           {cnt} samples
                         </div>
                       </div>
                     );
                   })}
                 </div>
-                <div className="flex justify-between text-[10px] font-mono text-neutral-500">
+                <div className="flex justify-between text-xs font-mono text-zinc-400">
                   <span>-3.0&sigma;</span>
                   <span>-1.5&sigma;</span>
                   <span>0.0 (Zero Bias)</span>
@@ -1433,7 +1433,7 @@ function CorrelationCockpitContent() {
                     <Layers className="w-5 h-5 text-purple-400" />
                     <span>Session &amp; Lap Delta Investigation (Lap A vs Lap B)</span>
                   </h2>
-                  <p className="text-xs text-neutral-400 font-mono">
+                  <p className="text-xs text-neutral-400 font-sans leading-relaxed">
                     Attributing performance differences to physical setup changes &bull; What, Where, When, Magnitude
                   </p>
                 </div>
@@ -1491,7 +1491,7 @@ function CorrelationCockpitContent() {
                     <div className="overflow-x-auto">
                       <table className="w-full text-left border-collapse font-mono text-xs">
                         <thead>
-                          <tr className="border-b border-neutral-800 text-[11px] uppercase text-neutral-400">
+                          <tr className="border-b border-neutral-800 text-xs uppercase text-neutral-400">
                             <th className="py-2.5 px-3">Zone / Corner</th>
                             <th className="py-2.5 px-3">Station</th>
                             <th className="py-2.5 px-3">Apex Speed (A &rarr; B)</th>
@@ -1532,15 +1532,15 @@ function CorrelationCockpitContent() {
                         <div key={i} className="bg-neutral-950 border border-neutral-800 rounded-lg p-3.5 space-y-2">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-bold text-cyan-400">{exp.phenomenon}</span>
-                            <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 text-[10px] font-bold">
+                            <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 text-xs font-bold">
                               {exp.magnitude}
                             </span>
                           </div>
-                          <div className="text-[11px] text-neutral-400">Location: {exp.where}</div>
-                          <div className="space-y-1 pt-1 border-t border-neutral-800/60 text-neutral-300 text-[11px]">
+                          <div className="text-xs text-neutral-400">Location: {exp.where}</div>
+                          <div className="space-y-1 pt-1 border-t border-neutral-800/60 text-neutral-300 text-xs">
                             {exp.possible_explanations?.map((cause: string, c_i: number) => (
                               <div key={c_i} className="flex items-start gap-1.5">
-                                <span className="text-neutral-500">&bull;</span>
+                                <span className="text-zinc-400">&bull;</span>
                                 <span>{cause}</span>
                               </div>
                             ))}
@@ -1566,7 +1566,7 @@ function CorrelationCockpitContent() {
                       <button
                         key={ds.id}
                         onClick={() => handleLoadSampleDataset(ds)}
-                        className="px-2.5 py-1 text-[11px] font-mono bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded border border-neutral-700"
+                        className="px-2.5 py-1 text-xs font-mono bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded border border-neutral-700"
                       >
                         Load {ds.shortLabel}
                       </button>

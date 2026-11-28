@@ -5,8 +5,8 @@ import Link from "next/link";
 import { Settings, LogOut, CreditCard, Key, ChevronDown, ShieldCheck } from "lucide-react";
 
 const PLAN_STYLES: Record<string, string> = {
-  FREE:       "text-gray-500 bg-[#1e1e1e]",
-  PRO:        "text-ansys-yellow bg-ansys-yellow/10",
+  FREE:       "text-zinc-400 bg-[#1e1e1e]",
+  PRO:        "text-signal bg-signal/10",
   ENTERPRISE: "text-purple-400 bg-purple-900/20",
 };
 
@@ -85,8 +85,8 @@ export default function UserMenu() {
         aria-controls="user-account-menu"
         aria-label="User account menu"
         className="flex items-center gap-1.5 hover:opacity-80 transition-opacity">
-        <div className="w-7 h-7 rounded-full bg-ansys-yellow/20 border border-ansys-yellow/30
-          flex items-center justify-center text-[10px] font-bold text-ansys-yellow">
+        <div className="w-7 h-7 rounded-full bg-signal/20 border border-signal/30
+          flex items-center justify-center text-xs font-bold text-signal">
           {initials}
         </div>
         <ChevronDown size={11} className={`text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -101,8 +101,8 @@ export default function UserMenu() {
           {/* User info */}
           <div className="px-4 py-3 border-b border-[#1e1e1e]">
             <p className="text-xs font-semibold text-white truncate">{user.name || user.email}</p>
-            <p className="text-[10px] text-gray-400 truncate mt-0.5">{user.email}</p>
-            <span className={`mt-1.5 inline-flex text-[9px] font-bold uppercase tracking-wider
+            <p className="text-xs text-gray-400 truncate mt-0.5">{user.email}</p>
+            <span className={`mt-1.5 inline-flex text-xs font-bold uppercase tracking-wider
               px-2 py-0.5 rounded-full ${planBadge}`}>
               {user.plan}
             </span>
@@ -111,7 +111,7 @@ export default function UserMenu() {
           {/* Simulation usage meter (Tier A4) */}
           {usage && (
             <div className="px-4 py-2.5 border-b border-[#1e1e1e]">
-              <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
+              <div className="flex items-center justify-between text-xs text-zinc-400 mb-1">
                 <span>Sims this month</span>
                 <span className={usage.remaining === 0 ? "text-red-400 font-bold" : "text-gray-400"}>
                   {usage.sims_used}/{usage.quota}
@@ -121,13 +121,13 @@ export default function UserMenu() {
                 aria-valuenow={Math.round(usage.utilization_pct)} aria-valuemin={0} aria-valuemax={100}
                 aria-label="Monthly simulation quota usage">
                 <div
-                  className={`h-full rounded-full transition-all ${usage.utilization_pct >= 100 ? "bg-red-500" : usage.utilization_pct >= 80 ? "bg-amber-400" : "bg-ansys-yellow"}`}
+                  className={`h-full rounded-full transition-all ${usage.utilization_pct >= 100 ? "bg-red-500" : usage.utilization_pct >= 80 ? "bg-amber-400" : "bg-amber-500"}`}
                   style={{ width: `${Math.min(100, usage.utilization_pct)}%` }}
                 />
               </div>
               {usage.remaining === 0 && (
                 <Link href="/pricing" onClick={() => setOpen(false)}
-                  className="block mt-1.5 text-[10px] text-ansys-yellow hover:underline">
+                  className="block mt-1.5 text-xs text-signal hover:underline">
                   Quota reached — upgrade for more simulations →
                 </Link>
               )}

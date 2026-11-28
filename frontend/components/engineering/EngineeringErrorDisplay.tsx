@@ -52,7 +52,7 @@ export default function EngineeringErrorDisplay({
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-rose-950/80 border border-rose-500/60 text-rose-300">
+          <span className="px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-rose-950/80 border border-rose-500/60 text-rose-300">
             SCIENTIFIC INTEGRITY GUARD
           </span>
           {onDismiss && (
@@ -70,7 +70,7 @@ export default function EngineeringErrorDisplay({
       <div className="space-y-3 font-sans">
         {/* 1. WHAT FAILED */}
         <div className="p-3 rounded-xl bg-black/50 border border-rose-500/30">
-          <div className="flex items-center gap-1.5 text-rose-400 font-bold font-mono text-[11px] mb-1">
+          <div className="flex items-center gap-1.5 text-rose-400 font-bold font-mono text-xs mb-1">
             <XCircle size={14} className="shrink-0 text-rose-400" />
             <span>1. WHAT FAILED</span>
           </div>
@@ -81,7 +81,7 @@ export default function EngineeringErrorDisplay({
 
         {/* 2. WHY */}
         <div className="p-3 rounded-xl bg-black/50 border border-amber-500/30">
-          <div className="text-amber-400 font-bold font-mono text-[11px] mb-1">
+          <div className="text-amber-400 font-bold font-mono text-xs mb-1">
             2. WHY
           </div>
           <p className="text-gray-300 text-xs leading-relaxed font-mono" data-testid="error-why">
@@ -92,7 +92,7 @@ export default function EngineeringErrorDisplay({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {/* 3. WHAT REMAINS VALID */}
           <div className="p-3 rounded-xl bg-black/50 border border-emerald-500/30">
-            <div className="flex items-center gap-1.5 text-emerald-400 font-bold font-mono text-[11px] mb-1">
+            <div className="flex items-center gap-1.5 text-emerald-400 font-bold font-mono text-xs mb-1">
               <CheckCircle2 size={13} className="shrink-0 text-emerald-400" />
               <span>3. WHAT REMAINS VALID</span>
             </div>
@@ -103,7 +103,7 @@ export default function EngineeringErrorDisplay({
 
           {/* 4. WHAT CANNOT BE CLAIMED */}
           <div className="p-3 rounded-xl bg-black/50 border border-rose-500/30">
-            <div className="flex items-center gap-1.5 text-rose-400 font-bold font-mono text-[11px] mb-1">
+            <div className="flex items-center gap-1.5 text-rose-400 font-bold font-mono text-xs mb-1">
               <ShieldAlert size={13} className="shrink-0 text-rose-400" />
               <span>4. WHAT CANNOT BE CLAIMED</span>
             </div>
@@ -116,7 +116,7 @@ export default function EngineeringErrorDisplay({
         {/* 5. WHAT THE ENGINEER CAN DO NEXT */}
         <div className="p-3 rounded-xl bg-blue-950/40 border border-blue-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <div className="text-blue-400 font-bold font-mono text-[11px] mb-1">
+            <div className="text-blue-400 font-bold font-mono text-xs mb-1">
               5. WHAT THE ENGINEER CAN DO NEXT
             </div>
             <div className="text-gray-200 text-xs font-mono" data-testid="error-next-action">

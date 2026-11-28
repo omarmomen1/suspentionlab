@@ -92,8 +92,8 @@ export default function ValidationBadge({
   const Icon = cfg.icon;
 
   const sizeClasses = {
-    xs: "px-1.5 py-0.5 text-[9px] gap-1",
-    sm: "px-2 py-0.5 text-[10px] gap-1.5",
+    xs: "px-1.5 py-0.5 text-xs gap-1",
+    sm: "px-2 py-0.5 text-xs gap-1.5",
     md: "px-2.5 py-1 text-xs gap-2",
   }[size];
 

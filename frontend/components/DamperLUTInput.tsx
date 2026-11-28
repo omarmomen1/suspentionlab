@@ -89,21 +89,21 @@ export default function DamperLUTInput({ label, onApply, onClear, isActive }: Da
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex justify-between items-center gap-2">
-        <label className="text-[11px] text-gray-400 flex-1 min-w-0 leading-tight flex items-center gap-1.5">
+        <label className="text-xs text-gray-400 flex-1 min-w-0 leading-tight flex items-center gap-1.5">
           {label}
           {isActive && <Check size={10} className="text-emerald-400" />}
         </label>
         
         {isActive ? (
           <div className="flex items-center gap-1.5">
-            <span className="text-[9px] font-mono text-emerald-400/80 bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-800/40">
+            <span className="text-xs font-mono text-emerald-400/80 bg-emerald-950/40 px-1.5 py-0.5 rounded border border-emerald-800/40">
               Active
             </span>
             <button
               type="button"
               onClick={onClear}
               aria-label={`Clear ${label} look up table`}
-              className="text-[10px] bg-red-950/30 text-red-400 border border-red-900/40 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-red-900/50 transition-colors"
+              className="text-xs bg-red-950/30 text-red-400 border border-red-900/40 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-red-900/50 transition-colors"
             >
               <X size={10} /> Clear
             </button>
@@ -114,7 +114,7 @@ export default function DamperLUTInput({ label, onApply, onClear, isActive }: Da
             onClick={() => setIsOpen(!isOpen)}
             aria-expanded={isOpen}
             aria-label={`Add ${label} look up table`}
-            className="text-[10px] bg-[#1e1e20] text-gray-300 border border-[#2a2a2a] px-2 py-0.5 rounded flex items-center gap-1 hover:border-ansys-yellow hover:text-ansys-yellow transition-colors"
+            className="text-xs bg-[#1e1e20] text-gray-300 border border-[#2a2a2a] px-2 py-0.5 rounded flex items-center gap-1 hover:border-signal hover:text-signal transition-colors"
           >
             <BarChart2 size={10} /> Add LUT
           </button>
@@ -124,12 +124,12 @@ export default function DamperLUTInput({ label, onApply, onClear, isActive }: Da
       {isOpen && !isActive && (
         <div className="bg-[#0d0d0f] border border-[#252525] rounded-lg p-2.5 mt-1 space-y-2 animate-in fade-in slide-in-from-top-1">
           <div className="flex justify-between items-center">
-            <span className="text-[9px] font-mono text-gray-400 uppercase tracking-widest">CSV (Velocity, Force)</span>
+            <span className="text-xs font-mono text-gray-400 uppercase tracking-widest">CSV (Velocity, Force)</span>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
               aria-label="Upload CSV file for Damper LUT"
-              className="text-[10px] text-ansys-yellow flex items-center gap-1 hover:underline"
+              className="text-xs text-signal flex items-center gap-1 hover:underline"
             >
               <Upload size={10} /> Upload .csv
             </button>
@@ -141,15 +141,15 @@ export default function DamperLUTInput({ label, onApply, onClear, isActive }: Da
             value={csvText}
             onChange={(e) => setCsvText(e.target.value)}
             placeholder={"-1.5, -4000\n-1.0, -3000\n0.0, 0\n1.0, 3000\n1.5, 4000"}
-            className="w-full h-24 bg-[#141416] border border-[#1e1e1e] rounded p-2 text-[10px] font-mono text-gray-300 focus:outline-none focus:border-ansys-yellow/50"
+            className="w-full h-24 bg-[#141416] border border-[#1e1e1e] rounded p-2 text-xs font-mono text-gray-300 focus:outline-none focus:border-signal/50"
           />
-          {error && <p role="alert" aria-live="polite" className="text-[10px] text-red-400 font-medium leading-tight">{error}</p>}
+          {error && <p role="alert" aria-live="polite" className="text-xs text-red-400 font-medium leading-tight">{error}</p>}
           <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={() => setIsOpen(false)} className="text-[10px] text-gray-400 hover:text-gray-200">Cancel</button>
+            <button type="button" onClick={() => setIsOpen(false)} className="text-xs text-gray-400 hover:text-gray-200">Cancel</button>
             <button
               type="button"
               onClick={() => parseAndApply(csvText)}
-              className="text-[10px] bg-ansys-yellow text-black px-2 py-0.5 rounded font-bold hover:brightness-110"
+              className="text-xs bg-signal text-carbon px-2 py-0.5 rounded font-bold hover:brightness-110"
             >
               Apply Curve
             </button>

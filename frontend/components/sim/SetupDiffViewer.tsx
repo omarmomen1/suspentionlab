@@ -298,7 +298,7 @@ export default function SetupDiffViewer({
             <h3 className="font-extrabold text-sm text-white tracking-tight">
               Setup Comparison & Consequence Engine
             </h3>
-            <p className="text-[11px] text-gray-400">
+            <p className="text-xs text-gray-400">
               Differential analysis of setup revisions with physics-based causal tracking.
             </p>
           </div>
@@ -311,11 +311,11 @@ export default function SetupDiffViewer({
               type="text"
               value={runA}
               onChange={(e) => setRunA(e.target.value)}
-              className="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1 text-white font-bold w-32 focus:border-ansys-yellow focus:outline-none"
+              className="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1 text-white font-bold w-32 focus:border-signal focus:outline-none"
             />
           </div>
 
-          <ArrowRight size={14} className="text-gray-500" />
+          <ArrowRight size={14} className="text-zinc-400" />
 
           <div className="flex items-center gap-2">
             <span className="text-gray-400">Candidate (B):</span>
@@ -323,7 +323,7 @@ export default function SetupDiffViewer({
               type="text"
               value={runB}
               onChange={(e) => setRunB(e.target.value)}
-              className="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1 text-ansys-yellow font-bold w-32 focus:border-ansys-yellow focus:outline-none"
+              className="bg-black/50 border border-white/10 rounded-lg px-2.5 py-1 text-signal font-bold w-32 focus:border-signal focus:outline-none"
             />
           </div>
 
@@ -333,7 +333,7 @@ export default function SetupDiffViewer({
             className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white"
             title="Refresh comparison"
           >
-            {loading ? <Loader2 size={14} className="animate-spin text-ansys-yellow" /> : <RotateCcw size={14} />}
+            {loading ? <Loader2 size={14} className="animate-spin text-signal" /> : <RotateCcw size={14} />}
           </button>
         </div>
       </div>
@@ -351,7 +351,7 @@ export default function SetupDiffViewer({
                   VERDICT: {decision.verdict} ({decision.headline})
                 </span>
                 {whatChanged && (
-                  <span className="px-2 py-0.2 rounded-full text-[10px] font-mono bg-emerald-950/40 border border-emerald-500/30 text-emerald-300">
+                  <span className="px-2 py-0.2 rounded-full text-xs font-mono bg-emerald-950/40 border border-emerald-500/30 text-emerald-300">
                     {whatChanged.confidence_score_pct}% Confidence
                   </span>
                 )}
@@ -380,15 +380,15 @@ export default function SetupDiffViewer({
         <div className="lg:col-span-6 rounded-2xl bg-[#111116] border border-white/[0.08] overflow-hidden">
           <div className="px-5 py-3.5 border-b border-white/[0.06] flex items-center justify-between">
             <div className="flex items-center gap-2 text-xs font-mono font-bold text-white">
-              <Sliders size={14} className="text-ansys-yellow" />
+              <Sliders size={14} className="text-signal" />
               Parameter Modifications
             </div>
-            <span className="text-[10px] font-mono text-gray-400">Baseline vs Candidate</span>
+            <span className="text-xs font-mono text-gray-400">Baseline vs Candidate</span>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs font-mono">
-              <thead className="bg-white/[0.02] border-b border-white/[0.06] text-gray-400 uppercase text-[10px]">
+              <thead className="bg-white/[0.02] border-b border-white/[0.06] text-gray-400 uppercase text-xs">
                 <tr>
                   <th className="py-2.5 px-4">Parameter</th>
                   <th className="py-2.5 px-3 text-right">Setup A</th>
@@ -451,7 +451,7 @@ export default function SetupDiffViewer({
               {diff &&
                 Object.entries(diff.predicted_consequences).map(([mName, mVal], i) => (
                   <div key={i} className="p-2.5 rounded-xl bg-black/40 border border-white/[0.04]">
-                    <div className="text-[10px] text-gray-400 font-mono">{mName}</div>
+                    <div className="text-xs text-gray-400 font-mono">{mName}</div>
                     <div className="text-sm font-extrabold font-mono text-emerald-400 mt-0.5 flex items-center gap-1">
                       {mVal.delta < 0 ? <TrendingDown size={14} /> : <TrendingUp size={14} />}
                       {mVal.delta > 0 ? "+" : ""}

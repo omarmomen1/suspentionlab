@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
               border: "2px solid #222",
             }}
           >
-            <h2 style={{ fontSize: 32, color: "#f2a900", margin: 0, textTransform: "uppercase", letterSpacing: "2px" }}>
+            <h2 style={{ fontSize: 32, color: "#C8F04B", margin: 0, textTransform: "uppercase", letterSpacing: "2px" }}>
               SuspensionLab Report
             </h2>
             <h1 style={{ fontSize: 72, color: "white", margin: "20px 0 40px 0", textAlign: "center", fontWeight: "bold" }}>

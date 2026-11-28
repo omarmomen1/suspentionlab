@@ -318,9 +318,9 @@ export default function SmartInsights({ result, onApplyRecommendation }: SmartIn
   if (!result) {
     return (
       <div className="flex flex-col items-center justify-center h-full text-center p-8 bg-[#111113] border border-[#1e1e1e] rounded-xl">
-        <Zap size={24} className="text-gray-700 mb-2" />
-        <p className="text-xs text-gray-500 font-medium">Run simulation to generate engineering insights</p>
-        <p className="text-[10px] text-gray-700 mt-1">Evaluates ISO 2631 comfort, Dixon damping bands, and frequency separation automatically</p>
+        <Zap size={24} className="text-zinc-300 mb-2" />
+        <p className="text-xs text-zinc-400 font-medium">Run simulation to generate engineering insights</p>
+        <p className="text-xs text-zinc-300 mt-1">Evaluates ISO 2631 comfort, Dixon damping bands, and frequency separation automatically</p>
       </div>
     );
   }
@@ -329,8 +329,8 @@ export default function SmartInsights({ result, onApplyRecommendation }: SmartIn
     <div className="flex flex-col gap-3 h-full overflow-y-auto custom-scrollbar pr-1">
       <div className="flex items-center gap-3 shrink-0 bg-[#141416] border border-[#252525] rounded-xl px-4 py-2.5">
         <div className="flex items-center gap-1.5">
-          <Zap size={12} className="text-ansys-yellow" />
-          <span className="text-[9px] font-bold tracking-[0.2em] text-gray-600 uppercase">Auto Engineering Analysis</span>
+          <Zap size={12} className="text-signal" />
+          <span className="text-xs font-bold tracking-[0.2em] text-zinc-300 uppercase">Auto Engineering Analysis</span>
         </div>
         <div className="flex items-center gap-3 ml-auto">
           {critCount > 0 && (
@@ -367,7 +367,7 @@ export default function SmartInsights({ result, onApplyRecommendation }: SmartIn
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className={cfg.text}>{cfg.icon}</span>
-                  <span className={`text-[9px] font-bold tracking-[0.15em] uppercase ${cfg.text}`}>
+                  <span className={`text-xs font-bold tracking-[0.15em] uppercase ${cfg.text}`}>
                     {cfg.label} · {insight.category}
                   </span>
                 </div>
@@ -394,16 +394,16 @@ export default function SmartInsights({ result, onApplyRecommendation }: SmartIn
                   />
                 </div>
               </div>
-              <p className="text-[11px] text-gray-400 leading-relaxed">{insight.finding}</p>
+              <p className="text-xs text-gray-400 leading-relaxed">{insight.finding}</p>
               <div className="flex items-start gap-1.5 mt-0.5">
-                <ChevronRight size={11} className="text-gray-600 mt-0.5 shrink-0" />
-                <p className="text-[11px] text-gray-600 leading-relaxed">{insight.action}</p>
+                <ChevronRight size={11} className="text-zinc-300 mt-0.5 shrink-0" />
+                <p className="text-xs text-zinc-300 leading-relaxed">{insight.action}</p>
               </div>
 
               {insight.patch && onApplyRecommendation && (
                 <button
                   onClick={() => onApplyRecommendation(insight.patch!)}
-                  className="mt-2 self-start flex items-center gap-1.5 px-3 py-1.5 bg-ansys-yellow/10 border border-ansys-yellow/30 hover:bg-ansys-yellow/20 text-ansys-yellow rounded-lg text-[10px] font-bold transition-all shadow-sm group"
+                  className="mt-2 self-start flex items-center gap-1.5 px-3 py-1.5 bg-signal/10 border border-signal/30 hover:bg-signal/20 text-signal rounded-lg text-xs font-bold transition-all shadow-sm group"
                 >
                   <Zap size={11} className="group-hover:scale-110 transition-transform" />
                   {insight.patchLabel || "Apply Recommendation & Re-Solve"}

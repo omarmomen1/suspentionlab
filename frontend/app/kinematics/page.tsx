@@ -420,20 +420,20 @@ function KPICard({
       }`}
     >
       <div className="flex items-center justify-between">
-        <span className="text-[9px] font-bold tracking-[0.14em] text-gray-400 uppercase truncate">
+        <span className="text-xs font-bold tracking-[0.14em] text-gray-400 uppercase truncate">
           {label}
         </span>
         {isOutOfBand && (
-          <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold">
+          <span className="text-xs font-mono px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold">
             OUT
           </span>
         )}
       </div>
       <span className="text-[1.1rem] font-bold font-mono leading-tight tracking-tight" style={{ color }}>
         {typeof value === "number" ? value.toFixed(2) : value}
-        {unit && <span className="text-[10px] font-normal text-gray-400 ml-1">{unit}</span>}
+        {unit && <span className="text-xs font-normal text-gray-400 ml-1">{unit}</span>}
       </span>
-      {sub && <span className="text-[9px] text-gray-500 leading-tight truncate mt-0.5">{sub}</span>}
+      {sub && <span className="text-xs text-zinc-400 leading-tight truncate mt-0.5">{sub}</span>}
     </div>
   );
 }
@@ -463,7 +463,7 @@ function HPRow({
         isHovered ? "bg-cyan-950/40 border border-cyan-500/60" : "border border-transparent hover:bg-[#12141c]"
       }`}
     >
-      <span className={`text-[11px] font-mono truncate ${isHovered ? "text-cyan-300 font-bold" : "text-gray-400"}`}>
+      <span className={`text-xs font-mono truncate ${isHovered ? "text-cyan-300 font-bold" : "text-gray-400"}`}>
         {label}
       </span>
       {[0, 1, 2].map((i) => (
@@ -474,7 +474,7 @@ function HPRow({
           value={value[i]}
           title={`${label} ${axes[i]}`}
           aria-label={`${label} ${axes[i]}`}
-          className="w-full bg-[#0a0b10] border border-[#1e2230] rounded px-1.5 py-1 text-[11px] text-gray-200 font-mono text-center focus:border-cyan-500 focus:outline-none hover:border-[#333a52] transition-colors"
+          className="w-full bg-[#0a0b10] border border-[#1e2230] rounded px-1.5 py-1 text-xs text-gray-200 font-mono text-center focus:border-cyan-500 focus:outline-none hover:border-[#333a52] transition-colors"
           onChange={(e) => {
             const next = [...value] as HP3;
             next[i] = parseFloat(e.target.value) || 0;
@@ -971,12 +971,12 @@ export default function KinematicsPage() {
               <h1 className="text-sm font-bold text-white tracking-tight uppercase">
                 Suspension Kinematics & 3D CAE Study
               </h1>
-              <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-950/60 text-cyan-300 border border-cyan-800/40">
+              <span className="px-1.5 py-0.5 rounded text-xs font-mono bg-cyan-950/60 text-cyan-300 border border-cyan-800/40">
                 PRO
               </span>
               <NextStepLink />
             </div>
-            <p className="text-[10px] text-gray-500">
+            <p className="text-xs text-zinc-400">
               Multibody kinematics · C++ Newton–Raphson solver · Derivatives & Setup Causal Attribution
             </p>
           </div>
@@ -1035,7 +1035,7 @@ export default function KinematicsPage() {
 
           {/* Preset Selector */}
           <div className="flex items-center gap-1.5 bg-[#10121a] border border-[#222536] px-2.5 py-1.5 rounded-lg">
-            <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">
+            <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
               Preset:
             </span>
             <select
@@ -1071,11 +1071,11 @@ export default function KinematicsPage() {
         <ShellLeft className="lg:w-80">
         <aside className="w-full lg:w-80 flex-shrink-0 border-r border-[#171924] bg-[#090a0f] flex flex-col lg:max-h-[calc(100vh-57px)] lg:sticky lg:top-[57px] overflow-y-auto">
           <div className="p-3.5 border-b border-[#181a24] bg-[#0d0e16]">
-            <h2 className="text-[11px] font-bold text-gray-300 uppercase tracking-wider flex items-center justify-between">
+            <h2 className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center justify-between">
               <span>{isComparisonMode ? "Setup A Hardpoints (mm)" : "Corner Hardpoints (mm)"}</span>
-              <span className="text-[9px] font-mono text-cyan-400">Right-Front</span>
+              <span className="text-xs font-mono text-cyan-400">Right-Front</span>
             </h2>
-            <p className="text-[10px] text-gray-500 mt-0.5">
+            <p className="text-xs text-zinc-400 mt-0.5">
               Hover rows to highlight corresponding nodes in 3D canvas.
             </p>
           </div>
@@ -1083,12 +1083,12 @@ export default function KinematicsPage() {
           <div className="p-3 space-y-3.5 flex-1">
             {/* Travel Sweep Parameters */}
             <div className="bg-[#0e0f17] border border-[#1c1f2c] rounded-lg p-2.5 space-y-2">
-              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider block">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider block">
                 Wheel Travel Sweep Bounds
               </span>
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="text-[9px] text-gray-400">Droop (mm)</label>
+                  <label className="text-xs text-gray-400">Droop (mm)</label>
                   <input
                     type="number"
                     value={zMin}
@@ -1096,11 +1096,11 @@ export default function KinematicsPage() {
                       const v = parseFloat(e.target.value);
                       setZMin(Number.isFinite(v) ? v : -50);
                     }}
-                    className="w-full mt-0.5 bg-[#08090d] border border-[#232738] rounded px-1.5 py-1 text-[11px] text-gray-200 font-mono text-center focus:border-cyan-500 focus:outline-none"
+                    className="w-full mt-0.5 bg-[#08090d] border border-[#232738] rounded px-1.5 py-1 text-xs text-gray-200 font-mono text-center focus:border-cyan-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="text-[9px] text-gray-400">Bump (mm)</label>
+                  <label className="text-xs text-gray-400">Bump (mm)</label>
                   <input
                     type="number"
                     value={zMax}
@@ -1108,11 +1108,11 @@ export default function KinematicsPage() {
                       const v = parseFloat(e.target.value);
                       setZMax(Number.isFinite(v) ? v : 50);
                     }}
-                    className="w-full mt-0.5 bg-[#08090d] border border-[#232738] rounded px-1.5 py-1 text-[11px] text-gray-200 font-mono text-center focus:border-cyan-500 focus:outline-none"
+                    className="w-full mt-0.5 bg-[#08090d] border border-[#232738] rounded px-1.5 py-1 text-xs text-gray-200 font-mono text-center focus:border-cyan-500 focus:outline-none"
                   />
                 </div>
                 <div>
-                  <label className="text-[9px] text-gray-400">Steps</label>
+                  <label className="text-xs text-gray-400">Steps</label>
                   <input
                     type="number"
                     value={nSteps}
@@ -1120,7 +1120,7 @@ export default function KinematicsPage() {
                       const v = parseInt(e.target.value, 10);
                       setNSteps(Number.isFinite(v) && v > 1 ? v : 33);
                     }}
-                    className="w-full mt-0.5 bg-[#08090d] border border-[#232738] rounded px-1.5 py-1 text-[11px] text-gray-200 font-mono text-center focus:border-cyan-500 focus:outline-none"
+                    className="w-full mt-0.5 bg-[#08090d] border border-[#232738] rounded px-1.5 py-1 text-xs text-gray-200 font-mono text-center focus:border-cyan-500 focus:outline-none"
                   />
                 </div>
               </div>
@@ -1169,11 +1169,11 @@ export default function KinematicsPage() {
               ] as [string, [string, string][]][]
             ).map(([section, rows]) => (
               <div key={section} className="space-y-1">
-                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest pl-1">
+                <span className="text-xs font-bold text-gray-400 uppercase tracking-widest pl-1">
                   {section}
                 </span>
                 <div className="bg-[#0e0f17] border border-[#1b1e2a] rounded-lg p-1.5 space-y-1">
-                  <div className="grid grid-cols-[5.2rem_1fr_1fr_1fr] gap-1.5 px-2 text-[9px] text-gray-600 font-mono text-center">
+                  <div className="grid grid-cols-[5.2rem_1fr_1fr_1fr] gap-1.5 px-2 text-xs text-zinc-300 font-mono text-center">
                     <span />
                     <span>X</span>
                     <span>Y</span>
@@ -1202,7 +1202,7 @@ export default function KinematicsPage() {
                 <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
                 Solver Error
               </span>
-              <p className="mt-1 font-mono text-[10px] text-rose-200/80 leading-relaxed">{error}</p>
+              <p className="mt-1 font-mono text-xs text-rose-200/80 leading-relaxed">{error}</p>
             </div>
           )}
         </aside>
@@ -1210,7 +1210,7 @@ export default function KinematicsPage() {
 
         {/* ── MAIN VIEWPORT AREA ────────────────────────────────────────────── */}
         <ShellCenter>
-        <main className="flex-1 flex flex-col overflow-y-auto bg-[#07080c] p-4 space-y-4">
+        <div className="flex-1 flex flex-col overflow-y-auto bg-[#07080c] p-4 space-y-4">
           {/* Decoupled Model Validity Component */}
           <KinematicsModelValidity
             report={result?.validation_report}
@@ -1310,11 +1310,11 @@ export default function KinematicsPage() {
               <TrendingUp className="w-4 h-4" />
               <span>Real Finite-Difference Kinematic Rates (at {currentTravel.toFixed(1)} mm):</span>
             </div>
-            <div className="flex items-center gap-6 font-mono text-[11px] flex-wrap">
+            <div className="flex items-center gap-6 font-mono text-xs flex-wrap">
               <div>
                 <span className="text-gray-400">dγ/dz (Camber Gain): </span>
                 <span className="font-bold text-cyan-300">{currentCamberGain.toFixed(2)} °/100mm</span>
-                <span className="text-gray-400 text-[10px] ml-1">
+                <span className="text-gray-400 text-xs ml-1">
                   ({(currentCamberGain * 10.0).toFixed(1)} °/m)
                 </span>
               </div>
@@ -1364,12 +1364,12 @@ export default function KinematicsPage() {
               </button>
 
               <div className="flex flex-col ml-1">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
                   Wheel Travel Position
                 </span>
                 <span className="text-xs font-mono font-bold text-cyan-300">
                   {currentTravel >= 0 ? `+${currentTravel.toFixed(1)}` : currentTravel.toFixed(1)} mm
-                  <span className="text-[10px] text-gray-500 font-normal ml-1">
+                  <span className="text-xs text-zinc-400 font-normal ml-1">
                     {currentTravel > 0 ? "(BUMP)" : currentTravel < 0 ? "(DROOP)" : "(STATIC)"}
                   </span>
                 </span>
@@ -1378,7 +1378,7 @@ export default function KinematicsPage() {
 
             {/* Travel Scrubber Range Slider */}
             <div className="flex items-center gap-3 w-full sm:w-auto flex-1 max-w-xl px-2">
-              <span className="text-[10px] font-mono text-gray-500 w-16 text-right">
+              <span className="text-xs font-mono text-zinc-400 w-16 text-right">
                 {result ? `${result.wheel_travel_mm[0].toFixed(0)} mm` : `${zMin} mm`}
               </span>
               <input
@@ -1393,7 +1393,7 @@ export default function KinematicsPage() {
                 aria-label="Interactive Wheel Travel Slider"
                 className="flex-1 accent-cyan-400 cursor-pointer h-2 bg-[#171924] rounded-lg"
               />
-              <span className="text-[10px] font-mono text-gray-500 w-16 text-left">
+              <span className="text-xs font-mono text-zinc-400 w-16 text-left">
                 {result ? `+${result.wheel_travel_mm[result.n_points - 1].toFixed(0)} mm` : `+${zMax} mm`}
               </span>
             </div>
@@ -1408,7 +1408,7 @@ export default function KinematicsPage() {
                   <span className="font-bold text-rose-300 uppercase tracking-wide">
                     CAE Hostile Audit Notice: {failedPoints.length} travel point(s) diverged / failed solver tolerances!
                   </span>
-                  <p className="text-[11px] text-rose-300/80 mt-0.5">
+                  <p className="text-xs text-rose-300/80 mt-0.5">
                     Curve interpolation across failed points is suppressed to prevent fabricated results. Red divergence markers are placed on plot curves. Click any marker to view the 5-point root-cause analysis.
                   </p>
                 </div>
@@ -1449,7 +1449,7 @@ export default function KinematicsPage() {
                   className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-t-lg transition-colors border-b-2 ${
                     isActive
                       ? "border-signal text-signal bg-[#0f111a]"
-                      : "border-transparent text-gray-500 hover:text-gray-300 hover:bg-[#0c0d14]"
+                      : "border-transparent text-zinc-400 hover:text-gray-300 hover:bg-[#0c0d14]"
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
@@ -1512,7 +1512,7 @@ export default function KinematicsPage() {
                     <span className="w-2 h-2 rounded-full bg-signal inline-block" />
                     <span>Rigid-Body Kinematic Parity: C++ Newton-Raphson & Python fallback matched.</span>
                   </div>
-                  <div className="flex items-center gap-4 text-gray-500 font-mono text-[11px]">
+                  <div className="flex items-center gap-4 text-zinc-400 font-mono text-xs">
                     <span>Left Drag: Orbit 3D</span>
                     <span>Right Drag: Pan</span>
                     <span>Wheel: Zoom</span>
@@ -1522,15 +1522,15 @@ export default function KinematicsPage() {
                 <div className="bg-[#13181D] border border-white/10 p-4" data-testid="workspace-mr-field-card">
                   <div className="flex flex-wrap items-center gap-3 mb-2">
                     <h3 className="text-xs uppercase tracking-wide text-[#8a909a] m-0">Motion-ratio field MR(bump, steer)</h3>
-                    <button type="button" onClick={computeMrField} disabled={mrFieldBusy} className="text-[11px] px-2.5 py-1 border border-signal bg-signal text-carbon font-semibold hover:bg-[#d6f56e] disabled:opacity-40">
+                    <button type="button" onClick={computeMrField} disabled={mrFieldBusy} className="text-xs px-2.5 py-1 border border-signal bg-signal text-carbon font-semibold hover:bg-[#d6f56e] disabled:opacity-40">
                       {mrFieldBusy ? "Computing" : "Compute MR Field"}
                     </button>
-                    <label className="text-[11px] text-[#8a909a] flex items-center gap-1">
+                    <label className="text-xs text-[#8a909a] flex items-center gap-1">
                       Wheelbase (mm, optional, enables Ackermann)
                       <input type="number" inputMode="decimal" value={mrWheelbase} onChange={(e) => setMrWheelbase(e.target.value)} className="v2-num w-20 bg-[#0C0F12] border border-white/10 px-1 py-0.5 text-zinc-200" aria-label="Wheelbase mm" />
                     </label>
                   </div>
-                  {mrFieldError && <p role="alert" className="text-[11px] text-[#d9534f] m-0 mb-2">{mrFieldError}</p>}
+                  {mrFieldError && <p role="alert" className="text-xs text-[#d9534f] m-0 mb-2">{mrFieldError}</p>}
                   <MotionRatioField data={mrField} />
                 </div>
               </div>
@@ -1759,15 +1759,15 @@ export default function KinematicsPage() {
                 <div className="bg-[#13181D] border border-white/10 p-4" data-testid="mr-field-card">
                   <div className="flex flex-wrap items-center gap-3 mb-2">
                     <h3 className="text-xs uppercase tracking-wide text-[#8a909a] m-0">Motion-ratio field MR(bump, steer)</h3>
-                    <button type="button" onClick={computeMrField} disabled={mrFieldBusy} className="text-[11px] px-2.5 py-1 border border-signal bg-signal text-carbon font-semibold hover:bg-[#d6f56e] disabled:opacity-40">
+                    <button type="button" onClick={computeMrField} disabled={mrFieldBusy} className="text-xs px-2.5 py-1 border border-signal bg-signal text-carbon font-semibold hover:bg-[#d6f56e] disabled:opacity-40">
                       {mrFieldBusy ? "Computing" : "Compute MR Field"}
                     </button>
-                    <label className="text-[11px] text-[#8a909a] flex items-center gap-1">
+                    <label className="text-xs text-[#8a909a] flex items-center gap-1">
                       Wheelbase (mm, optional, enables Ackermann)
                       <input type="number" inputMode="decimal" value={mrWheelbase} onChange={(e) => setMrWheelbase(e.target.value)} className="v2-num w-20 bg-[#0C0F12] border border-white/10 px-1 py-0.5 text-zinc-200" aria-label="Wheelbase mm" />
                     </label>
                   </div>
-                  {mrFieldError && <p role="alert" className="text-[11px] text-[#d9534f] m-0 mb-2">{mrFieldError}</p>}
+                  {mrFieldError && <p role="alert" className="text-xs text-[#d9534f] m-0 mb-2">{mrFieldError}</p>}
                   <MotionRatioField data={mrField} />
                 </div>
 
@@ -1975,7 +1975,7 @@ export default function KinematicsPage() {
             )}
           </div>
           {result && <LedgerDock rows={kinLedgerRows} pinnable={false} caption="Kinematics ledger (at current travel)" />}
-        </main>
+        </div>
         </ShellCenter>
         <ShellRight className="lg:p-3">
           <VerdictRail

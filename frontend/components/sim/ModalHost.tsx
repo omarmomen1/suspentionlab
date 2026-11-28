@@ -161,7 +161,7 @@ export default function PromptModalHost() {
               onKeyDown={(e) => {
                 if (e.key === "Enter") confirm();
               }}
-              className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-ansys-yellow/60 focus:ring-1 focus:ring-ansys-yellow/50 mb-4"
+              className="w-full bg-[#0d0d0d] border border-[#2a2a2a] rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-signal/60 focus:ring-1 focus:ring-signal/50 mb-4"
             />
           </div>
         )}

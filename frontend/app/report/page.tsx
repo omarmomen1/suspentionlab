@@ -238,9 +238,9 @@ function ReportContent() {
   if (loading) {
     return (
       <div className="min-h-[calc(100vh-44px)] bg-[#08080a] text-white flex flex-col items-center justify-center p-8">
-        <Loader2 className="animate-spin text-ansys-yellow mb-4" size={32} />
+        <Loader2 className="animate-spin text-signal mb-4" size={32} />
         <h1 className="text-lg font-bold">Hydrating Engineering Report…</h1>
-        <p className="text-xs text-gray-400 mt-1 font-mono">Retrieving real vehicle, setup, tire, track, solver, and telemetry facets</p>
+        <p className="text-xs text-gray-400 mt-1 font-sans leading-relaxed">Retrieving real vehicle, setup, tire, track, solver, and telemetry facets</p>
       </div>
     );
   }
@@ -276,18 +276,18 @@ function ReportContent() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#1c1c20] pb-6 print:border-gray-300">
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-1">
-              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-ansys-yellow/15 text-ansys-yellow border border-ansys-yellow/30 tracking-wider">
+              <span className="px-2 py-0.5 rounded text-xs font-bold bg-signal/15 text-signal border border-signal/30 tracking-wider">
                 STAGE 6: OFFICIAL REPORT
               </span>
-              <span className="text-gray-600">·</span>
+              <span className="text-zinc-300">·</span>
               <span className="text-xs text-gray-400 font-mono font-bold">{report.doc_id || "DOC-2026-SL-0001"}</span>
-              <span className="text-gray-600">·</span>
+              <span className="text-zinc-300">·</span>
               <span className={`text-xs font-bold px-2 py-0.5 rounded border flex items-center gap-1 ${
                 isApproved
                   ? "bg-emerald-950/80 text-emerald-400 border-emerald-500/40"
                   : isRejected
                   ? "bg-rose-950/80 text-rose-400 border-rose-500/40"
-                  : "bg-amber-950/80 text-ansys-yellow border-ansys-yellow/40"
+                  : "bg-amber-950/80 text-amber-400 border-amber-500/40"
               }`}>
                 <ShieldCheck size={12} /> {report.status}
               </span>
@@ -298,7 +298,7 @@ function ReportContent() {
             <p className="text-xs text-gray-400 print:text-gray-700 mt-1">
               Vehicle: <strong className="text-gray-200 print:text-black">{report.vehicle_ref || "CAR-07"}</strong> &middot;
               Track: <strong className="text-gray-200 print:text-black">{report.track_ref || "SPA-FRANCORCHAMPS"}</strong> &middot;
-              Setup: <strong className="text-ansys-yellow print:text-amber-800">{report.setup_ref || "REV-01"}</strong> &middot;
+              Setup: <strong className="text-amber-400 print:text-amber-800">{report.setup_ref || "REV-01"}</strong> &middot;
               Run: <span className="font-mono text-gray-300">{report.run_id}</span>
             </p>
           </div>
@@ -401,7 +401,7 @@ function ReportContent() {
               disabled={sharing}
               className="px-3.5 py-2 rounded-xl bg-[#141417] hover:bg-[#1f1f24] border border-[#25252c] text-xs font-semibold text-gray-300 hover:text-white transition flex items-center gap-2"
             >
-              {sharing ? <Loader2 size={14} className="animate-spin text-ansys-yellow" /> : copied ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} />}
+              {sharing ? <Loader2 size={14} className="animate-spin text-signal" /> : copied ? <Check size={14} className="text-emerald-400" /> : <Share2 size={14} />}
               {copied ? "Link Copied" : "Share Token"}
             </button>
 
@@ -432,11 +432,11 @@ function ReportContent() {
                 onClick={() => setActiveTab(tab.id as any)}
                 className={`px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 whitespace-nowrap transition-all ${
                   active
-                    ? "bg-[#18181c] text-ansys-yellow border border-ansys-yellow/30 shadow-sm"
+                    ? "bg-[#18181c] text-signal border border-signal/30 shadow-sm"
                     : "text-gray-400 hover:text-gray-200 hover:bg-[#121215] border border-transparent"
                 }`}
               >
-                <Icon size={13} className={active ? "text-ansys-yellow" : "text-gray-500"} />
+                <Icon size={13} className={active ? "text-signal" : "text-zinc-400"} />
                 {tab.label}
               </button>
             );
@@ -447,41 +447,41 @@ function ReportContent() {
         {(showAll || activeTab === "executive") && (
           <div className="print-card space-y-6">
             <h2 className="text-lg font-bold text-white print:text-black border-b border-[#1c1c20] print:border-gray-300 pb-2 flex items-center gap-2">
-              <Sparkles size={16} className="text-ansys-yellow print:text-amber-800" />
+              <Sparkles size={16} className="text-amber-400 print:text-amber-800" />
               1. Executive Decision Summary & Performance Metrics (Real Engineering Output)
             </h2>
 
             {/* KPI Ribbon */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-[#0f0f12] print:bg-white border border-[#1e1e24] print:border-gray-300 rounded-2xl p-4">
-                <p className="text-[10px] font-bold text-gray-500 print:text-gray-600 uppercase tracking-wider">Simulated Lap Delta</p>
-                <p className="text-lg font-black text-emerald-400 print:text-emerald-700 font-mono mt-1">
+                <p className="text-xs font-bold text-zinc-400 print:text-gray-600 uppercase tracking-wider">Simulated Lap Delta</p>
+                <p className="text-lg font-black text-emerald-400 print:text-emerald-700 font-sans leading-relaxed mt-1">
                   {metrics["Simulated Lap Delta"] || "Baseline run (no comparison)"}
                 </p>
-                <p className="text-[11px] text-gray-400 print:text-gray-600 mt-1">
+                <p className="text-xs text-gray-400 print:text-gray-600 mt-1">
                   {report.baseline_run_id ? `Compared vs ${report.baseline_run_id}` : "Select a baseline run to compare"}
                 </p>
               </div>
               <div className="bg-[#0f0f12] print:bg-white border border-[#1e1e24] print:border-gray-300 rounded-2xl p-4">
-                <p className="text-[10px] font-bold text-gray-500 print:text-gray-600 uppercase tracking-wider">Front Turn-in Grip</p>
-                <p className="text-lg font-black text-signal print:text-amber-800 font-mono mt-1">
+                <p className="text-xs font-bold text-zinc-400 print:text-gray-600 uppercase tracking-wider">Front Turn-in Grip</p>
+                <p className="text-lg font-black text-signal print:text-amber-800 font-sans leading-relaxed mt-1">
                   {metrics["Front Turn-in Grip"] || "Baseline run (no comparison)"}
                 </p>
-                <p className="text-[11px] text-gray-400 print:text-gray-600 mt-1">Tire load consistency delta</p>
+                <p className="text-xs text-gray-400 print:text-gray-600 mt-1">Tire load consistency delta</p>
               </div>
               <div className="bg-[#0f0f12] print:bg-white border border-[#1e1e24] print:border-gray-300 rounded-2xl p-4">
-                <p className="text-[10px] font-bold text-gray-500 print:text-gray-600 uppercase tracking-wider">Rear Platform Stability</p>
-                <p className="text-lg font-black text-blue-400 print:text-blue-700 font-mono mt-1">
+                <p className="text-xs font-bold text-zinc-400 print:text-gray-600 uppercase tracking-wider">Rear Platform Stability</p>
+                <p className="text-lg font-black text-blue-400 print:text-blue-700 font-sans leading-relaxed mt-1">
                   {metrics["Rear Platform Stability"] || "Baseline run (no comparison)"}
                 </p>
-                <p className="text-[11px] text-gray-400 print:text-gray-600 mt-1">Platform Wk isolation delta</p>
+                <p className="text-xs text-gray-400 print:text-gray-600 mt-1">Platform Wk isolation delta</p>
               </div>
               <div className="bg-[#0f0f12] print:bg-white border border-[#1e1e24] print:border-gray-300 rounded-2xl p-4">
-                <p className="text-[10px] font-bold text-gray-500 print:text-gray-600 uppercase tracking-wider">Telemetry Correlation</p>
-                <p className="text-lg font-black text-cyan-400 print:text-cyan-700 font-mono mt-1">
+                <p className="text-xs font-bold text-zinc-400 print:text-gray-600 uppercase tracking-wider">Telemetry Correlation</p>
+                <p className="text-lg font-black text-cyan-400 print:text-cyan-700 font-sans leading-relaxed mt-1">
                   {metrics["Telemetry Correlation"] || (typeof report.correlation_pct === "number" ? `${report.correlation_pct.toFixed(1)} %` : "UNVALIDATED")}
                 </p>
-                <p className="text-[11px] text-gray-400 print:text-gray-600 mt-1">
+                <p className="text-xs text-gray-400 print:text-gray-600 mt-1">
                   {typeof report.correlation_pct === "number" ? "Empirical model correlation" : "No empirical telemetry dataset"}
                 </p>
               </div>
@@ -514,7 +514,7 @@ function ReportContent() {
                           y: (plotData.z_s || []).map((v: number) => v * 1000),
                           name: "Body Displacement (z_s) [mm]",
                           type: "scatter", mode: "lines",
-                          line: { color: "#f2a900", width: 2 }
+                          line: { color: "#C8F04B", width: 2 }
                         },
                         {
                           x: plotData.time,
@@ -534,7 +534,7 @@ function ReportContent() {
                       useResizeHandler
                     />
                   ) : (
-                    <div className="h-full flex items-center justify-center text-xs text-gray-500 font-mono">
+                    <div className="h-full flex items-center justify-center text-xs text-zinc-400 font-mono">
                       No time-series data available for this run.
                     </div>
                   )}
@@ -551,13 +551,13 @@ function ReportContent() {
                       <div key={idx} className="flex items-center justify-between text-xs p-2 rounded-lg bg-black/30 print:bg-gray-100 border border-[#1a1a20] print:border-gray-200">
                         <div>
                           <p className="font-semibold text-gray-200 print:text-black">{item.parameter}</p>
-                          <p className="text-[10px] text-gray-500 print:text-gray-600">{item.baseline ?? "\u2014"} &rarr; {item.simulated ?? "\u2014"}</p>
+                          <p className="text-xs text-zinc-400 print:text-gray-600">{item.baseline ?? "\u2014"} &rarr; {item.simulated ?? "\u2014"}</p>
                         </div>
                         <span className="font-mono text-emerald-400 print:text-emerald-700 font-bold">{item.delta ?? "N/A"}</span>
                       </div>
                       ))
                     ) : (
-                      <p className="text-xs text-gray-500 print:text-gray-600 font-mono">
+                      <p className="text-xs text-zinc-400 print:text-gray-600 font-sans leading-relaxed">
                         No baseline comparison run for this report - parameter deltas N/A.
                         Run a baseline simulation first to compute real deltas.
                       </p>
@@ -566,7 +566,7 @@ function ReportContent() {
                 </div>
 
                 <div className="pt-4 border-t border-[#1a1a20] print:border-gray-200">
-                  <p className="text-[10px] text-gray-500 print:text-gray-600 font-mono">
+                  <p className="text-xs text-zinc-400 print:text-gray-600 font-sans leading-relaxed">
                     SHA-256 Input Lineage Fingerprint:<br />
                     <span className="text-gray-400 print:text-black break-all">{report.input_hash}</span>
                   </p>
@@ -580,7 +580,7 @@ function ReportContent() {
         {(showAll || activeTab === "lap") && (
           <div className="print-card space-y-4">
             <h2 className="text-lg font-bold text-white print:text-black border-b border-[#1c1c20] print:border-gray-300 pb-2 flex items-center gap-2">
-              <Gauge size={16} className="text-ansys-yellow print:text-amber-800" />
+              <Gauge size={16} className="text-amber-400 print:text-amber-800" />
               2. Lap Performance, G-G Envelope & Aerodynamics (Calculated Physics)
             </h2>
 
@@ -595,7 +595,7 @@ function ReportContent() {
                           x: plotData.gg_envelope.boundary_lat_g,
                           y: plotData.gg_envelope.boundary_long_g,
                           type: "scatter", mode: "lines", name: "Tire Limit",
-                          line: { color: "#f2a900", width: 1.5, dash: "dot" }
+                          line: { color: "#C8F04B", width: 1.5, dash: "dot" }
                         },
                         {
                           x: plotData.gg_envelope.sim_lat_g,
@@ -660,7 +660,7 @@ function ReportContent() {
         {(showAll || activeTab === "kinematics") && (
           <div className="print-card space-y-4">
             <h2 className="text-lg font-bold text-white print:text-black border-b border-[#1c1c20] print:border-gray-300 pb-2 flex items-center gap-2">
-              <Layers size={16} className="text-ansys-yellow print:text-amber-800" />
+              <Layers size={16} className="text-amber-400 print:text-amber-800" />
               3. Suspension Kinematics & Geometry Sign-Off (Double-Wishbone)
             </h2>
 
@@ -705,27 +705,27 @@ function ReportContent() {
         {(showAll || activeTab === "nvh") && (
           <div className="print-card space-y-4">
             <h2 className="text-lg font-bold text-white print:text-black border-b border-[#1c1c20] print:border-gray-300 pb-2 flex items-center gap-2">
-              <Activity size={16} className="text-ansys-yellow print:text-amber-800" />
+              <Activity size={16} className="text-amber-400 print:text-amber-800" />
               4. ISO 2631-1 Ride Comfort & Vibration Exposure
             </h2>
 
             <div className="bg-[#0f0f12] print:bg-white border border-[#1e1e24] print:border-gray-300 rounded-2xl p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="p-4 bg-black/40 print:bg-gray-100 rounded-xl border border-[#1f1f26] print:border-gray-200">
-                  <p className="text-[10px] text-gray-500 print:text-gray-600 font-bold uppercase">Wk-Weighted RMS Accel</p>
-                  <p className="text-xl font-bold font-mono text-emerald-400 print:text-emerald-700 mt-1">
+                  <p className="text-xs text-zinc-400 print:text-gray-600 font-bold uppercase">Wk-Weighted RMS Accel</p>
+                  <p className="text-xl font-bold font-sans leading-relaxed text-emerald-400 print:text-emerald-700 mt-1">
                     {metrics["Wk-Weighted RMS Accel"] || "—"}
                   </p>
-                  <p className="text-[10px] text-gray-400 print:text-gray-600 mt-0.5">
+                  <p className="text-xs text-gray-400 print:text-gray-600 mt-0.5">
                     Category: {report.comfort_category || "—"}
                   </p>
                 </div>
                 <div className="p-4 bg-black/40 print:bg-gray-100 rounded-xl border border-[#1f1f26] print:border-gray-200">
-                  <p className="text-[10px] text-gray-500 print:text-gray-600 font-bold uppercase">Vibration Dose Value (VDV)</p>
-                  <p className="text-xl font-bold font-mono text-blue-400 print:text-blue-700 mt-1">
+                  <p className="text-xs text-zinc-400 print:text-gray-600 font-bold uppercase">Vibration Dose Value (VDV)</p>
+                  <p className="text-xl font-bold font-sans leading-relaxed text-blue-400 print:text-blue-700 mt-1">
                     {metrics["Vibration Dose Value (VDV)"] || "—"}
                   </p>
-                  <p className="text-[10px] text-gray-400 print:text-gray-600 mt-0.5">
+                  <p className="text-xs text-gray-400 print:text-gray-600 mt-0.5">
                     {(() => {
                       const v = parseFloat(String(metrics["Vibration Dose Value (VDV)"] || ""));
                       if (!Number.isFinite(v) || v <= 0) return "ISO 2631-1 Daily Check: Not evaluated";
@@ -734,11 +734,11 @@ function ReportContent() {
                   </p>
                 </div>
                 <div className="p-4 bg-black/40 print:bg-gray-100 rounded-xl border border-[#1f1f26] print:border-gray-200">
-                  <p className="text-[10px] text-gray-500 print:text-gray-600 font-bold uppercase">Heave Natural Frequency</p>
-                  <p className="text-xl font-bold font-mono text-cyan-400 print:text-cyan-700 mt-1">
+                  <p className="text-xs text-zinc-400 print:text-gray-600 font-bold uppercase">Heave Natural Frequency</p>
+                  <p className="text-xl font-bold font-sans leading-relaxed text-cyan-400 print:text-cyan-700 mt-1">
                     {metrics["Heave Natural Frequency"] || "—"}
                   </p>
-                  <p className="text-[10px] text-gray-400 print:text-gray-600 mt-0.5">
+                  <p className="text-xs text-gray-400 print:text-gray-600 mt-0.5">
                     Damping Ratio ζ = {metrics["Damping Ratio"] || "—"}
                   </p>
                 </div>
@@ -751,21 +751,21 @@ function ReportContent() {
         {(showAll || activeTab === "digital_twin") && (
           <div className="print-card space-y-4">
             <h2 className="text-lg font-bold text-white print:text-black border-b border-[#1c1c20] print:border-gray-300 pb-2 flex items-center gap-2">
-              <ShieldCheck size={16} className="text-ansys-yellow print:text-amber-800" />
+              <ShieldCheck size={16} className="text-amber-400 print:text-amber-800" />
               5. Digital Twin Discrepancy & Merkle Audit Lineage
             </h2>
 
             <div className="bg-[#0f0f12] print:bg-white border border-[#1e1e24] print:border-gray-300 rounded-2xl p-6 font-mono text-xs text-gray-300 print:text-gray-800 space-y-2.5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <p><strong className="text-gray-500 print:text-gray-600">RUN_ID:</strong> {report.run_id}</p>
-                <p><strong className="text-gray-500 print:text-gray-600">DOC_ID:</strong> {report.doc_id}</p>
-                <p><strong className="text-gray-500 print:text-gray-600">VALIDATION_STATUS:</strong> {report.validation_status} (Score: {report.correlation_pct}%)</p>
-                <p><strong className="text-gray-500 print:text-gray-600">SOLVER_LINEAGE:</strong> {report.solver_version}</p>
-                <p><strong className="text-gray-500 print:text-gray-600">PHYSICS_VERSION:</strong> {report.physics_version}</p>
-                <p><strong className="text-gray-500 print:text-gray-600">SOFTWARE_BUILD:</strong> {report.software_build}</p>
-                <p className="col-span-full"><strong className="text-gray-500 print:text-gray-600">INPUT_HASH:</strong> <span className="break-all">{report.input_hash}</span></p>
-                <p className="col-span-full"><strong className="text-gray-500 print:text-gray-600">RESULT_HASH:</strong> <span className="break-all">{report.result_hash}</span></p>
-                <p className="col-span-full"><strong className="text-gray-500 print:text-gray-600">ARTIFACT_HASH:</strong> <span className="break-all text-emerald-400">{report.artifact_hash}</span></p>
+                <p><strong className="text-zinc-400 print:text-gray-600">RUN_ID:</strong> {report.run_id}</p>
+                <p><strong className="text-zinc-400 print:text-gray-600">DOC_ID:</strong> {report.doc_id}</p>
+                <p><strong className="text-zinc-400 print:text-gray-600">VALIDATION_STATUS:</strong> {report.validation_status} (Score: {report.correlation_pct}%)</p>
+                <p><strong className="text-zinc-400 print:text-gray-600">SOLVER_LINEAGE:</strong> {report.solver_version}</p>
+                <p><strong className="text-zinc-400 print:text-gray-600">PHYSICS_VERSION:</strong> {report.physics_version}</p>
+                <p><strong className="text-zinc-400 print:text-gray-600">SOFTWARE_BUILD:</strong> {report.software_build}</p>
+                <p className="col-span-full"><strong className="text-zinc-400 print:text-gray-600">INPUT_HASH:</strong> <span className="break-all">{report.input_hash}</span></p>
+                <p className="col-span-full"><strong className="text-zinc-400 print:text-gray-600">RESULT_HASH:</strong> <span className="break-all">{report.result_hash}</span></p>
+                <p className="col-span-full"><strong className="text-zinc-400 print:text-gray-600">ARTIFACT_HASH:</strong> <span className="break-all text-emerald-400">{report.artifact_hash}</span></p>
               </div>
 
               {/* Wave 6: solver provenance Trust Badge */}
@@ -788,19 +788,19 @@ function ReportContent() {
                   <span className="font-bold flex items-center gap-1.5">
                     <ShieldCheck size={16} /> CHIEF ENGINEER DECISION SIGN-OFF: {report.status}
                   </span>
-                  <span className="text-[10px] uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-black/40">
+                  <span className="text-xs uppercase font-bold tracking-widest px-2 py-0.5 rounded bg-black/40">
                     {report.approval?.role || "LEAD"}
                   </span>
                 </div>
                 <p className="mt-2 text-xs italic text-gray-300 font-sans">
                   &ldquo;{report.approval?.comment || "Approved under telemetry residual correlation threshold."}&rdquo;
                 </p>
-                <div className="mt-3 text-[11px] text-gray-400 font-sans flex flex-wrap justify-between gap-2">
+                <div className="mt-3 text-xs text-gray-400 font-sans flex flex-wrap justify-between gap-2">
                   <span>Signee: <strong>{report.approval?.name || "Chief Race Engineer"}</strong></span>
                   <span>Timestamp: <strong>{report.approval?.timestamp ? new Date(report.approval.timestamp).toUTCString() : "Pending"}</strong></span>
                 </div>
                 {report.approval?.signature && (
-                  <div className="mt-2.5 pt-2 border-t border-white/10 text-[10px] font-mono break-all text-emerald-400">
+                  <div className="mt-2.5 pt-2 border-t border-white/10 text-xs font-mono break-all text-emerald-400">
                     <strong>HMAC-SHA256 Signature:</strong> {report.approval.signature}
                   </div>
                 )}
@@ -826,12 +826,12 @@ function ReportContent() {
             </p>
 
             <div>
-              <label className="text-[11px] font-semibold text-gray-400 mb-1 block">Decision Reason / Comments</label>
+              <label className="text-xs font-semibold text-gray-400 mb-1 block">Decision Reason / Comments</label>
               <textarea
                 value={approvalComment}
                 onChange={(e) => setApprovalComment(e.target.value)}
                 rows={3}
-                className="w-full bg-[#18181e] border border-[#2c2c36] rounded-xl p-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-ansys-yellow font-mono"
+                className="w-full bg-[#18181e] border border-[#2c2c36] rounded-xl p-3 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-signal font-mono"
                 placeholder="Enter engineering rationale..."
               />
             </div>
@@ -864,7 +864,7 @@ function ReportContent() {
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#111114] border border-[#25252d] rounded-2xl max-w-md w-full p-6 space-y-4">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Share2 size={18} className="text-ansys-yellow" />
+              <Share2 size={18} className="text-signal" />
               Genuine Backend Share Token Generated
             </h3>
             <p className="text-xs text-gray-400">
@@ -912,7 +912,7 @@ export default function ReportDashboardPage() {
   return (
     <Suspense fallback={
       <div className="min-h-[calc(100vh-44px)] bg-[#08080a] text-white flex items-center justify-center">
-        <Loader2 className="animate-spin text-ansys-yellow" size={32} />
+        <Loader2 className="animate-spin text-signal" size={32} />
       </div>
     }>
       <ReportContent />

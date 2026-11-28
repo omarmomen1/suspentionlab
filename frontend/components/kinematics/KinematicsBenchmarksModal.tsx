@@ -73,7 +73,7 @@ export default function KinematicsBenchmarksModal({
             {warnedCount > 0 && <span className="text-amber-400">Warnings: <strong>{warnedCount}</strong></span>}
             {failedCount > 0 && <span className="text-rose-400">Failed: <strong>{failedCount}</strong></span>}
           </div>
-          <span className="text-[11px] text-cyan-400 uppercase font-semibold">
+          <span className="text-xs text-cyan-400 uppercase font-semibold">
             {failedCount === 0 ? "Admissible CAE Envelope" : "Compliance Audit Alert"}
           </span>
         </div>
@@ -107,13 +107,13 @@ export default function KinematicsBenchmarksModal({
                     {isWarn && <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0" />}
                     {isFail && <XCircle className="w-4 h-4 text-rose-400 shrink-0" />}
                     <span className="font-bold text-sm text-gray-100">{item.name}</span>
-                    <span className="text-[10px] font-mono text-gray-500 bg-white/5 px-1.5 py-0.5 rounded">
+                    <span className="text-xs font-mono text-zinc-400 bg-white/5 px-1.5 py-0.5 rounded">
                       {item.id}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span
-                      className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded uppercase border ${
+                      className={`text-xs font-mono font-bold px-2 py-0.5 rounded uppercase border ${
                         isPass
                           ? "bg-emerald-950/80 text-emerald-300 border-emerald-500/50"
                           : isWarn
@@ -129,19 +129,19 @@ export default function KinematicsBenchmarksModal({
                 {/* Values comparison grid */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-3 text-xs font-mono">
                   <div className="bg-black/30 p-2 rounded border border-white/5">
-                    <span className="text-[10px] text-gray-400 block uppercase">Literature Reference</span>
+                    <span className="text-xs text-gray-400 block uppercase">Literature Reference</span>
                     <span className="text-gray-200 font-bold">{item.reference_value} {item.unit}</span>
                   </div>
                   <div className="bg-black/30 p-2 rounded border border-white/5">
-                    <span className="text-[10px] text-gray-400 block uppercase">Current Production</span>
+                    <span className="text-xs text-gray-400 block uppercase">Current Production</span>
                     <span className="text-cyan-300 font-bold">{item.production_value} {item.unit}</span>
                   </div>
                   <div className="bg-black/30 p-2 rounded border border-white/5">
-                    <span className="text-[10px] text-gray-400 block uppercase">Tolerance Allowed</span>
+                    <span className="text-xs text-gray-400 block uppercase">Tolerance Allowed</span>
                     <span className="text-gray-300 font-bold">±{item.tolerance_pct}%</span>
                   </div>
                   <div className="bg-black/30 p-2 rounded border border-white/5">
-                    <span className="text-[10px] text-gray-400 block uppercase">Relative Error</span>
+                    <span className="text-xs text-gray-400 block uppercase">Relative Error</span>
                     <span className={`font-bold ${isPass ? "text-emerald-400" : isWarn ? "text-amber-400" : "text-rose-400"}`}>
                       {(item.error_pct ?? 0).toFixed(1)}%
                     </span>
@@ -149,12 +149,12 @@ export default function KinematicsBenchmarksModal({
                 </div>
 
                 {/* Source & Description Footer */}
-                <div className="mt-3 pt-2 border-t border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-gray-400">
+                <div className="mt-3 pt-2 border-t border-white/5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-gray-400">
                   <div className="flex items-center gap-1.5 text-cyan-400/90 font-medium">
                     <BookOpen className="w-3.5 h-3.5" />
                     <span>Source: {item.reference_source}</span>
                   </div>
-                  <span className="text-gray-400 text-[11px]">{item.description}</span>
+                  <span className="text-gray-400 text-xs">{item.description}</span>
                 </div>
               </div>
             );

@@ -82,12 +82,12 @@ export default function ComparePanel({ current }: ComparePanelProps) {
     const better = isMetricImprovement(key as string, diff, bv);
     return (
       <div className="flex justify-between items-center py-1.5 border-b border-[#1a1a1a]">
-        <span className="text-[10px] text-gray-400">{label}</span>
+        <span className="text-xs text-gray-400">{label}</span>
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono text-gray-400">{bv.toFixed(3)}</span>
-          <span className="text-[9px] text-gray-500">→</span>
-          <span className="text-[10px] font-mono text-white">{cv.toFixed(3)}</span>
-          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+          <span className="text-xs font-mono text-gray-400">{bv.toFixed(3)}</span>
+          <span className="text-xs text-zinc-400">→</span>
+          <span className="text-xs font-mono text-white">{cv.toFixed(3)}</span>
+          <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${
             better ? "bg-emerald-950 text-emerald-400" : "bg-red-950 text-red-400"
           }`}>
             {diff >= 0 ? "+" : ""}{pct.toFixed(1)}%{unit}
@@ -124,14 +124,14 @@ export default function ComparePanel({ current }: ComparePanelProps) {
       <div className="px-5 py-3 border-b border-[#1e1e1e] shrink-0">
         {!baseline ? (
           <div className="text-center py-2">
-            <p className="text-xs text-gray-600 mb-2">Run a simulation first, then pin it as the baseline.</p>
+            <p className="text-xs text-zinc-300 mb-2">Run a simulation first, then pin it as the baseline.</p>
             <button onClick={() => current && setBaseline(current)}
               disabled={!current}
               className="px-4 py-1.5 bg-[#0af]/10 border border-[#0af]/20 text-[#0af] text-xs font-bold
                 rounded-lg hover:bg-[#0af]/20 transition-colors disabled:opacity-40">
               📌 Pin Current as Baseline
             </button>
-            <p className="text-[10px] text-gray-500 my-3">— OR —</p>
+            <p className="text-xs text-zinc-400 my-3">— OR —</p>
             <label className="px-4 py-1.5 bg-[#141416] border border-[#252525] text-gray-300 text-xs font-bold
                 rounded-lg hover:bg-[#1e1e20] transition-colors cursor-pointer inline-flex items-center gap-1.5">
               <Upload size={13} /> Import CSV Telemetry
@@ -182,7 +182,7 @@ export default function ComparePanel({ current }: ComparePanelProps) {
         ) : (
           <div className="flex items-center justify-between">
             <div>
-              <span className="text-[9px] font-bold text-gray-700 uppercase tracking-wider">
+              <span className="text-xs font-bold text-zinc-300 uppercase tracking-wider">
                 {baseline.is_telemetry ? "Real-World Telemetry" : "Baseline pinned"}
               </span>
               <p className="text-xs text-gray-400">
@@ -190,7 +190,7 @@ export default function ComparePanel({ current }: ComparePanelProps) {
               </p>
             </div>
             <button onClick={() => setBaseline(null)}
-              className="text-[10px] text-gray-600 hover:text-red-400 transition-colors">
+              className="text-xs text-zinc-300 hover:text-red-400 transition-colors">
               Clear
             </button>
           </div>
@@ -207,7 +207,7 @@ export default function ComparePanel({ current }: ComparePanelProps) {
         {/* Delta metrics (hide if telemetry since we lack full metrics) */}
         {baseline && current && !baseline.is_telemetry && (
           <div>
-            <h3 className="text-[9px] font-bold text-gray-700 uppercase tracking-widest mb-2">
+            <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2">
               Δ Performance Delta
             </h3>
             {delta("rms_body_accel",       "Body Accel RMS",  " m/s²")}
@@ -221,7 +221,7 @@ export default function ComparePanel({ current }: ComparePanelProps) {
         {/* Overlay plot — transmissibility */}
         {baseline && current && (
           <div>
-            <h3 className="text-[9px] font-bold text-gray-700 uppercase tracking-widest mb-2">
+            <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2">
               Transmissibility Overlay
             </h3>
             <div className="h-[200px] bg-black/40 rounded-xl border border-[#1a1a1a]">
@@ -232,7 +232,7 @@ export default function ComparePanel({ current }: ComparePanelProps) {
                     line: { color: "#555", width: 1.5, dash: "dash" } },
                   { x: current.freq_hz,  y: current.transmissibility_body,
                     type: "scatter", mode: "lines", name: "Current",
-                    line: { color: "#f2a900", width: 2 } },
+                    line: { color: "#C8F04B", width: 2 } },
                 ]}
                 layout={{
                   ...DARK,
@@ -250,7 +250,7 @@ export default function ComparePanel({ current }: ComparePanelProps) {
         {/* Overlay plot — acceleration */}
         {baseline && current && (
           <div>
-            <h3 className="text-[9px] font-bold text-gray-700 uppercase tracking-widest mb-2">
+            <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2">
               Body Acceleration Overlay
             </h3>
             <div className="h-[200px] bg-black/40 rounded-xl border border-[#1a1a1a]">
@@ -277,8 +277,8 @@ export default function ComparePanel({ current }: ComparePanelProps) {
 
         {!baseline && (
           <div className="flex flex-col items-center justify-center py-12 gap-3 opacity-40">
-            <TrendingUp size={40} strokeWidth={1} className="text-gray-600" />
-            <p className="text-xs text-gray-600 text-center">Pin a baseline run to see side-by-side comparison</p>
+            <TrendingUp size={40} strokeWidth={1} className="text-zinc-300" />
+            <p className="text-xs text-zinc-300 text-center">Pin a baseline run to see side-by-side comparison</p>
           </div>
         )}
       </div>

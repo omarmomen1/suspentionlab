@@ -104,7 +104,7 @@ export default function ReportClient({ report }: { report: ReportData }) {
   const timeTraces = hasTimeDomain ? [
     {
       x: r.time as number[], y: (r.z_s as number[]).map((v: number) => v * 1000),
-      name: "Body", line: { color: "#f2a900", width: 1.5 }, type: "scatter" as const,
+      name: "Body", line: { color: "#C8F04B", width: 1.5 }, type: "scatter" as const,
     },
     Array.isArray(r.z_u) ? {
       x: r.time as number[], y: (r.z_u as number[]).map((v: number) => v * 1000),
@@ -126,14 +126,14 @@ export default function ReportClient({ report }: { report: ReportData }) {
         <div className="max-w-5xl mx-auto flex items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-[11px] text-gray-600 uppercase tracking-widest font-medium">SuspensionLab Report</span>
-              <span className="text-gray-700">·</span>
-              <span className="text-[11px] text-gray-600">{date}</span>
-              <span className="text-gray-700">·</span>
-              <span className="text-[11px] text-gray-600">{report.view_count} views</span>
+              <span className="text-xs text-zinc-300 uppercase tracking-widest font-medium">SuspensionLab Report</span>
+              <span className="text-zinc-300">·</span>
+              <span className="text-xs text-zinc-300">{date}</span>
+              <span className="text-zinc-300">·</span>
+              <span className="text-xs text-zinc-300">{report.view_count} views</span>
             </div>
             <h1 className="text-2xl font-bold text-white">{report.title}</h1>
-            {report.notes && <p className="text-sm text-gray-500 mt-1">{report.notes}</p>}
+            {report.notes && <p className="text-sm text-zinc-400 mt-1">{report.notes}</p>}
 
             {/* Provenance & Integrity Badges */}
             <div className="flex flex-wrap items-center gap-2 mt-3">
@@ -159,7 +159,7 @@ export default function ReportClient({ report }: { report: ReportData }) {
                 </span>
               )}
               {prov?.result_hash && (
-                <span className="text-xs font-mono text-gray-500">
+                <span className="text-xs font-mono text-zinc-400">
                   SHA-256: {prov.result_hash.substring(0, 16)}…
                 </span>
               )}
@@ -203,7 +203,7 @@ export default function ReportClient({ report }: { report: ReportData }) {
             </button>
             <Link
               href="/"
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-[#f2a900] text-black text-sm font-bold hover:brightness-110 transition-all"
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-signal text-carbon text-sm font-bold hover:brightness-110 transition-all"
             >
               <ExternalLink size={14} />
               Try SuspensionLab
@@ -230,7 +230,7 @@ export default function ReportClient({ report }: { report: ReportData }) {
         <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
           {kpis.map(({ label, value }) => (
             <div key={label} className="rounded-xl border border-[#1a1a1a] bg-[#080808] p-4">
-              <p className="text-[10px] text-gray-600 mb-1">{label}</p>
+              <p className="text-xs text-zinc-300 mb-1">{label}</p>
               <p className="text-sm font-bold text-white">{value}</p>
             </div>
           ))}
@@ -240,7 +240,7 @@ export default function ReportClient({ report }: { report: ReportData }) {
         {hasTimeDomain && (
           <div className="rounded-2xl border border-[#1a1a1a] bg-[#080808] p-5">
             <div className="flex items-center gap-2 mb-4">
-              <Activity size={14} className="text-gray-500" />
+              <Activity size={14} className="text-zinc-400" />
               <h3 className="text-sm font-semibold text-gray-300">Time Domain Response</h3>
             </div>
             <div className="h-64">
@@ -261,7 +261,7 @@ export default function ReportClient({ report }: { report: ReportData }) {
         {hasBode && (
           <div className="rounded-2xl border border-[#1a1a1a] bg-[#080808] p-5">
             <div className="flex items-center gap-2 mb-4">
-              <BarChart2 size={14} className="text-gray-500" />
+              <BarChart2 size={14} className="text-zinc-400" />
               <h3 className="text-sm font-semibold text-gray-300">Frequency Response (Bode Plot)</h3>
             </div>
             <div className="h-64">
@@ -282,13 +282,13 @@ export default function ReportClient({ report }: { report: ReportData }) {
         {/* Parameters Table */}
         <div className="rounded-2xl border border-[#1a1a1a] bg-[#080808] p-5">
           <div className="flex items-center gap-2 mb-4">
-            <Layers size={14} className="text-gray-500" />
+            <Layers size={14} className="text-zinc-400" />
             <h3 className="text-sm font-semibold text-gray-300">Simulation Parameters</h3>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             {Object.entries(p).filter(([k]) => k in PARAM_LABELS).map(([k, v]) => (
               <div key={k} className="flex justify-between items-center py-2 border-b border-[#111]">
-                <span className="text-xs text-gray-500">{PARAM_LABELS[k] || k}</span>
+                <span className="text-xs text-zinc-400">{PARAM_LABELS[k] || k}</span>
                 <span className="text-xs font-mono font-semibold text-white">
                   {typeof v === "number" ? v.toLocaleString() : String(v)} {PARAM_UNITS[k] || ""}
                 </span>
@@ -304,7 +304,7 @@ export default function ReportClient({ report }: { report: ReportData }) {
               <ShieldCheck size={14} className="text-emerald-400" />
               <h3 className="text-sm font-semibold text-gray-300">13-Point Configuration Lineage & Cryptographic Verification</h3>
             </div>
-            <span className={`text-[11px] font-mono font-bold px-2 py-0.5 rounded border ${
+            <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded border ${
               prov?.approval_status === "APPROVED" || prov?.approval_status === "EXPORTED"
                 ? "bg-emerald-950/80 text-emerald-400 border-emerald-500/40"
                 : prov?.approval_status === "REJECTED"
@@ -317,20 +317,20 @@ export default function ReportClient({ report }: { report: ReportData }) {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono text-gray-400 bg-black/50 p-4 rounded-xl border border-[#141416]">
             <div className="space-y-1">
-              <p><span className="text-gray-600 font-sans">Document ID:</span> <strong className="text-gray-300">{report.doc_id || "DOC-2026-SL-0001"}</strong></p>
-              <p><span className="text-gray-600 font-sans">Vehicle Ref:</span> <strong className="text-gray-300">{report.vehicle_ref || "CAR-07"}</strong></p>
-              <p><span className="text-gray-600 font-sans">Setup Ref:</span> <strong className="text-ansys-yellow">{report.setup_ref || "REV-01"}</strong></p>
-              <p><span className="text-gray-600 font-sans">Tire Ref:</span> <strong className="text-gray-300">{report.tire_ref || "TIRE-MF52-COMPOUND-SOFT"}</strong></p>
-              <p><span className="text-gray-600 font-sans">Track Ref:</span> <strong className="text-gray-300">{report.track_ref || "SPA-FRANCORCHAMPS"}</strong></p>
-              <p><span className="text-gray-600 font-sans">Telemetry Sync:</span> <strong className="text-gray-300">{report.telemetry_ref || "TELEMETRY-SYNC-Q2"}</strong></p>
-              <p><span className="text-gray-600 font-sans">Validation:</span> <strong className={report.correlation_pct ? "text-emerald-400" : "text-amber-400"}>{report.validation_status || "UNVALIDATED"} {typeof report.correlation_pct === "number" ? `(${report.correlation_pct.toFixed(1)}%)` : "(No empirical dataset)"}</strong></p>
+              <p><span className="text-zinc-300 font-sans">Document ID:</span> <strong className="text-gray-300">{report.doc_id || "DOC-2026-SL-0001"}</strong></p>
+              <p><span className="text-zinc-300 font-sans">Vehicle Ref:</span> <strong className="text-gray-300">{report.vehicle_ref || "CAR-07"}</strong></p>
+              <p><span className="text-zinc-300 font-sans">Setup Ref:</span> <strong className="text-signal">{report.setup_ref || "REV-01"}</strong></p>
+              <p><span className="text-zinc-300 font-sans">Tire Ref:</span> <strong className="text-gray-300">{report.tire_ref || "TIRE-MF52-COMPOUND-SOFT"}</strong></p>
+              <p><span className="text-zinc-300 font-sans">Track Ref:</span> <strong className="text-gray-300">{report.track_ref || "SPA-FRANCORCHAMPS"}</strong></p>
+              <p><span className="text-zinc-300 font-sans">Telemetry Sync:</span> <strong className="text-gray-300">{report.telemetry_ref || "TELEMETRY-SYNC-Q2"}</strong></p>
+              <p><span className="text-zinc-300 font-sans">Validation:</span> <strong className={report.correlation_pct ? "text-emerald-400" : "text-amber-400"}>{report.validation_status || "UNVALIDATED"} {typeof report.correlation_pct === "number" ? `(${report.correlation_pct.toFixed(1)}%)` : "(No empirical dataset)"}</strong></p>
             </div>
             <div className="space-y-1">
-              <p><span className="text-gray-600 font-sans">Solver Lineage:</span> <strong className="text-gray-300">{report.solver_version || prov?.software_version || "RK45 / BDF Adaptive Stiff"}</strong></p>
-              <p><span className="text-gray-600 font-sans">Software Build:</span> <strong className="text-gray-300">{report.software_build || "BUILD-REL-2026.1"}</strong></p>
-              <p><span className="text-gray-600 font-sans">Input Hash:</span> <span className="text-gray-300 break-all">{prov?.input_hash || prov?.params_hash || "—"}</span></p>
-              <p><span className="text-gray-600 font-sans">Result Hash:</span> <span className="text-gray-300 break-all">{prov?.result_hash || "—"}</span></p>
-              <p><span className="text-gray-600 font-sans">Canonical Artifact Hash:</span> <span className="text-emerald-400 break-all">{prov?.artifact_hash || "—"}</span></p>
+              <p><span className="text-zinc-300 font-sans">Solver Lineage:</span> <strong className="text-gray-300">{report.solver_version || prov?.software_version || "RK45 / BDF Adaptive Stiff"}</strong></p>
+              <p><span className="text-zinc-300 font-sans">Software Build:</span> <strong className="text-gray-300">{report.software_build || "BUILD-REL-2026.1"}</strong></p>
+              <p><span className="text-zinc-300 font-sans">Input Hash:</span> <span className="text-gray-300 break-all">{prov?.input_hash || prov?.params_hash || "—"}</span></p>
+              <p><span className="text-zinc-300 font-sans">Result Hash:</span> <span className="text-gray-300 break-all">{prov?.result_hash || "—"}</span></p>
+              <p><span className="text-zinc-300 font-sans">Canonical Artifact Hash:</span> <span className="text-emerald-400 break-all">{prov?.artifact_hash || "—"}</span></p>
             </div>
           </div>
 
@@ -338,22 +338,22 @@ export default function ReportClient({ report }: { report: ReportData }) {
           <div className="p-4 rounded-xl bg-[#0e0e11] border border-[#222] space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-gray-200 flex items-center gap-1.5">
-                <ShieldCheck size={14} className="text-ansys-yellow" />
+                <ShieldCheck size={14} className="text-signal" />
                 CHIEF RACE ENGINEER SIGN-OFF
               </span>
-              <span className="text-[10px] uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded bg-black text-gray-400 border border-[#333]">
+              <span className="text-xs uppercase font-mono font-bold tracking-wider px-2 py-0.5 rounded bg-black text-gray-400 border border-[#333]">
                 ROLE: {prov?.approved_by_role || "ENGINEER"}
               </span>
             </div>
             <p className="text-xs text-gray-400 italic">
               &ldquo;{prov?.approval_comment || "Approved under automated telemetry correlation threshold."}&rdquo;
             </p>
-            <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-gray-500 font-mono pt-2 border-t border-[#18181c]">
+            <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400 font-mono pt-2 border-t border-[#18181c]">
               <span>Signee: <strong className="text-gray-300">{prov?.approved_by_email || "Chief Race Engineer"}</strong></span>
               <span>Timestamp: <strong className="text-gray-300">{prov?.approved_at ? new Date(prov.approved_at).toUTCString() : "Pending"}</strong></span>
             </div>
             {prov?.approval_signature && (
-              <div className="text-[10px] font-mono break-all text-emerald-400 bg-black/40 p-2 rounded border border-[#1a1a20]">
+              <div className="text-xs font-mono break-all text-emerald-400 bg-black/40 p-2 rounded border border-[#1a1a20]">
                 <strong>HMAC-SHA256 Signature:</strong> {prov.approval_signature}
               </div>
             )}
@@ -362,7 +362,7 @@ export default function ReportClient({ report }: { report: ReportData }) {
 
         {/* CTA */}
 
-        <div className="rounded-2xl border border-[#f2a900]/20 bg-[#f2a900]/5 p-6 text-center space-y-3 mt-6">
+        <div className="rounded-2xl border border-[#C8F04B]/20 bg-[#C8F04B]/5 p-6 text-center space-y-3 mt-6">
           <h3 className="text-lg font-bold text-white">Run your own suspension simulations</h3>
           <p className="text-sm text-gray-400">
             This analysis used a Spring Rate of {typeof p.k_s === "number" ? p.k_s.toLocaleString() : "..."} N/m and achieved ISO 2631-1 comfort rating: <strong className="text-white">{r.comfort_rating as string || "..."}</strong>.
@@ -376,7 +376,7 @@ export default function ReportClient({ report }: { report: ReportData }) {
             </Link>
             <Link
               href={`/${report.simulation_type}?${new URLSearchParams(Object.entries(p).map(([k, v]) => [k, String(v)])).toString()}`}
-              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-[#f2a900] text-black font-bold text-sm hover:brightness-110 transition-all"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl bg-signal text-carbon font-bold text-sm hover:brightness-110 transition-all"
             >
               <ExternalLink size={14} />
               Clone This Setup

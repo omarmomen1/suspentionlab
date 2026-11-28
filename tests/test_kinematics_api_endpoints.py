@@ -154,3 +154,134 @@ async def test_kinematics_defaults_and_info_endpoints(authenticated_client):
     info_data = res_info.json()
     assert "backend" in info_data
     assert "cpp_loaded" in info_data
+
+
+@pytest.mark.asyncio
+async def test_solve_response_reports_active_backend_and_fallback_reason(authenticated_client):
+    """
+    Wave 8: /solve reports requested_backend, active_backend, fallback_reason,
+    solver_version and geometry_hash.
+    Never shows C++ branding when the fallback answered.
+    """
+    payload = {
+        "hardpoints": DEFAULT_HARDPOINTS,
+        "z_min_mm": -25.0,
+        "z_max_mm": 25.0,
+        "n_steps": 11,
+        "backend": "auto",
+    }
+    resp = await authenticated_client.post("/api/v1/kinematics/solve", json=payload)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    assert "requested_backend" in data
+    assert "active_backend" in data
+    assert "fallback_reason" in data
+    assert "solver_version" in data
+    assert "geometry_hash" in data
+    assert len(data["geometry_hash"]) > 0
+
+    from suspensionlab.physics import kinematics as py_kin
+    if not py_kin._HAVE_CPP:
+        assert data["active_backend"] == "python_reference"
+        assert data["fallback_reason"] == "cpp_extension_not_loaded"
+        assert "c++" not in data["active_backend"].lower()
+    else:
+        assert data["active_backend"] == "cpp"
+        assert data["fallback_reason"] is None
+
+    # Test explicit C++ request in non-strict mode
+    payload_cpp = dict(payload, backend="cpp", strict_mode=False)
+    resp_cpp = await authenticated_client.post("/api/v1/kinematics/solve", json=payload_cpp)
+    assert resp_cpp.status_code == 200, resp_cpp.text
+    data_cpp = resp_cpp.json()
+    assert data_cpp["requested_backend"] == "cpp"
+    if not py_kin._HAVE_CPP:
+        assert data_cpp["active_backend"] == "python_reference"
+        assert data_cpp["fallback_reason"] == "cpp_extension_not_loaded"
+    else:
+        assert data_cpp["active_backend"] == "cpp"
+        assert data_cpp["fallback_reason"] is None
+
+
+@pytest.mark.asyncio
+async def test_nonconverged_sweep_steps_are_counted_not_hidden(authenticated_client):
+    """
+    Wave 8: Non-converged sweep steps must be counted and not hidden from the API response.
+    The response maintains the full n_steps length, marks failed steps as False in `converged`,
+    sets `all_converged` to False, and counts the non-converged steps in `nonconverged_steps`
+    and `convergence_summary`.
+    """
+    import copy
+    divergent_hp = copy.deepcopy(DEFAULT_HARDPOINTS)
+    # Modify upper wishbone outer balljoint so linkage locks before +/-150mm
+    divergent_hp["UWO"] = [-19.0, 450.0, 360.0]
+
+    payload = {
+        "hardpoints": divergent_hp,
+        "z_min_mm": -150.0,
+        "z_max_mm": 150.0,
+        "n_steps": 15,
+        "backend": "python",
+    }
+    resp = await authenticated_client.post("/api/v1/kinematics/solve", json=payload)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    # Steps must not be dropped/hidden: arrays preserve full step count
+    assert len(data["wheel_travel_mm"]) == 15
+    assert len(data["camber_deg"]) == 15
+    assert len(data["converged"]) == 15
+
+    # Some steps failed to converge
+    n_failed = sum(1 for c in data["converged"] if not c)
+    assert n_failed > 0, "Expected at least one nonconverged step for extreme geometry"
+    assert data["all_converged"] is False
+    assert data["nonconverged_steps"] == n_failed
+    assert data["nonconverged_count"] == n_failed
+    assert str(n_failed) in data["convergence_summary"]
+    assert "failed" in data["convergence_summary"].lower()
+
+
+@pytest.mark.asyncio
+async def test_kinematics_scope_notes_in_solve_and_export(authenticated_client):
+    """
+    Wave 8: Rigid-body and Corner-model scope notes in solve and CSV/JSON exports.
+    """
+    payload = {
+        "hardpoints": DEFAULT_HARDPOINTS,
+        "z_min_mm": -20.0,
+        "z_max_mm": 20.0,
+        "n_steps": 5,
+    }
+    # Solve response
+    resp = await authenticated_client.post("/api/v1/kinematics/solve", json=payload)
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "rigid_body_scope_note" in data
+    assert "Rigid-body kinematics. Bushing compliance" in data["rigid_body_scope_note"]
+    assert "corner_model_scope_note" in data
+    assert "Single-corner sweep; roll centre from a 2-D front-view" in data["corner_model_scope_note"]
+
+    # CSV Export
+    csv_resp = await authenticated_client.post(
+        "/api/v1/kinematics/export/csv",
+        json={"hardpoints": DEFAULT_HARDPOINTS, "format": "csv"},
+    )
+    assert csv_resp.status_code == 200
+    csv_text = csv_resp.text
+    assert "Single-corner sweep; roll centre from a 2-D front-view construction" in csv_text
+    assert "Left/right interaction and steering-rack compliance are not modeled" in csv_text
+
+    # JSON Export
+    json_resp = await authenticated_client.post(
+        "/api/v1/kinematics/export/json",
+        json={"hardpoints": DEFAULT_HARDPOINTS, "format": "json"},
+    )
+    assert json_resp.status_code == 200
+    json_data = json_resp.json()
+    scope_note_found = (
+        "Single-corner sweep; roll centre from a 2-D front-view construction" in json_data.get("scope_note", "")
+        or "Single-corner sweep; roll centre from a 2-D front-view construction" in json_data.get("metadata", {}).get("scope_note", "")
+    )
+    assert scope_note_found

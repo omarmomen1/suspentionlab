@@ -56,7 +56,7 @@ export default function GGFrictionCircle({ maxG, latG, longG, points }: GGFricti
             y: [longG],
             type: "scatter",
             mode: "markers",
-            marker: { color: "#f2a900", size: 12, symbol: "circle" },
+            marker: { color: "#C8F04B", size: 12, symbol: "circle" },
             name: "Actual G"
           }
         ]}

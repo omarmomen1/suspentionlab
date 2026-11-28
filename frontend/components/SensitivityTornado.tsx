@@ -44,7 +44,7 @@ function sensitivityColor(v: number): string {
 const KPI_COLORS: Record<string, string> = {
   rms_body_accel_wk:     "#ff2d55",
   rms_susp_travel:       "#bf5af2",
-  peak_transmissibility: "#f2a900",
+  peak_transmissibility: "#C8F04B",
   rms_tire_load:         "#00aeff",
 };
 
@@ -105,14 +105,14 @@ export default function SensitivityTornado({ payload, authHeader }: Props) {
       {/* Header */}
       <div className="flex items-center justify-between shrink-0">
         <div>
-          <p className="text-[9px] font-bold tracking-[0.2em] text-ansys-yellow uppercase">
+          <p className="text-xs font-bold tracking-[0.2em] text-signal uppercase">
             Parametric Sensitivity
           </p>
           <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-            <Activity size={14} className="text-ansys-yellow" />
+            <Activity size={14} className="text-signal" />
             Sensitivity Analysis
           </h2>
-          <p className="text-[10px] text-gray-400 mt-0.5">
+          <p className="text-xs text-gray-400 mt-0.5">
             Normalized finite-difference sensitivities of each KPI to ±{data?.perturbation_pct ?? 10}% parameter perturbation.
           </p>
         </div>
@@ -130,7 +130,7 @@ export default function SensitivityTornado({ payload, authHeader }: Props) {
           <button
             onClick={run}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-ansys-yellow text-black text-xs font-bold rounded-lg
+            className="flex items-center gap-2 px-4 py-2 bg-signal text-carbon text-xs font-bold rounded-lg
               hover:brightness-110 transition-all shadow-[0_0_16px_rgba(242,169,0,0.2)]
               disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
           >
@@ -154,8 +154,8 @@ export default function SensitivityTornado({ payload, authHeader }: Props) {
       {/* Empty state */}
       {!data && !loading && !error && (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-ansys-yellow/5 border border-ansys-yellow/10 flex items-center justify-center">
-            <TrendingUp size={32} strokeWidth={1} className="text-ansys-yellow/40" />
+          <div className="w-16 h-16 rounded-2xl bg-signal/5 border border-signal/10 flex items-center justify-center">
+            <TrendingUp size={32} strokeWidth={1} className="text-signal/40" />
           </div>
           <div>
             <p className="text-sm font-semibold text-gray-400 mb-1">Sensitivity Analysis</p>
@@ -170,7 +170,7 @@ export default function SensitivityTornado({ payload, authHeader }: Props) {
       {/* Loading pulse */}
       {loading && (
         <div className="flex-1 flex flex-col items-center justify-center gap-4" role="status" aria-live="polite">
-          <div className="w-10 h-10 border-2 border-ansys-yellow/20 border-t-ansys-yellow rounded-full animate-spin" />
+          <div className="w-10 h-10 border-2 border-signal/20 border-t-signal rounded-full animate-spin" />
           <p className="text-xs text-gray-400">
             Running {data?.n_simulations ?? 13} BDF simulations concurrently…
           </p>
@@ -184,7 +184,7 @@ export default function SensitivityTornado({ payload, authHeader }: Props) {
           <div className="flex flex-col gap-3">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-[#0d0d0f] border border-[#1e1e1e] rounded-xl p-3">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Target KPI:</span>
+                <span className="text-xs font-bold uppercase tracking-widest text-gray-400">Target KPI:</span>
                 {/* KPI selector */}
                 <div className="flex gap-2 flex-wrap" role="tablist" aria-label="KPI sensitivity targets">
                   {Object.entries(data.kpi_labels).map(([key, label]) => (
@@ -205,7 +205,7 @@ export default function SensitivityTornado({ payload, authHeader }: Props) {
                   ))}
                 </div>
               </div>
-              <span className="text-[10px] text-gray-500 font-mono">
+              <span className="text-xs text-zinc-400 font-mono">
                 ±{data.perturbation_pct}% Perturbation · {data.n_simulations} Runs
               </span>
             </div>
@@ -221,15 +221,15 @@ export default function SensitivityTornado({ payload, authHeader }: Props) {
                     onClick={() => setActiveKpi(key)}
                     className={`text-left rounded-xl p-3 flex flex-col gap-1 transition-all border ${
                       isSelected
-                        ? "bg-[#161619] border-ansys-yellow/50 shadow-[0_0_12px_rgba(242,169,0,0.12)]"
+                        ? "bg-[#161619] border-signal/50 shadow-[0_0_12px_rgba(242,169,0,0.12)]"
                         : "bg-[#111113] border-[#1e1e1e] hover:border-[#2d2d32]"
                     }`}
                   >
                     <div className="flex items-center justify-between w-full">
-                      <span className="text-[10px] font-bold tracking-wider text-gray-400 uppercase truncate">
+                      <span className="text-xs font-bold tracking-wider text-gray-400 uppercase truncate">
                         {data.kpi_labels[key] ?? key}
                       </span>
-                      <span className="text-[9px] text-gray-500 font-mono">Baseline</span>
+                      <span className="text-xs text-zinc-400 font-mono">Baseline</span>
                     </div>
                     <span className="text-base font-bold font-mono" style={{ color: KPI_COLORS[key] ?? "#fff" }}>
                       {val.toFixed(3)}
@@ -263,7 +263,7 @@ export default function SensitivityTornado({ payload, authHeader }: Props) {
                         <td className="py-2 px-3 text-right font-bold" style={{ color: sensitivityColor(val) }}>
                           {val.toFixed(4)}
                         </td>
-                        <td className="py-2 px-3 text-right text-[11px] text-gray-400">
+                        <td className="py-2 px-3 text-right text-xs text-gray-400">
                           {val > 0 ? "Increasing param increases KPI" : "Increasing param reduces KPI"}
                         </td>
                       </tr>

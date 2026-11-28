@@ -67,7 +67,7 @@ export default function EngineeringCard({
       <div className="flex-1">
         {status === "loading" && (
           <div className="py-12 flex flex-col items-center justify-center gap-3 text-gray-400 font-mono text-xs">
-            <Loader2 size={24} className="animate-spin text-ansys-yellow" />
+            <Loader2 size={24} className="animate-spin text-signal" />
             <span>Resolving physical state & telemetry...</span>
           </div>
         )}
@@ -104,8 +104,8 @@ export default function EngineeringCard({
         )}
 
         {status === "empty" && (
-          <div className="py-12 flex flex-col items-center justify-center gap-2 text-gray-500 font-mono text-xs text-center">
-            <Inbox size={24} className="text-gray-600" />
+          <div className="py-12 flex flex-col items-center justify-center gap-2 text-zinc-400 font-mono text-xs text-center">
+            <Inbox size={24} className="text-zinc-300" />
             <span>{statusMessage || "No engineering observations recorded."}</span>
           </div>
         )}
@@ -116,7 +116,7 @@ export default function EngineeringCard({
               <AlertTriangle size={14} /> Telemetry data is stale (&gt; 30s since DAQ heartbeat)
             </span>
             {onRetry && (
-              <button onClick={onRetry} className="text-[11px] underline hover:text-white">
+              <button onClick={onRetry} className="text-xs underline hover:text-white">
                 Reconnect
               </button>
             )}

@@ -104,11 +104,11 @@ export default function PricingPage() {
 
         {/* Header */}
         <div className="text-center mb-16">
-          <span className="text-[10px] font-bold tracking-[0.25em] text-ansys-yellow uppercase">Pricing & Plans</span>
+          <span className="text-xs font-bold tracking-[0.25em] text-signal uppercase">Pricing & Plans</span>
           <h1 className="text-5xl font-semibold tracking-tight text-white mt-3 mb-4">
             Simple, transparent engineering tiers
           </h1>
-          <p className="text-gray-500 text-lg max-w-xl mx-auto">
+          <p className="text-zinc-400 text-lg max-w-xl mx-auto">
             Every tier includes the core physics engine. Upgrade for full-car dynamics, damper LUTs, telemetry correlation, and team collaboration.
           </p>
         </div>
@@ -149,13 +149,13 @@ export default function PricingPage() {
               >
                 {isCurrentPlan ? (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="px-3 py-1 bg-emerald-500 text-black text-[10px] font-bold uppercase tracking-wider rounded-full">
+                    <span className="px-3 py-1 bg-emerald-500 text-black text-xs font-bold uppercase tracking-wider rounded-full">
                       Your Active Plan
                     </span>
                   </div>
                 ) : plan.badge && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <span className="px-3 py-1 bg-signal text-carbon text-[10px] font-bold uppercase tracking-wider rounded-full">
+                    <span className="px-3 py-1 bg-signal text-carbon text-xs font-bold uppercase tracking-wider rounded-full">
                       {plan.badge}
                     </span>
                   </div>
@@ -163,16 +163,16 @@ export default function PricingPage() {
 
                 <div className="mb-6">
                   <div className="flex items-center gap-2 mb-3">
-                    <Icon size={16} className={isCurrentPlan ? "text-emerald-400" : "text-ansys-yellow"} />
-                    <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{plan.name}</span>
+                    <Icon size={16} className={isCurrentPlan ? "text-emerald-400" : "text-signal"} />
+                    <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">{plan.name}</span>
                   </div>
                   <div className="flex items-end gap-1.5 mb-2">
                     <span className="text-4xl font-bold text-white">{plan.price}</span>
                     {plan.price !== "Free" && plan.price !== "Custom" && (
-                      <span className="text-gray-600 text-sm mb-1">{plan.billing}</span>
+                      <span className="text-zinc-300 text-sm mb-1">{plan.billing}</span>
                     )}
                   </div>
-                  <p className="text-sm text-gray-500">{plan.description}</p>
+                  <p className="text-sm text-zinc-400">{plan.description}</p>
                 </div>
 
                 <ul className="space-y-3 mb-8 flex-1">
@@ -229,7 +229,7 @@ export default function PricingPage() {
 
                 {plan.planKey === "ENTERPRISE" && (
                   <div className="mt-4 p-3 rounded-xl bg-purple-950/30 border border-purple-500/20 text-xs text-purple-200 text-center leading-relaxed">
-                    <span className="font-semibold text-purple-300">University Formula Student (FSAE / Formula Bharat / FSG) teams:</span> Use code <span className="font-mono font-bold text-ansys-yellow">FSAE50</span> at checkout for 50% academic sponsorship ($249/yr).
+                    <span className="font-semibold text-purple-300">University Formula Student (FSAE / Formula Bharat / FSG) teams:</span> Use code <span className="font-mono font-bold text-signal">FSAE50</span> at checkout for 50% academic sponsorship ($249/yr).
                   </div>
                 )}
               </div>
@@ -244,7 +244,7 @@ export default function PricingPage() {
             {FAQS.map((faq) => (
               <div key={faq.q} className="border-b border-[#1e1e1e] pb-6">
                 <h3 className="text-sm font-semibold text-white mb-2">{faq.q}</h3>
-                <p className="text-sm text-gray-500 leading-relaxed">{faq.a}</p>
+                <p className="text-sm text-zinc-400 leading-relaxed">{faq.a}</p>
               </div>
             ))}
           </div>
@@ -253,7 +253,7 @@ export default function PricingPage() {
         {/* Bottom CTA */}
         <div className="mt-20 text-center bg-[#0d0d0f] border border-[#1e1e1e] rounded-2xl p-12">
           <h2 className="text-3xl font-semibold text-white mb-3">Still have questions?</h2>
-          <p className="text-gray-500 mb-8">Our team of engineers is happy to walk you through the right plan for your use case.</p>
+          <p className="text-zinc-400 mb-8">Our team of engineers is happy to walk you through the right plan for your use case.</p>
           <Link href="mailto:support@suspensionlab.io"
             className="inline-flex items-center gap-2 px-6 py-3 bg-signal text-carbon border border-signal font-bold rounded-xl
               hover:bg-[#d6f56e] transition-colors">
@@ -263,11 +263,11 @@ export default function PricingPage() {
 
         {/* Legal links */}
         <div className="mt-12 text-center">
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-zinc-300">
             By subscribing you agree to our{" "}
-            <a href="/legal/terms" className="text-gray-500 hover:text-white underline transition-colors">Terms of Service</a>
+            <a href="/legal/terms" className="text-zinc-400 hover:text-white underline transition-colors">Terms of Service</a>
             {" "}and{" "}
-            <a href="/legal/privacy" className="text-gray-500 hover:text-white underline transition-colors">Privacy Policy</a>.
+            <a href="/legal/privacy" className="text-zinc-400 hover:text-white underline transition-colors">Privacy Policy</a>.
             Instant license key delivery via Gumroad or direct team invoicing.
           </p>
         </div>

@@ -60,7 +60,7 @@ export default function PlanGate({ required, children, overlay = false, compact 
       return (
         <span
           aria-busy="true"
-          className="inline-flex items-center px-2 py-0.5 rounded bg-slate-800/60 border border-slate-700/50 text-[10px] font-mono text-slate-400 animate-pulse"
+          className="inline-flex items-center px-2 py-0.5 rounded bg-slate-800/60 border border-slate-700/50 text-xs font-mono text-slate-400 animate-pulse"
         >
           Checking access...
         </span>
@@ -96,7 +96,7 @@ export default function PlanGate({ required, children, overlay = false, compact 
         title={copy.desc}
         className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-medium transition-all hover:brightness-110 ${copy.color}`}
       >
-        <span className="text-[10px] font-bold tracking-[0.14em] uppercase">{copy.badge}</span>
+        <span className="text-xs font-bold tracking-[0.14em] uppercase">{copy.badge}</span>
         {feature && <span className="text-gray-200">· {feature}</span>}
       </Link>
     );
@@ -110,7 +110,7 @@ export default function PlanGate({ required, children, overlay = false, compact 
         className="relative min-h-[240px]"
       >
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 rounded-xl border border-white/5 backdrop-blur-sm">
-          <span className={`text-[10px] font-bold tracking-[0.18em] uppercase border px-2.5 py-1 rounded-full mb-2 ${copy.color}`}>
+          <span className={`text-xs font-bold tracking-[0.18em] uppercase border px-2.5 py-1 rounded-full mb-2 ${copy.color}`}>
             {copy.badge}
           </span>
           {feature && <p className="text-xs text-gray-300 mb-1">{feature}</p>}
@@ -132,7 +132,7 @@ export default function PlanGate({ required, children, overlay = false, compact 
     >
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/[0.06] pb-4">
         <div className="space-y-1">
-          <span className={`inline-flex items-center text-[10px] font-mono font-bold tracking-[0.18em] uppercase border px-2.5 py-0.5 rounded-full ${copy.color}`}>
+          <span className={`inline-flex items-center text-xs font-mono font-bold tracking-[0.18em] uppercase border px-2.5 py-0.5 rounded-full ${copy.color}`}>
             {copy.badge} REQUIRED
           </span>
           {feature && <h2 className="text-base sm:text-lg font-bold text-white tracking-tight pt-1">{feature}</h2>}
@@ -141,7 +141,7 @@ export default function PlanGate({ required, children, overlay = false, compact 
           <div className="text-xs font-bold text-amber-400">
             {required === "ENTERPRISE" ? "$499 / yr" : "$79 / mo"}
           </div>
-          <div className="text-[10px] text-slate-400">
+          <div className="text-xs text-slate-400">
             {required === "ENTERPRISE" ? "Up to 10 Seats" : "License key required"}
           </div>
         </div>
@@ -155,13 +155,13 @@ export default function PlanGate({ required, children, overlay = false, compact 
             key={item.code}
             className="p-3 rounded-xl bg-[#090a0e] border border-[#1d202b] space-y-1"
           >
-            <div className="flex items-center gap-2 font-mono text-[10px] text-cyan-400 uppercase tracking-wider font-bold">
+            <div className="flex items-center gap-2 font-mono text-xs text-cyan-400 uppercase tracking-wider font-bold">
               <span>[{item.code}]</span>
               <span className="text-slate-100 font-sans text-xs tracking-normal normal-case font-semibold">
                 {item.title}
               </span>
             </div>
-            <p className="text-[11px] text-slate-400 leading-snug">{item.detail}</p>
+            <p className="text-xs text-slate-400 leading-snug">{item.detail}</p>
           </div>
         ))}
       </div>

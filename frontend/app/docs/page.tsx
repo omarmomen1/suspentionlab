@@ -41,17 +41,17 @@ export default function DocsPage() {
       <div className="max-w-6xl mx-auto px-6 py-12 flex gap-12">
         {/* Sidebar */}
         <div className="w-48 shrink-0 sticky top-16 self-start">
-          <p className="text-[9px] font-bold text-gray-700 uppercase tracking-widest mb-3">Contents</p>
+          <p className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-3">Contents</p>
           <nav className="space-y-1">
             {SECTIONS.map((s) => (
               <a key={s.id} href={`#${s.id}`}
-                className="block text-xs text-gray-500 hover:text-white transition-colors py-1">
+                className="block text-xs text-zinc-400 hover:text-white transition-colors py-1">
                 {s.label}
               </a>
             ))}
           </nav>
           <div className="mt-8 p-3 bg-[#111113] border border-[#1e1e1e] rounded-xl">
-            <p className="text-[10px] text-gray-600 mb-2">Need more help?</p>
+            <p className="text-xs text-zinc-300 mb-2">Need more help?</p>
             <a href="mailto:support@suspensionlab.io"
               className="inline-flex items-center gap-2 px-6 py-3 bg-[#1e1e20] border border-[#333] text-sm font-medium text-white rounded-xl hover:bg-[#252528] transition-colors">
               Contact Support
@@ -63,9 +63,9 @@ export default function DocsPage() {
         <div className="flex-1 min-w-0 space-y-16">
           {/* Header */}
           <div>
-            <span className="text-[10px] font-bold tracking-[0.2em] text-ansys-yellow uppercase">Reference</span>
+            <span className="text-xs font-bold tracking-[0.2em] text-signal uppercase">Reference</span>
             <h1 className="text-4xl font-semibold text-white mt-2 mb-4">Documentation</h1>
-            <p className="text-gray-500 leading-relaxed">
+            <p className="text-zinc-400 leading-relaxed">
               Complete reference for simulation parameters, physics models, KPI interpretation,
               and REST API access.
             </p>
@@ -74,7 +74,7 @@ export default function DocsPage() {
           {/* Quick Start */}
           <section id="quickstart">
             <h2 className="text-2xl font-semibold text-white mb-6 flex items-center gap-2">
-              <Zap size={20} className="text-ansys-yellow" /> Quick Start
+              <Zap size={20} className="text-signal" /> Quick Start
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {[
@@ -83,12 +83,12 @@ export default function DocsPage() {
                 { step: "3", title: "Run & analyse",         desc: "Click Run Solver. The RK45 ODE engine returns results in <1 second. Check the KPI ribbon and plots." },
               ].map((s) => (
                 <div key={s.step} className="bg-[#111113] border border-[#1e1e1e] rounded-xl p-5">
-                  <div className="w-7 h-7 rounded-full bg-ansys-yellow/10 text-ansys-yellow text-xs font-bold
+                  <div className="w-7 h-7 rounded-full bg-signal/10 text-signal text-xs font-bold
                     flex items-center justify-center mb-3">
                     {s.step}
                   </div>
                   <h3 className="text-sm font-bold text-white mb-1">{s.title}</h3>
-                  <p className="text-xs text-gray-500 leading-relaxed">{s.desc}</p>
+                  <p className="text-xs text-zinc-400 leading-relaxed">{s.desc}</p>
                 </div>
               ))}
             </div>
@@ -97,27 +97,27 @@ export default function DocsPage() {
           {/* Parameters */}
           <section id="params">
             <h2 className="text-2xl font-semibold text-white mb-6 flex items-center gap-2">
-              <Settings2 size={20} className="text-ansys-yellow" /> Input Parameters
+              <Settings2 size={20} className="text-signal" /> Input Parameters
             </h2>
             <div className="overflow-hidden rounded-xl border border-[#1e1e1e]">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="bg-[#111113] border-b border-[#1e1e1e]">
-                    <th className="px-5 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-wider">Symbol</th>
-                    <th className="px-5 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-wider">Name</th>
-                    <th className="px-5 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-wider">Unit</th>
-                    <th className="px-5 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-wider">Typical Range</th>
-                    <th className="px-5 py-3 text-left text-[10px] font-bold text-gray-600 uppercase tracking-wider">Description</th>
+                    <th className="px-5 py-3 text-left text-xs font-bold text-zinc-300 uppercase tracking-wider">Symbol</th>
+                    <th className="px-5 py-3 text-left text-xs font-bold text-zinc-300 uppercase tracking-wider">Name</th>
+                    <th className="px-5 py-3 text-left text-xs font-bold text-zinc-300 uppercase tracking-wider">Unit</th>
+                    <th className="px-5 py-3 text-left text-xs font-bold text-zinc-300 uppercase tracking-wider">Typical Range</th>
+                    <th className="px-5 py-3 text-left text-xs font-bold text-zinc-300 uppercase tracking-wider">Description</th>
                   </tr>
                 </thead>
                 <tbody>
                   {PARAMS.map((p, i) => (
                     <tr key={p.param} className={`border-b border-[#111113] ${i % 2 === 0 ? "bg-[#0a0a0c]" : "bg-[#0d0d0f]"}`}>
-                      <td className="px-5 py-3 font-mono text-ansys-yellow text-xs font-bold">{p.param}</td>
+                      <td className="px-5 py-3 font-mono text-signal text-xs font-bold">{p.param}</td>
                       <td className="px-5 py-3 text-white text-xs font-medium">{p.name}</td>
-                      <td className="px-5 py-3 text-gray-500 text-xs font-mono">{p.unit}</td>
+                      <td className="px-5 py-3 text-zinc-400 text-xs font-mono">{p.unit}</td>
                       <td className="px-5 py-3 text-gray-400 text-xs">{p.typical}</td>
-                      <td className="px-5 py-3 text-gray-600 text-xs leading-relaxed">{p.desc}</td>
+                      <td className="px-5 py-3 text-zinc-300 text-xs leading-relaxed">{p.desc}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -128,18 +128,18 @@ export default function DocsPage() {
           {/* KPIs */}
           <section id="kpis">
             <h2 className="text-2xl font-semibold text-white mb-6 flex items-center gap-2">
-              <BarChart3 size={20} className="text-ansys-yellow" /> KPI Interpretation
+              <BarChart3 size={20} className="text-signal" /> KPI Interpretation
             </h2>
             <div className="space-y-4">
               {KPIs.map((kpi) => (
                 <div key={kpi.name} className="bg-[#111113] border border-[#1e1e1e] rounded-xl p-5 flex gap-5">
                   <div className="shrink-0 w-28">
-                    <p className="text-[10px] font-bold text-gray-600 uppercase tracking-wider mb-1">Target</p>
+                    <p className="text-xs font-bold text-zinc-300 uppercase tracking-wider mb-1">Target</p>
                     <p className="text-xs font-bold text-emerald-400 font-mono">{kpi.good}</p>
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-white mb-1">{kpi.name}</h3>
-                    <p className="text-xs text-gray-500 leading-relaxed">{kpi.desc}</p>
+                    <p className="text-xs text-zinc-400 leading-relaxed">{kpi.desc}</p>
                   </div>
                 </div>
               ))}
@@ -149,7 +149,7 @@ export default function DocsPage() {
           {/* Models */}
           <section id="models">
             <h2 className="text-2xl font-semibold text-white mb-6 flex items-center gap-2">
-              <Activity size={20} className="text-ansys-yellow" /> Physics Models
+              <Activity size={20} className="text-signal" /> Physics Models
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {[
@@ -158,10 +158,20 @@ export default function DocsPage() {
                   eqs: ["m_s·z̈_s + c(ż_s-ż_u) + k_s(z_s-z_u) = 0", "m_u·z̈_u - c(ż_s-ż_u) - k_s(z_s-z_u) + k_t(z_u-z_r) = 0"] },
                 { name: "Half Car (4-DOF)", plan: "PRO", href: "/half-car",
                   desc: "Front + rear axles. Adds pitch coupling. Reveals front-to-rear phase lag at highway speeds, critical for vehicle-level comfort and dynamic weight transfer.",
-                  eqs: ["m_s·z̈_s = ...", "I_y·θ̈ = ..."] },
+                  eqs: [
+                    "m_s·z̈_s = F_f + F_r",
+                    "I_y·θ̈ = -l_f·F_f + l_r·F_r",
+                    "m_uf·z̈_uf = k_tf·(z_rf - z_uf) - F_f",
+                    "m_ur·z̈_ur = k_tr·(z_rr - z_ur) - F_r",
+                  ] },
                 { name: "Full Car (7-DOF)", plan: "PRO", href: "/full-car",
                   desc: "All 4 corners. Body heave + pitch + roll + 4 unsprung masses. Required for roll dynamics, anti-roll bar sizing, and lateral load transfer analysis.",
-                  eqs: [] },
+                  eqs: [
+                    "m_s·z̈_s = Σ F_i  (i ∈ FL, FR, RL, RR)",
+                    "I_x·φ̈ = (F_FL - F_FR)·t_f/2 + (F_RL - F_RR)·t_r/2",
+                    "I_y·θ̈ = -(F_FL + F_FR)·l_f + (F_RL + F_RR)·l_r",
+                    "m_ui·z̈_ui = k_ti·(z_ri - z_ui) - F_i  (4 corners)",
+                  ] },
                 { name: "Active Suspension", plan: "PRO", href: "/active",
                   desc: "Skyhook control law applied to a quarter car. Compares controlled damping against passive baseline. Quantifies the theoretical maximum comfort improvement.",
                   eqs: [] },
@@ -171,17 +181,17 @@ export default function DocsPage() {
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-sm font-bold text-white">{m.name}</h3>
                     <div className="flex items-center gap-2">
-                      <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                        m.plan === "FREE" ? "text-gray-500 bg-[#1e1e1e]" : "text-ansys-yellow bg-ansys-yellow/10"
+                      <span className={`text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                        m.plan === "FREE" ? "text-zinc-400 bg-[#1e1e1e]" : "text-signal bg-signal/10"
                       }`}>{m.plan}</span>
-                      <ChevronRight size={13} className="text-gray-700 group-hover:text-white transition-colors" />
+                      <ChevronRight size={13} className="text-zinc-300 group-hover:text-white transition-colors" />
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500 leading-relaxed mb-3">{m.desc}</p>
+                  <p className="text-xs text-zinc-400 leading-relaxed mb-3">{m.desc}</p>
                   {m.eqs.length > 0 && (
                     <div className="bg-black/50 rounded-lg px-3 py-2 border border-[#1a1a1a]">
                       {m.eqs.map((eq) => (
-                        <p key={eq} className="text-[10px] font-mono text-gray-600">{eq}</p>
+                        <p key={eq} className="text-xs font-mono text-zinc-300">{eq}</p>
                       ))}
                     </div>
                   )}
@@ -193,15 +203,11 @@ export default function DocsPage() {
           {/* API */}
           <section id="api">
             <h2 className="text-2xl font-semibold text-white mb-2 flex items-center gap-2">
-              <BookOpen size={20} className="text-ansys-yellow" /> REST API
+              <BookOpen size={20} className="text-signal" /> REST API
             </h2>
-            <p className="text-sm text-gray-500 mb-6">
-              The SuspensionLab API is available to Pro and Enterprise subscribers.
-              Interactive docs are at{" "}
-              <a href={`${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000"}/docs`}
-                target="_blank" className="text-ansys-yellow hover:underline inline-flex items-center gap-1">
-                /docs <ExternalLink size={11} />
-              </a>
+            <p className="text-sm text-zinc-300 mb-6 leading-relaxed">
+              The SuspensionLab API powers Pro and Enterprise workspaces via cookie-authenticated REST endpoints.
+              Interactive OpenAPI documentation (<code className="text-zinc-200 font-mono">/docs</code>) is disabled on production deployments and available when running locally with <code className="text-zinc-200 font-mono">ENVIRONMENT=DEV</code>.
             </p>
 
             <div className="space-y-4">
@@ -215,14 +221,14 @@ export default function DocsPage() {
                 { method: "POST", path: "/billing/checkout",   desc: "Create a Gumroad Checkout Session. Returns a URL to redirect the user to." },
               ].map((ep) => (
                 <div key={ep.path} className="flex gap-4 items-start bg-[#111113] border border-[#1e1e1e] rounded-xl px-5 py-3">
-                  <span className={`text-[10px] font-black tracking-wider px-2 py-1 rounded font-mono shrink-0 mt-0.5 ${
+                  <span className={`text-xs font-black tracking-wider px-2 py-1 rounded font-mono shrink-0 mt-0.5 ${
                     ep.method === "GET" ? "bg-blue-950 text-blue-400" : "bg-green-950 text-green-400"
                   }`}>
                     {ep.method}
                   </span>
                   <div>
                     <code className="text-xs text-gray-300 font-mono">{ep.path}</code>
-                    <p className="text-xs text-gray-600 mt-0.5">{ep.desc}</p>
+                    <p className="text-xs text-zinc-300 mt-0.5">{ep.desc}</p>
                   </div>
                 </div>
               ))}
@@ -235,7 +241,7 @@ export default function DocsPage() {
             <div className="space-y-5">
               {[
                 { q: "What ODE solver does the physics engine use?",
-                  a: "RK45 (Runge-Kutta 4th/5th order with adaptive step size) via scipy.integrate.solve_ivp. This provides excellent accuracy for stiff suspension systems with minimal numerical drift." },
+                  a: "BDF (Implicit Backward Differentiation Formula) via scipy.integrate.solve_ivp is used for stiff 2-DOF/4-DOF/7-DOF coupled suspension systems, alongside adaptive RK45 where non-stiff explicit integration applies." },
                 { q: "How is ISO 2631-1 Wk weighting applied?",
                   a: "A 3rd-order IIR filter approximating the Wk frequency weighting curve is applied to the sprung mass acceleration time series. Requires a simulation sample rate > 160 Hz." },
                 { q: "My simulation shows ringing/oscillations — what does this mean?",
@@ -247,7 +253,7 @@ export default function DocsPage() {
               ].map((faq) => (
                 <div key={faq.q} className="border-b border-[#1e1e1e] pb-5">
                   <h3 className="text-sm font-semibold text-white mb-2">{faq.q}</h3>
-                  <p className="text-sm text-gray-500 leading-relaxed">{faq.a}</p>
+                  <p className="text-sm text-zinc-400 leading-relaxed">{faq.a}</p>
                 </div>
               ))}
             </div>

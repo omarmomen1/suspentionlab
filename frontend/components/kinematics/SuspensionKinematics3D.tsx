@@ -594,13 +594,13 @@ export default function SuspensionKinematics3D({
 
         {/* Kinematic Overlay Toggles */}
         <div className="flex items-center gap-1.5 bg-[#0f1118]/90 backdrop-blur-md border border-[#252836] px-2.5 py-1 rounded-lg pointer-events-auto shadow-lg">
-          <span className="text-[10px] font-bold uppercase tracking-wider text-gray-400 mr-1 hidden sm:inline">
+          <span className="text-xs font-bold uppercase tracking-wider text-gray-400 mr-1 hidden sm:inline">
             Overlays:
           </span>
           <button
             onClick={() => setShowIC(!showIC)}
-            className={`px-2 py-0.5 text-[11px] font-mono rounded border transition-colors ${
-              showIC ? "bg-rose-950/60 border-rose-500/50 text-rose-300 font-semibold" : "bg-[#141620] border-transparent text-gray-500"
+            className={`px-2 py-0.5 text-xs font-mono rounded border transition-colors ${
+              showIC ? "bg-rose-950/60 border-rose-500/50 text-rose-300 font-semibold" : "bg-[#141620] border-transparent text-zinc-400"
             }`}
             title="Toggle Instant Centers (IC_fv, IC_sv)"
           >
@@ -608,8 +608,8 @@ export default function SuspensionKinematics3D({
           </button>
           <button
             onClick={() => setShowRC(!showRC)}
-            className={`px-2 py-0.5 text-[11px] font-mono rounded border transition-colors ${
-              showRC ? "bg-purple-950/60 border-purple-500/50 text-purple-300 font-semibold" : "bg-[#141620] border-transparent text-gray-500"
+            className={`px-2 py-0.5 text-xs font-mono rounded border transition-colors ${
+              showRC ? "bg-purple-950/60 border-purple-500/50 text-purple-300 font-semibold" : "bg-[#141620] border-transparent text-zinc-400"
             }`}
             title="Toggle Roll Center (RC)"
           >
@@ -617,8 +617,8 @@ export default function SuspensionKinematics3D({
           </button>
           <button
             onClick={() => setShowSteering(!showSteering)}
-            className={`px-2 py-0.5 text-[11px] font-mono rounded border transition-colors ${
-              showSteering ? "bg-amber-950/60 border-amber-500/50 text-amber-300 font-semibold" : "bg-[#141620] border-transparent text-gray-500"
+            className={`px-2 py-0.5 text-xs font-mono rounded border transition-colors ${
+              showSteering ? "bg-amber-950/60 border-amber-500/50 text-amber-300 font-semibold" : "bg-[#141620] border-transparent text-zinc-400"
             }`}
             title="Toggle Steering Axis & Scrub Radius"
           >
@@ -626,8 +626,8 @@ export default function SuspensionKinematics3D({
           </button>
           <button
             onClick={() => setShowGround(!showGround)}
-            className={`px-2 py-0.5 text-[11px] font-mono rounded border transition-colors ${
-              showGround ? "bg-cyan-950/60 border-cyan-500/50 text-cyan-300 font-semibold" : "bg-[#141620] border-transparent text-gray-500"
+            className={`px-2 py-0.5 text-xs font-mono rounded border transition-colors ${
+              showGround ? "bg-cyan-950/60 border-cyan-500/50 text-cyan-300 font-semibold" : "bg-[#141620] border-transparent text-zinc-400"
             }`}
             title="Toggle Ground Grid Datum"
           >
@@ -675,7 +675,7 @@ export default function SuspensionKinematics3D({
               <span className="text-xs font-bold text-gray-100 font-mono">
                 {activeHoveredNode}
               </span>
-              <span className="text-[11px] text-gray-400">
+              <span className="text-xs text-gray-400">
                 {hoveredInfo?.label || "Suspension Hardpoint"}
               </span>
             </div>
@@ -690,13 +690,13 @@ export default function SuspensionKinematics3D({
                 <strong className="text-cyan-400">Z</strong> (up): {hoveredCoords[2] >= 0 ? `+${hoveredCoords[2].toFixed(1)}` : hoveredCoords[2].toFixed(1)} mm
               </span>
             </div>
-            <div className="mt-1 text-[9px] text-gray-500 font-mono">
+            <div className="mt-1 text-xs text-zinc-400 font-mono">
               Coordinate Frame: SAE J670 (+X Forward, +Y Outboard, +Z Upward)
             </div>
           </div>
         ) : (
           <div className="bg-[#0c0e15]/80 backdrop-blur-md border border-[#222533] rounded-lg px-3 py-1.5 pointer-events-auto">
-            <span className="text-[11px] text-gray-400 flex items-center gap-2">
+            <span className="text-xs text-gray-400 flex items-center gap-2">
               <Info className="w-3.5 h-3.5 text-cyan-500" />
               Hover any suspension joint or construction line for 3D coordinates
             </span>
@@ -704,7 +704,7 @@ export default function SuspensionKinematics3D({
         )}
 
         {/* Legend / Coordinate Frame Indicator */}
-        <div className="bg-[#0c0e15]/85 backdrop-blur-md border border-[#222533] px-3 py-1.5 rounded-lg flex items-center gap-3 text-[10px] font-mono text-gray-400 pointer-events-auto ml-auto">
+        <div className="bg-[#0c0e15]/85 backdrop-blur-md border border-[#222533] px-3 py-1.5 rounded-lg flex items-center gap-3 text-xs font-mono text-gray-400 pointer-events-auto ml-auto">
           <div className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-rose-500 inline-block" />
             <span>Upper A-Arm</span>

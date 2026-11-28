@@ -174,7 +174,7 @@ class EngineeringDecisionRequest(BaseModel):
     selected_setup: str = Field("SETUP-P3L-CAND-01")
     alternatives: Optional[List[str]] = None
     outcome: str = Field("ACCEPT", description="ACCEPT | REJECT | INCONCLUSIVE | UNSUPPORTED")
-    author: str = Field("Elena Rostova")
+    author: str = Field("", description="Decision author")
     evidence: Optional[Dict[str, Any]] = None
     simulation_results: Optional[Dict[str, Any]] = None
     blind_validation_results: Optional[Dict[str, Any]] = None
@@ -182,7 +182,7 @@ class EngineeringDecisionRequest(BaseModel):
 
 class ApprovalRequest(BaseModel):
     decision_code: str = Field("DEC-P3L-01")
-    approver_name: str = Field("Elena Rostova")
+    approver_name: str = Field("", description="Approver full name")
     approver_role: str = Field("Chief Race Engineer & Technical Director")
     approval_code: str = Field("APPR-P3L-01")
     notes: Optional[str] = None

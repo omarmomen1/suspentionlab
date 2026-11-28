@@ -135,7 +135,7 @@ export default function BlueprintSVG({
         </label>
       )}
 
-      <dl data-testid="blueprint-readouts" className="grid grid-cols-2 gap-2 text-[11px] sm:grid-cols-4">
+      <dl data-testid="blueprint-readouts" className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4">
         {[
           ["ΔY wheel centre", dYWheel, "mm"],
           ["ΔY roll centre", dYRoll, "mm"],
@@ -143,13 +143,13 @@ export default function BlueprintSVG({
           ["Motion ratio", motionRatio, ""],
         ].map(([label, v, unit]) => (
           <div key={label as string} className="rounded border border-hairline bg-panel px-2 py-1.5">
-            <dt className="text-[10px] uppercase tracking-wider text-gray-500">{label as string}</dt>
+            <dt className="text-xs uppercase tracking-wider text-zinc-400">{label as string}</dt>
             <dd className="v2-num text-white">{fin(v as number | null | undefined) ? `${(v as number).toFixed(label === "Motion ratio" ? 3 : 1)} ${unit}` : <EmptyState />}</dd>
           </div>
         ))}
       </dl>
       {motionRatioBand && fin(motionRatio) && (
-        <p data-testid="blueprint-mr-band" className={`text-[11px] ${mrOut ? "text-warning" : "text-verified"}`}>
+        <p data-testid="blueprint-mr-band" className={`text-xs ${mrOut ? "text-warning" : "text-verified"}`}>
           Motion ratio {motionRatio.toFixed(3)} is {mrOut ? "outside" : "inside"} the target band {motionRatioBand[0].toFixed(2)} to {motionRatioBand[1].toFixed(2)}.
         </p>
       )}

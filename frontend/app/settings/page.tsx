@@ -13,7 +13,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 const PLAN_BADGES: Record<string, { label: string; color: string }> = {
   FREE:       { label: "Free Sandbox", color: "text-gray-400 bg-[#1e1e1e]"          },
   TRIAL:      { label: "Evaluation", color: "text-amber-300 bg-amber-500/10"      },
-  PRO:        { label: "Pro Engineer ($79/mo)", color: "text-ansys-yellow bg-ansys-yellow/10" },
+  PRO:        { label: "Pro Engineer ($79/mo)", color: "text-signal bg-signal/10" },
   ENTERPRISE: { label: "Race Team & Consultancy Pass ($499/yr)", color: "text-purple-400 bg-purple-900/20" },
 };
 
@@ -28,7 +28,7 @@ function SectionCard({ title, icon: Icon, children }: {
   return (
     <div className="bg-[#111113] border border-[#1e1e1e] rounded-2xl overflow-hidden">
       <div className="flex items-center gap-2.5 px-6 py-4 border-b border-[#1e1e1e]">
-        <Icon size={15} className="text-ansys-yellow" />
+        <Icon size={15} className="text-signal" />
         <h2 className="text-sm font-semibold text-white">{title}</h2>
       </div>
       <div className="p-6">{children}</div>
@@ -68,7 +68,7 @@ export default function SettingsPage() {
   const [scimStatus, setScimStatus] = useState<any>(null);
 
   const plan    = user?.plan ?? "FREE";
-  const badge   = PLAN_BADGES[plan] ?? { label: "Unknown", color: "text-gray-500 bg-[#1e1e1e]" };
+  const badge   = PLAN_BADGES[plan] ?? { label: "Unknown", color: "text-zinc-400 bg-[#1e1e1e]" };
   const canKeys = plan !== "FREE";
   const isEnterprise = plan === "ENTERPRISE" || user?.user_id === "admin-001";
 
@@ -216,7 +216,7 @@ export default function SettingsPage() {
     <div className="min-h-full bg-black pt-[44px]">
       <div className="max-w-4xl mx-auto px-6 py-12">
         <div className="mb-8">
-          <span className="text-[10px] font-bold tracking-[0.2em] text-ansys-yellow uppercase">Account</span>
+          <span className="text-xs font-bold tracking-[0.2em] text-signal uppercase">Account</span>
           <h1 className="text-3xl font-semibold text-white mt-1">Settings</h1>
         </div>
 
@@ -229,8 +229,8 @@ export default function SettingsPage() {
                 <button key={tab.id} onClick={() => setActiveTab(tab.id)}
                   className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm transition-colors ${
                     activeTab === tab.id
-                      ? "bg-ansys-yellow/10 text-ansys-yellow font-semibold"
-                      : "text-gray-500 hover:text-gray-300 hover:bg-[#111113]"
+                      ? "bg-signal/10 text-signal font-semibold"
+                      : "text-zinc-400 hover:text-gray-300 hover:bg-[#111113]"
                   }`}>
                   <Icon size={14} /> {tab.label}
                 </button>
@@ -253,15 +253,15 @@ export default function SettingsPage() {
               <SectionCard title="Profile" icon={User}>
                 <div className="space-y-4">
                   <div>
-                    <p className="text-xs text-gray-500 mb-0.5">Name</p>
+                    <p className="text-xs text-zinc-400 mb-0.5">Name</p>
                     <p className="text-sm text-white font-medium">{user?.name || "—"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 mb-0.5">Email</p>
+                    <p className="text-xs text-zinc-400 mb-0.5">Email</p>
                     <p className="text-sm text-white font-medium">{user?.email || "—"}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 mb-0.5">Current Plan</p>
+                    <p className="text-xs text-zinc-400 mb-0.5">Current Plan</p>
                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${badge.color}`}>
                       {badge.label}
                     </span>
@@ -305,7 +305,7 @@ export default function SettingsPage() {
                   {plan !== "ENTERPRISE" && (
                     <div className="mt-4 pt-4 border-t border-[#1e1e1e]">
                       <p className="text-sm font-semibold text-white mb-2">Activate License Key</p>
-                      <p className="text-xs text-gray-500 mb-4">
+                      <p className="text-xs text-zinc-400 mb-4">
                         Purchased a license on Gumroad or received a direct team key (SLPRO-...)? Enter your license key here to unlock features instantly.
                       </p>
                       <div className="mb-3">
@@ -313,7 +313,7 @@ export default function SettingsPage() {
                           href={gumroadProUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-ansys-yellow/10 border border-ansys-yellow/30 text-xs font-bold text-ansys-yellow hover:bg-ansys-yellow/20 transition-all"
+                          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-signal/10 border border-signal/30 text-xs font-bold text-signal hover:bg-signal/20 transition-all"
                         >
                           Don’t have a license key yet? Get Pro on Gumroad →
                           <ExternalLink size={12} />
@@ -325,7 +325,7 @@ export default function SettingsPage() {
                           value={gumroadKey}
                           onChange={(e) => setGumroadKey(e.target.value)}
                           placeholder="e.g. XXXXXXXX-XXXXXXXX-XXXXXXXX-XXXXXXXX or SLPRO-PRO-..."
-                          className="flex-1 bg-[#0d0d0f] border border-[#252525] rounded-xl px-3 py-2 text-sm text-white placeholder:text-gray-700 focus:outline-none focus:border-ansys-yellow/60 transition-all font-mono"
+                          className="flex-1 bg-[#0d0d0f] border border-[#252525] rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-300 focus:outline-none focus:border-signal/60 transition-all font-mono"
                         />
                         <button
                           onClick={activateLicense}
@@ -352,8 +352,8 @@ export default function SettingsPage() {
               <SectionCard title="API Keys" icon={Key}>
                 {!canKeys ? (
                   <div className="text-center py-6">
-                    <Key size={32} className="mx-auto text-gray-700 mb-3" />
-                    <p className="text-sm text-gray-500 mb-4">API key access requires the Pro or Enterprise plan.</p>
+                    <Key size={32} className="mx-auto text-zinc-300 mb-3" />
+                    <p className="text-sm text-zinc-400 mb-4">API key access requires the Pro or Enterprise plan.</p>
                     <Link href="/pricing"
                       className="px-4 py-2 bg-signal text-carbon border border-signal text-xs font-bold rounded-xl hover:bg-[#d6f56e] transition-colors">
                       Upgrade to Pro
@@ -371,12 +371,12 @@ export default function SettingsPage() {
                         <div className="flex items-center gap-2 bg-black/50 rounded-lg px-3 py-2 font-mono text-xs text-gray-300 border border-white/5">
                           <span className="flex-1 truncate">{newKeyValue}</span>
                           <button onClick={() => copyKey(newKeyValue)}
-                            className="text-gray-600 hover:text-white transition-colors shrink-0">
+                            className="text-zinc-300 hover:text-white transition-colors shrink-0">
                             {copied ? <CheckCircle2 size={13} className="text-emerald-500" /> : <Copy size={13} />}
                           </button>
                         </div>
                         <button onClick={() => setNewKeyValue(null)}
-                          className="mt-2 text-[10px] text-gray-600 hover:text-gray-400">
+                          className="mt-2 text-xs text-zinc-300 hover:text-gray-400">
                           I&apos;ve copied the key
                         </button>
                       </div>
@@ -387,7 +387,7 @@ export default function SettingsPage() {
                       <input type="text" value={newKeyName} onChange={(e) => setNewKeyName(e.target.value)}
                         placeholder="Key name (e.g. Python Script, CI Pipeline)"
                         className="flex-1 bg-[#0d0d0f] border border-[#252525] rounded-xl px-3 py-2 text-sm text-white
-                          placeholder:text-gray-700 focus:outline-none focus:border-ansys-yellow/60 transition-all" />
+                          placeholder:text-zinc-300 focus:outline-none focus:border-signal/60 transition-all" />
                       <button onClick={createKey} disabled={creatingKey || !newKeyName.trim()}
                         className="px-4 py-2 bg-signal text-carbon border border-signal text-xs font-bold rounded-xl
                           hover:bg-[#d6f56e] transition-colors disabled:opacity-40 flex items-center gap-1.5">
@@ -399,10 +399,10 @@ export default function SettingsPage() {
                     {/* Key list */}
                     {loadingKeys ? (
                       <div className="flex items-center justify-center py-6">
-                        <Loader2 size={20} className="animate-spin text-gray-600" />
+                        <Loader2 size={20} className="animate-spin text-zinc-300" />
                       </div>
                     ) : apiKeys.length === 0 ? (
-                      <p className="text-sm text-gray-600 text-center py-4">No API keys yet.</p>
+                      <p className="text-sm text-zinc-300 text-center py-4">No API keys yet.</p>
                     ) : (
                       <div className="space-y-2">
                         {apiKeys.map((k) => (
@@ -410,16 +410,16 @@ export default function SettingsPage() {
                             bg-[#0d0d0f] border border-[#1e1e1e] rounded-xl">
                             <div className="min-w-0">
                               <p className="text-xs font-semibold text-white">{k.name}</p>
-                              <p className="text-[10px] text-gray-600 font-mono mt-0.5">{k.key_prefix}••••••••</p>
+                              <p className="text-xs text-zinc-300 font-mono mt-0.5">{k.key_prefix}••••••••</p>
                             </div>
                             <div className="flex items-center gap-3 shrink-0">
-                              <p className="text-[10px] text-gray-700">
+                              <p className="text-xs text-zinc-300">
                                 {k.last_used
                                   ? `Used ${new Date(k.last_used).toLocaleDateString("en-GB")}`
                                   : "Never used"}
                               </p>
                               <button onClick={() => revokeKey(k.id)}
-                                className="text-gray-600 hover:text-red-400 transition-colors">
+                                className="text-zinc-300 hover:text-red-400 transition-colors">
                                 <Trash2 size={13} />
                               </button>
                             </div>
@@ -429,10 +429,10 @@ export default function SettingsPage() {
                     )}
 
                     <div className="mt-4 p-3 bg-[#0d0d0f] border border-[#1e1e1e] rounded-xl">
-                      <p className="text-[10px] text-gray-600 leading-relaxed">
+                      <p className="text-xs text-zinc-300 leading-relaxed">
                         Use keys in your requests with the <code className="text-gray-400">X-API-Key</code> header.
                         {" "}API docs available at{" "}
-                        <a href={`${API_BASE}/docs`} target="_blank" className="text-ansys-yellow hover:underline">
+                        <a href={`${API_BASE}/docs`} target="_blank" className="text-signal hover:underline">
                           {API_BASE}/docs <ExternalLink size={9} className="inline" />
                         </a>
                       </p>
@@ -459,7 +459,7 @@ export default function SettingsPage() {
                       <p className="text-sm font-semibold text-amber-400">Password reset</p>
                       <p className="text-xs text-gray-400 max-w-sm">
                         To reset password or manage cryptographic credentials, contact{" "}
-                        <a href="mailto:support@suspensionlab.io" className="text-ansys-yellow hover:underline">support@suspensionlab.io</a>.
+                        <a href="mailto:support@suspensionlab.io" className="text-signal hover:underline">support@suspensionlab.io</a>.
                       </p>
                     </div>
                   </div>
@@ -468,7 +468,7 @@ export default function SettingsPage() {
                     <div className="flex items-center justify-between mb-3">
                       <div>
                         <p className="text-xs font-bold text-white uppercase tracking-wider">Active Device Sessions</p>
-                        <p className="text-[11px] text-gray-500">Cryptographically tracked JWT sessions with remote revocation</p>
+                        <p className="text-xs text-zinc-400">Cryptographically tracked JWT sessions with remote revocation</p>
                       </div>
                       <div className="flex items-center gap-2">
                         <button
@@ -499,18 +499,18 @@ export default function SettingsPage() {
 
                     {loadingSessions ? (
                       <div className="py-6 flex items-center justify-center">
-                        <Loader2 size={20} className="animate-spin text-ansys-yellow" />
+                        <Loader2 size={20} className="animate-spin text-signal" />
                       </div>
                     ) : sessions.length === 0 ? (
                       <div className="p-4 rounded-xl bg-[#0d0d0f] border border-[#1e1e1e] text-xs text-gray-400 flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
-                          <Laptop size={16} className="text-ansys-yellow" />
+                          <Laptop size={16} className="text-signal" />
                           <div>
                             <div className="font-semibold text-white">Current Browser Session</div>
-                            <div className="text-[10px] text-gray-500 font-mono">Authenticated via HTTP-only session cookie</div>
+                            <div className="text-xs text-zinc-400 font-mono">Authenticated via HTTP-only session cookie</div>
                           </div>
                         </div>
-                        <span className="px-2 py-0.5 rounded bg-emerald-950/50 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono">
+                        <span className="px-2 py-0.5 rounded bg-emerald-950/50 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
                           ACTIVE
                         </span>
                       </div>
@@ -525,17 +525,17 @@ export default function SettingsPage() {
                               className="flex items-center justify-between p-3 rounded-xl bg-[#0d0d0f] border border-[#1e1e1e] hover:border-white/10 transition-colors text-xs"
                             >
                               <div className="flex items-center gap-3 min-w-0">
-                                <DevIcon size={18} className="text-ansys-yellow shrink-0" />
+                                <DevIcon size={18} className="text-signal shrink-0" />
                                 <div className="min-w-0">
                                   <div className="font-semibold text-white flex items-center gap-2">
                                     <span className="truncate">{sess.user_agent || "Web Browser"}</span>
                                     {sess.is_current && (
-                                      <span className="px-1.5 py-0.2 rounded bg-emerald-950 border border-emerald-500/30 text-emerald-400 text-[9px] font-mono">
+                                      <span className="px-1.5 py-0.2 rounded bg-emerald-950 border border-emerald-500/30 text-emerald-400 text-xs font-mono">
                                         THIS DEVICE
                                       </span>
                                     )}
                                   </div>
-                                  <div className="text-[10px] text-gray-500 font-mono flex items-center gap-3 mt-0.5">
+                                  <div className="text-xs text-zinc-400 font-mono flex items-center gap-3 mt-0.5">
                                     <span>IP: {sess.ip_address || "127.0.0.1"}</span>
                                     <span>Expires: {new Date(sess.expires_at).toLocaleDateString()}</span>
                                   </div>
@@ -555,7 +555,7 @@ export default function SettingsPage() {
                                   }
                                 }}
                                 disabled={revokingJti === sess.jti}
-                                className="px-2.5 py-1 rounded bg-white/5 hover:bg-red-950/40 hover:text-red-400 border border-white/10 hover:border-red-500/30 text-gray-400 text-[11px] transition-colors shrink-0 flex items-center gap-1"
+                                className="px-2.5 py-1 rounded bg-white/5 hover:bg-red-950/40 hover:text-red-400 border border-white/10 hover:border-red-500/30 text-gray-400 text-xs transition-colors shrink-0 flex items-center gap-1"
                               >
                                 {revokingJti === sess.jti ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />}
                                 Revoke
@@ -585,17 +585,17 @@ export default function SettingsPage() {
                 <div className="space-y-6">
                   {!isEnterprise ? (
                     <div className="text-center py-6">
-                      <Building2 size={32} className="mx-auto text-gray-700 mb-3" />
+                      <Building2 size={32} className="mx-auto text-zinc-300 mb-3" />
                       <p className="text-sm text-gray-400 mb-2 font-semibold">Enterprise Directory Integration</p>
-                      <p className="text-xs text-gray-500 mb-4 max-w-md mx-auto">
+                      <p className="text-xs text-zinc-400 mb-4 max-w-md mx-auto">
                         Automated user lifecycle management via SCIM 2.0 and SAML/SSO authentication requires the Enterprise plan.
                       </p>
-                      <Link
-                        href="/pricing"
-                        className="px-4 py-2 bg-ansys-yellow text-black text-xs font-bold rounded-xl hover:brightness-110 inline-block"
+                      <a
+                        href="mailto:enterprise@suspensionlab.io?subject=Enterprise%20Inquiry"
+                        className="px-4 py-2 bg-signal text-carbon text-xs font-bold rounded-xl hover:brightness-110 inline-block"
                       >
-                        Upgrade to Enterprise
-                      </Link>
+                        Contact Sales
+                      </a>
                     </div>
                   ) : (
                     <>
@@ -606,7 +606,7 @@ export default function SettingsPage() {
                             <CheckCircle2 size={16} className="text-emerald-400" />
                             SCIM 2.0 User Provisioning
                           </div>
-                          <span className="px-2 py-0.5 rounded bg-emerald-950/50 border border-emerald-500/30 text-emerald-400 text-[10px] font-mono font-bold">
+                          <span className="px-2 py-0.5 rounded bg-emerald-950/50 border border-emerald-500/30 text-emerald-400 text-xs font-mono font-bold">
                             ENABLED
                           </span>
                         </div>
@@ -614,8 +614,8 @@ export default function SettingsPage() {
                           Configure your IdP (Okta, Microsoft Entra ID, PingFederate) to automatically provision and de-provision engineering team members.
                         </p>
                         <div className="p-2.5 rounded-lg bg-black/60 border border-white/5 font-mono text-xs text-gray-300">
-                          <span className="text-gray-500">SCIM Endpoint:</span>{" "}
-                          <code className="text-ansys-yellow">{appOrigin}/api/v1/scim/v2</code>
+                          <span className="text-zinc-400">SCIM Endpoint:</span>{" "}
+                          <code className="text-signal">{appOrigin}/api/v1/scim/v2</code>
                         </div>
                       </div>
 
@@ -626,7 +626,7 @@ export default function SettingsPage() {
                             <Shield size={16} className="text-purple-400" />
                             SAML 2.0 Single Sign-On (SSO)
                           </div>
-                          <span className="px-2 py-0.5 rounded bg-purple-950/50 border border-purple-500/30 text-purple-400 text-[10px] font-mono font-bold">
+                          <span className="px-2 py-0.5 rounded bg-purple-950/50 border border-purple-500/30 text-purple-400 text-xs font-mono font-bold">
                             READY
                           </span>
                         </div>
@@ -635,19 +635,19 @@ export default function SettingsPage() {
                         </p>
                         <div className="space-y-1.5 font-mono text-xs">
                           <div className="p-2 rounded bg-black/40 border border-white/5 text-gray-400">
-                            <span className="text-gray-500">ACS URL:</span>{" "}
+                            <span className="text-zinc-400">ACS URL:</span>{" "}
                             <code className="text-white">{appOrigin}/api/v1/saml/acs</code>
                           </div>
                           <div className="p-2 rounded bg-black/40 border border-white/5 text-gray-400">
-                            <span className="text-gray-500">Entity ID:</span>{" "}
+                            <span className="text-zinc-400">Entity ID:</span>{" "}
                             <code className="text-white">{appOrigin}/saml/metadata</code>
                           </div>
                         </div>
                       </div>
 
-                      <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] text-[11px] text-gray-400 flex items-center justify-between">
+                      <div className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] text-xs text-gray-400 flex items-center justify-between">
                         <span>Tamper-evident cryptographic audit logs are active for all directory events.</span>
-                        <Link href="/audit" className="text-ansys-yellow hover:underline flex items-center gap-1 font-mono">
+                        <Link href="/audit" className="text-signal hover:underline flex items-center gap-1 font-mono">
                           View Audit Logs <ExternalLink size={11} />
                         </Link>
                       </div>

@@ -196,24 +196,24 @@ export default function CommandCenterWorkspace() {
   const kpiCorrelation = kpiData?.kpis?.[4];
 
   return (
-    <div className="w-full bg-[#08080a] text-white selection:bg-ansys-yellow selection:text-black pt-10 pb-16 px-4 sm:px-6 font-sans">
+    <div className="w-full bg-[#08080a] text-white selection:bg-signal selection:text-black pt-10 pb-16 px-4 sm:px-6 font-sans">
       <div className="max-w-[1560px] mx-auto space-y-8">
         {/* ── 1. ACTIVE VEHICLE CONTEXT & COMMAND HERO ─────────────────── */}
         <div className="p-6 sm:p-8 rounded-3xl bg-gradient-to-b from-[#131319] via-[#0d0d12] to-[#08080a] border border-white/[0.08] shadow-2xl relative overflow-hidden">
           {/* Subtle aerodynamic glow */}
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-ansys-yellow/5 blur-3xl pointer-events-none" />
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-signal/5 blur-3xl pointer-events-none" />
 
           {/* Top Row: Context Identity & Status Badges */}
           <div className="flex flex-wrap items-start justify-between gap-4 pb-6 border-b border-white/[0.08]">
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-2 text-xs font-mono">
-                <span className="px-2.5 py-0.5 rounded-md bg-ansys-yellow/15 border border-ansys-yellow/40 text-ansys-yellow font-bold uppercase tracking-wider flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-ansys-yellow animate-pulse" />
+                <span className="px-2.5 py-0.5 rounded-md bg-signal/15 border border-signal/40 text-signal font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-signal animate-pulse" />
                   Engineering Command Center
                 </span>
-                <span className="text-gray-500">•</span>
+                <span className="text-zinc-400">•</span>
                 <span className="text-emerald-400 font-bold">{mode} WORKSPACE</span>
-                <span className="text-gray-500">•</span>
+                <span className="text-zinc-400">•</span>
                 <span className="text-gray-400">SESSION: {sessionName}</span>
               </div>
 
@@ -250,7 +250,7 @@ export default function CommandCenterWorkspace() {
 
               <Link
                 href="/investigate"
-                className="px-4 py-2 rounded-xl bg-ansys-yellow text-black font-bold font-mono text-xs hover:brightness-110 transition-all flex items-center gap-1.5 shadow-[0_0_15px_rgba(242,169,0,0.25)]"
+                className="px-4 py-2 rounded-xl bg-signal text-carbon font-bold font-mono text-xs hover:brightness-110 transition-all flex items-center gap-1.5 shadow-[0_0_15px_rgba(242,169,0,0.25)]"
               >
                 <span>Investigation Room</span>
                 <ArrowRight size={14} />
@@ -328,7 +328,7 @@ export default function CommandCenterWorkspace() {
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-1 mb-2">
-                  <span className="text-[10px] font-mono uppercase text-gray-400">Confidence</span>
+                  <span className="text-xs font-mono uppercase text-gray-400">Confidence</span>
                   <WhyButton
                     title="Model Confidence Score"
                     provenance={{
@@ -347,11 +347,11 @@ export default function CommandCenterWorkspace() {
                   {healthData?.model_confidence.score ? `${healthData.model_confidence.score}%` : "UNVALIDATED"}
                 </div>
               </div>
-              <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono">
+              <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-xs font-mono">
                 <span className={healthData?.model_confidence.status === "VALIDATED" ? "text-emerald-400 font-bold" : "text-amber-400"}>
                   {healthData?.model_confidence.band || "UNVALIDATED"}
                 </span>
-                <span className="text-gray-500">
+                <span className="text-zinc-400">
                   {healthData?.model_confidence.checks_pass ?? 0}/{healthData?.model_confidence.checks_total ?? 0}
                 </span>
               </div>
@@ -361,7 +361,7 @@ export default function CommandCenterWorkspace() {
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-1 mb-2">
-                  <span className="text-[10px] font-mono uppercase text-gray-400">Telemetry</span>
+                  <span className="text-xs font-mono uppercase text-gray-400">Telemetry</span>
                   <WhyButton
                     title="Telemetry Freshness"
                     provenance={{
@@ -380,11 +380,11 @@ export default function CommandCenterWorkspace() {
                   {healthData?.telemetry_freshness.status === "STREAMING" ? "STREAMING" : (healthData?.telemetry_freshness.sample_rate_hz ? `${healthData.telemetry_freshness.sample_rate_hz} Hz` : "IDLE")}
                 </div>
               </div>
-              <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono">
+              <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-xs font-mono">
                 <span className={healthData?.telemetry_freshness.status === "STREAMING" ? "text-emerald-400 font-bold" : "text-gray-400"}>
                   {healthData?.telemetry_freshness.status || "IDLE"}
                 </span>
-                <span className="text-gray-500">
+                <span className="text-zinc-400">
                   {healthData?.telemetry_freshness.channels_count ? `${healthData.telemetry_freshness.channels_count} Ch` : "0 Ch"}
                 </span>
               </div>
@@ -394,7 +394,7 @@ export default function CommandCenterWorkspace() {
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-1 mb-2">
-                  <span className="text-[10px] font-mono uppercase text-gray-400">Solver Status</span>
+                  <span className="text-xs font-mono uppercase text-gray-400">Solver Status</span>
                   <WhyButton
                     title="Simulation Health"
                     provenance={{
@@ -413,9 +413,9 @@ export default function CommandCenterWorkspace() {
                   {healthData?.simulation_health.status || "IDLE"}
                 </div>
               </div>
-              <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono">
+              <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-xs font-mono">
                 <span className="text-emerald-400 font-bold">{healthData?.simulation_health.residuals_clean ? "CLEAN" : "PENDING"}</span>
-                <span className="text-gray-500 truncate max-w-[70px]">
+                <span className="text-zinc-400 truncate max-w-[70px]">
                   {healthData?.simulation_health.last_run_label || "No Run"}
                 </span>
               </div>
@@ -425,7 +425,7 @@ export default function CommandCenterWorkspace() {
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-1 mb-2">
-                  <span className="text-[10px] font-mono uppercase text-gray-400">V&V Suite</span>
+                  <span className="text-xs font-mono uppercase text-gray-400">V&V Suite</span>
                   <WhyButton
                     title="Validation Suite"
                     provenance={{
@@ -444,11 +444,11 @@ export default function CommandCenterWorkspace() {
                   {healthData?.validation_health.correlation_pct ? `${healthData.validation_health.correlation_pct}%` : "UNVALIDATED"}
                 </div>
               </div>
-              <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono">
+              <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-xs font-mono">
                 <span className={healthData?.validation_health.status === "VALIDATED" ? "text-emerald-400 font-bold" : "text-amber-400"}>
                   {healthData?.validation_health.status || "UNVALIDATED"}
                 </span>
-                <span className="text-gray-500">
+                <span className="text-zinc-400">
                   {healthData?.validation_health.cases_passed ?? 0}/{healthData?.validation_health.cases_total ?? 0}
                 </span>
               </div>
@@ -458,7 +458,7 @@ export default function CommandCenterWorkspace() {
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-1 mb-2">
-                  <span className="text-[10px] font-mono uppercase text-gray-400">Digital Twin</span>
+                  <span className="text-xs font-mono uppercase text-gray-400">Digital Twin</span>
                   <WhyButton
                     title="Digital Twin State"
                     provenance={{
@@ -477,9 +477,9 @@ export default function CommandCenterWorkspace() {
                   {healthData?.digital_twin_health.identified_freq_hz ? `${healthData.digital_twin_health.identified_freq_hz} Hz` : "SYNCED"}
                 </div>
               </div>
-              <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono">
+              <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-xs font-mono">
                 <span className="text-emerald-400 font-bold">{healthData?.digital_twin_health.status || "VALIDATED"}</span>
-                <span className="text-gray-500">
+                <span className="text-zinc-400">
                   {healthData?.digital_twin_health.calibration_count ?? 0} Calibrations
                 </span>
               </div>
@@ -489,7 +489,7 @@ export default function CommandCenterWorkspace() {
             <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between gap-1 mb-2">
-                  <span className="text-[10px] font-mono uppercase text-gray-400">Envelope</span>
+                  <span className="text-xs font-mono uppercase text-gray-400">Envelope</span>
                   <WhyButton
                     title="Operating Envelope"
                     provenance={{
@@ -508,9 +508,9 @@ export default function CommandCenterWorkspace() {
                   {healthData?.operating_envelope.travel_utilization_pct ? `${healthData.operating_envelope.travel_utilization_pct}% Used` : "WITHIN_LIMITS"}
                 </div>
               </div>
-              <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono">
+              <div className="mt-2 pt-2 border-t border-white/5 flex items-center justify-between text-xs font-mono">
                 <span className="text-emerald-400 font-bold">{healthData?.operating_envelope.status || "WITHIN_LIMITS"}</span>
-                <span className="text-gray-500">Travel &lt; 50mm</span>
+                <span className="text-zinc-400">Travel &lt; 50mm</span>
               </div>
             </div>
           </div>
@@ -537,25 +537,25 @@ export default function CommandCenterWorkspace() {
             {/* 1-Click Experiment Builder */}
             <Link
               href="/experiment"
-              className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-ansys-yellow/50 hover:bg-ansys-yellow/5 transition-all group flex flex-col justify-between space-y-3"
+              className="p-4 rounded-2xl bg-white/[0.02] border border-white/10 hover:border-signal/50 hover:bg-signal/5 transition-all group flex flex-col justify-between space-y-3"
             >
               <div>
                 <div className="flex items-center justify-between text-xs mb-2">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-ansys-yellow/20 text-ansys-yellow border border-ansys-yellow/30">
+                  <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-signal/20 text-signal border border-signal/30">
                     STAGE 02: EXPERIMENT
                   </span>
-                  <ArrowRight size={14} className="text-gray-500 group-hover:text-ansys-yellow transition-transform group-hover:translate-x-1" />
+                  <ArrowRight size={14} className="text-zinc-400 group-hover:text-signal transition-transform group-hover:translate-x-1" />
                 </div>
-                <div className="text-sm font-bold text-white group-hover:text-ansys-yellow transition-colors">
+                <div className="text-sm font-bold text-white group-hover:text-signal transition-colors">
                   1-Click Experiment Builder
                 </div>
                 <p className="text-xs text-gray-400 mt-1 leading-relaxed">
                   Convert questions like <em>&quot;What happens if front roll stiffness increases by 10%?&quot;</em> into an automated 7-step pipeline with SHA-256 provenance tracking.
                 </p>
               </div>
-              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-gray-500">
+              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs font-mono text-zinc-400">
                 <span>Automated ODE solve_ivp</span>
-                <span className="text-ansys-yellow font-bold">[ TEST HYPOTHESIS ]</span>
+                <span className="text-signal font-bold">[ TEST HYPOTHESIS ]</span>
               </div>
             </Link>
 
@@ -566,10 +566,10 @@ export default function CommandCenterWorkspace() {
             >
               <div>
                 <div className="flex items-center justify-between text-xs mb-2">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
                     STAGE 04: COMPARE
                   </span>
-                  <ArrowRight size={14} className="text-gray-500 group-hover:text-purple-400 transition-transform group-hover:translate-x-1" />
+                  <ArrowRight size={14} className="text-zinc-400 group-hover:text-purple-400 transition-transform group-hover:translate-x-1" />
                 </div>
                 <div className="text-sm font-bold text-white group-hover:text-purple-300 transition-colors">
                   Comparative Intelligence
@@ -578,7 +578,7 @@ export default function CommandCenterWorkspace() {
                   Explicitly answers <em>&quot;Why is B better than A?&quot;</em> with What Changed, What Improved, Mandatory Tradeoffs, and Epistemic Causality.
                 </p>
               </div>
-              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-gray-500">
+              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs font-mono text-zinc-400">
                 <span>Exposes Tradeoffs</span>
                 <span className="text-purple-400 font-bold">[ COMPARE A vs B ]</span>
               </div>
@@ -591,10 +591,10 @@ export default function CommandCenterWorkspace() {
             >
               <div>
                 <div className="flex items-center justify-between text-xs mb-2">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                  <span className="px-2 py-0.5 rounded text-xs font-mono font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
                     STAGE 05: OPTIMIZE
                   </span>
-                  <ArrowRight size={14} className="text-gray-500 group-hover:text-cyan-400 transition-transform group-hover:translate-x-1" />
+                  <ArrowRight size={14} className="text-zinc-400 group-hover:text-cyan-400 transition-transform group-hover:translate-x-1" />
                 </div>
                 <div className="text-sm font-bold text-white group-hover:text-cyan-300 transition-colors">
                   Pareto Frontier Optimizer
@@ -603,7 +603,7 @@ export default function CommandCenterWorkspace() {
                   Batch tests candidate setups across Ride Comfort vs Grip Consistency, identifies non-dominated candidates, and pinpoints the compromise.
                 </p>
               </div>
-              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-[10px] font-mono text-gray-500">
+              <div className="pt-2 border-t border-white/5 flex items-center justify-between text-xs font-mono text-zinc-400">
                 <span>Non-Dominated Sort</span>
                 <span className="text-cyan-400 font-bold">[ VIEW FRONTIER ]</span>
               </div>
@@ -615,7 +615,7 @@ export default function CommandCenterWorkspace() {
         <div>
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
-              <div className="text-xs font-bold text-ansys-yellow uppercase tracking-wider font-mono flex items-center gap-1.5">
+              <div className="text-xs font-bold text-signal uppercase tracking-wider font-mono flex items-center gap-1.5">
                 <AlertTriangle size={13} /> Active Engineering Questions & Anomaly Feed
               </div>
               <h2 className="text-xl font-extrabold text-white mt-0.5">
@@ -628,7 +628,7 @@ export default function CommandCenterWorkspace() {
               </span>
               <button
                 onClick={() => setIsCreateModalOpen(true)}
-                className="px-3.5 py-1.5 rounded-xl bg-ansys-yellow text-black font-bold font-mono text-xs hover:brightness-110 transition-all flex items-center gap-1.5 shadow-[0_0_15px_rgba(242,169,0,0.25)] cursor-pointer"
+                className="px-3.5 py-1.5 rounded-xl bg-signal text-carbon font-bold font-mono text-xs hover:brightness-110 transition-all flex items-center gap-1.5 shadow-[0_0_15px_rgba(242,169,0,0.25)] cursor-pointer"
               >
                 <Plus size={13} />
                 <span>NEW ENGINEERING QUESTION</span>
@@ -667,7 +667,7 @@ export default function CommandCenterWorkspace() {
                 <div>NO ACTIVE ENGINEERING QUESTIONS LOGGED</div>
                 <button
                   onClick={() => setIsCreateModalOpen(true)}
-                  className="px-3 py-1.5 rounded-lg bg-ansys-yellow/10 border border-ansys-yellow/30 text-ansys-yellow font-bold hover:bg-ansys-yellow/20 transition-all cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg bg-signal/10 border border-signal/30 text-signal font-bold hover:bg-signal/20 transition-all cursor-pointer"
                 >
                   + Log First Engineering Question
                 </button>
@@ -678,9 +678,9 @@ export default function CommandCenterWorkspace() {
 
         {/* ── 4. 6-STAGE WORKFLOW PROGRESSION CHAIN ────────────────────── */}
         <div className="p-4 rounded-3xl bg-white/[0.02] border border-white/[0.06]">
-          <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2 flex items-center justify-between font-mono">
+          <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-2 flex items-center justify-between font-mono">
             <span>Engineering Decision Progression Chain</span>
-            <span className="text-ansys-yellow text-[10px] font-bold">STATEFUL PIPELINE</span>
+            <span className="text-signal text-xs font-bold">STATEFUL PIPELINE</span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-6 gap-2 font-mono">
             {[
@@ -697,18 +697,18 @@ export default function CommandCenterWorkspace() {
                 className={`p-3 rounded-2xl border transition-all flex flex-col justify-between ${
                   step.active
                     ? "bg-purple-950/40 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.2)]"
-                    : "bg-white/[0.02] border-white/[0.06] hover:border-ansys-yellow/40 hover:bg-white/[0.04]"
+                    : "bg-white/[0.02] border-white/[0.06] hover:border-signal/40 hover:bg-white/[0.04]"
                 }`}
               >
-                <div className="flex items-center justify-between text-[10px] mb-2">
-                  <span className={step.active ? "text-purple-300 font-bold" : "text-gray-500"}>
+                <div className="flex items-center justify-between text-xs mb-2">
+                  <span className={step.active ? "text-purple-300 font-bold" : "text-zinc-400"}>
                     {step.num}
                   </span>
                   <EvidenceBadge state={step.state} size="xs" />
                 </div>
                 <div>
                   <div className="text-xs font-bold text-white">{step.name}</div>
-                  <div className="text-[10px] text-gray-400 mt-0.5 truncate font-sans">{step.desc}</div>
+                  <div className="text-xs text-gray-400 mt-0.5 truncate font-sans">{step.desc}</div>
                 </div>
               </Link>
             ))}
@@ -719,7 +719,7 @@ export default function CommandCenterWorkspace() {
         <div>
           <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
             <div>
-              <div className="text-xs font-bold text-ansys-yellow uppercase tracking-wider font-mono flex items-center gap-1.5">
+              <div className="text-xs font-bold text-signal uppercase tracking-wider font-mono flex items-center gap-1.5">
                 <Layers size={13} /> Engineering Evidence Lineage Graph
               </div>
               <h2 className="text-xl font-extrabold text-white mt-0.5">
@@ -749,7 +749,7 @@ export default function CommandCenterWorkspace() {
               actions={
                 <Link
                   href="/report"
-                  className="text-xs font-mono text-ansys-yellow hover:underline flex items-center gap-1"
+                  className="text-xs font-mono text-signal hover:underline flex items-center gap-1"
                 >
                   <span>All Runs</span>
                   <ExternalLink size={12} />
@@ -766,7 +766,7 @@ export default function CommandCenterWorkspace() {
                 />
 
                 <div className="space-y-2">
-                  <div className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">
+                  <div className="text-xs text-gray-400 uppercase font-bold tracking-wider">
                     Recent Immutable Run Artifacts:
                   </div>
                   {recentRuns.length > 0 ? (
@@ -774,22 +774,22 @@ export default function CommandCenterWorkspace() {
                       <Link
                         key={i}
                         href={`/report?run_id=${encodeURIComponent(r.label)}`}
-                        className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-ansys-yellow/40 flex items-center justify-between transition-all block"
+                        className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.06] hover:border-signal/40 flex items-center justify-between transition-all block"
                       >
                         <div>
                           <div className="font-bold text-white text-xs">{r.label}</div>
-                          <div className="text-[10px] text-gray-400 font-sans mt-0.5">
+                          <div className="text-xs text-gray-400 font-sans mt-0.5">
                             {r.title || `${r.simulation_type} solver run`}
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] text-gray-500">{r.result_hash?.substring(0, 12)}</span>
+                          <span className="text-xs text-zinc-400">{r.result_hash?.substring(0, 12)}</span>
                           <EvidenceBadge state="VALIDATED" size="xs" />
                         </div>
                       </Link>
                     ))
                   ) : (
-                    <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] text-center text-xs text-gray-500 font-mono">
+                    <div className="p-4 rounded-xl bg-white/[0.02] border border-white/[0.06] text-center text-xs text-zinc-400 font-mono">
                       NO IMMUTABLE RUN ARTIFACTS RECORDED
                     </div>
                   )}
@@ -807,7 +807,7 @@ export default function CommandCenterWorkspace() {
               actions={
                 <Link
                   href="/setup-sensitivity"
-                  className="text-xs font-mono text-ansys-yellow hover:underline flex items-center gap-1"
+                  className="text-xs font-mono text-signal hover:underline flex items-center gap-1"
                 >
                   <span>Setup Diff</span>
                   <ExternalLink size={12} />
@@ -839,12 +839,12 @@ export default function CommandCenterWorkspace() {
                   <div className="p-6 rounded-2xl bg-white/[0.02] border border-white/10 text-center space-y-3 font-mono">
                     <div className="text-xs text-gray-400 font-bold uppercase tracking-wider">Formal Decision Gate</div>
                     <div className="text-sm font-bold text-gray-300">AWAITING SIGNED DECISION</div>
-                    <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                    <p className="text-xs text-zinc-400 max-w-sm mx-auto">
                       No cryptographically signed setup modification recorded for this vehicle. Complete an investigation and propose a setup change to register a formal decision.
                     </p>
                     <Link
                       href="/investigate"
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-ansys-yellow/10 border border-ansys-yellow/30 text-ansys-yellow text-xs font-bold hover:bg-ansys-yellow/20 transition-all"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-signal/10 border border-signal/30 text-signal text-xs font-bold hover:bg-signal/20 transition-all"
                     >
                       <span>Launch Investigation</span>
                       <ArrowRight size={12} />
@@ -880,7 +880,7 @@ export default function CommandCenterWorkspace() {
         >
           <div className="bg-[#111116] border border-white/10 rounded-2xl max-w-lg w-full p-6 shadow-2xl relative text-white">
             <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-4 font-mono">
-              <span className="text-xs font-bold text-ansys-yellow uppercase tracking-wider flex items-center gap-1.5">
+              <span className="text-xs font-bold text-signal uppercase tracking-wider flex items-center gap-1.5">
                 <AlertTriangle size={14} /> Ingest Engineering Question
               </span>
               <button
@@ -902,7 +902,7 @@ export default function CommandCenterWorkspace() {
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="e.g. Rear Damping Correlation Degraded in Turn 9"
-                  className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white focus:border-ansys-yellow focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white focus:border-signal focus:outline-none"
                 />
               </div>
 
@@ -915,7 +915,7 @@ export default function CommandCenterWorkspace() {
                   value={newText}
                   onChange={(e) => setNewText(e.target.value)}
                   placeholder="Describe the physical anomaly, telemetry divergence, or engineering hypothesis..."
-                  className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white focus:border-ansys-yellow focus:outline-none"
+                  className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white focus:border-signal focus:outline-none"
                 />
               </div>
 
@@ -926,7 +926,7 @@ export default function CommandCenterWorkspace() {
                     id="question-severity"
                     value={newSeverity}
                     onChange={(e) => setNewSeverity(e.target.value as any)}
-                    className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white focus:border-ansys-yellow focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white focus:border-signal focus:outline-none"
                   >
                     <option value="CRITICAL">CRITICAL</option>
                     <option value="WARNING">WARNING</option>
@@ -941,13 +941,13 @@ export default function CommandCenterWorkspace() {
                     value={newSubsystem}
                     onChange={(e) => setNewSubsystem(e.target.value)}
                     placeholder="e.g. Rear Damper / Aero"
-                    className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white focus:border-ansys-yellow focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl bg-black/40 border border-white/10 text-white focus:border-signal focus:outline-none"
                   />
                 </div>
               </div>
 
               {createError && (
-                <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-[11px]">
+                <div className="p-2.5 rounded-xl bg-rose-950/40 border border-rose-500/40 text-rose-300 text-xs">
                   {createError}
                 </div>
               )}
@@ -963,7 +963,7 @@ export default function CommandCenterWorkspace() {
                 <button
                   type="submit"
                   disabled={isCreating}
-                  className="px-4 py-1.5 rounded-xl bg-ansys-yellow text-black font-bold hover:brightness-110 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
+                  className="px-4 py-1.5 rounded-xl bg-signal text-carbon font-bold hover:brightness-110 disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
                 >
                   {isCreating ? "Ingesting..." : "Create & Launch Investigation"}
                 </button>

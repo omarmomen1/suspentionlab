@@ -30,7 +30,7 @@ export default function TrustBadge({ solverVersion, runId, inputSha256, classNam
   return (
     <footer
       data-testid="trust-badge"
-      className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-mono text-gray-500 print:text-gray-600 ${className}`}
+      className={`flex flex-wrap items-center gap-x-3 gap-y-1 text-xs font-mono text-zinc-400 print:text-gray-600 ${className}`}
     >
       <span className="inline-flex items-center gap-1 text-emerald-500 print:text-emerald-700">
         <ShieldCheck size={12} aria-hidden />

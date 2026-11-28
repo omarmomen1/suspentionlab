@@ -33,12 +33,12 @@ function KPICard({ label, value, unit, sub, status = "neutral" }: { label: strin
   const borders: Record<Status, string> = { good: "border-emerald-900/40 bg-emerald-950/10", warn: "border-amber-900/40 bg-amber-950/10", bad: "border-red-900/40 bg-red-950/10", neutral: "border-[#252525]" };
   return (
     <div className={`bg-[#141416] border ${borders[status]} rounded-xl p-3 flex flex-col gap-0.5`}>
-      <span className="text-[9px] font-bold tracking-[0.16em] text-gray-600 uppercase">{label}</span>
+      <span className="text-xs font-bold tracking-[0.16em] text-zinc-300 uppercase">{label}</span>
       <span className={`text-[1.1rem] font-bold font-mono leading-tight ${colours[status]}`}>
         {typeof value === "number" ? value.toFixed(3) : value}
-        {unit && <span className="text-[11px] font-normal text-gray-600 ml-1">{unit}</span>}
+        {unit && <span className="text-xs font-normal text-zinc-300 ml-1">{unit}</span>}
       </span>
-      {sub && <span className="text-[9px] text-gray-700 leading-tight mt-0.5">{sub}</span>}
+      {sub && <span className="text-xs text-zinc-300 leading-tight mt-0.5">{sub}</span>}
     </div>
   );
 }
@@ -46,7 +46,7 @@ function KPICard({ label, value, unit, sub, status = "neutral" }: { label: strin
 function ParamSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <h3 className="text-[9px] font-bold text-gray-700 uppercase tracking-[0.16em] pb-1.5 border-b border-[#1e1e1e]">
+      <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-[0.16em] pb-1.5 border-b border-[#1e1e1e]">
         {title}
       </h3>
       {children}
@@ -58,12 +58,12 @@ function ParameterInput({ label, val, unit, step = 1, min, onChange }: { label: 
   const inputId = `active-param-${label.toLowerCase().replace(/[^a-z0-9]/g, "-")}`;
   return (
     <div className="flex justify-between items-center gap-2">
-      <label htmlFor={inputId} className="text-[11px] text-gray-400 flex-1 min-w-0 leading-tight">{label}</label>
+      <label htmlFor={inputId} className="text-xs text-gray-400 flex-1 min-w-0 leading-tight">{label}</label>
       <div className="relative shrink-0">
         <input id={inputId} aria-label={`${label} (${unit})`} type="number" step={step} value={val} min={min} onChange={(e) => onChange(Number(e.target.value))}
-          className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white w-28 text-right pr-9 focus:outline-none focus:border-ansys-yellow/60 focus:ring-1 focus:ring-ansys-yellow/15 transition-all"
+          className="bg-[#0d0d0d] border border-[#252525] text-xs rounded-lg px-2 py-1.5 text-white w-28 text-right pr-9 focus:outline-none focus:border-signal/60 focus:ring-1 focus:ring-signal/15 transition-all"
         />
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-gray-400 pointer-events-none">{unit}</span>
+        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">{unit}</span>
       </div>
     </div>
   );
@@ -180,13 +180,13 @@ function ActiveSuspensionDashboard() {
     <div className="h-full flex flex-col p-5 pt-3 gap-3 min-h-0">
       <div className="flex items-center justify-between shrink-0 pb-3 border-b border-[#1e1e1e]">
         <div className="flex flex-col">
-          <span className="text-[9px] font-bold tracking-[0.25em] text-ansys-yellow uppercase">Semi-Active Skyhook Control Strategy</span>
+          <span className="text-xs font-bold tracking-[0.25em] text-signal uppercase">Semi-Active Skyhook Control Strategy</span>
           <h1 className="text-2xl font-semibold tracking-tight text-white leading-tight">Active Suspension</h1>
         </div>
 
         <div className="flex items-center gap-2">
           <button onClick={runSimulation} disabled={isRunning}
-            className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${isRunning ? "bg-[#222] text-gray-500 cursor-not-allowed" : "bg-signal text-carbon border border-signal hover:bg-[#d6f56e]"}`}>
+            className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${isRunning ? "bg-[#222] text-zinc-400 cursor-not-allowed" : "bg-signal text-carbon border border-signal hover:bg-[#d6f56e]"}`}>
             {isRunning ? <><div className="w-3 h-3 border border-gray-600 border-t-gray-300 rounded-full animate-spin" />Solving…</> : <><Zap size={13} fill="currentColor" /> Run Skyhook</>}
           </button>
         </div>
@@ -194,7 +194,7 @@ function ActiveSuspensionDashboard() {
 
       <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
         <div className="w-60 shrink-0 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-y-auto custom-scrollbar">
-          <div className="px-4 py-3 border-b border-[#1e1e1e] sticky top-0 bg-[#0d0d0f] z-10"><h2 className="text-xs font-semibold text-gray-300 flex items-center gap-2"><Settings2 size={13} className="text-ansys-yellow" /> Parameters</h2></div>
+          <div className="px-4 py-3 border-b border-[#1e1e1e] sticky top-0 bg-[#0d0d0f] z-10"><h2 className="text-xs font-semibold text-gray-300 flex items-center gap-2"><Settings2 size={13} className="text-signal" /> Parameters</h2></div>
           <div className="p-4 space-y-5">
             <ParamSection title="Skyhook Controller">
               <ParameterInput label="Skyhook Gain" val={params.c_sky} unit="Ns/m" step={100} onChange={(v) => setParams({ ...params, c_sky: v })} />
@@ -216,14 +216,14 @@ function ActiveSuspensionDashboard() {
         <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-hidden">
           {!results && !isRunning && (
             <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl flex flex-col items-center justify-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-ansys-yellow/5 border border-ansys-yellow/10 flex items-center justify-center"><Activity size={32} strokeWidth={1} className="text-ansys-yellow/40" /></div>
-              <div className="text-center"><p className="text-sm font-semibold text-gray-400 mb-1">Configure parameters and click <span className="text-ansys-yellow">Run Skyhook</span></p><p className="text-xs text-gray-700">Semi-Active MR Damper Control</p></div>
+              <div className="w-16 h-16 rounded-2xl bg-signal/5 border border-signal/10 flex items-center justify-center"><Activity size={32} strokeWidth={1} className="text-signal/40" /></div>
+              <div className="text-center"><p className="text-sm font-semibold text-gray-400 mb-1">Configure parameters and click <span className="text-signal">Run Skyhook</span></p><p className="text-xs text-zinc-300">Semi-Active MR Damper Control</p></div>
             </div>
           )}
 
           {isRunning && (
             <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl flex flex-col items-center justify-center gap-4">
-              <div className="w-10 h-10 border-2 border-ansys-yellow/20 border-t-ansys-yellow rounded-full animate-spin" />
+              <div className="w-10 h-10 border-2 border-signal/20 border-t-signal rounded-full animate-spin" />
               <div className="text-center"><p className="text-sm font-medium text-gray-400 mb-1">Simulating Controller…</p></div>
             </div>
           )}
@@ -283,7 +283,7 @@ function ActiveSuspensionDashboard() {
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-600 text-sm">Loading environment…</div>}>
+    <Suspense fallback={<div className="h-full flex items-center justify-center text-zinc-300 text-sm">Loading environment…</div>}>
       <ActiveSuspensionDashboard />
     </Suspense>
   );

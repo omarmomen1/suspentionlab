@@ -34,7 +34,7 @@ interface SetupScoreBadgeProps {
 
 const BAND_STYLES: Record<string, string> = {
   Excellent: "text-emerald-400 border-emerald-500/30 bg-emerald-500/5",
-  Good:      "text-ansys-yellow border-ansys-yellow/30 bg-ansys-yellow/5",
+  Good:      "text-signal border-signal/30 bg-signal/5",
   Fair:      "text-amber-400 border-amber-500/30 bg-amber-500/5",
   Poor:      "text-red-400 border-red-500/30 bg-red-500/5",
 };
@@ -75,7 +75,7 @@ export default function SetupScoreBadge({
 
   if (loading) {
     return (
-      <div className="flex items-center gap-2 text-[11px] text-gray-600 px-3 py-2">
+      <div className="flex items-center gap-2 text-xs text-zinc-300 px-3 py-2">
         <Loader2 size={12} className="animate-spin" /> Scoring vs fleet…
       </div>
     );
@@ -89,8 +89,8 @@ export default function SetupScoreBadge({
       <Trophy size={14} />
       <div className="leading-tight">
         <span className="text-sm font-bold">{result.score.toFixed(0)}</span>
-        <span className="text-[10px] uppercase tracking-wider ml-1.5 opacity-80">{result.band}</span>
-        <p className="text-[10px] text-gray-500">
+        <span className="text-xs uppercase tracking-wider ml-1.5 opacity-80">{result.band}</span>
+        <p className="text-xs text-zinc-400">
           Beats {result.percentile.toFixed(0)}% of the road-car fleet
           {result.fleet_size > 1 ? ` (n=${result.fleet_size})` : ""} · anonymous
         </p>

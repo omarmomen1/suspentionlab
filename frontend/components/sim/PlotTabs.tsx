@@ -63,9 +63,9 @@ export default function PlotTabs({ tabs, activeTab, onChange }: PlotTabsProps) {
             aria-controls={`sim-tabpanel-${i}`}
             onClick={() => onChange(i)}
             tabIndex={active ? 0 : -1}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold whitespace-nowrap transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-all ${
               active
-                ? "bg-ansys-yellow/15 text-ansys-yellow border border-ansys-yellow/40"
+                ? "bg-signal/15 text-signal border border-signal/40"
                 : "bg-[#141416] text-gray-400 border border-[#252525] hover:text-white hover:border-[#3a3a3a]"
             }`}
             aria-selected={active}

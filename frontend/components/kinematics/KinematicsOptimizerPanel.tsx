@@ -211,7 +211,7 @@ export default function KinematicsOptimizerPanel({
             <div>
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
                 Bounded Multi-Objective Kinematics Optimizer
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                <span className="text-xs font-mono px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
                   REAL NEWTON-RAPHSON SOLVER
                 </span>
               </h3>
@@ -235,7 +235,7 @@ export default function KinematicsOptimizerPanel({
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5 text-xs">
           {/* Col 1: Target Hardpoints */}
           <div className="space-y-2">
-            <label className="font-semibold text-slate-300 block uppercase tracking-wider text-[11px]">
+            <label className="font-semibold text-slate-300 block uppercase tracking-wider text-xs">
               Design Hardpoints to Perturb ({targetHps.length} selected)
             </label>
             <div className="space-y-1 max-h-48 overflow-y-auto pr-1 bg-slate-950/40 p-2 rounded-lg border border-slate-800">
@@ -250,7 +250,7 @@ export default function KinematicsOptimizerPanel({
                     onChange={() => handleToggleHp(hp.id)}
                     className="rounded border-slate-700 text-purple-500 focus:ring-0 bg-slate-900"
                   />
-                  <span className="font-mono text-[11px]">{hp.label}</span>
+                  <span className="font-mono text-xs">{hp.label}</span>
                 </label>
               ))}
             </div>
@@ -260,7 +260,7 @@ export default function KinematicsOptimizerPanel({
           <div className="space-y-4">
             <div>
               <div className="flex justify-between text-slate-300 mb-1">
-                <span className="font-semibold text-[11px] uppercase tracking-wider">Hardpoint Bounds Limit:</span>
+                <span className="font-semibold text-xs uppercase tracking-wider">Hardpoint Bounds Limit:</span>
                 <span className="font-mono font-bold text-cyan-400">±{boundsMm.toFixed(1)} mm</span>
               </div>
               <input
@@ -272,7 +272,7 @@ export default function KinematicsOptimizerPanel({
                 onChange={(e) => setBoundsMm(parseFloat(e.target.value))}
                 className="w-full accent-purple-500 cursor-pointer"
               />
-              <div className="flex justify-between text-[10px] text-slate-500 mt-1">
+              <div className="flex justify-between text-xs text-zinc-400 mt-1">
                 <span>±2.0 mm (Fine)</span>
                 <span>±8.0 mm (Moderate)</span>
                 <span>±15.0 mm (Structural)</span>
@@ -280,7 +280,7 @@ export default function KinematicsOptimizerPanel({
             </div>
 
             <div>
-              <label className="font-semibold text-slate-300 block mb-1.5 uppercase tracking-wider text-[11px]">
+              <label className="font-semibold text-slate-300 block mb-1.5 uppercase tracking-wider text-xs">
                 Allowed Displacement Axes
               </label>
               <div className="flex gap-2">
@@ -291,7 +291,7 @@ export default function KinematicsOptimizerPanel({
                     className={`flex-1 py-1 rounded font-mono font-bold text-xs border transition ${
                       allowedAxes.includes(ax)
                         ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
-                        : "bg-slate-800/40 text-slate-500 border-slate-800"
+                        : "bg-slate-800/40 text-zinc-400 border-slate-800"
                     }`}
                   >
                     Δ{ax}
@@ -301,7 +301,7 @@ export default function KinematicsOptimizerPanel({
             </div>
 
             <div>
-              <label className="font-semibold text-slate-300 block mb-1 uppercase tracking-wider text-[11px]">
+              <label className="font-semibold text-slate-300 block mb-1 uppercase tracking-wider text-xs">
                 Sweep Sample Budget
               </label>
               <div className="flex gap-2">
@@ -325,7 +325,7 @@ export default function KinematicsOptimizerPanel({
           {/* Col 3: Multi-Objective Selection */}
           <div className="space-y-3 bg-slate-950/40 p-3 rounded-lg border border-slate-800">
             <div>
-              <label className="font-semibold text-slate-300 block mb-1 uppercase tracking-wider text-[11px]">
+              <label className="font-semibold text-slate-300 block mb-1 uppercase tracking-wider text-xs">
                 Objective 1 (X-Axis)
               </label>
               <div className="flex gap-2">
@@ -340,7 +340,7 @@ export default function KinematicsOptimizerPanel({
                 </select>
                 <button
                   onClick={() => setPrimaryDir(primaryDir === "maximize" ? "minimize" : "maximize")}
-                  className={`px-2 py-1 rounded font-bold text-[10px] uppercase border ${
+                  className={`px-2 py-1 rounded font-bold text-xs uppercase border ${
                     primaryDir === "maximize"
                       ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
                       : "bg-amber-500/20 text-amber-300 border-amber-500/40"
@@ -352,7 +352,7 @@ export default function KinematicsOptimizerPanel({
             </div>
 
             <div>
-              <label className="font-semibold text-slate-300 block mb-1 uppercase tracking-wider text-[11px]">
+              <label className="font-semibold text-slate-300 block mb-1 uppercase tracking-wider text-xs">
                 Objective 2 (Y-Axis)
               </label>
               <div className="flex gap-2">
@@ -368,7 +368,7 @@ export default function KinematicsOptimizerPanel({
                 </select>
                 <button
                   onClick={() => setSecondaryDir(secondaryDir === "maximize" ? "minimize" : "maximize")}
-                  className={`px-2 py-1 rounded font-bold text-[10px] uppercase border ${
+                  className={`px-2 py-1 rounded font-bold text-xs uppercase border ${
                     secondaryDir === "maximize"
                       ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
                       : "bg-amber-500/20 text-amber-300 border-amber-500/40"
@@ -379,9 +379,9 @@ export default function KinematicsOptimizerPanel({
               </div>
             </div>
 
-            <div className="text-[11px] text-slate-400 pt-1">
+            <div className="text-xs text-slate-400 pt-1">
               <span className="text-slate-300 font-medium">Active Constraints:</span>
-              <div className="mt-0.5 font-mono text-[10px] text-slate-400">
+              <div className="mt-0.5 font-mono text-xs text-slate-400">
                 • Roll Center Height ∈ [-120, +30] mm<br />
                 • Structural Wishbone Length &gt; 120 mm
               </div>
@@ -409,12 +409,12 @@ export default function KinematicsOptimizerPanel({
                     {results.pareto_count ?? frontier.length} Non-Dominated Candidates
                   </span>
                 </h4>
-                <p className="text-[11px] text-slate-400">
+                <p className="text-xs text-slate-400">
                   Tradeoff between {primaryObj} and {secondaryObj}. Non-dominated frontier points represent optimal compromises.
                 </p>
               </div>
 
-              <div className="flex items-center gap-2 text-[10px] font-mono text-slate-400">
+              <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
                 <span className="flex items-center gap-1">
                   <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block" /> Pareto Frontier
                 </span>
@@ -532,12 +532,12 @@ export default function KinematicsOptimizerPanel({
 
             {/* Frontier Candidate Selector Chips */}
             <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs">
-              <span className="text-slate-500 font-mono text-[11px] whitespace-nowrap">Pareto Set:</span>
+              <span className="text-zinc-400 font-mono text-xs whitespace-nowrap">Pareto Set:</span>
               {frontier.map((p, idx) => (
                 <button
                   key={p.candidate_id}
                   onClick={() => setSelectedCandidate(p)}
-                  className={`px-2 py-1 rounded font-mono text-[11px] whitespace-nowrap border transition ${
+                  className={`px-2 py-1 rounded font-mono text-xs whitespace-nowrap border transition ${
                     selectedCandidate?.candidate_id === p.candidate_id
                       ? "bg-cyan-500 text-slate-950 font-bold border-cyan-400"
                       : p.is_best_compromise
@@ -562,17 +562,17 @@ export default function KinematicsOptimizerPanel({
                         {selectedCandidate.candidate_id}
                       </span>
                       {selectedCandidate.is_best_compromise && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
+                        <span className="text-xs font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 flex items-center gap-1">
                           <Award className="w-3 h-3" /> BEST COMPROMISE
                         </span>
                       )}
                     </div>
-                    <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                    <div className="text-xs text-slate-400 font-mono mt-0.5">
                       Utopia Distance d* = {typeof selectedCandidate.utopia_distance === "number" ? selectedCandidate.utopia_distance.toFixed(4) : "N/A"}
                     </div>
                   </div>
 
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
+                  <span className={`px-2 py-0.5 rounded text-xs font-bold font-mono ${
                     selectedCandidate.constraint_status === "PASS"
                       ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                       : "bg-red-500/20 text-red-300 border border-red-500/40"
@@ -585,30 +585,30 @@ export default function KinematicsOptimizerPanel({
                 <div className="space-y-2 text-xs">
                   {/* Point 1: What Changed */}
                   <div className="bg-slate-950/50 p-2.5 rounded-lg border border-slate-800">
-                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                    <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-1">
                       1. What Changed
                     </span>
-                    <p className="text-slate-300 font-mono text-[11px]">
+                    <p className="text-slate-300 font-sans leading-relaxed text-xs">
                       {selectedCandidate.explanation?.what_changed || "Hardpoint coordinate adjustments applied."}
                     </p>
                   </div>
 
                   {/* Point 2: Why It Was Chosen */}
                   <div className="bg-slate-950/50 p-2.5 rounded-lg border border-slate-800">
-                    <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider block mb-1">
+                    <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider block mb-1">
                       2. Why It Was Chosen (Utopia Distance)
                     </span>
-                    <p className="text-slate-300 text-[11px]">
+                    <p className="text-slate-300 text-xs">
                       {selectedCandidate.explanation?.why_chosen || "Minimizes normalized distance to the theoretical Utopia point across all objectives."}
                     </p>
                   </div>
 
                   {/* Point 3: What Improved */}
                   <div className="bg-slate-950/50 p-2.5 rounded-lg border border-slate-800">
-                    <span className="text-[10px] font-semibold text-emerald-500 uppercase tracking-wider block mb-1">
+                    <span className="text-xs font-semibold text-emerald-500 uppercase tracking-wider block mb-1">
                       3. What Improved
                     </span>
-                    <ul className="list-disc list-inside text-emerald-300/90 space-y-0.5 text-[11px]">
+                    <ul className="list-disc list-inside text-emerald-300/90 space-y-0.5 text-xs">
                       {selectedCandidate.explanation?.what_improved?.map((imp, idx) => (
                         <li key={idx}>{imp}</li>
                       )) || <li>Balanced objective trade-off achieved.</li>}
@@ -617,17 +617,17 @@ export default function KinematicsOptimizerPanel({
 
                   {/* Point 4: What Got Worse */}
                   <div className="bg-slate-950/50 p-2.5 rounded-lg border border-slate-800">
-                    <span className="text-[10px] font-semibold text-amber-500 uppercase tracking-wider block mb-1">
+                    <span className="text-xs font-semibold text-amber-500 uppercase tracking-wider block mb-1">
                       4. What Got Worse
                     </span>
                     {selectedCandidate.explanation?.what_got_worse?.length ? (
-                      <ul className="list-disc list-inside text-amber-300/90 space-y-0.5 text-[11px]">
+                      <ul className="list-disc list-inside text-amber-300/90 space-y-0.5 text-xs">
                         {selectedCandidate.explanation.what_got_worse.map((w, idx) => (
                           <li key={idx}>{w}</li>
                         ))}
                       </ul>
                     ) : (
-                      <p className="text-slate-400 italic text-[11px]">No secondary metrics degraded significantly.</p>
+                      <p className="text-slate-400 italic text-xs">No secondary metrics degraded significantly.</p>
                     )}
                   </div>
                 </div>
@@ -637,11 +637,11 @@ export default function KinematicsOptimizerPanel({
                   <div className="p-3 bg-emerald-950/50 border border-emerald-500/40 rounded-lg text-xs text-emerald-200 flex items-center justify-between">
                     <div>
                       <div className="font-semibold">Transferred to Experiment!</div>
-                      <div className="text-[10px] font-mono text-emerald-300/80">ID: {experimentResult.experiment_id}</div>
+                      <div className="text-xs font-mono text-emerald-300/80">ID: {experimentResult.experiment_id}</div>
                     </div>
                     <a
                       href={experimentResult.redirect_url}
-                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded text-[11px]"
+                      className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold rounded text-xs"
                     >
                       View
                     </a>
@@ -683,7 +683,7 @@ export default function KinematicsOptimizerPanel({
                 </div>
               </div>
             ) : (
-              <div className="text-center py-12 text-slate-500 text-xs">
+              <div className="text-center py-12 text-zinc-400 text-xs">
                 Select a candidate from the Pareto plot or list to inspect details.
               </div>
             )}

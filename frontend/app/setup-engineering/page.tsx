@@ -146,7 +146,7 @@ export default function SetupEngineeringPage() {
           <p className="text-xs text-slate-300 leading-relaxed">
             {error || "No manifest was returned by the setup engineering pipeline."}
           </p>
-          <p className="text-[11px] text-slate-400">
+          <p className="text-xs text-slate-400">
             Please run the causal workflow (`/execute-workflow`) or verify your authentication permissions (`VEHICLE_READ`).
           </p>
           <button
@@ -280,7 +280,7 @@ export default function SetupEngineeringPage() {
                                   {d.ci_95 ? `[${d.ci_95[0]}${unit}, ${d.ci_95[1]}${unit}]` : "—"}
                                 </td>
                                 <td className="py-2.5 px-3">
-                                  <span className={`px-2 py-0.5 rounded text-[10px] border ${
+                                  <span className={`px-2 py-0.5 rounded text-xs border ${
                                     d.beneficial
                                       ? "bg-emerald-500/20 text-emerald-400 border-emerald-500/30"
                                       : "bg-slate-700/50 text-slate-300 border-slate-600"
@@ -314,7 +314,7 @@ export default function SetupEngineeringPage() {
                           </span>
                         </div>
                       ))}
-                      <div className="text-[11px] text-emerald-500 mt-2">
+                      <div className="text-xs text-emerald-500 mt-2">
                         ✓ Isolation Verified: zero simultaneous changes to rear or aero.
                       </div>
                     </div>
@@ -331,7 +331,7 @@ export default function SetupEngineeringPage() {
                           </div>
                         ))
                       ) : (
-                        <div className="text-slate-500 py-1">No active constraints recorded.</div>
+                        <div className="text-zinc-400 py-1">No active constraints recorded.</div>
                       )}
                     </div>
                   </div>
@@ -459,7 +459,7 @@ export default function SetupEngineeringPage() {
                           ? `${manifest.prediction.expected_delta.peak_roll_angle_deg}°`
                           : "—"}
                       </div>
-                      <div className="text-[10px] text-slate-400">
+                      <div className="text-xs text-slate-400">
                         {manifest.prediction?.uncertainty_interval?.peak_roll_angle_deg
                           ? `95% CI: [${manifest.prediction.uncertainty_interval.peak_roll_angle_deg[0]}°, ${manifest.prediction.uncertainty_interval.peak_roll_angle_deg[1]}°]`
                           : "—"}
@@ -472,7 +472,7 @@ export default function SetupEngineeringPage() {
                           ? `+${manifest.prediction.expected_delta.peak_lateral_accel_g} G`
                           : "—"}
                       </div>
-                      <div className="text-[10px] text-slate-400">
+                      <div className="text-xs text-slate-400">
                         {manifest.prediction?.uncertainty_interval?.peak_lateral_accel_g
                           ? `95% CI: [+${manifest.prediction.uncertainty_interval.peak_lateral_accel_g[0]} G, +${manifest.prediction.uncertainty_interval.peak_lateral_accel_g[1]} G]`
                           : "—"}
@@ -485,7 +485,7 @@ export default function SetupEngineeringPage() {
                           ? `${manifest.prediction.expected_delta.front_susp_travel_mm} mm`
                           : "—"}
                       </div>
-                      <div className="text-[10px] text-slate-400">
+                      <div className="text-xs text-slate-400">
                         {manifest.prediction?.uncertainty_interval?.front_susp_travel_mm
                           ? `95% CI: [${manifest.prediction.uncertainty_interval.front_susp_travel_mm[0]}, ${manifest.prediction.uncertainty_interval.front_susp_travel_mm[1]}] mm`
                           : "—"}

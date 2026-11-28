@@ -19,9 +19,9 @@ export default function ConfidenceIndicator({
 }: ConfidenceIndicatorProps) {
   if (confidence === null || confidence === undefined || isNaN(confidence)) {
     return (
-      <div className={`inline-flex items-center gap-1.5 font-mono text-zinc-500 text-xs ${className}`}>
+      <div className={`inline-flex items-center gap-1.5 font-mono text-zinc-400 text-xs ${className}`}>
         <span className="w-2 h-2 rounded-full bg-zinc-600" />
-        <span className="font-semibold text-[11px] uppercase tracking-wider text-zinc-400">DATA UNAVAILABLE</span>
+        <span className="font-semibold text-xs uppercase tracking-wider text-zinc-400">DATA UNAVAILABLE</span>
       </div>
     );
   }
@@ -56,12 +56,12 @@ export default function ConfidenceIndicator({
       title={`Engineering Confidence: ${pct}% (${band}) ${sourceTag ? `via ${sourceTag}` : ""}`}
     >
       <div className="flex items-center justify-between gap-3 text-xs">
-        <span className="text-[10px] text-gray-400 font-sans font-semibold uppercase tracking-wider">
+        <span className="text-xs text-gray-400 font-sans font-semibold uppercase tracking-wider">
           Confidence
         </span>
         <div className="flex items-center gap-1.5 font-bold">
           <span className={color}>{normVal.toFixed(2)}</span>
-          <span className={`text-[10px] px-1 py-0.2 rounded font-semibold ${color} bg-white/5`}>
+          <span className={`text-xs px-1 py-0.2 rounded font-semibold ${color} bg-white/5`}>
             {band}
           </span>
         </div>
@@ -77,7 +77,7 @@ export default function ConfidenceIndicator({
       )}
 
       {sourceTag && (
-        <div className="text-[9px] text-gray-400 truncate max-w-[160px]">
+        <div className="text-xs text-gray-400 truncate max-w-[160px]">
           Source: {sourceTag}
         </div>
       )}

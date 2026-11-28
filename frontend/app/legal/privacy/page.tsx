@@ -14,7 +14,7 @@ export default function PrivacyPage() {
     <div className="min-h-full bg-black pt-[44px]">
       <div className="max-w-3xl mx-auto px-6 py-20 text-gray-300">
         <h1 className="text-4xl font-bold text-white mb-2">Privacy Policy</h1>
-        <p className="text-sm text-gray-500 mb-10">Effective Date: {EFFECTIVE_DATE}</p>
+        <p className="text-sm text-zinc-400 mb-10">Effective Date: {EFFECTIVE_DATE}</p>
 
         <div className="space-y-10 text-sm leading-relaxed">
           <section>
@@ -80,7 +80,7 @@ export default function PrivacyPage() {
 
           <section>
             <h2 className="text-lg font-semibold text-white mb-3">10. Contact</h2>
-            <p>For privacy-related questions or data requests, contact us at <a href={`mailto:${EMAIL}`} className="text-ansys-yellow hover:underline">{EMAIL}</a>.</p>
+            <p>For privacy-related questions or data requests, contact us at <a href={`mailto:${EMAIL}`} className="text-signal hover:underline">{EMAIL}</a>.</p>
           </section>
         </div>
       </div>

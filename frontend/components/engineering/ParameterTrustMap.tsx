@@ -769,10 +769,10 @@ export function ParameterTrustMap({
       <div className="flex flex-col md:flex-row md:items-center justify-between pb-6 border-b border-zinc-800 gap-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono tracking-widest uppercase px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <span className="text-xs font-mono tracking-widest uppercase px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
               Phase 6.1
             </span>
-            <span className="text-[10px] font-mono text-zinc-400">
+            <span className="text-xs font-mono text-zinc-400">
               POLICY: {trustData?.policy_version || "TRUST_POLICY_V1"}
             </span>
           </div>
@@ -814,7 +814,7 @@ export function ParameterTrustMap({
           <button
             type="submit"
             disabled={loading}
-            className="px-4 py-1.5 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-black rounded transition flex items-center gap-1.5 disabled:opacity-50"
+            className="px-4 py-1.5 text-xs font-semibold bg-signal hover:bg-[#d6f56e] text-carbon rounded transition flex items-center gap-1.5 disabled:opacity-50"
             data-testid="btn-query-trust"
           >
             <Search className="w-3.5 h-3.5" />
@@ -838,18 +838,18 @@ export function ParameterTrustMap({
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 rounded-lg bg-zinc-900/60 border border-zinc-800">
             {/* 1. Parameter */}
             <div>
-              <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400">Parameter</div>
+              <div className="text-xs uppercase font-mono tracking-wider text-zinc-400">Parameter</div>
               <div className="text-base font-semibold text-white mt-1 font-mono break-all" data-testid="param-name">
                 {trustData.parameter_identity.parameter_name}
               </div>
-              <div className="text-[11px] text-zinc-500 font-mono truncate mt-0.5" title={trustData.parameter_identity.parameter_path}>
+              <div className="text-xs text-zinc-400 font-mono truncate mt-0.5" title={trustData.parameter_identity.parameter_path}>
                 {trustData.parameter_identity.parameter_path}
               </div>
             </div>
 
             {/* 2. Value & Unit */}
             <div>
-              <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400">Value & Unit</div>
+              <div className="text-xs uppercase font-mono tracking-wider text-zinc-400">Value & Unit</div>
               <div className="text-lg font-bold text-white mt-1 flex items-baseline gap-1.5 font-mono">
                 <span data-testid="param-value">
                   {typeof trustData.value_reference.value === "number"
@@ -860,14 +860,14 @@ export function ParameterTrustMap({
                   {trustData.unit || "—"}
                 </span>
               </div>
-              <div className="text-[10px] text-zinc-500 font-mono mt-0.5">
+              <div className="text-xs text-zinc-400 font-mono mt-0.5">
                 Hash: {trustData.value_reference.value_identity}
               </div>
             </div>
 
             {/* 3. Trust State */}
             <div>
-              <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400">Trust State</div>
+              <div className="text-xs uppercase font-mono tracking-wider text-zinc-400">Trust State</div>
               <div className="mt-1">
                 {(() => {
                   const badge = getTrustStateBadge(trustData.current_trust_state);
@@ -883,14 +883,14 @@ export function ParameterTrustMap({
                   );
                 })()}
               </div>
-              <div className="text-[10px] text-zinc-500 mt-1">
+              <div className="text-xs text-zinc-400 mt-1">
                 Deterministic: {trustData.assessment_hash.slice(0, 12)}...
               </div>
             </div>
 
             {/* 4. Validation Coverage */}
             <div>
-              <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400">Validation Coverage</div>
+              <div className="text-xs uppercase font-mono tracking-wider text-zinc-400">Validation Coverage</div>
               <div className="mt-1">
                 <span
                   className={`inline-block px-2.5 py-1 rounded-md text-xs font-semibold border ${getValidationCoverageBadge(
@@ -901,7 +901,7 @@ export function ParameterTrustMap({
                   {trustData.validation_coverage.replace("_", " ")}
                 </span>
               </div>
-              <div className="text-[10px] text-zinc-500 mt-1">
+              <div className="text-xs text-zinc-400 mt-1">
                 {trustData.recency.latest_supporting_validation
                   ? `Latest: ${trustData.recency.latest_supporting_validation}`
                   : "No out-of-sample gate"}
@@ -1057,7 +1057,7 @@ export function ParameterTrustMap({
                         <div className="font-mono font-medium">{c.conflict_type}</div>
                         <div className="text-zinc-300 mt-1">{c.detail}</div>
                         {c.delta_pct !== null && c.delta_pct !== undefined && (
-                          <div className="text-[11px] text-rose-400 mt-0.5">
+                          <div className="text-xs text-rose-400 mt-0.5">
                             Divergence: {c.delta_pct}% (Delta: {c.delta})
                           </div>
                         )}
@@ -1076,14 +1076,14 @@ export function ParameterTrustMap({
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 text-xs">
                   {Object.entries(trustData.scope).map(([k, v]) => (
                     <div key={k} className="p-2 rounded bg-zinc-900 border border-zinc-800 font-mono">
-                      <div className="text-[10px] text-zinc-500 uppercase">{k}</div>
+                      <div className="text-xs text-zinc-400 uppercase">{k}</div>
                       <div className="text-zinc-200 truncate mt-0.5" title={String(v)}>
                         {String(v ?? "—")}
                       </div>
                     </div>
                   ))}
                   {Object.keys(trustData.scope).length === 0 && (
-                    <div className="text-xs text-zinc-500 italic">No scope boundaries recorded.</div>
+                    <div className="text-xs text-zinc-400 italic">No scope boundaries recorded.</div>
                   )}
                 </div>
               </div>
@@ -1105,7 +1105,7 @@ export function ParameterTrustMap({
 
                 {trustData.explanation.limitations && trustData.explanation.limitations.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-zinc-800">
-                    <div className="text-[10px] uppercase font-mono text-zinc-500 tracking-wider">
+                    <div className="text-xs uppercase font-mono text-zinc-400 tracking-wider">
                       Known Limitations
                     </div>
                     <ul className="mt-1 list-disc list-inside text-xs text-zinc-400 space-y-1">
@@ -1125,7 +1125,7 @@ export function ParameterTrustMap({
                     Validation Recency Metadata
                   </div>
                   {trustData.recency.recency_condition && (
-                    <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-zinc-800 text-amber-300 border border-zinc-700">
+                    <span className="px-2 py-0.5 rounded text-xs font-mono font-semibold bg-zinc-800 text-amber-300 border border-zinc-700">
                       {trustData.recency.recency_condition}
                     </span>
                   )}
@@ -1144,25 +1144,25 @@ export function ParameterTrustMap({
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-3 text-xs font-mono">
                   <div className="p-2 rounded bg-zinc-900 border border-zinc-800">
-                    <div className="text-[10px] text-zinc-500 uppercase">Evidence Timestamp</div>
+                    <div className="text-xs text-zinc-400 uppercase">Evidence Timestamp</div>
                     <div className="text-zinc-200 mt-0.5">{trustData.recency.evidence_timestamp || "—"}</div>
                   </div>
                   <div className="p-2 rounded bg-zinc-900 border border-zinc-800">
-                    <div className="text-[10px] text-zinc-500 uppercase">Validation Timestamp</div>
+                    <div className="text-xs text-zinc-400 uppercase">Validation Timestamp</div>
                     <div className="text-zinc-200 mt-0.5">{trustData.recency.validation_timestamp || "—"}</div>
                   </div>
                   <div className="p-2 rounded bg-zinc-900 border border-zinc-800">
-                    <div className="text-[10px] text-zinc-500 uppercase">Source Version</div>
+                    <div className="text-xs text-zinc-400 uppercase">Source Version</div>
                     <div className="text-zinc-200 mt-0.5">{trustData.recency.source_version || "—"}</div>
                   </div>
                   <div className="p-2 rounded bg-zinc-900 border border-zinc-800">
-                    <div className="text-[10px] text-zinc-500 uppercase">Age (Days)</div>
+                    <div className="text-xs text-zinc-400 uppercase">Age (Days)</div>
                     <div className="text-zinc-200 mt-0.5">{trustData.recency.age_days ?? "—"}</div>
                   </div>
                 </div>
 
                 {/* Epistemic Aging Invariant Note */}
-                <div className="mt-3 p-2 rounded bg-zinc-900/60 border border-zinc-800/80 text-[11px] text-zinc-400 flex items-start gap-2">
+                <div className="mt-3 p-2 rounded bg-zinc-900/60 border border-zinc-800/80 text-xs text-zinc-400 flex items-start gap-2">
                   <span className="text-amber-400 font-bold shrink-0">ℹ</span>
                   <span>
                     <strong>Epistemic Invariant:</strong> {trustData.recency.epistemic_aging_note || "Evidence aging reflects temporal epistemic recency, NOT physical component degradation or mechanical fatigue."}
@@ -1176,13 +1176,13 @@ export function ParameterTrustMap({
           {activeTab === "evidence" && (
             <div className="space-y-4" data-testid="evidence-container">
               {trustData.supporting_evidence.length === 0 ? (
-                <div className="p-6 text-center text-xs text-zinc-500 italic rounded-lg bg-zinc-900/40 border border-zinc-800">
+                <div className="p-6 text-center text-xs text-zinc-400 italic rounded-lg bg-zinc-900/40 border border-zinc-800">
                   No supporting evidence artifacts connected in the Evidence Graph.
                 </div>
               ) : (
                 <div className="overflow-x-auto rounded-lg border border-zinc-800">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-zinc-900/80 text-zinc-400 uppercase font-mono text-[10px] border-b border-zinc-800">
+                    <thead className="bg-zinc-900/80 text-zinc-400 uppercase font-mono text-xs border-b border-zinc-800">
                       <tr>
                         <th className="p-3">Relationship</th>
                         <th className="p-3">Artifact Type</th>
@@ -1197,10 +1197,10 @@ export function ParameterTrustMap({
                           <td className="p-3 text-amber-400 font-semibold">{ev.relationship}</td>
                           <td className="p-3 text-zinc-300">{ev.evidence_type}</td>
                           <td className="p-3 text-white">{ev.evidence_id}</td>
-                          <td className="p-3 text-zinc-500 text-[11px] truncate max-w-xs" title={ev.artifact_hash}>
+                          <td className="p-3 text-zinc-400 text-xs truncate max-w-xs" title={ev.artifact_hash}>
                             {ev.artifact_hash.slice(0, 16)}...
                           </td>
-                          <td className="p-3 text-zinc-400 text-[11px]">{ev.timestamp || "—"}</td>
+                          <td className="p-3 text-zinc-400 text-xs">{ev.timestamp || "—"}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -1214,7 +1214,7 @@ export function ParameterTrustMap({
           {activeTab === "history" && (
             <div className="space-y-4" data-testid="history-container">
               {historyItems.length === 0 ? (
-                <div className="p-6 text-center text-xs text-zinc-500 italic rounded-lg bg-zinc-900/40 border border-zinc-800">
+                <div className="p-6 text-center text-xs text-zinc-400 italic rounded-lg bg-zinc-900/40 border border-zinc-800">
                   No historical assessments recorded yet.
                 </div>
               ) : (
@@ -1226,20 +1226,20 @@ export function ParameterTrustMap({
                     >
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-mono text-zinc-400 text-[11px]">{h.created_at}</span>
-                          <span className="font-mono text-[10px] text-zinc-600">ID: {h.id.slice(0, 8)}</span>
+                          <span className="font-mono text-zinc-400 text-xs">{h.created_at}</span>
+                          <span className="font-mono text-xs text-zinc-300">ID: {h.id.slice(0, 8)}</span>
                         </div>
                         <div className="mt-1 flex items-center gap-2">
                           <span className="font-semibold text-white">{h.trust_state}</span>
-                          <span className="text-zinc-500">•</span>
+                          <span className="text-zinc-400">•</span>
                           <span className="text-zinc-400">{h.validation_coverage}</span>
-                          <span className="text-zinc-500">•</span>
-                          <span className="text-zinc-500 font-mono text-[11px]">
+                          <span className="text-zinc-400">•</span>
+                          <span className="text-zinc-400 font-mono text-xs">
                             Policy: {h.policy_version}
                           </span>
                         </div>
                       </div>
-                      <div className="text-right font-mono text-[11px] text-zinc-500">
+                      <div className="text-right font-mono text-xs text-zinc-400">
                         <div title={h.assessment_hash}>Hash: {h.assessment_hash.slice(0, 16)}...</div>
                         <div title={h.value_identity}>Val: {h.value_identity}</div>
                       </div>
@@ -1259,14 +1259,14 @@ export function ParameterTrustMap({
                     <Sliders className="w-4 h-4 text-amber-400" />
                     Cross-Variant Parameter Sweep Analysis
                   </div>
-                  <div className="text-[11px] text-zinc-400 mt-1">
+                  <div className="text-xs text-zinc-400 mt-1">
                     Evaluates comparability across candidate setups, sweeps, and simulation runs.
                   </div>
                 </div>
                 <button
                   onClick={handleRunSweep}
                   disabled={sweepLoading}
-                  className="px-3 py-1.5 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-black rounded transition flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-3 py-1.5 text-xs font-semibold bg-signal hover:bg-[#d6f56e] text-carbon rounded transition flex items-center gap-1.5 disabled:opacity-50"
                   data-testid="btn-run-sweep"
                 >
                   <Sliders className="w-3.5 h-3.5" />
@@ -1285,31 +1285,31 @@ export function ParameterTrustMap({
                   {/* Sweep Metrics Cards */}
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-3 font-mono">
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">Min Value</div>
+                      <div className="text-xs text-zinc-400 uppercase">Min Value</div>
                       <div className="text-base font-bold text-white mt-1">
                         {sweepData.summary_metrics.min ?? "—"} <span className="text-xs font-normal text-amber-400">{sweepData.canonical_unit}</span>
                       </div>
                     </div>
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">Max Value</div>
+                      <div className="text-xs text-zinc-400 uppercase">Max Value</div>
                       <div className="text-base font-bold text-white mt-1">
                         {sweepData.summary_metrics.max ?? "—"} <span className="text-xs font-normal text-amber-400">{sweepData.canonical_unit}</span>
                       </div>
                     </div>
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">Delta (Range)</div>
+                      <div className="text-xs text-zinc-400 uppercase">Delta (Range)</div>
                       <div className="text-base font-bold text-white mt-1">
                         {sweepData.summary_metrics.delta ?? "—"} <span className="text-xs font-normal text-amber-400">{sweepData.canonical_unit}</span>
                       </div>
                     </div>
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">Mean Value</div>
+                      <div className="text-xs text-zinc-400 uppercase">Mean Value</div>
                       <div className="text-base font-bold text-white mt-1">
                         {sweepData.summary_metrics.mean ?? "—"} <span className="text-xs font-normal text-amber-400">{sweepData.canonical_unit}</span>
                       </div>
                     </div>
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">Comparable</div>
+                      <div className="text-xs text-zinc-400 uppercase">Comparable</div>
                       <div className="text-base font-bold text-emerald-400 mt-1">
                         {sweepData.comparable_count} / {sweepData.total_observations}
                       </div>
@@ -1332,7 +1332,7 @@ export function ParameterTrustMap({
                   {/* Observations Table */}
                   <div className="rounded-lg border border-zinc-800 overflow-hidden">
                     <table className="w-full text-xs text-left">
-                      <thead className="bg-zinc-900 text-zinc-400 font-mono text-[11px] uppercase">
+                      <thead className="bg-zinc-900 text-zinc-400 font-mono text-xs uppercase">
                         <tr>
                           <th className="p-3">Candidate / Entity</th>
                           <th className="p-3">Observed Value</th>
@@ -1374,14 +1374,14 @@ export function ParameterTrustMap({
                     <RefreshCw className="w-4 h-4 text-amber-400" />
                     Automated Trust Ingestion & Reconciliation
                   </div>
-                  <div className="text-[11px] text-zinc-400 mt-1">
+                  <div className="text-xs text-zinc-400 mt-1">
                     Discovers all eligible parameters from {entityType}:{entityId} and reconciles trust assessments idempotently.
                   </div>
                 </div>
                 <button
                   onClick={handleRunIngest}
                   disabled={ingestLoading}
-                  className="px-3 py-1.5 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-black rounded transition flex items-center gap-1.5 disabled:opacity-50"
+                  className="px-3 py-1.5 text-xs font-semibold bg-signal hover:bg-[#d6f56e] text-carbon rounded transition flex items-center gap-1.5 disabled:opacity-50"
                   data-testid="btn-run-ingest"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${ingestLoading ? "animate-spin" : ""}`} />
@@ -1400,27 +1400,27 @@ export function ParameterTrustMap({
                   {/* Summary KPI grid */}
                   <div className="grid grid-cols-2 md:grid-cols-6 gap-3 font-mono text-xs">
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">Discovered</div>
+                      <div className="text-xs text-zinc-400 uppercase">Discovered</div>
                       <div className="text-base font-bold text-white mt-1">{ingestSummary.discovered_parameters}</div>
                     </div>
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">New Profiles</div>
+                      <div className="text-xs text-zinc-400 uppercase">New Profiles</div>
                       <div className="text-base font-bold text-emerald-400 mt-1">{ingestSummary.new_profiles}</div>
                     </div>
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">Refreshed</div>
+                      <div className="text-xs text-zinc-400 uppercase">Refreshed</div>
                       <div className="text-base font-bold text-cyan-400 mt-1">{ingestSummary.refreshed_assessments}</div>
                     </div>
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">Unchanged</div>
+                      <div className="text-xs text-zinc-400 uppercase">Unchanged</div>
                       <div className="text-base font-bold text-zinc-400 mt-1">{ingestSummary.unchanged_assessments}</div>
                     </div>
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">Evidence Linked</div>
+                      <div className="text-xs text-zinc-400 uppercase">Evidence Linked</div>
                       <div className="text-base font-bold text-amber-400 mt-1">{ingestSummary.linked_evidence_count}</div>
                     </div>
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">Conflicts</div>
+                      <div className="text-xs text-zinc-400 uppercase">Conflicts</div>
                       <div className="text-base font-bold text-rose-400 mt-1">{ingestSummary.conflicts_found}</div>
                     </div>
                   </div>
@@ -1428,7 +1428,7 @@ export function ParameterTrustMap({
                   {/* Profiles Table */}
                   <div className="rounded-lg border border-zinc-800 overflow-hidden">
                     <table className="w-full text-xs text-left">
-                      <thead className="bg-zinc-900 text-zinc-400 font-mono text-[11px] uppercase">
+                      <thead className="bg-zinc-900 text-zinc-400 font-mono text-xs uppercase">
                         <tr>
                           <th className="p-3">Parameter Name</th>
                           <th className="p-3">Unit</th>
@@ -1446,7 +1446,7 @@ export function ParameterTrustMap({
                             <td className="p-3">{p.trust_state}</td>
                             <td className="p-3 text-zinc-400">{p.validation_coverage}</td>
                             <td className="p-3 text-zinc-400">{p.recency_condition}</td>
-                            <td className="p-3 text-zinc-500">{p.assessment_hash.slice(0, 12)}...</td>
+                            <td className="p-3 text-zinc-400">{p.assessment_hash.slice(0, 12)}...</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1481,7 +1481,7 @@ export function ParameterTrustMap({
                   <button
                     onClick={handleRunFleetSync}
                     disabled={fleetLoading}
-                    className="px-4 py-1.5 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-black rounded transition flex items-center gap-1.5 disabled:opacity-50"
+                    className="px-4 py-1.5 text-xs font-semibold bg-signal hover:bg-[#d6f56e] text-carbon rounded transition flex items-center gap-1.5 disabled:opacity-50"
                     data-testid="btn-run-fleet-sync"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${fleetLoading ? "animate-spin" : ""}`} />
@@ -1501,29 +1501,29 @@ export function ParameterTrustMap({
                   {/* Summary Stats Grid */}
                   <div className="grid grid-cols-2 md:grid-cols-6 gap-3 font-mono text-xs">
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">Cohort Size</div>
+                      <div className="text-xs text-zinc-400 uppercase">Cohort Size</div>
                       <div className="text-base font-bold text-white mt-1">{fleetData.cohort_size}</div>
                     </div>
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">Comparable</div>
+                      <div className="text-xs text-zinc-400 uppercase">Comparable</div>
                       <div className="text-base font-bold text-emerald-400 mt-1">{fleetData.comparable_count}</div>
                     </div>
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">Missing</div>
+                      <div className="text-xs text-zinc-400 uppercase">Missing</div>
                       <div className="text-base font-bold text-zinc-400 mt-1">{fleetData.missing_count}</div>
                     </div>
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">Excluded</div>
+                      <div className="text-xs text-zinc-400 uppercase">Excluded</div>
                       <div className="text-base font-bold text-rose-400 mt-1">{fleetData.excluded_count}</div>
                     </div>
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">Range (Min - Max)</div>
+                      <div className="text-xs text-zinc-400 uppercase">Range (Min - Max)</div>
                       <div className="text-xs font-bold text-amber-400 mt-1 truncate">
                         {fleetData.summary_metrics.min ?? "—"} – {fleetData.summary_metrics.max ?? "—"}
                       </div>
                     </div>
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800">
-                      <div className="text-[10px] text-zinc-500 uppercase">Median / Mean</div>
+                      <div className="text-xs text-zinc-400 uppercase">Median / Mean</div>
                       <div className="text-xs font-bold text-cyan-400 mt-1 truncate">
                         {fleetData.summary_metrics.median ?? "—"} / {fleetData.summary_metrics.mean ?? "—"}
                       </div>
@@ -1537,7 +1537,7 @@ export function ParameterTrustMap({
                         <AlertTriangle className="w-4 h-4" />
                         Statistical Outliers Detected ({fleetData.outliers.length})
                       </div>
-                      <div className="text-[11px] text-amber-300/80 italic">
+                      <div className="text-xs text-amber-300/80 italic">
                         Notice: Statistical outlier does not constitute an engineering defect or automatic rejection.
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
@@ -1545,7 +1545,7 @@ export function ParameterTrustMap({
                           <div key={idx} className="p-2.5 rounded bg-zinc-900/80 border border-zinc-800 text-xs font-mono">
                             <div className="text-white font-semibold">{outlier.vehicle_ref}</div>
                             <div className="text-amber-400 mt-1">Value: {outlier.value}</div>
-                            <div className="text-[10px] text-zinc-400 mt-0.5">{outlier.note}</div>
+                            <div className="text-xs text-zinc-400 mt-0.5">{outlier.note}</div>
                           </div>
                         ))}
                       </div>
@@ -1558,7 +1558,7 @@ export function ParameterTrustMap({
                       Comparable Fleet Instances ({fleetData.comparable_instances.length})
                     </div>
                     <table className="w-full text-xs text-left">
-                      <thead className="bg-zinc-900/80 text-zinc-400 font-mono text-[11px] uppercase">
+                      <thead className="bg-zinc-900/80 text-zinc-400 font-mono text-xs uppercase">
                         <tr>
                           <th className="p-3">Vehicle Ref</th>
                           <th className="p-3">Normalized Value</th>
@@ -1578,7 +1578,7 @@ export function ParameterTrustMap({
                             <td className="p-3">{inst.trust_state}</td>
                             <td className="p-3 text-zinc-400">{inst.validation_coverage}</td>
                             <td className="p-3 text-zinc-400">{inst.provenance_class}</td>
-                            <td className="p-3 text-zinc-500">{inst.assessment_hash?.slice(0, 10)}...</td>
+                            <td className="p-3 text-zinc-400">{inst.assessment_hash?.slice(0, 10)}...</td>
                           </tr>
                         ))}
                       </tbody>
@@ -1626,7 +1626,7 @@ export function ParameterTrustMap({
                   {/* Dependency Path Breadcrumbs */}
                   {impactData.dependency_path && (
                     <div className="p-3 rounded bg-zinc-900 border border-zinc-800 text-xs font-mono text-zinc-300 flex items-center gap-2">
-                      <span className="text-zinc-500 uppercase text-[10px]">Structural Lineage:</span>
+                      <span className="text-zinc-400 uppercase text-xs">Structural Lineage:</span>
                       <span className="text-amber-400 font-semibold">{impactData.dependency_path.join(" ➔ ")}</span>
                     </div>
                   )}
@@ -1660,13 +1660,13 @@ export function ParameterTrustMap({
                         <div className="text-white font-semibold">
                           Classification: <span className="text-cyan-400">{impactData.impact_assessment?.impact_classification}</span>
                         </div>
-                        <div className="text-zinc-300 text-[11px] mt-1 font-sans">
+                        <div className="text-zinc-300 text-xs mt-1 font-sans">
                           {impactData.impact_assessment?.impact_summary}
                         </div>
-                        <div className="text-zinc-400 text-[10px] mt-2 pt-2 border-t border-zinc-800/80 font-mono">
+                        <div className="text-zinc-400 text-xs mt-2 pt-2 border-t border-zinc-800/80 font-mono">
                           Threshold Provenance: <span className="text-amber-300">{impactData.impact_assessment?.threshold_provenance || "PROVISIONAL"}</span> (Analytical Screening Bins)
                         </div>
-                        <div className="text-zinc-500 text-[10px] mt-1 font-sans italic">
+                        <div className="text-zinc-400 text-xs mt-1 font-sans italic">
                           Deployment Safety: Independent Governance Gate (Not Inferred)
                         </div>
                       </div>
@@ -1678,7 +1678,7 @@ export function ParameterTrustMap({
                     <div className="p-4 rounded-lg bg-zinc-900/60 border border-zinc-800 space-y-3">
                       <div className="text-xs font-semibold uppercase font-mono text-zinc-300 flex items-center justify-between">
                         <span>Authoritative Sensitivity Evidence</span>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-amber-400 border border-zinc-700">
+                        <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-amber-400 border border-zinc-700">
                           STATUS: {impactData.sensitivity_evidence.status}
                         </span>
                       </div>
@@ -1691,19 +1691,19 @@ export function ParameterTrustMap({
                         <div className="space-y-3">
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 font-mono text-xs">
                             <div className="p-2 rounded bg-zinc-900 border border-zinc-800">
-                              <div className="text-[10px] text-zinc-500 uppercase">Source</div>
+                              <div className="text-xs text-zinc-400 uppercase">Source</div>
                               <div className="text-white truncate">{impactData.sensitivity_evidence.source_type}:{impactData.sensitivity_evidence.source_id}</div>
                             </div>
                             <div className="p-2 rounded bg-zinc-900 border border-zinc-800">
-                              <div className="text-[10px] text-zinc-500 uppercase">Method</div>
+                              <div className="text-xs text-zinc-400 uppercase">Method</div>
                               <div className="text-white truncate">{impactData.sensitivity_evidence.method}</div>
                             </div>
                             <div className="p-2 rounded bg-zinc-900 border border-zinc-800">
-                              <div className="text-[10px] text-zinc-500 uppercase">Regime</div>
+                              <div className="text-xs text-zinc-400 uppercase">Regime</div>
                               <div className="text-white truncate">{impactData.sensitivity_evidence.operating_regime}</div>
                             </div>
                             <div className="p-2 rounded bg-zinc-900 border border-zinc-800">
-                              <div className="text-[10px] text-zinc-500 uppercase">Artifact Hash</div>
+                              <div className="text-xs text-zinc-400 uppercase">Artifact Hash</div>
                               <div className="text-zinc-400 truncate">{impactData.sensitivity_evidence.artifact_hash?.slice(0, 10)}...</div>
                             </div>
                           </div>
@@ -1712,7 +1712,7 @@ export function ParameterTrustMap({
                           {impactData.impact_assessment?.downstream_metrics && impactData.impact_assessment.downstream_metrics.length > 0 && (
                             <div className="rounded border border-zinc-800 overflow-hidden">
                               <table className="w-full text-xs text-left">
-                                <thead className="bg-zinc-900 text-zinc-400 font-mono text-[11px] uppercase">
+                                <thead className="bg-zinc-900 text-zinc-400 font-mono text-xs uppercase">
                                   <tr>
                                     <th className="p-2.5">Downstream KPI</th>
                                     <th className="p-2.5">Sensitivity Unit</th>
@@ -1759,7 +1759,7 @@ export function ParameterTrustMap({
                   </div>
                   {/* Preset Decision Chips */}
                   <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="text-[10px] uppercase font-mono text-zinc-500">Presets:</span>
+                    <span className="text-xs uppercase font-mono text-zinc-400">Presets:</span>
                     {["DEC-12", "DEC-P3L-01", "PROB-P3L-01", "INV-91"].map((preset) => (
                       <button
                         key={preset}
@@ -1770,7 +1770,7 @@ export function ParameterTrustMap({
                           setDecisionType(dtype);
                           fetchDecisionExposure(preset, dtype);
                         }}
-                        className="px-2 py-0.5 text-[10px] font-mono rounded bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-700 transition"
+                        className="px-2 py-0.5 text-xs font-mono rounded bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-700 transition"
                       >
                         {preset}
                       </button>
@@ -1801,7 +1801,7 @@ export function ParameterTrustMap({
                     type="button"
                     onClick={() => fetchDecisionExposure(decisionId, decisionType, false)}
                     disabled={decisionLoading}
-                    className="px-3.5 py-1.5 text-xs font-semibold bg-amber-500 hover:bg-amber-400 text-black rounded transition flex items-center gap-1.5 disabled:opacity-50"
+                    className="px-3.5 py-1.5 text-xs font-semibold bg-signal hover:bg-[#d6f56e] text-carbon rounded transition flex items-center gap-1.5 disabled:opacity-50"
                     data-testid="btn-assess-decision"
                   >
                     <Search className="w-3.5 h-3.5" />
@@ -1836,10 +1836,10 @@ export function ParameterTrustMap({
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-mono tracking-widest uppercase px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                          <span className="text-xs font-mono tracking-widest uppercase px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
                             POLICY: {decisionExposureData.policy_version}
                           </span>
-                          <span className="text-[10px] font-mono text-zinc-500">
+                          <span className="text-xs font-mono text-zinc-400">
                             DECISION: {decisionExposureData.decision_id} ({decisionExposureData.decision_type})
                           </span>
                         </div>
@@ -1852,7 +1852,7 @@ export function ParameterTrustMap({
                       </div>
 
                       <div className="text-right">
-                        <div className="text-[10px] text-zinc-400 uppercase font-mono mb-1">Exposure Classification</div>
+                        <div className="text-xs text-zinc-400 uppercase font-mono mb-1">Exposure Classification</div>
                         <span
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold border ${
                             decisionExposureData.exposure_classification === "LOW_EXPOSURE"
@@ -1870,20 +1870,20 @@ export function ParameterTrustMap({
                           <Scale className="w-3.5 h-3.5" />
                           {decisionExposureData.exposure_classification}
                         </span>
-                        <div className="text-[10px] text-zinc-500 font-mono mt-1.5">
+                        <div className="text-xs text-zinc-400 font-mono mt-1.5">
                           Thresholds: <span className="text-amber-300">{decisionExposureData.threshold_provenance || "PROVISIONAL"}</span> (Analytical Screening)
                         </div>
                       </div>
                     </div>
 
                     {/* Hashes & Lineage */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 pt-4 border-t border-zinc-800 text-[11px] font-mono">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-4 pt-4 border-t border-zinc-800 text-xs font-mono">
                       <div className="p-2 rounded bg-zinc-950/60 border border-zinc-800/80">
-                        <span className="text-zinc-500">Input Snapshot Hash:</span>{" "}
+                        <span className="text-zinc-400">Input Snapshot Hash:</span>{" "}
                         <span className="text-zinc-300">{decisionExposureData.input_snapshot_hash}</span>
                       </div>
                       <div className="p-2 rounded bg-zinc-950/60 border border-zinc-800/80">
-                        <span className="text-zinc-500">Assessment Hash:</span>{" "}
+                        <span className="text-zinc-400">Assessment Hash:</span>{" "}
                         <span className="text-amber-400">{decisionExposureData.assessment_hash}</span>
                       </div>
                     </div>
@@ -1900,51 +1900,51 @@ export function ParameterTrustMap({
 
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 text-xs font-mono">
                       <div className="p-2.5 rounded bg-zinc-900 border border-zinc-800">
-                        <div className="text-[9px] uppercase text-zinc-500">1. Parameter Trust</div>
+                        <div className="text-xs uppercase text-zinc-400">1. Parameter Trust</div>
                         <div className="text-white font-semibold mt-1">
                           {Object.keys(decisionExposureData.governance_separation.parameter_trust_states).length} Parameters
                         </div>
-                        <div className="text-[10px] text-zinc-400 truncate mt-0.5">Local component posture</div>
+                        <div className="text-xs text-zinc-400 truncate mt-0.5">Local component posture</div>
                       </div>
 
                       <div className="p-2.5 rounded bg-zinc-900 border border-zinc-800">
-                        <div className="text-[9px] uppercase text-zinc-500">2. Sensitivity / Impact</div>
+                        <div className="text-xs uppercase text-zinc-400">2. Sensitivity / Impact</div>
                         <div className="text-white font-semibold mt-1">Physical Deriv.</div>
-                        <div className="text-[10px] text-zinc-400 truncate mt-0.5">∂(KPI) / ∂(Param)</div>
+                        <div className="text-xs text-zinc-400 truncate mt-0.5">∂(KPI) / ∂(Param)</div>
                       </div>
 
                       <div className="p-2.5 rounded bg-zinc-900 border border-zinc-800">
-                        <div className="text-[9px] uppercase text-zinc-500">3. Completeness</div>
+                        <div className="text-xs uppercase text-zinc-400">3. Completeness</div>
                         <div className="text-white font-semibold mt-1">Evidence Coverage</div>
-                        <div className="text-[10px] text-zinc-400 truncate mt-0.5">Holdout validation & recency</div>
+                        <div className="text-xs text-zinc-400 truncate mt-0.5">Holdout validation & recency</div>
                       </div>
 
                       <div className="p-2.5 rounded bg-zinc-900 border border-zinc-800">
-                        <div className="text-[9px] uppercase text-zinc-500">4. Decision Exposure</div>
+                        <div className="text-xs uppercase text-zinc-400">4. Decision Exposure</div>
                         <div className="text-amber-400 font-semibold mt-1 truncate">
                           {decisionExposureData.exposure_classification}
                         </div>
-                        <div className="text-[10px] text-zinc-400 truncate mt-0.5">Premise vulnerability</div>
+                        <div className="text-xs text-zinc-400 truncate mt-0.5">Premise vulnerability</div>
                       </div>
 
                       <div className="p-2.5 rounded bg-zinc-900 border border-zinc-800">
-                        <div className="text-[9px] uppercase text-zinc-500">5. Human Approval</div>
+                        <div className="text-xs uppercase text-zinc-400">5. Human Approval</div>
                         <div className="text-emerald-400 font-semibold mt-1">
                           {decisionExposureData.governance_separation.approval_authorization.decision_status}
                         </div>
-                        <div className="text-[10px] text-zinc-400 truncate mt-0.5">
+                        <div className="text-xs text-zinc-400 truncate mt-0.5">
                           {decisionExposureData.governance_separation.approval_authorization.is_human_approved ? "Signed" : "Pending Sign-off"}
                         </div>
                       </div>
 
                       <div className="p-2.5 rounded bg-zinc-900 border border-zinc-800">
-                        <div className="text-[9px] uppercase text-zinc-500">6. Deployment Safety</div>
+                        <div className="text-xs uppercase text-zinc-400">6. Deployment Safety</div>
                         <div className="text-rose-400 font-semibold mt-1">NOT ESTABLISHED</div>
-                        <div className="text-[10px] text-zinc-400 truncate mt-0.5">Independent Commissioning</div>
+                        <div className="text-xs text-zinc-400 truncate mt-0.5">Independent Commissioning</div>
                       </div>
                     </div>
 
-                    <div className="p-2.5 rounded bg-zinc-950/60 border border-zinc-800 text-[11px] text-zinc-400 font-sans italic">
+                    <div className="p-2.5 rounded bg-zinc-950/60 border border-zinc-800 text-xs text-zinc-400 font-sans italic">
                       {decisionExposureData.governance_separation_notice}
                     </div>
                   </div>
@@ -1957,7 +1957,7 @@ export function ParameterTrustMap({
                         Supersession Differential Analysis
                       </div>
                       <p>{decisionExposureData.differential.rationale}</p>
-                      <div className="text-[10px] font-mono text-amber-400/80 pt-1">
+                      <div className="text-xs font-mono text-amber-400/80 pt-1">
                         Previous Hash: {decisionExposureData.differential.previous_hash.slice(0, 16)}... → New Hash: {decisionExposureData.differential.new_hash.slice(0, 16)}...
                       </div>
                     </div>
@@ -1970,14 +1970,14 @@ export function ParameterTrustMap({
                         <FileText className="w-4 h-4 text-amber-400" />
                         Decision Parameter Dependencies ({decisionExposureData.parameter_dependencies.length})
                       </h3>
-                      <span className="text-[10px] font-mono text-zinc-500">
+                      <span className="text-xs font-mono text-zinc-400">
                         Direct vs Quantitative vs Qualitative vs Unresolved
                       </span>
                     </div>
 
                     <div className="rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900/30">
                       <table className="w-full text-xs text-left" data-testid="table-decision-dependencies">
-                        <thead className="bg-zinc-900 text-zinc-400 font-mono text-[11px] uppercase border-b border-zinc-800">
+                        <thead className="bg-zinc-900 text-zinc-400 font-mono text-xs uppercase border-b border-zinc-800">
                           <tr>
                             <th className="p-3">Parameter & Entity</th>
                             <th className="p-3">Dependency Nature</th>
@@ -1991,11 +1991,11 @@ export function ParameterTrustMap({
                             <tr key={idx} className="hover:bg-zinc-900/50 transition">
                               <td className="p-3">
                                 <div className="text-white font-semibold">{dep.parameter_name}</div>
-                                <div className="text-[10px] text-zinc-500">{dep.entity_type}:{dep.entity_id}</div>
+                                <div className="text-xs text-zinc-400">{dep.entity_type}:{dep.entity_id}</div>
                               </td>
                               <td className="p-3">
                                 <span
-                                  className={`inline-block px-2 py-0.5 text-[10px] font-bold rounded border ${
+                                  className={`inline-block px-2 py-0.5 text-xs font-bold rounded border ${
                                     dep.dependency_nature === "DIRECTLY_EVIDENCED"
                                       ? "bg-blue-950/70 border-blue-500/40 text-blue-300"
                                       : dep.dependency_nature === "QUANTITATIVELY_SENSITIVE"
@@ -2015,20 +2015,20 @@ export function ParameterTrustMap({
                                 {dep.elasticity !== null && dep.elasticity !== undefined ? (
                                   <div>
                                     <span className="text-amber-400 font-semibold">{dep.elasticity}</span>
-                                    <span className="text-[10px] text-zinc-500 ml-1">({dep.derivative_unit || "ratio"})</span>
+                                    <span className="text-xs text-zinc-400 ml-1">({dep.derivative_unit || "ratio"})</span>
                                   </div>
                                 ) : (
-                                  <span className="text-zinc-500 text-[11px] italic">
+                                  <span className="text-zinc-400 text-xs italic">
                                     {dep.dependency_nature === "QUALITATIVE_HYPOTHESIS" ? "Directional trend only" : "Unavailable"}
                                   </span>
                                 )}
                               </td>
                               <td className="p-3">
                                 <div className="flex items-center gap-1.5">
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-200">
+                                  <span className="px-1.5 py-0.5 rounded text-xs bg-zinc-800 text-zinc-200">
                                     {dep.direct_profile.trust_state}
                                   </span>
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-400">
+                                  <span className="px-1.5 py-0.5 rounded text-xs bg-zinc-800 text-zinc-400">
                                     {dep.direct_profile.validation_coverage}
                                   </span>
                                 </div>
@@ -2047,7 +2047,7 @@ export function ParameterTrustMap({
                         <FlaskConical className="w-4 h-4 text-amber-400" />
                         Actionable Evidence Gaps & Candidate Experiments ({decisionExposureData.evidence_gaps.length})
                       </h3>
-                      <span className="text-[10px] font-mono text-zinc-500">
+                      <span className="text-xs font-mono text-zinc-400">
                         Prioritized uncertainty reduction designs
                       </span>
                     </div>
@@ -2072,7 +2072,7 @@ export function ParameterTrustMap({
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-bold text-white font-mono">{gap.parameter_name}</span>
                               <span
-                                className={`px-2 py-0.5 text-[9px] font-bold rounded uppercase ${
+                                className={`px-2 py-0.5 text-xs font-bold rounded uppercase ${
                                   gap.severity === "CRITICAL"
                                     ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
                                     : gap.severity === "WARNING"
@@ -2087,14 +2087,14 @@ export function ParameterTrustMap({
                             <p className="text-xs text-zinc-300">{gap.reason}</p>
 
                             <div className="p-2.5 rounded bg-zinc-950/60 border border-zinc-800 text-xs space-y-1 font-mono">
-                              <div className="text-[10px] text-amber-400 uppercase font-semibold">Recommended Candidate Experiment</div>
+                              <div className="text-xs text-amber-400 uppercase font-semibold">Recommended Candidate Experiment</div>
                               <div className="text-white">{gap.candidate_experiment_type}</div>
-                              <div className="text-[11px] text-zinc-400 mt-1">
-                                <span className="text-zinc-500">Expected Info Gain:</span> {gap.expected_information_gain}
+                              <div className="text-xs text-zinc-400 mt-1">
+                                <span className="text-zinc-400">Expected Info Gain:</span> {gap.expected_information_gain}
                               </div>
                             </div>
 
-                            <div className="text-[10px] text-zinc-500 italic font-sans">
+                            <div className="text-xs text-zinc-400 italic font-sans">
                               {gap.recommendation_disclaimer}
                             </div>
                           </div>
@@ -2111,7 +2111,7 @@ export function ParameterTrustMap({
                           <History className="w-4 h-4 text-amber-400" />
                           Historical Revisions & Supersession Lineage ({decisionHistoryItems.length})
                         </h3>
-                        <span className="text-[10px] font-mono text-zinc-500">Append-only audit trail</span>
+                        <span className="text-xs font-mono text-zinc-400">Append-only audit trail</span>
                       </div>
 
                       <div className="space-y-2">
@@ -2128,18 +2128,18 @@ export function ParameterTrustMap({
                               <div className="flex items-center gap-2">
                                 <span className="font-bold">{hist.exposure_classification}</span>
                                 {hist.is_active ? (
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                                  <span className="px-1.5 py-0.2 rounded text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
                                     ACTIVE
                                   </span>
                                 ) : (
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-zinc-800 text-zinc-500">
+                                  <span className="px-1.5 py-0.2 rounded text-xs bg-zinc-800 text-zinc-400">
                                     SUPERSEDED
                                   </span>
                                 )}
                               </div>
-                              <div className="text-[11px] text-zinc-400 mt-0.5">{hist.exposure_summary}</div>
+                              <div className="text-xs text-zinc-400 mt-0.5">{hist.exposure_summary}</div>
                             </div>
-                            <div className="text-right text-[10px] text-zinc-500">
+                            <div className="text-right text-xs text-zinc-400">
                               <div>Hash: {hist.assessment_hash.slice(0, 16)}...</div>
                               <div>{hist.created_at ? new Date(hist.created_at).toLocaleString() : ""}</div>
                             </div>
@@ -2164,7 +2164,7 @@ export function ParameterTrustMap({
                     <div className="text-xs font-bold text-white uppercase font-mono">
                       Phase 6.5 — Decision Robustness & Uncertainty Propagation
                     </div>
-                    <div className="text-[10px] text-zinc-400">
+                    <div className="text-xs text-zinc-400">
                       Bounded intervals, reversal identification, parameter boundary bisection, and VOI prioritization
                     </div>
                   </div>
@@ -2190,7 +2190,7 @@ export function ParameterTrustMap({
                   <button
                     onClick={() => handleRunRobustnessAnalysis(robustnessDecisionId, false)}
                     disabled={robustnessLoading}
-                    className="px-3 py-1 text-xs font-semibold rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition disabled:opacity-50"
+                    className="px-3 py-1 text-xs font-semibold rounded bg-signal/20 text-amber-300 border border-amber-500/40 hover:bg-signal/30 transition disabled:opacity-50"
                     data-testid="btn-run-robustness-analysis"
                   >
                     {robustnessLoading ? "Evaluating Envelope..." : "Analyze Robustness"}
@@ -2219,7 +2219,7 @@ export function ParameterTrustMap({
                     <span className="text-xs font-bold text-zinc-200 font-mono">
                       PREFLIGHT AUDIT: {preflightData.decision_id}
                     </span>
-                    <span className={`px-2 py-0.5 text-[10px] font-bold rounded ${
+                    <span className={`px-2 py-0.5 text-xs font-bold rounded ${
                       preflightData.is_ready ? "bg-emerald-950/80 border border-emerald-500/40 text-emerald-300" : "bg-rose-950/80 border border-rose-500/40 text-rose-300"
                     }`}>
                       {preflightData.is_ready ? "READY FOR PROPAGATION" : "BLOCKED"}
@@ -2227,17 +2227,17 @@ export function ParameterTrustMap({
                   </div>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs font-mono">
                     <div className="p-2 rounded bg-zinc-950/60 border border-zinc-800/80">
-                      <span className="text-[10px] text-zinc-500 block">Verified Parameters</span>
+                      <span className="text-xs text-zinc-400 block">Verified Parameters</span>
                       <span className="text-white font-semibold">{preflightData.matched_parameters_count}</span>
                     </div>
                     <div className="p-2 rounded bg-zinc-950/60 border border-zinc-800/80">
-                      <span className="text-[10px] text-zinc-500 block">Missing Uncertainty Evidence</span>
+                      <span className="text-xs text-zinc-400 block">Missing Uncertainty Evidence</span>
                       <span className={preflightData.missing_evidence_parameters.length > 0 ? "text-amber-400 font-semibold" : "text-emerald-400 font-semibold"}>
                         {preflightData.missing_evidence_parameters.length}
                       </span>
                     </div>
                     <div className="p-2 rounded bg-zinc-950/60 border border-zinc-800/80">
-                      <span className="text-[10px] text-zinc-500 block">Recomputable Modal KPIs</span>
+                      <span className="text-xs text-zinc-400 block">Recomputable Modal KPIs</span>
                       <span className="text-cyan-400 font-semibold">{preflightData.recomputable_kpis?.map((k) => k.kpi).join(", ") || "None"}</span>
                     </div>
                   </div>
@@ -2276,7 +2276,7 @@ export function ParameterTrustMap({
                     <p className="text-zinc-300">
                       {robustnessData.governance_separation_notice}
                     </p>
-                    <div className="flex flex-wrap gap-4 pt-1 font-mono text-[11px]">
+                    <div className="flex flex-wrap gap-4 pt-1 font-mono text-xs">
                       <span>
                         Deployment Safety Inferred:{" "}
                         <strong className="text-rose-400">
@@ -2301,7 +2301,7 @@ export function ParameterTrustMap({
                   {/* Summary Metric Cards */}
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 rounded-lg bg-zinc-900/60 border border-zinc-800">
                     <div>
-                      <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400">
+                      <div className="text-xs uppercase font-mono tracking-wider text-zinc-400">
                         Robustness Posture
                       </div>
                       <div className="mt-1">
@@ -2322,41 +2322,41 @@ export function ParameterTrustMap({
                     </div>
 
                     <div>
-                      <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400">
+                      <div className="text-xs uppercase font-mono tracking-wider text-zinc-400">
                         Target KPI & Selection
                       </div>
                       <div className="mt-1 text-sm font-bold text-white font-mono">
                         {robustnessData.target_kpi}
                       </div>
-                      <div className="text-[10px] text-zinc-500 font-mono">
+                      <div className="text-xs text-zinc-400 font-mono">
                         Selected: {robustnessData.selected_option}
                       </div>
                     </div>
 
                     <div>
-                      <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400">
+                      <div className="text-xs uppercase font-mono tracking-wider text-zinc-400">
                         Scenarios & Reversals
                       </div>
                       <div className="mt-1 text-sm font-bold font-mono">
                         <span className="text-white">{robustnessData.evaluated_scenarios_count} Evaluated</span>
-                        <span className="text-zinc-500 mx-1">/</span>
+                        <span className="text-zinc-400 mx-1">/</span>
                         <span className={robustnessData.reversals_count > 0 ? "text-rose-400" : "text-emerald-400"}>
                           {robustnessData.reversals_count} Reversals
                         </span>
                       </div>
-                      <div className="text-[10px] text-zinc-500 font-mono">
+                      <div className="text-xs text-zinc-400 font-mono">
                         Boundaries: {robustnessData.boundary_crossings?.length || 0}
                       </div>
                     </div>
 
                     <div>
-                      <div className="text-[10px] uppercase font-mono tracking-wider text-zinc-400">
+                      <div className="text-xs uppercase font-mono tracking-wider text-zinc-400">
                         Cryptographic Provenance
                       </div>
-                      <div className="text-[11px] text-zinc-300 font-mono mt-1 truncate" title={robustnessData.analysis_hash}>
+                      <div className="text-xs text-zinc-300 font-mono mt-1 truncate" title={robustnessData.analysis_hash}>
                         Analysis: {robustnessData.analysis_hash.slice(0, 14)}...
                       </div>
-                      <div className="text-[10px] text-zinc-500 font-mono truncate" title={robustnessData.input_snapshot_hash}>
+                      <div className="text-xs text-zinc-400 font-mono truncate" title={robustnessData.input_snapshot_hash}>
                         Snapshot: {robustnessData.input_snapshot_hash.slice(0, 14)}...
                       </div>
                     </div>
@@ -2375,10 +2375,10 @@ export function ParameterTrustMap({
                         <AlertTriangle className="w-4 h-4" />
                         Numerical Solver Failures Preserved ({robustnessData.solver_failures.length})
                       </div>
-                      <p className="text-zinc-400 text-[11px]">
+                      <p className="text-zinc-400 text-xs">
                         The following scenarios triggered physical constraint violations or numerical non-convergence and are preserved as explicit failure results rather than masked.
                       </p>
-                      <div className="space-y-1 font-mono text-[10px]">
+                      <div className="space-y-1 font-mono text-xs">
                         {robustnessData.solver_failures.map((sf, idx) => (
                           <div key={idx} className="p-2 rounded bg-zinc-950/60 border border-rose-500/30">
                             Scenario: {sf.scenario_id} | Status: {sf.convergence_status} | Reason: {sf.failure_reason}
@@ -2395,7 +2395,7 @@ export function ParameterTrustMap({
                         <AlertTriangle className="w-4 h-4 text-rose-400" />
                         Demonstrated Ranking Reversals ({robustnessData.reversal_scenarios?.length || 0})
                       </h3>
-                      <span className="text-[10px] font-mono text-zinc-500">
+                      <span className="text-xs font-mono text-zinc-400">
                         Parameter combinations that flip the engineering conclusion
                       </span>
                     </div>
@@ -2407,7 +2407,7 @@ export function ParameterTrustMap({
                     ) : (
                       <div className="rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900/30">
                         <table className="w-full text-xs text-left" data-testid="table-reversal-scenarios">
-                          <thead className="bg-zinc-900 text-zinc-400 font-mono text-[11px] uppercase border-b border-zinc-800">
+                          <thead className="bg-zinc-900 text-zinc-400 font-mono text-xs uppercase border-b border-zinc-800">
                             <tr>
                               <th className="p-3">Scenario</th>
                               <th className="p-3">Reversal Winner</th>
@@ -2421,13 +2421,13 @@ export function ParameterTrustMap({
                               <tr key={idx} className="hover:bg-zinc-900/50 transition">
                                 <td className="p-3 text-amber-400 font-semibold">{rev.scenario_id}</td>
                                 <td className="p-3 text-rose-300 font-semibold">
-                                  {rev.scenario_winner} <span className="text-[10px] text-zinc-500">(vs {rev.original_selection})</span>
+                                  {rev.scenario_winner} <span className="text-xs text-zinc-400">(vs {rev.original_selection})</span>
                                 </td>
                                 <td className="p-3 text-zinc-300">
                                   {rev.decision_margin !== undefined && rev.decision_margin !== null ? rev.decision_margin.toFixed(4) : "—"}
                                 </td>
                                 <td className="p-3 text-cyan-300">{rev.nature}</td>
-                                <td className="p-3 text-zinc-400 text-[10px]">
+                                <td className="p-3 text-zinc-400 text-xs">
                                   {rev.parameter_values ? JSON.stringify(rev.parameter_values) : "—"}
                                 </td>
                               </tr>
@@ -2445,7 +2445,7 @@ export function ParameterTrustMap({
                         <Target className="w-4 h-4 text-cyan-400" />
                         Decision Boundary Crossings ({robustnessData.boundary_crossings?.length || 0})
                       </h3>
-                      <span className="text-[10px] font-mono text-zinc-500">
+                      <span className="text-xs font-mono text-zinc-400">
                         Bisection analysis of parameter shifts required to flip decision
                       </span>
                     </div>
@@ -2457,7 +2457,7 @@ export function ParameterTrustMap({
                     ) : (
                       <div className="rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900/30">
                         <table className="w-full text-xs text-left" data-testid="table-decision-boundaries">
-                          <thead className="bg-zinc-900 text-zinc-400 font-mono text-[11px] uppercase border-b border-zinc-800">
+                          <thead className="bg-zinc-900 text-zinc-400 font-mono text-xs uppercase border-b border-zinc-800">
                             <tr>
                               <th className="p-3">Type</th>
                               <th className="p-3">Parameter</th>
@@ -2471,7 +2471,7 @@ export function ParameterTrustMap({
                             {robustnessData.boundary_crossings.map((bc, idx) => (
                               <tr key={idx} className="hover:bg-zinc-900/50 transition">
                                 <td className="p-3">
-                                  <span className={`px-2 py-0.5 text-[9px] font-bold rounded ${
+                                  <span className={`px-2 py-0.5 text-xs font-bold rounded ${
                                     bc.crossing_type === "BISECTION_APPROXIMATED" ? "bg-cyan-950/70 border border-cyan-500/40 text-cyan-300" : "bg-zinc-800 text-zinc-300"
                                   }`}>
                                     {bc.crossing_type}
@@ -2485,7 +2485,7 @@ export function ParameterTrustMap({
                                 <td className="p-3 text-rose-300 font-semibold">
                                   {bc.parameter_shift_pct !== undefined ? `${bc.parameter_shift_pct.toFixed(1)}%` : "—"}
                                 </td>
-                                <td className="p-3 text-zinc-400 text-[11px] font-sans">{bc.description}</td>
+                                <td className="p-3 text-zinc-400 text-xs font-sans">{bc.description}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -2501,7 +2501,7 @@ export function ParameterTrustMap({
                         <TrendingUp className="w-4 h-4 text-amber-400" />
                         Dominant Decision Uncertainties ({robustnessData.dominant_uncertainties?.length || 0})
                       </h3>
-                      <span className="text-[10px] font-mono text-zinc-500">
+                      <span className="text-xs font-mono text-zinc-400">
                         Ranked by elasticity × uncertainty span & reversal participation
                       </span>
                     </div>
@@ -2513,7 +2513,7 @@ export function ParameterTrustMap({
                     ) : (
                       <div className="rounded-lg border border-zinc-800 overflow-hidden bg-zinc-900/30">
                         <table className="w-full text-xs text-left" data-testid="table-dominant-uncertainties">
-                          <thead className="bg-zinc-900 text-zinc-400 font-mono text-[11px] uppercase border-b border-zinc-800">
+                          <thead className="bg-zinc-900 text-zinc-400 font-mono text-xs uppercase border-b border-zinc-800">
                             <tr>
                               <th className="p-3">Rank</th>
                               <th className="p-3">Parameter</th>
@@ -2526,7 +2526,7 @@ export function ParameterTrustMap({
                           <tbody className="divide-y divide-zinc-800 font-mono text-xs">
                             {robustnessData.dominant_uncertainties.map((du, idx) => (
                               <tr key={idx} className="hover:bg-zinc-900/50 transition">
-                                <td className="p-3 text-zinc-500 font-bold">#{idx + 1}</td>
+                                <td className="p-3 text-zinc-400 font-bold">#{idx + 1}</td>
                                 <td className="p-3 text-white font-semibold">{du.parameter_name}</td>
                                 <td className="p-3 text-amber-400 font-bold">{du.impact_score !== undefined ? du.impact_score.toFixed(4) : "—"}</td>
                                 <td className="p-3 text-zinc-300">{du.elasticity !== undefined ? du.elasticity.toFixed(3) : "—"}</td>
@@ -2547,7 +2547,7 @@ export function ParameterTrustMap({
                         <FlaskConical className="w-4 h-4 text-emerald-400" />
                         Value of Information (VOI) Prioritizations ({robustnessData.voi_prioritizations?.length || 0})
                       </h3>
-                      <span className="text-[10px] font-mono text-zinc-500">
+                      <span className="text-xs font-mono text-zinc-400">
                         Concrete experiments mapped to uncertainty reduction (No fabricated dollar EVOI)
                       </span>
                     </div>
@@ -2572,7 +2572,7 @@ export function ParameterTrustMap({
                             <div className="flex items-center justify-between">
                               <span className="text-xs font-bold text-white font-mono">{voi.parameter_name}</span>
                               <span
-                                className={`px-2 py-0.5 text-[9px] font-bold rounded uppercase ${
+                                className={`px-2 py-0.5 text-xs font-bold rounded uppercase ${
                                   voi.priority_level === "HIGH"
                                     ? "bg-rose-500/20 text-rose-300 border border-rose-500/40"
                                     : voi.priority_level === "MEDIUM"
@@ -2585,9 +2585,9 @@ export function ParameterTrustMap({
                             </div>
 
                             <div className="p-2.5 rounded bg-zinc-950/60 border border-zinc-800 text-xs space-y-1 font-mono">
-                              <div className="text-[10px] text-amber-400 uppercase font-semibold">Recommended Physical Experiment</div>
+                              <div className="text-xs text-amber-400 uppercase font-semibold">Recommended Physical Experiment</div>
                               <div className="text-white">{voi.recommended_experiment}</div>
-                              <div className="text-[11px] text-zinc-400 mt-1 flex justify-between">
+                              <div className="text-xs text-zinc-400 mt-1 flex justify-between">
                                 <span>Elasticity: {voi.elasticity}</span>
                                 <span>Trust: {voi.current_trust_state}</span>
                               </div>
@@ -2608,7 +2608,7 @@ export function ParameterTrustMap({
                           <History className="w-4 h-4 text-amber-400" />
                           Robustness Analysis Lineage ({robustnessHistoryItems.length})
                         </h3>
-                        <span className="text-[10px] font-mono text-zinc-500">Append-only audit trail</span>
+                        <span className="text-xs font-mono text-zinc-400">Append-only audit trail</span>
                       </div>
 
                       <div className="space-y-2">
@@ -2625,18 +2625,18 @@ export function ParameterTrustMap({
                               <div className="flex items-center gap-2">
                                 <span className="font-bold">{hist.robustness_classification}</span>
                                 {hist.is_active ? (
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                                  <span className="px-1.5 py-0.2 rounded text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
                                     ACTIVE
                                   </span>
                                 ) : (
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-zinc-800 text-zinc-500">
+                                  <span className="px-1.5 py-0.2 rounded text-xs bg-zinc-800 text-zinc-400">
                                     SUPERSEDED
                                   </span>
                                 )}
                               </div>
-                              <div className="text-[11px] text-zinc-400 mt-0.5">{hist.robustness_summary}</div>
+                              <div className="text-xs text-zinc-400 mt-0.5">{hist.robustness_summary}</div>
                             </div>
-                            <div className="text-right text-[10px] text-zinc-500">
+                            <div className="text-right text-xs text-zinc-400">
                               <div>Hash: {hist.analysis_hash ? `${hist.analysis_hash.slice(0, 16)}...` : ""}</div>
                               <div>{hist.created_at ? new Date(hist.created_at).toLocaleString() : ""}</div>
                             </div>
@@ -2665,13 +2665,13 @@ export function ParameterTrustMap({
                   </div>
                   <div className="flex items-center gap-2">
                     <span
-                      className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-300 border border-zinc-700"
+                      className="px-2 py-0.5 rounded text-xs font-mono bg-zinc-800 text-zinc-300 border border-zinc-700"
                       data-testid="badge-safety-inferred"
                     >
                       deployment_safety_inferred = false
                     </span>
                     <span
-                      className="px-2 py-0.5 rounded text-[10px] font-mono bg-rose-950/70 text-rose-300 border border-rose-500/40"
+                      className="px-2 py-0.5 rounded text-xs font-mono bg-rose-950/70 text-rose-300 border border-rose-500/40"
                       data-testid="badge-deployment-auth"
                     >
                       Deployment: NOT_ESTABLISHED
@@ -2700,7 +2700,7 @@ export function ParameterTrustMap({
                   <button
                     onClick={() => fetchValidationPlans(validationDecisionId)}
                     disabled={validationLoading}
-                    className="px-3 py-1.5 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-400 text-black transition flex items-center gap-1.5 disabled:opacity-50"
+                    className="px-3 py-1.5 text-xs font-semibold rounded bg-signal hover:bg-[#d6f56e] text-carbon transition flex items-center gap-1.5 disabled:opacity-50"
                     data-testid="btn-fetch-plans"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${validationLoading ? "animate-spin" : ""}`} />
@@ -2743,7 +2743,7 @@ export function ParameterTrustMap({
                       data-testid={`btn-select-plan-${p.plan_id}`}
                     >
                       <span className="font-bold">{p.plan_id}</span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+                      <span className="text-xs px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
                         {p.status}
                       </span>
                     </button>
@@ -2864,19 +2864,19 @@ export function ParameterTrustMap({
                     {/* Metadata Grid */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
                       <div>
-                        <span className="text-zinc-500 block text-[10px] uppercase">Target Parameter</span>
+                        <span className="text-zinc-400 block text-xs uppercase">Target Parameter</span>
                         <span className="text-white font-bold" data-testid="plan-target-param">{selectedPlan.parameter_name}</span>
                       </div>
                       <div>
-                        <span className="text-zinc-500 block text-[10px] uppercase">Method</span>
+                        <span className="text-zinc-400 block text-xs uppercase">Method</span>
                         <span className="text-zinc-200">{selectedPlan.validation_method}</span>
                       </div>
                       <div>
-                        <span className="text-zinc-500 block text-[10px] uppercase">Canonical Unit</span>
+                        <span className="text-zinc-400 block text-xs uppercase">Canonical Unit</span>
                         <span className="text-amber-400 font-bold">{selectedPlan.unit || "—"}</span>
                       </div>
                       <div>
-                        <span className="text-zinc-500 block text-[10px] uppercase">Plan Hash</span>
+                        <span className="text-zinc-400 block text-xs uppercase">Plan Hash</span>
                         <span className="text-zinc-400 truncate block" title={selectedPlan.plan_hash || ""}>
                           {selectedPlan.plan_hash ? `${selectedPlan.plan_hash.slice(0, 16)}...` : "—"}
                         </span>
@@ -2894,7 +2894,7 @@ export function ParameterTrustMap({
                         </h3>
                         {selectedPlan.status !== "DRAFT" && selectedPlan.status !== "PROPOSED" && (
                           <span
-                            className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-emerald-400 border border-emerald-500/40 flex items-center gap-1"
+                            className="px-2 py-0.5 rounded text-xs font-mono bg-zinc-800 text-emerald-400 border border-emerald-500/40 flex items-center gap-1"
                             data-testid="badge-criteria-sealed"
                           >
                             <Lock className="w-3 h-3 text-emerald-400" />
@@ -2902,14 +2902,14 @@ export function ParameterTrustMap({
                           </span>
                         )}
                       </div>
-                      <span className="text-[10px] font-mono text-zinc-500">
+                      <span className="text-xs font-mono text-zinc-400">
                         {selectedPlan.acceptance_criteria ? selectedPlan.acceptance_criteria.length : 0} criteria defined
                       </span>
                     </div>
 
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs text-left font-mono border border-zinc-800 rounded">
-                        <thead className="bg-zinc-950 text-zinc-400 text-[10px] uppercase">
+                        <thead className="bg-zinc-950 text-zinc-400 text-xs uppercase">
                           <tr>
                             <th className="p-2.5">Metric</th>
                             <th className="p-2.5">Target Value</th>
@@ -2931,7 +2931,7 @@ export function ParameterTrustMap({
                                 <td className="p-2.5 text-amber-400">{c.unit}</td>
                                 <td className="p-2.5">
                                   <span
-                                    className={`px-1.5 py-0.5 rounded text-[10px] ${
+                                    className={`px-1.5 py-0.5 rounded text-xs ${
                                       c.status === "AUTHORIZED" || c.status === "ESTABLISHED"
                                         ? "bg-emerald-950/60 text-emerald-400 border border-emerald-500/30"
                                         : "bg-amber-950/60 text-amber-400 border border-amber-500/30"
@@ -2940,12 +2940,12 @@ export function ParameterTrustMap({
                                     {c.status}
                                   </span>
                                 </td>
-                                <td className="p-2.5 text-zinc-500 truncate max-w-xs">{c.provenance || c.rationale || "—"}</td>
+                                <td className="p-2.5 text-zinc-400 truncate max-w-xs">{c.provenance || c.rationale || "—"}</td>
                               </tr>
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={6} className="p-3 text-center text-zinc-500 font-sans">
+                              <td colSpan={6} className="p-3 text-center text-zinc-400 font-sans">
                                 No acceptance criteria recorded.
                               </td>
                             </tr>
@@ -2974,7 +2974,7 @@ export function ParameterTrustMap({
                     </div>
 
                     {/* Masquerade Protection Notice */}
-                    <div className="p-2.5 rounded bg-zinc-950 border border-blue-900/30 text-[11px] text-zinc-400 flex items-center gap-2">
+                    <div className="p-2.5 rounded bg-zinc-950 border border-blue-900/30 text-xs text-zinc-400 flex items-center gap-2">
                       <ShieldCheck className="w-4 h-4 text-blue-400 shrink-0" />
                       <span>
                         Anti-Masquerading Guardrail: CAE and numerical simulation data cannot be falsely flagged as
@@ -2994,22 +2994,22 @@ export function ParameterTrustMap({
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <span className="font-bold text-white">{ev.source_identifier}</span>
-                                <span className="px-1.5 py-0.2 rounded text-[10px] bg-zinc-800 text-zinc-300">
+                                <span className="px-1.5 py-0.2 rounded text-xs bg-zinc-800 text-zinc-300">
                                   {ev.evidence_source_type}
                                 </span>
                                 {ev.is_physically_validated ? (
-                                  <span className="px-1.5 py-0.2 rounded text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-500/40 font-bold">
+                                  <span className="px-1.5 py-0.2 rounded text-xs bg-emerald-950 text-emerald-400 border border-emerald-500/40 font-bold">
                                     PHYSICAL
                                   </span>
                                 ) : (
-                                  <span className="px-1.5 py-0.2 rounded text-[10px] bg-zinc-800 text-zinc-400">
+                                  <span className="px-1.5 py-0.2 rounded text-xs bg-zinc-800 text-zinc-400">
                                     SYNTHETIC / CAE
                                   </span>
                                 )}
                               </div>
                               <div className="flex items-center gap-2">
                                 <span
-                                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                  className={`px-1.5 py-0.5 rounded text-xs font-mono font-bold ${
                                     ev.integrity_stage === "SOURCE_IDENTITY_VERIFIED" || ev.integrity_stage === "EVIDENCE_ACCEPTED"
                                       ? "bg-emerald-950 text-emerald-300 border border-emerald-500/40"
                                       : "bg-amber-950 text-amber-300 border border-amber-500/40"
@@ -3019,7 +3019,7 @@ export function ParameterTrustMap({
                                   {ev.integrity_stage || "SOURCE_CLAIMED"}
                                 </span>
                                 <span
-                                  className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold ${
+                                  className={`px-1.5 py-0.5 rounded text-xs font-mono font-bold ${
                                     ev.source_verification_status === "VERIFIED"
                                       ? "bg-emerald-950 text-emerald-300 border border-emerald-500/40"
                                       : ev.source_verification_status === "REJECTED" || ev.source_verification_status === "REVOKED"
@@ -3031,7 +3031,7 @@ export function ParameterTrustMap({
                                   {ev.source_verification_status || "UNVERIFIED"}
                                 </span>
                                 <span
-                                  className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                                  className={`px-2 py-0.5 rounded text-xs font-bold ${
                                     ev.review_status === "ACCEPTED"
                                       ? "bg-emerald-950 text-emerald-300 border border-emerald-500/40"
                                       : ev.review_status === "REJECTED"
@@ -3046,7 +3046,7 @@ export function ParameterTrustMap({
                                   <button
                                     onClick={() => handleRevokeEvidenceSource(ev.id)}
                                     disabled={validationLoading}
-                                    className="px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-700 hover:bg-rose-900 text-[10px]"
+                                    className="px-2 py-0.5 rounded bg-rose-950 text-rose-300 border border-rose-700 hover:bg-rose-900 text-xs"
                                     data-testid={`btn-revoke-source-${ev.id}`}
                                   >
                                     Revoke
@@ -3058,7 +3058,7 @@ export function ParameterTrustMap({
                                       setShowVerifySourceModal(true);
                                     }}
                                     disabled={validationLoading}
-                                    className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-600 hover:bg-emerald-900 text-[10px]"
+                                    className="px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-600 hover:bg-emerald-900 text-xs"
                                     data-testid={`btn-open-verify-source-${ev.id}`}
                                   >
                                     Verify Source
@@ -3067,7 +3067,7 @@ export function ParameterTrustMap({
                               </div>
                             </div>
 
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] text-zinc-400 pt-1 border-t border-zinc-900">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-zinc-400 pt-1 border-t border-zinc-900">
                               <div>
                                 Observed: <span className="text-white font-bold">{ev.observed_value ?? "—"}</span> {ev.unit}
                               </div>
@@ -3075,21 +3075,21 @@ export function ParameterTrustMap({
                                 Interval: <span className="text-zinc-300">{ev.observed_interval ? `[${ev.observed_interval[0]}, ${ev.observed_interval[1]}]` : "—"}</span>
                               </div>
                               <div className="truncate" title={ev.integrity_hash || ""}>
-                                Hash: <span className="text-zinc-500">{ev.integrity_hash ? `${ev.integrity_hash.slice(0, 10)}...` : "—"}</span>
+                                Hash: <span className="text-zinc-400">{ev.integrity_hash ? `${ev.integrity_hash.slice(0, 10)}...` : "—"}</span>
                               </div>
                               <div className="text-right">
                                 {ev.review_status === "PENDING_REVIEW" && (
                                   <div className="flex items-center justify-end gap-1.5">
                                     <button
                                       onClick={() => handleReviewEvidence(selectedPlan.id, ev.id, "ACCEPTED")}
-                                      className="px-2 py-0.5 rounded bg-emerald-700 hover:bg-emerald-600 text-white text-[10px]"
+                                      className="px-2 py-0.5 rounded bg-emerald-700 hover:bg-emerald-600 text-white text-xs"
                                       data-testid={`btn-evidence-accept-${ev.id}`}
                                     >
                                       Accept
                                     </button>
                                     <button
                                       onClick={() => handleReviewEvidence(selectedPlan.id, ev.id, "REJECTED")}
-                                      className="px-2 py-0.5 rounded bg-rose-800 hover:bg-rose-700 text-white text-[10px]"
+                                      className="px-2 py-0.5 rounded bg-rose-800 hover:bg-rose-700 text-white text-xs"
                                       data-testid={`btn-evidence-reject-${ev.id}`}
                                     >
                                       Reject
@@ -3100,7 +3100,7 @@ export function ParameterTrustMap({
                             </div>
 
                             {ev.physical_limitations && (
-                              <div className="text-[10px] text-zinc-500 font-sans">
+                              <div className="text-xs text-zinc-400 font-sans">
                                 Limitation: {ev.physical_limitations}
                               </div>
                             )}
@@ -3108,7 +3108,7 @@ export function ParameterTrustMap({
                         ))}
                       </div>
                     ) : (
-                      <p className="text-xs text-zinc-500 font-sans">
+                      <p className="text-xs text-zinc-400 font-sans">
                         No validation evidence items recorded yet. Ingest empirical telemetry or dyno runs above.
                       </p>
                     )}
@@ -3149,19 +3149,19 @@ export function ParameterTrustMap({
                             <span className="text-sm tracking-wide" data-testid="text-closure-verdict">
                               VERDICT: {closureAssessment.closure_verdict}
                             </span>
-                            <span className="text-[10px] text-zinc-400">
+                            <span className="text-xs text-zinc-400">
                               Criteria Met: {closureAssessment.criteria_met ? "YES" : "NO"}
                             </span>
                           </div>
                           <p className="text-xs text-zinc-300 font-sans">{closureAssessment.closure_summary}</p>
-                          <div className="text-[10px] text-zinc-400 pt-1 border-t border-zinc-800">
+                          <div className="text-xs text-zinc-400 pt-1 border-t border-zinc-800">
                             Closure Hash: {closureAssessment.closure_hash}
                           </div>
                         </div>
 
                         {/* Finite Sample Scope Notice */}
                         <div
-                          className="p-3 rounded bg-zinc-950 border border-zinc-800 text-[11px] text-zinc-400 space-y-1 font-sans"
+                          className="p-3 rounded bg-zinc-950 border border-zinc-800 text-xs text-zinc-400 space-y-1 font-sans"
                           data-testid="box-finite-sample-notice"
                         >
                           <div className="font-bold font-mono text-amber-400 text-xs">
@@ -3185,7 +3185,7 @@ export function ParameterTrustMap({
                       <button
                         onClick={() => handleExecuteReassessment(selectedPlan.id)}
                         disabled={reassessmentLoading}
-                        className="px-3 py-1.5 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-400 text-black font-bold transition flex items-center gap-1.5 disabled:opacity-50"
+                        className="px-3 py-1.5 text-xs font-semibold rounded bg-signal hover:bg-[#d6f56e] text-carbon font-bold transition flex items-center gap-1.5 disabled:opacity-50"
                         data-testid="btn-execute-reassessment"
                       >
                         <RefreshCw className={`w-3.5 h-3.5 ${reassessmentLoading ? "animate-spin" : ""}`} />
@@ -3216,19 +3216,19 @@ export function ParameterTrustMap({
                         {reassessmentResult.reassessment_delta && (
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs" data-testid="grid-reassessment-delta">
                             <div className="p-3 rounded bg-zinc-950 border border-zinc-800">
-                              <span className="text-[10px] text-zinc-500 block uppercase">Classification Before</span>
+                              <span className="text-xs text-zinc-400 block uppercase">Classification Before</span>
                               <span className="text-zinc-400 font-bold">
                                 {reassessmentResult.reassessment_delta.classification_before}
                               </span>
                             </div>
                             <div className="p-3 rounded bg-zinc-950 border border-amber-500/40">
-                              <span className="text-[10px] text-amber-400 block uppercase font-bold">Classification After</span>
+                              <span className="text-xs text-amber-400 block uppercase font-bold">Classification After</span>
                               <span className="text-emerald-400 font-bold">
                                 {reassessmentResult.reassessment_delta.classification_after}
                               </span>
                             </div>
                             <div className="p-3 rounded bg-zinc-950 border border-zinc-800">
-                              <span className="text-[10px] text-zinc-500 block uppercase">Reversals Before / After</span>
+                              <span className="text-xs text-zinc-400 block uppercase">Reversals Before / After</span>
                               <span className="text-white">
                                 {reassessmentResult.reassessment_delta.reversals_before_count} →{" "}
                                 <span className="font-bold text-emerald-400">
@@ -3237,7 +3237,7 @@ export function ParameterTrustMap({
                               </span>
                             </div>
                             <div className="p-3 rounded bg-zinc-950 border border-zinc-800">
-                              <span className="text-[10px] text-zinc-500 block uppercase">Boundaries Before / After</span>
+                              <span className="text-xs text-zinc-400 block uppercase">Boundaries Before / After</span>
                               <span className="text-white">
                                 {reassessmentResult.reassessment_delta.boundaries_before_count} →{" "}
                                 <span className="font-bold text-emerald-400">
@@ -3264,7 +3264,7 @@ export function ParameterTrustMap({
                           <History className="w-4 h-4 text-amber-400" />
                           Reassessment Audit History ({historicalReassessments.length})
                         </h4>
-                        <span className="text-[10px] font-mono text-zinc-500">Immutable ledger</span>
+                        <span className="text-xs font-mono text-zinc-400">Immutable ledger</span>
                       </div>
 
                       <div className="space-y-2">
@@ -3281,18 +3281,18 @@ export function ParameterTrustMap({
                               <div className="flex items-center gap-2">
                                 <span className="font-bold">{r.reversal_status}</span>
                                 {r.is_active ? (
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
+                                  <span className="px-1.5 py-0.2 rounded text-xs bg-emerald-500/20 text-emerald-400 border border-emerald-500/40">
                                     ACTIVE
                                   </span>
                                 ) : (
-                                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-zinc-800 text-zinc-500">
+                                  <span className="px-1.5 py-0.2 rounded text-xs bg-zinc-800 text-zinc-400">
                                     SUPERSEDED
                                   </span>
                                 )}
                               </div>
-                              <div className="text-[11px] text-zinc-400 mt-0.5">{r.envelope_coverage_statement}</div>
+                              <div className="text-xs text-zinc-400 mt-0.5">{r.envelope_coverage_statement}</div>
                             </div>
-                            <div className="text-right text-[10px] text-zinc-500">
+                            <div className="text-right text-xs text-zinc-400">
                               <div>Hash: {r.reassessment_hash ? `${r.reassessment_hash.slice(0, 16)}...` : ""}</div>
                               <div>{r.created_at ? new Date(r.created_at).toLocaleString() : ""}</div>
                             </div>
@@ -3303,7 +3303,7 @@ export function ParameterTrustMap({
                   )}
                 </div>
               ) : (
-                <div className="p-8 text-center rounded-lg bg-zinc-900/20 border border-zinc-800 text-zinc-500 text-xs">
+                <div className="p-8 text-center rounded-lg bg-zinc-900/20 border border-zinc-800 text-zinc-400 text-xs">
                   No validation plan selected. Click &quot;New Validation Plan&quot; or select an existing plan above.
                 </div>
               )}
@@ -3322,7 +3322,7 @@ export function ParameterTrustMap({
                       </h3>
                       <button
                         onClick={() => setShowNewPlanModal(false)}
-                        className="text-zinc-500 hover:text-zinc-300 text-sm"
+                        className="text-zinc-400 hover:text-zinc-300 text-sm"
                       >
                         ✕
                       </button>
@@ -3330,7 +3330,7 @@ export function ParameterTrustMap({
 
                     <div className="space-y-3 text-xs">
                       <div>
-                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                        <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">
                           Target Parameter
                         </label>
                         <input
@@ -3343,7 +3343,7 @@ export function ParameterTrustMap({
                       </div>
 
                       <div>
-                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                        <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">
                           Validation Method
                         </label>
                         <select
@@ -3361,7 +3361,7 @@ export function ParameterTrustMap({
                       </div>
 
                       <div>
-                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                        <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">
                           Validation Objective
                         </label>
                         <textarea
@@ -3375,7 +3375,7 @@ export function ParameterTrustMap({
 
                       <div className="grid grid-cols-3 gap-2">
                         <div>
-                          <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">Target</label>
+                          <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">Target</label>
                           <input
                             type="number"
                             value={newPlanTargetValue}
@@ -3385,7 +3385,7 @@ export function ParameterTrustMap({
                           />
                         </div>
                         <div>
-                          <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">Tol Min</label>
+                          <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">Tol Min</label>
                           <input
                             type="number"
                             value={newPlanToleranceLow}
@@ -3395,7 +3395,7 @@ export function ParameterTrustMap({
                           />
                         </div>
                         <div>
-                          <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">Tol Max</label>
+                          <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">Tol Max</label>
                           <input
                             type="number"
                             value={newPlanToleranceHigh}
@@ -3417,7 +3417,7 @@ export function ParameterTrustMap({
                       <button
                         onClick={handleCreateValidationPlan}
                         disabled={validationLoading}
-                        className="px-3.5 py-1.5 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-400 text-black font-bold"
+                        className="px-3.5 py-1.5 text-xs font-semibold rounded bg-signal hover:bg-[#d6f56e] text-carbon font-bold"
                         data-testid="btn-submit-new-plan"
                       >
                         Create Plan
@@ -3441,7 +3441,7 @@ export function ParameterTrustMap({
                       </h3>
                       <button
                         onClick={() => setShowSubmitEvidenceModal(false)}
-                        className="text-zinc-500 hover:text-zinc-300 text-sm"
+                        className="text-zinc-400 hover:text-zinc-300 text-sm"
                       >
                         ✕
                       </button>
@@ -3449,7 +3449,7 @@ export function ParameterTrustMap({
 
                     <div className="space-y-3 text-xs">
                       <div>
-                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                        <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">
                           Source Identifier
                         </label>
                         <input
@@ -3463,7 +3463,7 @@ export function ParameterTrustMap({
 
                       <div className="grid grid-cols-3 gap-2">
                         <div>
-                          <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">Observed Mean</label>
+                          <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">Observed Mean</label>
                           <input
                             type="number"
                             value={evidenceObservedVal}
@@ -3473,7 +3473,7 @@ export function ParameterTrustMap({
                           />
                         </div>
                         <div>
-                          <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">Interval Min</label>
+                          <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">Interval Min</label>
                           <input
                             type="number"
                             value={evidenceLowBound}
@@ -3483,7 +3483,7 @@ export function ParameterTrustMap({
                           />
                         </div>
                         <div>
-                          <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">Interval Max</label>
+                          <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">Interval Max</label>
                           <input
                             type="number"
                             value={evidenceHighBound}
@@ -3503,13 +3503,13 @@ export function ParameterTrustMap({
                           className="rounded border-zinc-700 bg-zinc-950 text-emerald-500"
                           data-testid="chk-physically-validated"
                         />
-                        <label htmlFor="chk-phys" className="text-zinc-300 font-mono text-[11px]">
+                        <label htmlFor="chk-phys" className="text-zinc-300 font-mono text-xs">
                           Empirically / Physically Validated Measurement (Non-Simulated)
                         </label>
                       </div>
 
                       <div>
-                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                        <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">
                           Physical Limitations / Scope Notes
                         </label>
                         <input
@@ -3559,13 +3559,13 @@ export function ParameterTrustMap({
                   </div>
                   <div className="flex items-center gap-2">
                     <span
-                      className="px-2 py-0.5 rounded text-[10px] font-mono bg-zinc-800 text-zinc-300 border border-zinc-700"
+                      className="px-2 py-0.5 rounded text-xs font-mono bg-zinc-800 text-zinc-300 border border-zinc-700"
                       data-testid="badge-dossier-safety-inferred"
                     >
                       deployment_safety_inferred = false
                     </span>
                     <span
-                      className="px-2 py-0.5 rounded text-[10px] font-mono bg-rose-950/70 text-rose-300 border border-rose-500/40"
+                      className="px-2 py-0.5 rounded text-xs font-mono bg-rose-950/70 text-rose-300 border border-rose-500/40"
                       data-testid="badge-dossier-deployment-auth"
                     >
                       Deployment: NOT_ESTABLISHED
@@ -3593,7 +3593,7 @@ export function ParameterTrustMap({
                   <button
                     onClick={() => fetchDossiers(validationDecisionId)}
                     disabled={dossierLoading}
-                    className="px-3 py-1.5 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-400 text-black transition flex items-center gap-1.5 disabled:opacity-50"
+                    className="px-3 py-1.5 text-xs font-semibold rounded bg-signal hover:bg-[#d6f56e] text-carbon transition flex items-center gap-1.5 disabled:opacity-50"
                     data-testid="btn-fetch-dossiers"
                   >
                     <RefreshCw className={`w-3.5 h-3.5 ${dossierLoading ? "animate-spin" : ""}`} />
@@ -3641,7 +3641,7 @@ export function ParameterTrustMap({
                       data-testid={`btn-select-dossier-${d.dossier_number}`}
                     >
                       <span className="font-bold">{d.dossier_number}</span>
-                      <span className="text-[10px] px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+                      <span className="text-xs px-1.5 py-0.2 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
                         {d.governance_state}
                       </span>
                     </button>
@@ -3670,11 +3670,11 @@ export function ParameterTrustMap({
                             {selectedDossier.governance_state}
                           </span>
                           {selectedDossier.is_active ? (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-emerald-950 text-emerald-400 border border-emerald-500/40">
+                            <span className="text-xs px-1.5 py-0.2 rounded font-mono bg-emerald-950 text-emerald-400 border border-emerald-500/40">
                               ACTIVE
                             </span>
                           ) : (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded font-mono bg-zinc-800 text-zinc-400">
+                            <span className="text-xs px-1.5 py-0.2 rounded font-mono bg-zinc-800 text-zinc-400">
                               SUPERSEDED
                             </span>
                           )}
@@ -3708,7 +3708,7 @@ export function ParameterTrustMap({
                           <button
                             onClick={() => handleAdvanceDossierGovernance(selectedDossier.id, "REVIEW_CONCLUSION")}
                             disabled={dossierLoading}
-                            className="px-2.5 py-1 text-xs font-semibold rounded bg-amber-600 hover:bg-amber-500 text-black font-bold transition"
+                            className="px-2.5 py-1 text-xs font-semibold rounded bg-signal hover:bg-signal text-carbon font-bold transition"
                             data-testid="btn-dossier-review-conclusion"
                           >
                             Review Conclusion
@@ -3741,21 +3741,21 @@ export function ParameterTrustMap({
                     {/* Metadata & Lineage Grid */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs font-mono">
                       <div>
-                        <span className="text-zinc-500 block text-[10px] uppercase">Decision Type</span>
+                        <span className="text-zinc-400 block text-xs uppercase">Decision Type</span>
                         <span className="text-white font-bold">{selectedDossier.decision_type}</span>
                       </div>
                       <div>
-                        <span className="text-zinc-500 block text-[10px] uppercase">Parent Dossier</span>
+                        <span className="text-zinc-400 block text-xs uppercase">Parent Dossier</span>
                         <span className="text-zinc-400">{selectedDossier.parent_dossier_id ? `${selectedDossier.parent_dossier_id.slice(0, 12)}...` : "None (Root v1)"}</span>
                       </div>
                       <div>
-                        <span className="text-zinc-500 block text-[10px] uppercase">Dossier Content Hash</span>
+                        <span className="text-zinc-400 block text-xs uppercase">Dossier Content Hash</span>
                         <span className="text-amber-400 truncate block font-bold" title={selectedDossier.dossier_content_hash} data-testid="dossier-content-hash">
                           {selectedDossier.dossier_content_hash.slice(0, 16)}...
                         </span>
                       </div>
                       <div>
-                        <span className="text-zinc-500 block text-[10px] uppercase">Plan Hash</span>
+                        <span className="text-zinc-400 block text-xs uppercase">Plan Hash</span>
                         <span className="text-zinc-400 truncate block" title={selectedDossier.plan_hash} data-testid="dossier-plan-hash">
                           {selectedDossier.plan_hash.slice(0, 16)}...
                         </span>
@@ -3763,25 +3763,25 @@ export function ParameterTrustMap({
                     </div>
 
                     {/* Sub-Stage Gate Status Badges */}
-                    <div className="pt-2 border-t border-zinc-800 grid grid-cols-2 md:grid-cols-5 gap-2 text-center text-[10px] font-mono">
+                    <div className="pt-2 border-t border-zinc-800 grid grid-cols-2 md:grid-cols-5 gap-2 text-center text-xs font-mono">
                       <div className="p-2 rounded bg-zinc-950 border border-zinc-800">
-                        <span className="text-zinc-500 block uppercase">Admissibility</span>
+                        <span className="text-zinc-400 block uppercase">Admissibility</span>
                         <span className="text-white font-bold">{selectedDossier.admissibility_status}</span>
                       </div>
                       <div className="p-2 rounded bg-zinc-950 border border-zinc-800">
-                        <span className="text-zinc-500 block uppercase">Criteria Satisfaction</span>
+                        <span className="text-zinc-400 block uppercase">Criteria Satisfaction</span>
                         <span className="text-white font-bold">{selectedDossier.criteria_satisfaction_status}</span>
                       </div>
                       <div className="p-2 rounded bg-zinc-950 border border-zinc-800">
-                        <span className="text-zinc-500 block uppercase">Closure</span>
+                        <span className="text-zinc-400 block uppercase">Closure</span>
                         <span className="text-white font-bold">{selectedDossier.closure_status}</span>
                       </div>
                       <div className="p-2 rounded bg-zinc-950 border border-zinc-800">
-                        <span className="text-zinc-500 block uppercase">Conclusion Review</span>
+                        <span className="text-zinc-400 block uppercase">Conclusion Review</span>
                         <span className="text-white font-bold">{selectedDossier.conclusion_review_status}</span>
                       </div>
                       <div className="p-2 rounded bg-zinc-950 border border-zinc-800">
-                        <span className="text-zinc-500 block uppercase">Decision Approval</span>
+                        <span className="text-zinc-400 block uppercase">Decision Approval</span>
                         <span className="text-emerald-400 font-bold">{selectedDossier.decision_approval_status}</span>
                       </div>
                     </div>
@@ -3798,22 +3798,22 @@ export function ParameterTrustMap({
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs" data-testid="grid-dossier-delta">
                         <div className="p-3 rounded bg-zinc-950 border border-zinc-800">
-                          <span className="text-[10px] text-zinc-500 block uppercase">Baseline State</span>
+                          <span className="text-xs text-zinc-400 block uppercase">Baseline State</span>
                           <span className="text-zinc-400 font-bold">{selectedDossier.before_after_comparison.baseline_robustness_state || "—"}</span>
                         </div>
                         <div className="p-3 rounded bg-zinc-950 border border-amber-500/40">
-                          <span className="text-[10px] text-amber-400 block uppercase font-bold">Reassessed State</span>
+                          <span className="text-xs text-amber-400 block uppercase font-bold">Reassessed State</span>
                           <span className="text-emerald-400 font-bold">{selectedDossier.before_after_comparison.reassessed_robustness_state || "—"}</span>
                         </div>
                         <div className="p-3 rounded bg-zinc-950 border border-zinc-800">
-                          <span className="text-[10px] text-zinc-500 block uppercase">Reversals Count</span>
+                          <span className="text-xs text-zinc-400 block uppercase">Reversals Count</span>
                           <span className="text-white">
                             {selectedDossier.before_after_comparison.baseline_reversals_count ?? "—"} →{" "}
                             <span className="font-bold text-emerald-400">{selectedDossier.before_after_comparison.reassessed_reversals_count ?? "—"}</span>
                           </span>
                         </div>
                         <div className="p-3 rounded bg-zinc-950 border border-zinc-800">
-                          <span className="text-[10px] text-zinc-500 block uppercase">Closure Verdict</span>
+                          <span className="text-xs text-zinc-400 block uppercase">Closure Verdict</span>
                           <span className="text-emerald-400 font-bold">{selectedDossier.before_after_comparison.closure_verdict || "—"}</span>
                         </div>
                       </div>
@@ -3830,7 +3830,7 @@ export function ParameterTrustMap({
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
                       <div className="p-3.5 rounded bg-zinc-950 border border-zinc-800 space-y-2">
-                        <span className="text-[10px] text-zinc-400 block uppercase font-bold">
+                        <span className="text-xs text-zinc-400 block uppercase font-bold">
                           Contradictory Evidence Summary
                         </span>
                         {selectedDossier.contradictory_evidence_summary &&
@@ -3844,24 +3844,24 @@ export function ParameterTrustMap({
                             ))}
                           </div>
                         ) : (
-                          <p className="text-zinc-500 font-sans text-xs">No contradictory evidence records observed.</p>
+                          <p className="text-zinc-400 font-sans text-xs">No contradictory evidence records observed.</p>
                         )}
                       </div>
 
                       <div className="p-3.5 rounded bg-zinc-950 border border-zinc-800 space-y-2">
-                        <span className="text-[10px] text-zinc-400 block uppercase font-bold">
+                        <span className="text-xs text-zinc-400 block uppercase font-bold">
                           Unresolved Assumptions ({selectedDossier.unresolved_assumptions ? selectedDossier.unresolved_assumptions.length : 0})
                         </span>
                         {selectedDossier.unresolved_assumptions && selectedDossier.unresolved_assumptions.length > 0 ? (
                           <div className="space-y-1">
                             {selectedDossier.unresolved_assumptions.map((u: any, idx: number) => (
-                              <div key={idx} className="p-2 rounded bg-zinc-900 text-zinc-300 text-[11px]">
+                              <div key={idx} className="p-2 rounded bg-zinc-900 text-zinc-300 text-xs">
                                 {u.assumption || JSON.stringify(u)}
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <p className="text-zinc-500 font-sans text-xs">No unresolved epistemic assumptions.</p>
+                          <p className="text-zinc-400 font-sans text-xs">No unresolved epistemic assumptions.</p>
                         )}
                       </div>
                     </div>
@@ -3876,12 +3876,12 @@ export function ParameterTrustMap({
                           Review Audit Trail ({selectedDossier.review_audit_trail ? selectedDossier.review_audit_trail.length : 0})
                         </h3>
                       </div>
-                      <span className="text-[10px] font-mono text-zinc-500">Tamper-evident governance ledger</span>
+                      <span className="text-xs font-mono text-zinc-400">Tamper-evident governance ledger</span>
                     </div>
 
                     <div className="overflow-x-auto">
                       <table className="w-full text-xs text-left font-mono border border-zinc-800 rounded" data-testid="table-dossier-audit-trail">
-                        <thead className="bg-zinc-950 text-zinc-400 text-[10px] uppercase">
+                        <thead className="bg-zinc-950 text-zinc-400 text-xs uppercase">
                           <tr>
                             <th className="p-2.5">Action</th>
                             <th className="p-2.5">Reviewer</th>
@@ -3897,13 +3897,13 @@ export function ParameterTrustMap({
                                 <td className="p-2.5 text-amber-300 font-bold">{entry.action_type}</td>
                                 <td className="p-2.5 text-white">{entry.reviewer_identity || entry.reviewer_user_id || "—"}</td>
                                 <td className="p-2.5 text-zinc-400">{entry.reviewer_role}</td>
-                                <td className="p-2.5 text-zinc-500">{entry.timestamp ? new Date(entry.timestamp).toLocaleString() : "—"}</td>
+                                <td className="p-2.5 text-zinc-400">{entry.timestamp ? new Date(entry.timestamp).toLocaleString() : "—"}</td>
                                 <td className="p-2.5 text-zinc-300 font-sans">{entry.rationale || "—"}</td>
                               </tr>
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={5} className="p-3 text-center text-zinc-500 font-sans">
+                              <td colSpan={5} className="p-3 text-center text-zinc-400 font-sans">
                                 No governance review actions recorded.
                               </td>
                             </tr>
@@ -3914,7 +3914,7 @@ export function ParameterTrustMap({
                   </div>
                 </div>
               ) : (
-                <div className="p-8 text-center rounded-lg bg-zinc-900/20 border border-zinc-800 text-zinc-500 text-xs">
+                <div className="p-8 text-center rounded-lg bg-zinc-900/20 border border-zinc-800 text-zinc-400 text-xs">
                   No decision dossier selected. Click &quot;Compile Decision Dossier&quot; or select an existing dossier above.
                 </div>
               )}
@@ -3933,7 +3933,7 @@ export function ParameterTrustMap({
                       </h3>
                       <button
                         onClick={() => setShowCompileModal(false)}
-                        className="text-zinc-500 hover:text-zinc-300 text-sm"
+                        className="text-zinc-400 hover:text-zinc-300 text-sm"
                       >
                         ✕
                       </button>
@@ -3941,7 +3941,7 @@ export function ParameterTrustMap({
 
                     <div className="space-y-3 text-xs">
                       <div>
-                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                        <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">
                           Engineering Question
                         </label>
                         <textarea
@@ -3955,7 +3955,7 @@ export function ParameterTrustMap({
 
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">Plan ID (UUID)</label>
+                          <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">Plan ID (UUID)</label>
                           <input
                             type="text"
                             value={compilePlanId}
@@ -3966,7 +3966,7 @@ export function ParameterTrustMap({
                           />
                         </div>
                         <div>
-                          <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">Closure ID (UUID)</label>
+                          <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">Closure ID (UUID)</label>
                           <input
                             type="text"
                             value={compileClosureId}
@@ -3979,7 +3979,7 @@ export function ParameterTrustMap({
                       </div>
 
                       <div>
-                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                        <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">
                           Reassessment ID (UUID)
                         </label>
                         <input
@@ -4003,7 +4003,7 @@ export function ParameterTrustMap({
                       <button
                         onClick={handleCompileDossier}
                         disabled={dossierLoading}
-                        className="px-3.5 py-1.5 text-xs font-semibold rounded bg-amber-500 hover:bg-amber-400 text-black font-bold"
+                        className="px-3.5 py-1.5 text-xs font-semibold rounded bg-signal hover:bg-[#d6f56e] text-carbon font-bold"
                         data-testid="btn-submit-compile-dossier"
                       >
                         Compile Dossier
@@ -4027,7 +4027,7 @@ export function ParameterTrustMap({
                       </h3>
                       <button
                         onClick={() => setShowVerifySourceModal(false)}
-                        className="text-zinc-500 hover:text-zinc-300 text-sm"
+                        className="text-zinc-400 hover:text-zinc-300 text-sm"
                       >
                         ✕
                       </button>
@@ -4035,7 +4035,7 @@ export function ParameterTrustMap({
 
                     <div className="space-y-3 text-xs">
                       <div>
-                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                        <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">
                           Verification Method
                         </label>
                         <select
@@ -4052,7 +4052,7 @@ export function ParameterTrustMap({
                       </div>
 
                       <div>
-                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                        <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">
                           Verifier Identity
                         </label>
                         <input
@@ -4065,7 +4065,7 @@ export function ParameterTrustMap({
                       </div>
 
                       <div>
-                        <label className="block text-zinc-400 uppercase font-mono text-[10px] mb-1">
+                        <label className="block text-zinc-400 uppercase font-mono text-xs mb-1">
                           Verification Audit Notes
                         </label>
                         <textarea

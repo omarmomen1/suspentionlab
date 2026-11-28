@@ -166,11 +166,17 @@ async def get_handling_diagram(
             setup_id=req.setup_id or "SETUP-001",
             kinematics_study_id=req.kinematics_study_id
         )
+        fallback_warnings = []
+        if "C_l" not in req.params:
+            fallback_warnings.append(f"Aero C_l defaulted to {p.C_l:.2f} (not specified in request).")
+        if "rc_f" not in req.params and "kinematics_lut_f" not in req.params and not req.kinematics_study_id:
+            fallback_warnings.append("Roll center heights defaulted (0.10 m front / 0.12 m rear) without a K&C LUT.")
 
         return {
             "diagram": diagram,
             "validity": validity.to_dict(),
             "provenance": provenance,
+            "assumptions_warnings": fallback_warnings,
         }
     except Exception as exc:
         logger.exception("Handling diagram generation failed: %s", exc)

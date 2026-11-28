@@ -73,9 +73,9 @@ export default function TimelinePage() {
   const [decisions, setDecisions] = useState<EngineeringDecisionData[]>([]);
   const [selectedDecision, setSelectedDecision] = useState<EngineeringDecisionData | null>(null);
   const [signingDecisionId, setSigningDecisionId] = useState<string | null>(null);
-  const [approverName, setApproverName] = useState("James Wilson");
+  const [approverName, setApproverName] = useState("");
   const [approverRole, setApproverRole] = useState("Chief Race Engineer");
-  const [approvalNotes, setApprovalNotes] = useState("Approved based on telemetry correlation and 20% holdout validation.");
+  const [approvalNotes, setApprovalNotes] = useState("");
   const [isSubmittingApproval, setIsSubmittingApproval] = useState(false);
 
   const loadData = async () => {
@@ -269,14 +269,14 @@ export default function TimelinePage() {
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-2">
                           <span
-                            className={`px-2.5 py-0.5 rounded text-[10px] font-mono font-semibold uppercase border ${typeStyle.color}`}
+                            className={`px-2.5 py-0.5 rounded text-xs font-mono font-semibold uppercase border ${typeStyle.color}`}
                           >
                             {typeStyle.label}
                           </span>
                           <span className="text-xs font-mono text-neutral-400">
                             {ev.timestamp ? new Date(ev.timestamp).toLocaleString() : "Recent"}
                           </span>
-                          <span className="text-neutral-600">&bull;</span>
+                          <span className="text-zinc-300">&bull;</span>
                           <span className="text-xs font-mono text-cyan-300 flex items-center gap-1">
                             <User className="w-3 h-3 text-cyan-400" />
                             {ev.author}
@@ -286,7 +286,7 @@ export default function TimelinePage() {
                         {/* Explicit Uncertainty State Badge */}
                         <div className="flex items-center gap-2">
                           <span
-                            className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold ${
+                            className={`text-xs font-mono px-2 py-0.5 rounded uppercase font-bold ${
                               ev.approval_status === "APPROVED"
                                 ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                                 : ev.approval_status === "VALIDATED"
@@ -318,7 +318,7 @@ export default function TimelinePage() {
                           {ev.parameter_changes.map((pc, i) => (
                             <span
                               key={i}
-                              className="text-[11px] font-mono bg-neutral-950 px-2 py-0.5 rounded border border-neutral-800 text-neutral-300"
+                              className="text-xs font-mono bg-neutral-950 px-2 py-0.5 rounded border border-neutral-800 text-neutral-300"
                             >
                               <strong>{pc.parameter}:</strong> {pc.before} &rarr; {pc.after} ({pc.delta > 0 ? "+" : ""}
                               {pc.delta} {pc.unit})
@@ -333,7 +333,7 @@ export default function TimelinePage() {
                           {/* Engineering Effects */}
                           {ev.engineering_effects && ev.engineering_effects.length > 0 && (
                             <div className="space-y-1">
-                              <span className="text-[10px] text-neutral-400 uppercase">Engineering Effects:</span>
+                              <span className="text-xs text-neutral-400 uppercase">Engineering Effects:</span>
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {ev.engineering_effects.map((ef, i) => (
                                   <div key={i} className="bg-neutral-950 p-2 rounded border border-neutral-800 flex justify-between items-center">
@@ -351,12 +351,12 @@ export default function TimelinePage() {
                           {ev.validation_effects && (
                             <div className="bg-neutral-950 p-3 rounded border border-neutral-800 flex items-center justify-between">
                               <div className="space-y-0.5">
-                                <span className="text-[10px] text-neutral-400 uppercase">Empirical Validation</span>
+                                <span className="text-xs text-neutral-400 uppercase">Empirical Validation</span>
                                 <div className="text-neutral-200">
                                   Holdout R&sup2;: <strong className="text-emerald-400">{ev.validation_effects.holdout_r2}</strong> &bull; Overall R&sup2;: <strong>{ev.validation_effects.overall_r2}</strong>
                                 </div>
                               </div>
-                              <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
+                              <span className="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
                                 {ev.validation_effects.status}
                               </span>
                             </div>
@@ -365,8 +365,8 @@ export default function TimelinePage() {
                           {/* Decision consequences */}
                           {ev.decision_consequences && ev.decision_consequences.length > 0 && (
                             <div className="space-y-1">
-                              <span className="text-[10px] text-neutral-400 uppercase">Consequences &amp; Downstream Impact:</span>
-                              <ul className="list-disc pl-4 space-y-0.5 text-neutral-300 text-[11px]">
+                              <span className="text-xs text-neutral-400 uppercase">Consequences &amp; Downstream Impact:</span>
+                              <ul className="list-disc pl-4 space-y-0.5 text-neutral-300 text-xs">
                                 {ev.decision_consequences.map((c, i) => (
                                   <li key={i}>{c}</li>
                                 ))}
@@ -375,7 +375,7 @@ export default function TimelinePage() {
                           )}
 
                           {/* Provenance Hash */}
-                          <div className="pt-2 text-[10px] text-neutral-500 flex items-center justify-between">
+                          <div className="pt-2 text-xs text-zinc-400 flex items-center justify-between">
                             <span className="truncate">
                               SHA-256 Fingerprint: <span className="text-cyan-400">{ev.provenance_hash}</span>
                             </span>
@@ -401,7 +401,7 @@ export default function TimelinePage() {
                     <Scale className="w-5 h-5 text-cyan-400" />
                     <span>Comparative Diff Engine: &ldquo;What Changed?&rdquo;</span>
                   </h2>
-                  <p className="text-xs text-neutral-400 font-mono mt-0.5">
+                  <p className="text-xs text-neutral-400 font-sans leading-relaxed mt-0.5">
                     Select any two timeline events to perform side-by-side delta verification.
                   </p>
                 </div>
@@ -456,14 +456,14 @@ export default function TimelinePage() {
                 {/* Event Summary Banners */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-xs">
                   <div className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-4 space-y-1">
-                    <span className="text-[10px] text-cyan-400 uppercase font-bold">EVENT A (BASELINE)</span>
+                    <span className="text-xs text-cyan-400 uppercase font-bold">EVENT A (BASELINE)</span>
                     <div className="text-sm font-bold text-white font-sans">{comparisonReport.event_a.title}</div>
-                    <div className="text-neutral-400 text-[11px]">{comparisonReport.event_a.description}</div>
+                    <div className="text-neutral-400 text-xs">{comparisonReport.event_a.description}</div>
                   </div>
                   <div className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-4 space-y-1">
-                    <span className="text-[10px] text-purple-400 uppercase font-bold">EVENT B (CANDIDATE)</span>
+                    <span className="text-xs text-purple-400 uppercase font-bold">EVENT B (CANDIDATE)</span>
                     <div className="text-sm font-bold text-white font-sans">{comparisonReport.event_b.title}</div>
-                    <div className="text-neutral-400 text-[11px]">{comparisonReport.event_b.description}</div>
+                    <div className="text-neutral-400 text-xs">{comparisonReport.event_b.description}</div>
                   </div>
                 </div>
 
@@ -489,7 +489,7 @@ export default function TimelinePage() {
                       <div className="overflow-x-auto">
                         <table className="w-full text-left font-mono text-xs">
                           <thead>
-                            <tr className="border-b border-neutral-800 text-[10px] uppercase text-neutral-400">
+                            <tr className="border-b border-neutral-800 text-xs uppercase text-neutral-400">
                               <th className="py-2.5 px-3">Parameter</th>
                               <th className="py-2.5 px-3">State in Event A</th>
                               <th className="py-2.5 px-3">State in Event B</th>
@@ -569,7 +569,7 @@ export default function TimelinePage() {
                               {ef.delta > 0 ? `+${ef.delta}` : ef.delta} {ef.unit}
                             </span>
                           </div>
-                          <div className="text-[11px] font-mono text-neutral-400 flex justify-between">
+                          <div className="text-xs font-mono text-neutral-400 flex justify-between">
                             <span>A: {ef.a} {ef.unit}</span>
                             <span>B: {ef.b} {ef.unit}</span>
                           </div>
@@ -607,7 +607,7 @@ export default function TimelinePage() {
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-mono font-bold text-cyan-400">{d.decision_id_display}</span>
                         <span
-                          className={`text-[10px] font-mono px-2 py-0.5 rounded uppercase font-bold ${
+                          className={`text-xs font-mono px-2 py-0.5 rounded uppercase font-bold ${
                             d.status === "APPROVED"
                               ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                               : d.status === "VALIDATED"
@@ -635,7 +635,7 @@ export default function TimelinePage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-mono font-bold text-cyan-400">{selectedDecision.decision_id_display}</span>
-                        <span className="text-xs text-neutral-500">&bull;</span>
+                        <span className="text-xs text-zinc-400">&bull;</span>
                         <span className="text-xs font-mono text-neutral-400">{selectedDecision.vehicle_ref}</span>
                       </div>
                       <h2 className="text-xl font-extrabold text-white mt-1">{selectedDecision.title}</h2>
@@ -665,7 +665,7 @@ export default function TimelinePage() {
 
                   {/* The Core Question */}
                   <div className="bg-neutral-950/80 border border-neutral-800 rounded-lg p-4 space-y-1">
-                    <span className="text-[10px] font-mono text-cyan-400 uppercase font-bold">The Engineering Question</span>
+                    <span className="text-xs font-mono text-cyan-400 uppercase font-bold">The Engineering Question</span>
                     <p className="text-sm font-semibold text-white italic">&ldquo;{selectedDecision.question}&rdquo;</p>
                   </div>
 
@@ -674,19 +674,19 @@ export default function TimelinePage() {
                     <span className="text-xs font-mono uppercase text-neutral-400 tracking-wider">Context &bull; Operating Conditions</span>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 font-mono text-xs">
                       <div className="bg-neutral-950 p-2.5 rounded border border-neutral-800">
-                        <span className="text-[10px] text-neutral-500">Track:</span>
+                        <span className="text-xs text-zinc-400">Track:</span>
                         <div className="text-neutral-200 font-bold">{selectedDecision.context_data?.track || "Silverstone"}</div>
                       </div>
                       <div className="bg-neutral-950 p-2.5 rounded border border-neutral-800">
-                        <span className="text-[10px] text-neutral-500">Speed Band:</span>
+                        <span className="text-xs text-zinc-400">Speed Band:</span>
                         <div className="text-neutral-200 font-bold">{selectedDecision.context_data?.speed_band || "High Speed (240+)"}</div>
                       </div>
                       <div className="bg-neutral-950 p-2.5 rounded border border-neutral-800">
-                        <span className="text-[10px] text-neutral-500">Weather / Ambient:</span>
+                        <span className="text-xs text-zinc-400">Weather / Ambient:</span>
                         <div className="text-neutral-200 font-bold">{selectedDecision.context_data?.weather || "Dry, 26°C"}</div>
                       </div>
                       <div className="bg-neutral-950 p-2.5 rounded border border-neutral-800">
-                        <span className="text-[10px] text-neutral-500">Tire Compound:</span>
+                        <span className="text-xs text-zinc-400">Tire Compound:</span>
                         <div className="text-neutral-200 font-bold">{selectedDecision.context_data?.tire_compound || "C3 Medium"}</div>
                       </div>
                     </div>
@@ -717,27 +717,27 @@ export default function TimelinePage() {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
                       {/* Simulation Pillar */}
                       <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3.5 space-y-2">
-                        <span className="text-[10px] font-bold text-indigo-400 uppercase">1. Simulation Evidence</span>
-                        <div className="text-neutral-300 text-[11px] leading-relaxed">
-                          {selectedDecision.simulation_evidence?.summary || <span className="text-neutral-500 italic">No simulation evidence summary available.</span>}
+                        <span className="text-xs font-bold text-indigo-400 uppercase">1. Simulation Evidence</span>
+                        <div className="text-neutral-300 text-xs leading-relaxed">
+                          {selectedDecision.simulation_evidence?.summary || <span className="text-zinc-400 italic">No simulation evidence summary available.</span>}
                         </div>
                       </div>
 
                       {/* Telemetry Pillar */}
                       <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3.5 space-y-2">
-                        <span className="text-[10px] font-bold text-purple-400 uppercase">2. Telemetry Evidence</span>
-                        <div className="text-neutral-300 text-[11px] leading-relaxed">
-                          {selectedDecision.telemetry_evidence?.summary || <span className="text-neutral-500 italic">No telemetry evidence summary available.</span>}
+                        <span className="text-xs font-bold text-purple-400 uppercase">2. Telemetry Evidence</span>
+                        <div className="text-neutral-300 text-xs leading-relaxed">
+                          {selectedDecision.telemetry_evidence?.summary || <span className="text-zinc-400 italic">No telemetry evidence summary available.</span>}
                         </div>
                       </div>
 
                       {/* Validation Pillar */}
                       <div className="bg-neutral-950 border border-neutral-800 rounded-lg p-3.5 space-y-2">
-                        <span className="text-[10px] font-bold text-teal-400 uppercase">3. Holdout Validation</span>
-                        <div className="text-neutral-300 text-[11px] leading-relaxed">
+                        <span className="text-xs font-bold text-teal-400 uppercase">3. Holdout Validation</span>
+                        <div className="text-neutral-300 text-xs leading-relaxed">
                           {selectedDecision.validation_evidence?.holdout_r2 != null
                             ? <>Holdout R&sup2;: <strong className="text-emerald-400">{selectedDecision.validation_evidence.holdout_r2}</strong> without leakage.</>
-                            : <span className="text-neutral-500 italic">No holdout validation data available.</span>}
+                            : <span className="text-zinc-400 italic">No holdout validation data available.</span>}
                         </div>
                       </div>
                     </div>
@@ -747,16 +747,16 @@ export default function TimelinePage() {
                   {selectedDecision.status === "APPROVED" && selectedDecision.approval_signature_hmac && (
                     <div className="bg-neutral-950 border border-emerald-500/40 rounded-xl p-4 space-y-2 font-mono text-xs">
                       <div className="flex items-center justify-between">
-                        <span className="text-emerald-400 font-bold flex items-center gap-1.5 uppercase text-[11px]">
+                        <span className="text-emerald-400 font-bold flex items-center gap-1.5 uppercase text-xs">
                           <ShieldCheck className="w-4 h-4 text-emerald-400" />
                           Cryptographic Sign-off Active
                         </span>
-                        <span className="text-neutral-400 text-[11px]">{selectedDecision.approved_at}</span>
+                        <span className="text-neutral-400 text-xs">{selectedDecision.approved_at}</span>
                       </div>
                       <div className="text-neutral-300">
                         Signed by: <strong>{selectedDecision.approved_by}</strong> ({selectedDecision.approver_role})
                       </div>
-                      <div className="p-2 bg-black/60 rounded border border-neutral-800 text-[10px] text-neutral-400 truncate">
+                      <div className="p-2 bg-black/60 rounded border border-neutral-800 text-xs text-neutral-400 truncate">
                         HMAC-SHA256: <span className="text-emerald-400">{selectedDecision.approval_signature_hmac}</span>
                       </div>
                     </div>

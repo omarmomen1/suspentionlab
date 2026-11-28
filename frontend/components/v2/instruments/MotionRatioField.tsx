@@ -47,13 +47,13 @@ export default function MotionRatioField({ data }: { data: SteerGridResponse | n
         <text x={LM + (nB * CW) / 2} y={H - 3} textAnchor="middle" fontSize={9} fill="#8a909a">wheel bump [mm]</text>
         <text x={4} y={12} fontSize={9} fill="#8a909a">rack travel</text>
       </svg>
-      <figcaption className="text-[11px] text-[#8a909a] leading-snug" data-testid="mr-field-caption">
+      <figcaption className="text-xs text-[#8a909a] leading-snug" data-testid="mr-field-caption">
         {min !== null && max !== null ? `MR range ${min.toFixed(3)} to ${max.toFixed(3)}. ` : "No reachable cell. "}
         {unreachable > 0 ? `${unreachable} hatched cell${unreachable === 1 ? "" : "s"}: unreachable, the solver did not converge. ` : ""}
         Clearances: {data.clearances?.status ?? "NOT_MODELED"}.
       </figcaption>
       {data.ackermann?.status === "COMPUTED" && Array.isArray(data.ackermann.points) && (
-        <table data-testid="mr-ackermann" className="v2-num text-[11px] text-zinc-200 mt-2 border-collapse">
+        <table data-testid="mr-ackermann" className="v2-num text-xs text-zinc-200 mt-2 border-collapse">
           <caption className="text-left text-[#8a909a]">Ackermann at wheelbase {String(data.ackermann.wheelbase_mm)} mm, track {String(data.ackermann.track_mm)} mm (mirror-symmetric, static pose)</caption>
           <tbody>
             {(data.ackermann.points as any[]).map((pt, i) => (

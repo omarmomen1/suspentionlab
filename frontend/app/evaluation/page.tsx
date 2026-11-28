@@ -525,8 +525,8 @@ export default function EvaluationPage() {
     return (
       <div className="min-h-screen bg-[#0a0a0c] text-white flex items-center justify-center pt-16">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-ansys-yellow border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-xs text-gray-400 font-mono">Loading Formula Student Evaluation Garage…</p>
+          <div className="w-8 h-8 border-2 border-signal border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-xs text-gray-400 font-sans leading-relaxed">Loading Formula Student Evaluation Garage…</p>
         </div>
       </div>
     );
@@ -561,7 +561,7 @@ export default function EvaluationPage() {
             <div className="pt-3">
               <a
                 href="mailto:enterprise@suspensionlab.pro?subject=Trial%20Extension%20Request"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-ansys-yellow text-black font-extrabold text-xs sm:text-sm rounded-xl hover:brightness-110 shadow-lg shadow-ansys-yellow/20 cursor-pointer"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-signal text-carbon font-extrabold text-xs sm:text-sm rounded-xl hover:brightness-110 shadow-lg shadow-signal/20 cursor-pointer"
               >
                 REQUEST EXTENDED EVALUATION
               </a>
@@ -574,7 +574,7 @@ export default function EvaluationPage() {
             className="p-6 bg-[#111114] border-2 border-red-500/40 rounded-2xl space-y-4 text-xs"
           >
             <div>
-              <div className="text-[11px] font-mono uppercase tracking-wider text-red-400 font-bold">
+              <div className="text-xs font-mono uppercase tracking-wider text-red-400 font-bold">
                 Evaluation Policy Limit Reached
               </div>
               <h2 className="text-lg font-bold text-white mt-0.5">
@@ -584,8 +584,8 @@ export default function EvaluationPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-3 border-t border-red-500/20 font-sans">
               <div className="bg-[#17171b] p-3 rounded-xl border border-[#222]">
-                <div className="text-gray-400 font-bold uppercase tracking-wider text-[10px] mb-2 flex items-center gap-1.5">
-                  <Gauge size={12} className="text-ansys-yellow" /> CURRENT USAGE
+                <div className="text-gray-400 font-bold uppercase tracking-wider text-xs mb-2 flex items-center gap-1.5">
+                  <Gauge size={12} className="text-signal" /> CURRENT USAGE
                 </div>
                 <div className="space-y-1 font-mono text-gray-300">
                   <div>Simulations: <span className="font-bold text-white">{simsUsed} / {simsLimit}</span></div>
@@ -595,7 +595,7 @@ export default function EvaluationPage() {
               </div>
 
               <div className="bg-[#17171b] p-3 rounded-xl border border-[#222]">
-                <div className="text-gray-400 font-bold uppercase tracking-wider text-[10px] mb-2 flex items-center gap-1.5">
+                <div className="text-gray-400 font-bold uppercase tracking-wider text-xs mb-2 flex items-center gap-1.5">
                   <CheckCircle2 size={12} className="text-emerald-400" /> WHAT REMAINS AVAILABLE
                 </div>
                 <ul className="space-y-1 text-gray-300 list-disc list-inside">
@@ -611,14 +611,14 @@ export default function EvaluationPage() {
               </div>
 
               <div className="bg-[#17171b] p-3 rounded-xl border border-[#222]">
-                <div className="text-gray-400 font-bold uppercase tracking-wider text-[10px] mb-2 flex items-center gap-1.5">
+                <div className="text-gray-400 font-bold uppercase tracking-wider text-xs mb-2 flex items-center gap-1.5">
                   <Mail size={12} className="text-blue-400" /> HOW TO REQUEST CONTINUATION
                 </div>
                 <p className="text-gray-300 leading-relaxed">
                   {limitError?.how_to_request_continuation ||
                     "Contact enterprise@suspensionlab.pro to extend your evaluation."}
                 </p>
-                <div className="mt-2 text-ansys-yellow font-mono text-[11px] font-bold">
+                <div className="mt-2 text-signal font-mono text-xs font-bold">
                   enterprise@suspensionlab.pro
                 </div>
               </div>
@@ -632,7 +632,7 @@ export default function EvaluationPage() {
   return (
     <div className="min-h-screen bg-[#0a0a0c] text-white pt-16 pb-20 px-4 sm:px-8 max-w-[1540px] mx-auto">
       {/* ── Expiration Warning (< 2 days remaining) ── */}
-      {daysLeft < 2.0 && !isExpired && (
+      {trial && daysLeft < 2.0 && !isExpired && (
         <div
           role="alert"
           className="mb-6 p-4 bg-amber-950/40 border border-amber-500/50 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg"
@@ -652,7 +652,7 @@ export default function EvaluationPage() {
           </div>
           <a
             href="mailto:enterprise@suspensionlab.pro?subject=Trial%20Extension%20Request"
-            className="px-4 py-2 bg-amber-500 text-black text-xs font-bold rounded-xl hover:brightness-110 shrink-0 self-start sm:self-auto cursor-pointer"
+            className="px-4 py-2 bg-signal text-carbon text-xs font-bold rounded-xl hover:brightness-110 shrink-0 self-start sm:self-auto cursor-pointer"
           >
             REQUEST EXTENDED EVALUATION
           </a>
@@ -664,16 +664,16 @@ export default function EvaluationPage() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-ansys-yellow/15 text-ansys-yellow border border-ansys-yellow/30">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-signal/15 text-signal border border-signal/30">
                 Evaluation Workspace
               </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-950/40 text-purple-300 border border-purple-800/40">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-950/40 text-purple-300 border border-purple-800/40">
                 EVALUATION DATASET
               </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-blue-950/40 text-blue-300 border border-blue-800/40">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-950/40 text-blue-300 border border-blue-800/40">
                 SYNTHETIC EVALUATION DATA
               </span>
-              <span className="text-xs text-gray-500">|</span>
+              <span className="text-xs text-zinc-400">|</span>
               <span className="text-xs text-gray-400 font-mono">
                 Vehicle: {workspace?.vehicle?.car_ref || sharedVehicle?.name || "No active vehicle"}
               </span>
@@ -681,10 +681,10 @@ export default function EvaluationPage() {
             <h1 className="text-3xl font-extrabold tracking-tight text-white">
               SuspensionLab PRO
             </h1>
-            <h2 className="text-lg font-bold text-ansys-yellow mt-0.5">
+            <h2 className="text-lg font-bold text-signal mt-0.5">
               7-Day Engineering Evaluation
             </h2>
-            <p className="text-xs text-gray-300 font-mono mt-1 flex items-center gap-1.5">
+            <p className="text-xs text-gray-300 font-sans leading-relaxed mt-1 flex items-center gap-1.5">
               Investigate → Experiment → Compare → Optimize → Decide
             </p>
           </div>
@@ -693,13 +693,15 @@ export default function EvaluationPage() {
           <div className="flex flex-wrap items-center gap-3 bg-[#111114] border border-[#222] p-3 rounded-2xl shadow-xl">
             {/* Days Remaining / Day label */}
             <div className="px-3 py-2 bg-[#17171b] border border-[#26262a] rounded-xl flex items-center gap-2.5">
-              <Clock size={16} className="text-ansys-yellow" />
+              <Clock size={16} className="text-signal" />
               <div>
-                <div className="text-[10px] uppercase font-bold tracking-wider text-gray-500">Trial Status</div>
+                <div className="text-xs uppercase font-bold tracking-wider text-zinc-400">Trial Status</div>
                 <div className="text-xs font-mono font-bold text-white">
-                  {daysLeft <= 0
+                  {!trial
+                    ? "Standard Workspace"
+                    : isExpired
                     ? "Trial expired"
-                    : workspace?.trial?.day_label || `Day ${Math.min(7, Math.max(1, 8 - Math.ceil(daysLeft)))} of 7`}{daysLeft > 0 ? ` (${daysLeft} days left)` : ""}
+                    : `${workspace?.trial?.day_label || `Day ${Math.min(7, Math.max(1, 8 - Math.ceil(daysLeft)))} of 7`}${daysLeft > 0 ? ` (${daysLeft} days left)` : ""}`}
                 </div>
               </div>
             </div>
@@ -708,7 +710,7 @@ export default function EvaluationPage() {
             <div className="px-3 py-2 bg-[#17171b] border border-[#26262a] rounded-xl flex items-center gap-2.5">
               <Gauge size={16} className={simsUsed >= simsLimit ? "text-red-400" : "text-emerald-400"} />
               <div>
-                <div className="text-[10px] uppercase font-bold tracking-wider text-gray-500">Simulations</div>
+                <div className="text-xs uppercase font-bold tracking-wider text-zinc-400">Simulations</div>
                 <div className="text-xs font-mono font-bold text-white">
                   {Math.max(0, simsLimit - simsUsed)} / {simsLimit} simulations remaining
                 </div>
@@ -719,7 +721,7 @@ export default function EvaluationPage() {
             <div className="px-3 py-2 bg-[#17171b] border border-[#26262a] rounded-xl flex items-center gap-2.5">
               <Car size={16} className="text-blue-400" />
               <div>
-                <div className="text-[10px] uppercase font-bold tracking-wider text-gray-500">Active Vehicle</div>
+                <div className="text-xs uppercase font-bold tracking-wider text-zinc-400">Active Vehicle</div>
                 <div className="text-xs font-mono font-bold text-white">{workspace?.vehicle?.car_ref || sharedVehicle?.name || "No active vehicle"}</div>
               </div>
             </div>
@@ -728,15 +730,15 @@ export default function EvaluationPage() {
             <div className="px-3 py-2 bg-[#17171b] border border-[#26262a] rounded-xl flex items-center gap-2.5">
               <Activity size={16} className="text-purple-400" />
               <div>
-                <div className="text-[10px] uppercase font-bold tracking-wider text-gray-500">Current Stage</div>
-                <div className="text-xs font-mono font-bold text-ansys-yellow">{getStageLabel(activeTab)}</div>
+                <div className="text-xs uppercase font-bold tracking-wider text-zinc-400">Current Stage</div>
+                <div className="text-xs font-mono font-bold text-signal">{getStageLabel(activeTab)}</div>
               </div>
             </div>
 
             <button
               onClick={() => logout()}
               title="Sign Out"
-              className="p-2 text-gray-500 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+              className="p-2 text-zinc-400 hover:text-white rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
             >
               <LogOut size={16} />
             </button>
@@ -750,7 +752,7 @@ export default function EvaluationPage() {
               <Target size={18} />
             </div>
             <div>
-              <div className="text-[10px] font-mono uppercase tracking-wider text-red-400 font-bold">
+              <div className="text-xs font-mono uppercase tracking-wider text-red-400 font-bold">
                 Active Engineering Question
               </div>
               <div className="text-sm font-bold text-white">
@@ -759,10 +761,10 @@ export default function EvaluationPage() {
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <span className="px-2.5 py-1 bg-red-950/60 border border-red-500/40 text-red-300 font-mono text-[11px] font-bold rounded-lg">
+            <span className="px-2.5 py-1 bg-red-950/60 border border-red-500/40 text-red-300 font-mono text-xs font-bold rounded-lg">
               SEVERITY: {workspace?.engineering_question?.severity || "CRITICAL"}
             </span>
-            <span className="px-2.5 py-1 bg-[#1a1a20] border border-[#333] text-gray-300 font-mono text-[11px] rounded-lg">
+            <span className="px-2.5 py-1 bg-[#1a1a20] border border-[#333] text-gray-300 font-mono text-xs rounded-lg">
               {workspace?.vehicle?.track_ref || "FS-Michigan-Autocross"}
             </span>
           </div>
@@ -776,15 +778,15 @@ export default function EvaluationPage() {
             setActiveTab("question");
             trackEvent("question_opened", { question_id: workspace?.engineering_question?.id });
           }}
-          className="px-6 py-3.5 bg-ansys-yellow text-black font-extrabold text-xs sm:text-sm rounded-xl hover:brightness-110 shadow-lg shadow-ansys-yellow/20 flex items-center gap-2.5 transition-all cursor-pointer"
+          className="px-6 py-3.5 bg-signal text-carbon font-extrabold text-xs sm:text-sm rounded-xl hover:brightness-110 shadow-lg shadow-signal/20 flex items-center gap-2.5 transition-all cursor-pointer"
         >
           <Play size={16} fill="black" /> START ENGINEERING INVESTIGATION
         </button>
         <button
           onClick={() => setShowCustomModal(true)}
-          className="px-5 py-3.5 bg-[#17171b] border border-[#26262a] text-xs font-bold text-white rounded-xl hover:border-ansys-yellow/50 flex items-center gap-2 transition-all cursor-pointer"
+          className="px-5 py-3.5 bg-[#17171b] border border-[#26262a] text-xs font-bold text-white rounded-xl hover:border-signal/50 flex items-center gap-2 transition-all cursor-pointer"
         >
-          <PlusCircle size={15} className="text-ansys-yellow" /> TRY YOUR OWN QUESTION
+          <PlusCircle size={15} className="text-signal" /> TRY YOUR OWN QUESTION
         </button>
         <button
           onClick={() => {
@@ -801,86 +803,86 @@ export default function EvaluationPage() {
       <div className="mb-6 p-4 bg-[#111114] border border-[#222] rounded-2xl shadow-lg">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-extrabold text-[10px] uppercase tracking-wider rounded">
+            <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 font-extrabold text-xs uppercase tracking-wider rounded">
               FULL APPLICATION ACCESS
             </span>
             <span className="text-xs font-bold text-white">Full Application Studios — Identical to Enterprise License</span>
           </div>
-          <span className="text-[10px] text-gray-500 font-mono">Formula Student EV Pre-loaded • 50 Runs Quota</span>
+          <span className="text-xs text-zinc-400 font-mono">Formula Student EV Pre-loaded • 50 Runs Quota</span>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
           <Link
             href="/kinematics"
-            className="p-3.5 bg-[#17171b] border border-[#26262a] rounded-xl hover:border-ansys-yellow/50 hover:bg-[#1c1c22] transition-all group"
+            className="p-3.5 bg-[#17171b] border border-[#26262a] rounded-xl hover:border-signal/50 hover:bg-[#1c1c22] transition-all group"
           >
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] uppercase font-bold text-gray-400 group-hover:text-ansys-yellow">Kinematics</span>
-              <ExternalLink size={12} className="text-gray-500 group-hover:text-ansys-yellow" />
+              <span className="text-xs uppercase font-bold text-gray-400 group-hover:text-signal">Kinematics</span>
+              <ExternalLink size={12} className="text-zinc-400 group-hover:text-signal" />
             </div>
             <div className="text-xs font-bold text-white">3D Hardpoints</div>
-            <div className="text-[10px] text-gray-400 mt-0.5 font-mono">Double Wishbone CAE</div>
+            <div className="text-xs text-gray-400 mt-0.5 font-mono">Double Wishbone CAE</div>
           </Link>
           <Link
             href="/handling"
-            className="p-3.5 bg-[#17171b] border border-[#26262a] rounded-xl hover:border-ansys-yellow/50 hover:bg-[#1c1c22] transition-all group"
+            className="p-3.5 bg-[#17171b] border border-[#26262a] rounded-xl hover:border-signal/50 hover:bg-[#1c1c22] transition-all group"
           >
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] uppercase font-bold text-gray-400 group-hover:text-ansys-yellow">Handling</span>
-              <ExternalLink size={12} className="text-gray-500 group-hover:text-ansys-yellow" />
+              <span className="text-xs uppercase font-bold text-gray-400 group-hover:text-signal">Handling</span>
+              <ExternalLink size={12} className="text-zinc-400 group-hover:text-signal" />
             </div>
             <div className="text-xs font-bold text-white">Yaw & Balance</div>
-            <div className="text-[10px] text-gray-400 mt-0.5 font-mono">Kus & Magic Formula</div>
+            <div className="text-xs text-gray-400 mt-0.5 font-mono">Kus & Magic Formula</div>
           </Link>
           <Link
             href="/lap-sim"
-            className="p-3.5 bg-[#17171b] border border-[#26262a] rounded-xl hover:border-ansys-yellow/50 hover:bg-[#1c1c22] transition-all group"
+            className="p-3.5 bg-[#17171b] border border-[#26262a] rounded-xl hover:border-signal/50 hover:bg-[#1c1c22] transition-all group"
           >
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] uppercase font-bold text-gray-400 group-hover:text-ansys-yellow">Lap Sim</span>
-              <ExternalLink size={12} className="text-gray-500 group-hover:text-ansys-yellow" />
+              <span className="text-xs uppercase font-bold text-gray-400 group-hover:text-signal">Lap Sim</span>
+              <ExternalLink size={12} className="text-zinc-400 group-hover:text-signal" />
             </div>
             <div className="text-xs font-bold text-white">Lap Simulation</div>
-            <div className="text-[10px] text-gray-400 mt-0.5 font-mono">Sectors & Velocity Map</div>
+            <div className="text-xs text-gray-400 mt-0.5 font-mono">Sectors & Velocity Map</div>
           </Link>
           <Link
             href="/correlation"
-            className="p-3.5 bg-[#17171b] border border-[#26262a] rounded-xl hover:border-ansys-yellow/50 hover:bg-[#1c1c22] transition-all group"
+            className="p-3.5 bg-[#17171b] border border-[#26262a] rounded-xl hover:border-signal/50 hover:bg-[#1c1c22] transition-all group"
           >
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] uppercase font-bold text-gray-400 group-hover:text-ansys-yellow">Telemetry</span>
-              <ExternalLink size={12} className="text-gray-500 group-hover:text-ansys-yellow" />
+              <span className="text-xs uppercase font-bold text-gray-400 group-hover:text-signal">Telemetry</span>
+              <ExternalLink size={12} className="text-zinc-400 group-hover:text-signal" />
             </div>
             <div className="text-xs font-bold text-white">Investigation</div>
-            <div className="text-[10px] text-gray-400 mt-0.5 font-mono">Sim vs Logged Overlays</div>
+            <div className="text-xs text-gray-400 mt-0.5 font-mono">Sim vs Logged Overlays</div>
           </Link>
           <Link
             href="/quarter-car"
-            className="p-3.5 bg-[#17171b] border border-[#26262a] rounded-xl hover:border-ansys-yellow/50 hover:bg-[#1c1c22] transition-all group"
+            className="p-3.5 bg-[#17171b] border border-[#26262a] rounded-xl hover:border-signal/50 hover:bg-[#1c1c22] transition-all group"
           >
             <div className="flex items-center justify-between mb-1.5">
-              <span className="text-[10px] uppercase font-bold text-gray-400 group-hover:text-ansys-yellow">Quarter Car</span>
-              <ExternalLink size={12} className="text-gray-500 group-hover:text-ansys-yellow" />
+              <span className="text-xs uppercase font-bold text-gray-400 group-hover:text-signal">Quarter Car</span>
+              <ExternalLink size={12} className="text-zinc-400 group-hover:text-signal" />
             </div>
             <div className="text-xs font-bold text-white">Dynamic Ride</div>
-            <div className="text-[10px] text-gray-400 mt-0.5 font-mono">2-DOF Solver & Freq</div>
+            <div className="text-xs text-gray-400 mt-0.5 font-mono">2-DOF Solver & Freq</div>
           </Link>
         </div>
       </div>
 
       {/* ── 4. EXPLAIN THE VALUE (Engineering Language) ── */}
-      <div className="mb-6 p-5 bg-gradient-to-r from-[#141418] via-[#101014] to-[#141418] border border-ansys-yellow/25 rounded-2xl shadow-lg">
+      <div className="mb-6 p-5 bg-gradient-to-r from-[#141418] via-[#101014] to-[#141418] border border-signal/25 rounded-2xl shadow-lg">
         <div className="flex items-start gap-3.5">
-          <div className="p-2 bg-ansys-yellow/15 border border-ansys-yellow/30 rounded-xl shrink-0 mt-0.5">
-            <Sparkles size={18} className="text-ansys-yellow" />
+          <div className="p-2 bg-signal/15 border border-signal/30 rounded-xl shrink-0 mt-0.5">
+            <Sparkles size={18} className="text-signal" />
           </div>
           <div className="space-y-1 text-xs">
-            <div className="font-mono text-[11px] font-bold text-ansys-yellow uppercase tracking-wider">
+            <div className="font-mono text-xs font-bold text-signal uppercase tracking-wider">
               Connected Vehicle Dynamics Architecture
             </div>
             <p className="text-gray-200 leading-relaxed font-sans text-xs">
               Instead of manually moving setup values between simulation, telemetry and spreadsheets, SuspensionLab keeps the engineering question, evidence, experiment, comparison and decision connected.
             </p>
-            <div className="pt-2 flex flex-wrap items-center gap-2 text-[10px] font-mono text-gray-400">
+            <div className="pt-2 flex flex-wrap items-center gap-2 text-xs font-mono text-gray-400">
               <span className="px-2 py-0.5 bg-[#1a1a20] rounded border border-[#282830] text-gray-300">QUESTION</span>
               <span>→</span>
               <span className="px-2 py-0.5 bg-[#1a1a20] rounded border border-[#282830] text-gray-300">EVIDENCE</span>
@@ -891,7 +893,7 @@ export default function EvaluationPage() {
               <span>→</span>
               <span className="px-2 py-0.5 bg-[#1a1a20] rounded border border-[#282830] text-gray-300">OPTIMIZE</span>
               <span>→</span>
-              <span className="px-2 py-0.5 bg-[#1a1a20] rounded border border-[#282830] text-ansys-yellow font-bold">DECISION</span>
+              <span className="px-2 py-0.5 bg-[#1a1a20] rounded border border-[#282830] text-signal font-bold">DECISION</span>
             </div>
           </div>
         </div>
@@ -901,12 +903,12 @@ export default function EvaluationPage() {
       <div className="mb-6 p-4 bg-[#111114] border border-[#222] rounded-2xl shadow-lg">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-2">
-            <span className="px-2 py-0.5 bg-ansys-yellow text-black font-extrabold text-[10px] uppercase tracking-wider rounded">
+            <span className="px-2 py-0.5 bg-signal text-carbon font-extrabold text-xs uppercase tracking-wider rounded">
               TRY THIS FIRST
             </span>
             <span className="text-xs font-bold text-white">10-Minute Formula Student Evaluation Path</span>
           </div>
-          <span className="text-[11px] font-mono text-gray-400">Click any stage to inspect real backend state</span>
+          <span className="text-xs font-mono text-gray-400">Click any stage to inspect real backend state</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
@@ -929,19 +931,19 @@ export default function EvaluationPage() {
                 }}
                 className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
                   isCurrent
-                    ? "bg-ansys-yellow/15 border-ansys-yellow text-white shadow-md shadow-ansys-yellow/10"
+                    ? "bg-signal/15 border-signal text-white shadow-md shadow-signal/10"
                     : stage.isDone
                     ? "bg-emerald-950/20 border-emerald-500/30 text-white hover:border-emerald-500"
                     : "bg-[#16161b] border-[#252528] text-gray-400 hover:text-white hover:border-gray-600"
                 }`}
               >
                 <div className="flex items-center justify-between mb-1">
-                  <span className={`text-[10px] font-mono font-bold tracking-wider ${isCurrent ? "text-ansys-yellow" : stage.isDone ? "text-emerald-400" : "text-gray-400"}`}>
+                  <span className={`text-xs font-mono font-bold tracking-wider ${isCurrent ? "text-signal" : stage.isDone ? "text-emerald-400" : "text-gray-400"}`}>
                     {stage.step}
                   </span>
-                  <Icon size={13} className={isCurrent ? "text-ansys-yellow" : stage.isDone ? "text-emerald-400" : "text-gray-500"} />
+                  <Icon size={13} className={isCurrent ? "text-signal" : stage.isDone ? "text-emerald-400" : "text-zinc-400"} />
                 </div>
-                <div className="text-[10px] text-gray-400 truncate mt-0.5">{stage.desc}</div>
+                <div className="text-xs text-gray-400 truncate mt-0.5">{stage.desc}</div>
               </button>
             );
           })}
@@ -953,14 +955,14 @@ export default function EvaluationPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
             <div className="flex items-center gap-2">
-              <CheckCircle2 size={16} className="text-ansys-yellow" />
+              <CheckCircle2 size={16} className="text-signal" />
               <h3 className="text-xs font-bold text-white uppercase tracking-wider">Evaluation Checklist</h3>
             </div>
-            <p className="text-[11px] text-gray-400 mt-0.5">
+            <p className="text-xs text-gray-400 mt-0.5">
               Automatically verified against actual backend database state.
             </p>
           </div>
-          <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-[#18181d] text-ansys-yellow border border-ansys-yellow/30">
+          <span className="px-3 py-1 rounded-full text-xs font-mono font-bold bg-[#18181d] text-signal border border-signal/30">
             {workspace?.checklist?.completed_count ?? 0} / 6 Completed
           </span>
         </div>
@@ -1018,7 +1020,7 @@ export default function EvaluationPage() {
             >
               <div className="flex items-center gap-2.5">
                 <div
-                  className={`w-4 h-4 rounded-md flex items-center justify-center text-[10px] font-bold ${
+                  className={`w-4 h-4 rounded-md flex items-center justify-center text-xs font-bold ${
                     item.isDone ? "bg-emerald-500 text-black" : "border border-gray-600"
                   }`}
                 >
@@ -1027,7 +1029,7 @@ export default function EvaluationPage() {
                 <span className="font-medium text-xs">{item.label}</span>
               </div>
               <span
-                className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
+                className={`text-xs font-mono px-1.5 py-0.5 rounded font-bold uppercase tracking-wider ${
                   item.isDone ? "bg-emerald-500/20 text-emerald-400" : "bg-gray-800 text-gray-400"
                 }`}
               >
@@ -1050,7 +1052,7 @@ export default function EvaluationPage() {
             </div>
             <div className="flex-1 space-y-4">
               <div>
-                <div className="text-[11px] font-mono uppercase tracking-wider text-red-400 font-bold">
+                <div className="text-xs font-mono uppercase tracking-wider text-red-400 font-bold">
                   Evaluation Policy Limit Reached
                 </div>
                 <h2 className="text-lg font-bold text-white mt-0.5">
@@ -1062,8 +1064,8 @@ export default function EvaluationPage() {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-red-500/20 text-xs">
                 {/* 1. Current Usage */}
                 <div className="bg-[#111114] p-3.5 rounded-xl border border-[#222]">
-                  <div className="text-gray-400 font-bold uppercase tracking-wider text-[10px] mb-2 flex items-center gap-1.5">
-                    <Gauge size={12} className="text-ansys-yellow" /> CURRENT USAGE
+                  <div className="text-gray-400 font-bold uppercase tracking-wider text-xs mb-2 flex items-center gap-1.5">
+                    <Gauge size={12} className="text-signal" /> CURRENT USAGE
                   </div>
                   <div className="space-y-1 font-mono text-gray-300">
                     <div>
@@ -1088,7 +1090,7 @@ export default function EvaluationPage() {
 
                 {/* 2. What Remains Available */}
                 <div className="bg-[#111114] p-3.5 rounded-xl border border-[#222]">
-                  <div className="text-gray-400 font-bold uppercase tracking-wider text-[10px] mb-2 flex items-center gap-1.5">
+                  <div className="text-gray-400 font-bold uppercase tracking-wider text-xs mb-2 flex items-center gap-1.5">
                     <CheckCircle2 size={12} className="text-emerald-400" /> WHAT REMAINS AVAILABLE
                   </div>
                   <ul className="space-y-1 text-gray-400 list-disc list-inside">
@@ -1103,17 +1105,17 @@ export default function EvaluationPage() {
                 {/* 3. How to Request Continuation */}
                 <div className="bg-[#111114] p-3.5 rounded-xl border border-[#222] flex flex-col justify-between">
                   <div>
-                    <div className="text-gray-400 font-bold uppercase tracking-wider text-[10px] mb-1.5 flex items-center gap-1.5">
+                    <div className="text-gray-400 font-bold uppercase tracking-wider text-xs mb-1.5 flex items-center gap-1.5">
                       <ExternalLink size={12} className="text-purple-400" /> HOW TO REQUEST CONTINUATION
                     </div>
-                    <p className="text-gray-400 leading-relaxed text-[11px]">
+                    <p className="text-gray-400 leading-relaxed text-xs">
                       {limitError.how_to_request_continuation}
                     </p>
                   </div>
                   <div className="mt-3 flex gap-2">
                     <a
                       href="mailto:enterprise@suspensionlab.pro?subject=SuspensionLab%20PRO%20Evaluation%20Continuation"
-                      className="px-3 py-1.5 bg-ansys-yellow text-black font-bold rounded-lg text-xs hover:brightness-110 flex items-center gap-1.5"
+                      className="px-3 py-1.5 bg-signal text-carbon font-bold rounded-lg text-xs hover:brightness-110 flex items-center gap-1.5"
                     >
                       <Mail size={12} /> Contact Engineering Team
                     </a>
@@ -1144,11 +1146,11 @@ export default function EvaluationPage() {
               onClick={() => setActiveTab(tab.id as any)}
               className={`px-4 py-3 text-xs font-semibold rounded-t-xl transition-all flex items-center gap-2 border-b-2 -mb-px whitespace-nowrap ${
                 active
-                  ? "border-ansys-yellow text-white bg-[#151518]"
+                  ? "border-signal text-white bg-[#151518]"
                   : "border-transparent text-gray-400 hover:text-white"
               }`}
             >
-              <Icon size={14} className={active ? "text-ansys-yellow" : "text-gray-500"} />
+              <Icon size={14} className={active ? "text-signal" : "text-zinc-400"} />
               {tab.label}
             </button>
           );
@@ -1162,13 +1164,13 @@ export default function EvaluationPage() {
           <div className="bg-[#111114] border border-[#222] rounded-2xl p-6 shadow-xl space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-red-950/40 text-red-400 border border-red-800/40">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-red-950/40 text-red-400 border border-red-800/40">
                   {workspace?.engineering_question?.severity || "CRITICAL"}
                 </span>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-950/40 text-purple-300 border border-purple-800/40">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-950/40 text-purple-300 border border-purple-800/40">
                   EVALUATION DATASET
                 </span>
-                <span className="text-xs text-gray-500 font-mono">
+                <span className="text-xs text-zinc-400 font-mono">
                   Track: {workspace?.vehicle?.track_ref} | Corner: Turn 4 Hairpin Entry
                 </span>
               </div>
@@ -1191,7 +1193,7 @@ export default function EvaluationPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Pillar 1: WHAT IS HAPPENING */}
               <div className="bg-[#111114] border border-[#222] rounded-2xl p-6 space-y-3">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-ansys-yellow flex items-center gap-2">
+                <div className="text-xs font-bold uppercase tracking-wider text-signal flex items-center gap-2">
                   <Info size={14} /> 1. WHAT IS HAPPENING?
                 </div>
                 <h4 className="font-bold text-white text-sm">{investigation.what_is_happening.summary}</h4>
@@ -1202,30 +1204,30 @@ export default function EvaluationPage() {
 
               {/* Pillar 2: EVIDENCE */}
               <div className="bg-[#111114] border border-[#222] rounded-2xl p-6 space-y-3">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
+                <div className="text-xs font-bold uppercase tracking-wider text-emerald-400 flex items-center gap-2">
                   <Activity size={14} /> 2. EVIDENCE (SYNTHETIC EVALUATION DATA)
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-xs font-mono">
                   <div className="bg-[#0e0e11] p-3 rounded-xl border border-[#1e1e22]">
-                    <div className="text-[10px] text-gray-500 uppercase">Tire Load Spike (ΔFz)</div>
+                    <div className="text-xs text-zinc-400 uppercase">Tire Load Spike (ΔFz)</div>
                     <div className="text-lg font-bold text-red-400 mt-0.5">
                       {investigation.evidence.peak_tire_load_variation_n} N
                     </div>
                   </div>
                   <div className="bg-[#0e0e11] p-3 rounded-xl border border-[#1e1e22]">
-                    <div className="text-[10px] text-gray-500 uppercase">Peak Damper Vel</div>
-                    <div className="text-lg font-bold text-ansys-yellow mt-0.5">
+                    <div className="text-xs text-zinc-400 uppercase">Peak Damper Vel</div>
+                    <div className="text-lg font-bold text-signal mt-0.5">
                       {investigation.evidence.max_damper_velocity_mms} mm/s
                     </div>
                   </div>
                   <div className="bg-[#0e0e11] p-3 rounded-xl border border-[#1e1e22]">
-                    <div className="text-[10px] text-gray-500 uppercase">Lat Accel Ramp Rate</div>
+                    <div className="text-xs text-zinc-400 uppercase">Lat Accel Ramp Rate</div>
                     <div className="text-lg font-bold text-white mt-0.5">
                       {investigation.evidence.lateral_accel_rate_gs} G/s
                     </div>
                   </div>
                   <div className="bg-[#0e0e11] p-3 rounded-xl border border-[#1e1e22]">
-                    <div className="text-[10px] text-gray-500 uppercase">Settle Delay vs Target</div>
+                    <div className="text-xs text-zinc-400 uppercase">Settle Delay vs Target</div>
                     <div className="text-lg font-bold text-white mt-0.5">
                       {investigation.evidence.transient_settle_delay_s}s / {investigation.evidence.target_settle_s}s
                     </div>
@@ -1235,7 +1237,7 @@ export default function EvaluationPage() {
 
               {/* Pillar 3: WHY? */}
               <div className="bg-[#111114] border border-[#222] rounded-2xl p-6 space-y-3">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-purple-400 flex items-center gap-2">
+                <div className="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-2">
                   <Compass size={14} /> 3. WHY? (PHYSICAL ROOT CAUSE)
                 </div>
                 <h4 className="font-bold text-white text-sm">{investigation.why.root_cause}</h4>
@@ -1246,13 +1248,13 @@ export default function EvaluationPage() {
 
               {/* Pillar 4: WHAT SHOULD WE TEST? */}
               <div className="bg-[#111114] border border-[#222] rounded-2xl p-6 space-y-3">
-                <div className="text-[11px] font-bold uppercase tracking-wider text-blue-400 flex items-center gap-2">
+                <div className="text-xs font-bold uppercase tracking-wider text-blue-400 flex items-center gap-2">
                   <Target size={14} /> 4. WHAT SHOULD WE TEST?
                 </div>
                 <ul className="space-y-2 text-xs text-gray-300">
                   {investigation.what_should_we_test.map((testItem, idx) => (
                     <li key={idx} className="bg-[#0e0e11] p-2.5 rounded-xl border border-[#1e1e22] flex items-start gap-2">
-                      <span className="w-5 h-5 rounded-full bg-ansys-yellow/20 text-ansys-yellow flex items-center justify-center text-[10px] shrink-0 font-bold">
+                      <span className="w-5 h-5 rounded-full bg-signal/20 text-signal flex items-center justify-center text-xs shrink-0 font-bold">
                         {idx + 1}
                       </span>
                       <span>{testItem}</span>
@@ -1266,7 +1268,7 @@ export default function EvaluationPage() {
           <div className="pt-2 flex flex-wrap gap-3">
             <button
               onClick={() => setActiveTab("experiment")}
-              className="px-5 py-2.5 bg-ansys-yellow text-black text-xs font-bold rounded-xl hover:brightness-110 flex items-center gap-2"
+              className="px-5 py-2.5 bg-signal text-carbon text-xs font-bold rounded-xl hover:brightness-110 flex items-center gap-2"
             >
               Step 2: Run Prepared Experiment (+10% ARB) <ArrowRight size={14} />
             </button>
@@ -1287,41 +1289,41 @@ export default function EvaluationPage() {
           <div className="bg-[#111114] border border-[#222] rounded-2xl p-6 shadow-xl space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-ansys-yellow/20 text-ansys-yellow">
+                <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-signal/20 text-signal">
                   EVALUATION DATASET
                 </span>
                 <h3 className="text-lg font-bold text-white mt-1 flex items-center gap-2">
-                  <Car size={18} className="text-ansys-yellow" /> {workspace?.vehicle?.car_ref} — Formula Student EV Specifications
+                  <Car size={18} className="text-signal" /> {workspace?.vehicle?.car_ref} — Formula Student EV Specifications
                 </h3>
               </div>
-              <span className="text-xs text-gray-500 font-mono">
+              <span className="text-xs text-zinc-400 font-mono">
                 Formula Student Electric (4WD In-Hub)
               </span>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-3 text-xs">
               <div className="bg-[#17171b] p-3 rounded-xl border border-[#252528]">
-                <div className="text-[10px] text-gray-500 uppercase">Sprung Mass (Corner)</div>
+                <div className="text-xs text-zinc-400 uppercase">Sprung Mass (Corner)</div>
                 <div className="text-base font-bold text-white mt-0.5">50.0 kg</div>
               </div>
               <div className="bg-[#17171b] p-3 rounded-xl border border-[#252528]">
-                <div className="text-[10px] text-gray-500 uppercase">Unsprung Mass</div>
+                <div className="text-xs text-zinc-400 uppercase">Unsprung Mass</div>
                 <div className="text-base font-bold text-white mt-0.5">10.5 kg</div>
               </div>
               <div className="bg-[#17171b] p-3 rounded-xl border border-[#252528]">
-                <div className="text-[10px] text-gray-500 uppercase">Wheelbase</div>
+                <div className="text-xs text-zinc-400 uppercase">Wheelbase</div>
                 <div className="text-base font-bold text-white mt-0.5">1,530 mm</div>
               </div>
               <div className="bg-[#17171b] p-3 rounded-xl border border-[#252528]">
-                <div className="text-[10px] text-gray-500 uppercase">Track Width (F/R)</div>
+                <div className="text-xs text-zinc-400 uppercase">Track Width (F/R)</div>
                 <div className="text-base font-bold text-white mt-0.5">1200 / 1180 mm</div>
               </div>
               <div className="bg-[#17171b] p-3 rounded-xl border border-[#252528]">
-                <div className="text-[10px] text-gray-500 uppercase">Weight Dist (F/R)</div>
+                <div className="text-xs text-zinc-400 uppercase">Weight Dist (F/R)</div>
                 <div className="text-base font-bold text-white mt-0.5">46% / 54%</div>
               </div>
               <div className="bg-[#17171b] p-3 rounded-xl border border-[#252528]">
-                <div className="text-[10px] text-gray-500 uppercase">Motion Ratio</div>
+                <div className="text-xs text-zinc-400 uppercase">Motion Ratio</div>
                 <div className="text-base font-bold text-white mt-0.5">0.92</div>
               </div>
             </div>
@@ -1332,7 +1334,7 @@ export default function EvaluationPage() {
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <h3 className="text-base font-bold text-white flex items-center gap-2">
-                  <Layers size={16} className="text-ansys-yellow" /> Multi-Setup Comparative Analysis (Real Persisted Setups)
+                  <Layers size={16} className="text-signal" /> Multi-Setup Comparative Analysis (Real Persisted Setups)
                 </h3>
                 <p className="text-xs text-gray-400 mt-0.5">
                   Side-by-side comparison of genuine physics simulation results across stored setup profiles.
@@ -1374,10 +1376,10 @@ export default function EvaluationPage() {
             {/* Comparison Matrix Table */}
             <div className="overflow-x-auto border border-[#252528] rounded-xl">
               <table className="w-full text-xs text-left">
-                <thead className="bg-[#17171b] text-gray-400 font-mono text-[11px] uppercase border-b border-[#252528]">
+                <thead className="bg-[#17171b] text-gray-400 font-mono text-xs uppercase border-b border-[#252528]">
                   <tr>
                     <th className="p-3">Parameter / KPI</th>
-                    <th className="p-3 text-ansys-yellow">{setupA?.name}</th>
+                    <th className="p-3 text-signal">{setupA?.name}</th>
                     <th className="p-3 text-purple-400">{setupB?.name}</th>
                     <th className="p-3">Physical Difference / Tradeoff</th>
                   </tr>
@@ -1433,7 +1435,7 @@ export default function EvaluationPage() {
                   </tr>
                   <tr className="bg-[#141418]">
                     <td className="p-3 text-white font-sans font-bold">Simulated RMS Body Accel</td>
-                    <td className="p-3 text-ansys-yellow font-bold">{setupA?.kpis?.rms_body_accel?.toFixed(3)} m/s²</td>
+                    <td className="p-3 text-signal font-bold">{setupA?.kpis?.rms_body_accel?.toFixed(3)} m/s²</td>
                     <td className="p-3 text-purple-400 font-bold">{setupB?.kpis?.rms_body_accel?.toFixed(3)} m/s²</td>
                     <td className="p-3 text-gray-300">
                       Chassis heave disturbance delta:{" "}
@@ -1446,7 +1448,7 @@ export default function EvaluationPage() {
                   </tr>
                   <tr className="bg-[#141418]">
                     <td className="p-3 text-white font-sans font-bold">Tire Load Variation (RMS)</td>
-                    <td className="p-3 text-ansys-yellow font-bold">{setupA?.kpis?.tire_load_variation_rms?.toFixed(1)} N</td>
+                    <td className="p-3 text-signal font-bold">{setupA?.kpis?.tire_load_variation_rms?.toFixed(1)} N</td>
                     <td className="p-3 text-purple-400 font-bold">{setupB?.kpis?.tire_load_variation_rms?.toFixed(1)} N</td>
                     <td className="p-3 text-gray-300">
                       Grip consistency delta:{" "}
@@ -1470,9 +1472,9 @@ export default function EvaluationPage() {
           <div className="bg-[#111114] border border-[#222] rounded-2xl p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Sparkles size={16} className="text-ansys-yellow" /> Hero Hypothesis Experiment
+                <Sparkles size={16} className="text-signal" /> Hero Hypothesis Experiment
               </h3>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-950/40 text-purple-300 border border-purple-800/40">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-950/40 text-purple-300 border border-purple-800/40">
                 PREPARED DEMONSTRATION
               </span>
             </div>
@@ -1494,7 +1496,7 @@ export default function EvaluationPage() {
 
               <div className="p-3 bg-[#0d0d10] border border-[#222] rounded-xl text-xs space-y-1">
                 <div className="text-gray-400 font-bold">Planned Parameter Change:</div>
-                <div className="font-mono text-ansys-yellow">Front ARB (k_arb_f): 4,500 N/m → 4,950 N/m (+10.0%)</div>
+                <div className="font-mono text-signal">Front ARB (k_arb_f): 4,500 N/m → 4,950 N/m (+10.0%)</div>
               </div>
             </div>
 
@@ -1507,7 +1509,7 @@ export default function EvaluationPage() {
             <button
               onClick={handleRunExperiment}
               disabled={experimenting || isExpired || simsUsed >= simsLimit}
-              className="py-3 px-6 bg-ansys-yellow text-black text-xs font-bold rounded-xl hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="py-3 px-6 bg-signal text-carbon text-xs font-bold rounded-xl hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {experimenting ? "Executing ODE Physics & Tradeoff Engine…" : "Run Prepared Experiment (Computes Real Tradeoffs)"}
             </button>
@@ -1516,7 +1518,7 @@ export default function EvaluationPage() {
           {/* Experiment Provenance Ledger */}
           <div className="bg-[#111114] border border-[#222] rounded-2xl p-6 shadow-xl space-y-4">
             <h4 className="text-sm font-bold text-white flex items-center gap-2">
-              <FileText size={16} className="text-ansys-yellow" /> Experiment Provenance Ledger (Zero Fake Physics)
+              <FileText size={16} className="text-signal" /> Experiment Provenance Ledger (Zero Fake Physics)
             </h4>
 
             {workspace?.experiment_history && workspace.experiment_history.length > 0 ? (
@@ -1524,8 +1526,8 @@ export default function EvaluationPage() {
                 {workspace.experiment_history.map((exp) => (
                   <div key={exp.id} className="bg-[#17171b] border border-[#252528] rounded-xl p-4 text-xs space-y-3">
                     <div className="flex items-center justify-between">
-                      <span className="font-mono font-bold text-ansys-yellow">{exp.simulation_run_id}</span>
-                      <span className="text-[10px] text-gray-500">
+                      <span className="font-mono font-bold text-signal">{exp.simulation_run_id}</span>
+                      <span className="text-xs text-zinc-400">
                         {exp.created_at?.slice(0, 19).replace("T", " ")}
                       </span>
                     </div>
@@ -1535,11 +1537,11 @@ export default function EvaluationPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
                       {/* Improvements */}
                       <div className="bg-[#101912] p-3 rounded-lg border border-emerald-500/20">
-                        <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1 mb-1.5">
+                        <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1 mb-1.5">
                           <TrendingUp size={12} /> What Improved ({exp.improvements?.length || 0})
                         </div>
                         {exp.improvements && exp.improvements.length > 0 ? (
-                          <ul className="space-y-1 text-gray-300 text-[11px]">
+                          <ul className="space-y-1 text-gray-300 text-xs">
                             {exp.improvements.map((imp, i) => (
                               <li key={i} className="flex justify-between">
                                 <span>{imp.label}</span>
@@ -1550,17 +1552,17 @@ export default function EvaluationPage() {
                             ))}
                           </ul>
                         ) : (
-                          <div className="text-gray-500 text-[11px]">No significant improvements recorded</div>
+                          <div className="text-zinc-400 text-xs">No significant improvements recorded</div>
                         )}
                       </div>
 
                       {/* Regressions */}
                       <div className="bg-[#1c1214] p-3 rounded-lg border border-red-500/20">
-                        <div className="text-[10px] font-bold text-red-400 uppercase tracking-wider flex items-center gap-1 mb-1.5">
+                        <div className="text-xs font-bold text-red-400 uppercase tracking-wider flex items-center gap-1 mb-1.5">
                           <TrendingDown size={12} /> What Got Worse ({exp.regressions?.length || 0})
                         </div>
                         {exp.regressions && exp.regressions.length > 0 ? (
-                          <ul className="space-y-1 text-gray-300 text-[11px]">
+                          <ul className="space-y-1 text-gray-300 text-xs">
                             {exp.regressions.map((reg, i) => (
                               <li key={i} className="flex justify-between">
                                 <span>{reg.label}</span>
@@ -1571,19 +1573,19 @@ export default function EvaluationPage() {
                             ))}
                           </ul>
                         ) : (
-                          <div className="text-gray-500 text-[11px]">Zero physical tradeoffs observed</div>
+                          <div className="text-zinc-400 text-xs">Zero physical tradeoffs observed</div>
                         )}
                       </div>
                     </div>
 
-                    <div className="pt-1 text-[10px] text-gray-500 font-mono truncate">
+                    <div className="pt-1 text-xs text-zinc-400 font-mono truncate">
                       Reproducibility SHA-256: {exp.reproducibility_hash}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p className="text-xs text-gray-500 py-4 text-center">No experiment history available yet.</p>
+              <p className="text-xs text-zinc-400 py-4 text-center">No experiment history available yet.</p>
             )}
 
             <div className="pt-3 flex flex-wrap gap-3 border-t border-[#222]">
@@ -1595,7 +1597,7 @@ export default function EvaluationPage() {
               </button>
               <button
                 onClick={() => setActiveTab("optimize")}
-                className="px-5 py-2.5 bg-ansys-yellow text-black text-xs font-bold rounded-xl hover:brightness-110 flex items-center gap-2 cursor-pointer"
+                className="px-5 py-2.5 bg-signal text-carbon text-xs font-bold rounded-xl hover:brightness-110 flex items-center gap-2 cursor-pointer"
               >
                 Next Step: Solve Pareto Optimization <ArrowRight size={14} />
               </button>
@@ -1610,9 +1612,9 @@ export default function EvaluationPage() {
           <div className="bg-[#111114] border border-[#222] rounded-2xl p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Target size={16} className="text-ansys-yellow" /> Multi-Objective Pareto Frontier Optimizer
+                <Target size={16} className="text-signal" /> Multi-Objective Pareto Frontier Optimizer
               </h3>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-ansys-yellow/15 text-ansys-yellow border border-ansys-yellow/30">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-signal/15 text-signal border border-signal/30">
                 PREPARED DEMONSTRATION
               </span>
             </div>
@@ -1623,11 +1625,11 @@ export default function EvaluationPage() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
               <div className="bg-[#17171b] p-3 rounded-xl border border-[#252528]">
-                <div className="text-gray-400 text-[10px] uppercase font-bold">Objective 1</div>
+                <div className="text-gray-400 text-xs uppercase font-bold">Objective 1</div>
                 <div className="text-white font-bold mt-1">Minimize RMS Body Acceleration (m/s²)</div>
               </div>
               <div className="bg-[#17171b] p-3 rounded-xl border border-[#252528]">
-                <div className="text-gray-400 text-[10px] uppercase font-bold">Objective 2</div>
+                <div className="text-gray-400 text-xs uppercase font-bold">Objective 2</div>
                 <div className="text-white font-bold mt-1">Minimize Peak Tire Load Variation (N)</div>
               </div>
             </div>
@@ -1635,7 +1637,7 @@ export default function EvaluationPage() {
             <button
               onClick={handleRunParetoOptimization}
               disabled={optimizing || isExpired || simsUsed >= simsLimit}
-              className="py-3 px-6 bg-ansys-yellow text-black text-xs font-bold rounded-xl hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="py-3 px-6 bg-signal text-carbon text-xs font-bold rounded-xl hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {optimizing ? "Sweeping Candidate Setups via SciPy ODE..." : "Execute Pareto Optimizer (Live Grid Search)"}
             </button>
@@ -1645,7 +1647,7 @@ export default function EvaluationPage() {
             <div className="bg-[#111114] border border-[#222] rounded-2xl p-6 shadow-xl space-y-6">
               <div className="flex items-center justify-between">
                 <h4 className="text-sm font-bold text-white flex items-center gap-2">
-                  <Award size={16} className="text-ansys-yellow" /> Pareto Frontier (Non-Dominated Optimal Setups)
+                  <Award size={16} className="text-signal" /> Pareto Frontier (Non-Dominated Optimal Setups)
                 </h4>
                 <span className="text-xs text-gray-400 font-mono">
                   {paretoData.pareto_result?.frontier?.length || 0} non-dominated points discovered
@@ -1656,7 +1658,7 @@ export default function EvaluationPage() {
               {paretoData.pareto_result?.best_compromise && (
                 <div className="bg-gradient-to-r from-[#172017] to-[#121612] p-4 rounded-xl border border-emerald-500/30 flex items-center justify-between">
                   <div>
-                    <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
+                    <div className="text-xs font-bold text-emerald-400 uppercase tracking-wider">
                       Recommended Best Compromise Point
                     </div>
                     <div className="text-xs font-mono text-white mt-1">
@@ -1678,12 +1680,12 @@ export default function EvaluationPage() {
               {/* Frontier Points Table */}
               <div className="overflow-x-auto border border-[#252528] rounded-xl">
                 <table className="w-full text-xs text-left font-mono">
-                  <thead className="bg-[#17171b] text-gray-400 text-[10px] uppercase border-b border-[#252528]">
+                  <thead className="bg-[#17171b] text-gray-400 text-xs uppercase border-b border-[#252528]">
                     <tr>
                       <th className="p-3">Rank</th>
                       <th className="p-3">Spring k_s (N/m)</th>
                       <th className="p-3">Damper c (Ns/m)</th>
-                      <th className="p-3 text-ansys-yellow">RMS Accel (m/s²)</th>
+                      <th className="p-3 text-signal">RMS Accel (m/s²)</th>
                       <th className="p-3 text-emerald-400">Tire Load Var (N)</th>
                       <th className="p-3">Action</th>
                     </tr>
@@ -1691,10 +1693,10 @@ export default function EvaluationPage() {
                   <tbody className="divide-y divide-[#222]">
                     {(paretoData.pareto_result?.frontier || []).map((pt: any, idx: number) => (
                       <tr key={idx} className="hover:bg-white/5">
-                        <td className="p-3 font-bold text-ansys-yellow">Rank 0 (Optimal)</td>
+                        <td className="p-3 font-bold text-signal">Rank 0 (Optimal)</td>
                         <td className="p-3 text-white">{pt.params?.k_s}</td>
                         <td className="p-3 text-white">{pt.params?.c}</td>
-                        <td className="p-3 text-ansys-yellow font-bold">{pt.objectives?.rms_body_accel?.toFixed(3)}</td>
+                        <td className="p-3 text-signal font-bold">{pt.objectives?.rms_body_accel?.toFixed(3)}</td>
                         <td className="p-3 text-emerald-400 font-bold">{pt.objectives?.tire_load_variation?.toFixed(1)}</td>
                         <td className="p-3">
                           <button
@@ -1702,7 +1704,7 @@ export default function EvaluationPage() {
                               setParams(pt.params);
                               setActiveTab("simulate");
                             }}
-                            className="text-[11px] text-ansys-yellow hover:underline"
+                            className="text-xs text-signal hover:underline"
                           >
                             Simulate
                           </button>
@@ -1716,7 +1718,7 @@ export default function EvaluationPage() {
               <div className="pt-3 flex justify-end border-t border-[#222]">
                 <button
                   onClick={() => setActiveTab("decision")}
-                  className="px-5 py-2.5 bg-ansys-yellow text-black text-xs font-bold rounded-xl hover:brightness-110 flex items-center gap-2 cursor-pointer"
+                  className="px-5 py-2.5 bg-signal text-carbon text-xs font-bold rounded-xl hover:brightness-110 flex items-center gap-2 cursor-pointer"
                 >
                   Next Step: Create Engineering Decision <ArrowRight size={14} />
                 </button>
@@ -1732,9 +1734,9 @@ export default function EvaluationPage() {
           <div className="bg-[#111114] border border-[#222] rounded-2xl p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Award size={16} className="text-ansys-yellow" /> Formal Engineering Decision Workflow Demo
+                <Award size={16} className="text-signal" /> Formal Engineering Decision Workflow Demo
               </h3>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-purple-950/40 text-purple-300 border border-purple-800/40">
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-950/40 text-purple-300 border border-purple-800/40">
                 DECISION WORKFLOW DEMO
               </span>
             </div>
@@ -1749,11 +1751,11 @@ export default function EvaluationPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                 <div className="bg-[#17171b] p-3 rounded-lg border border-[#252528]">
-                  <div className="text-[10px] text-gray-500 uppercase font-bold">Selected Setup Option</div>
+                  <div className="text-xs text-zinc-400 uppercase font-bold">Selected Setup Option</div>
                   <div className="text-white font-mono font-bold mt-1">Setup A+ (Tuned Damping: c = 1,650 Ns/m)</div>
                 </div>
                 <div className="bg-[#17171b] p-3 rounded-lg border border-[#252528]">
-                  <div className="text-[10px] text-gray-500 uppercase font-bold">Engineering Tradeoff</div>
+                  <div className="text-xs text-zinc-400 uppercase font-bold">Engineering Tradeoff</div>
                   <div className="text-emerald-400 font-mono font-bold mt-1">-14.2% tire load variation vs +1.8% pitch compliance</div>
                 </div>
               </div>
@@ -1762,7 +1764,7 @@ export default function EvaluationPage() {
             <button
               onClick={handleCreateDecision}
               disabled={creatingDecision || isExpired}
-              className="py-3 px-6 bg-ansys-yellow text-black text-xs font-bold rounded-xl hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="py-3 px-6 bg-signal text-carbon text-xs font-bold rounded-xl hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
               {creatingDecision ? "Generating Cryptographic Record…" : "Create Formal Engineering Decision"}
             </button>
@@ -1777,7 +1779,7 @@ export default function EvaluationPage() {
                     Audit-Defensible Decision Generated: {decisionRecord.decision_id}
                   </span>
                 </div>
-                <span className="px-2.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-950/40 text-emerald-400 border border-emerald-800/40">
+                <span className="px-2.5 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-emerald-950/40 text-emerald-400 border border-emerald-800/40">
                   {decisionRecord.status}
                 </span>
               </div>
@@ -1787,7 +1789,7 @@ export default function EvaluationPage() {
                   <span className="text-gray-400 font-bold">Justification: </span>
                   <span className="text-gray-200">{decisionRecord.reason}</span>
                 </div>
-                <div className="text-[11px] font-mono text-gray-400 bg-black/40 p-3 rounded-xl border border-white/5 break-all">
+                <div className="text-xs font-mono text-gray-400 bg-black/40 p-3 rounded-xl border border-white/5 break-all">
                   SHA-256 Provenance Hash: {decisionRecord.provenance_hash}
                 </div>
               </div>
@@ -1798,7 +1800,7 @@ export default function EvaluationPage() {
                     const el = document.getElementById("feedback-section");
                     if (el) el.scrollIntoView({ behavior: "smooth" });
                   }}
-                  className="px-5 py-2.5 bg-ansys-yellow text-black text-xs font-bold rounded-xl hover:brightness-110 flex items-center gap-2 cursor-pointer"
+                  className="px-5 py-2.5 bg-signal text-carbon text-xs font-bold rounded-xl hover:brightness-110 flex items-center gap-2 cursor-pointer"
                 >
                   Next Step: Submit Evaluation Feedback <ArrowRight size={14} />
                 </button>
@@ -1814,7 +1816,7 @@ export default function EvaluationPage() {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="flex items-center gap-2">
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-blue-950/40 text-blue-300 border border-blue-800/40">
+                <span className="px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wider bg-blue-950/40 text-blue-300 border border-blue-800/40">
                   SYNTHETIC EVALUATION DATA
                 </span>
                 <span className="text-xs text-gray-400 font-mono">
@@ -1822,10 +1824,10 @@ export default function EvaluationPage() {
                 </span>
               </div>
               <h3 className="text-lg font-bold text-white mt-1 flex items-center gap-2">
-                <Activity size={18} className="text-ansys-yellow" /> Turn 4 Corner Entry Transient Telemetry
+                <Activity size={18} className="text-signal" /> Turn 4 Corner Entry Transient Telemetry
               </h3>
             </div>
-            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-950/40 text-emerald-400 border border-emerald-800/40">
+            <span className="px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-950/40 text-emerald-400 border border-emerald-800/40">
               100% REPRODUCIBLE
             </span>
           </div>
@@ -1834,7 +1836,7 @@ export default function EvaluationPage() {
           <div className="space-y-2 bg-[#17171b] p-4 rounded-xl border border-[#252528]">
             <div className="flex items-center justify-between text-xs font-mono">
               <span className="text-gray-400">Scrub Time Slice: t = {currentTelemPoint?.time.toFixed(2)}s / 5.00s</span>
-              <span className="text-ansys-yellow font-bold">
+              <span className="text-signal font-bold">
                 {currentTelemPoint?.time >= 1.5 && currentTelemPoint?.time <= 2.2
                   ? "⚠️ Corner Entry Transient Spike"
                   : "Normal Operating State"}
@@ -1846,56 +1848,56 @@ export default function EvaluationPage() {
               max={Math.max(0, telemData.length - 1)}
               value={telemetryIndex}
               onChange={(e) => setTelemetryIndex(parseInt(e.target.value))}
-              className="w-full accent-ansys-yellow"
+              className="w-full accent-signal"
             />
           </div>
 
           {/* Synchronized Channel Gauges */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-xs font-mono">
             <div className="bg-[#17171b] p-4 rounded-xl border border-[#252528]">
-              <div className="text-[10px] text-gray-500 uppercase">Vehicle Speed</div>
+              <div className="text-xs text-zinc-400 uppercase">Vehicle Speed</div>
               <div className="text-xl font-bold text-white mt-1">
                 {currentTelemPoint?.vehicle_speed_kmh} km/h
               </div>
             </div>
             <div className="bg-[#17171b] p-4 rounded-xl border border-[#252528]">
-              <div className="text-[10px] text-gray-500 uppercase">Lateral Accel</div>
-              <div className="text-xl font-bold text-ansys-yellow mt-1">
+              <div className="text-xs text-zinc-400 uppercase">Lateral Accel</div>
+              <div className="text-xl font-bold text-signal mt-1">
                 {currentTelemPoint?.lateral_accel_g} G
               </div>
             </div>
             <div className="bg-[#17171b] p-4 rounded-xl border border-[#252528]">
-              <div className="text-[10px] text-gray-500 uppercase">Steering Angle</div>
+              <div className="text-xs text-zinc-400 uppercase">Steering Angle</div>
               <div className="text-xl font-bold text-white mt-1">
                 {currentTelemPoint?.steering_angle_deg}°
               </div>
             </div>
             <div className="bg-[#17171b] p-4 rounded-xl border border-[#252528]">
-              <div className="text-[10px] text-gray-500 uppercase">Outer Tire Normal Load</div>
+              <div className="text-xs text-zinc-400 uppercase">Outer Tire Normal Load</div>
               <div className="text-xl font-bold text-red-400 mt-1">
                 {currentTelemPoint?.tire_load_fl_n} N
               </div>
             </div>
             <div className="bg-[#17171b] p-4 rounded-xl border border-[#252528]">
-              <div className="text-[10px] text-gray-500 uppercase">FL Susp Travel</div>
+              <div className="text-xs text-zinc-400 uppercase">FL Susp Travel</div>
               <div className="text-xl font-bold text-white mt-1">
                 {currentTelemPoint?.susp_travel_fl_mm} mm
               </div>
             </div>
             <div className="bg-[#17171b] p-4 rounded-xl border border-[#252528]">
-              <div className="text-[10px] text-gray-500 uppercase">Damper Velocity</div>
-              <div className="text-xl font-bold text-ansys-yellow mt-1">
+              <div className="text-xs text-zinc-400 uppercase">Damper Velocity</div>
+              <div className="text-xl font-bold text-signal mt-1">
                 {currentTelemPoint?.damper_velocity_fl_mms} mm/s
               </div>
             </div>
             <div className="bg-[#17171b] p-4 rounded-xl border border-[#252528]">
-              <div className="text-[10px] text-gray-500 uppercase">Wheel Speed (FL)</div>
+              <div className="text-xs text-zinc-400 uppercase">Wheel Speed (FL)</div>
               <div className="text-xl font-bold text-white mt-1">
                 {currentTelemPoint?.wheel_speed_fl_rpm} RPM
               </div>
             </div>
             <div className="bg-[#17171b] p-4 rounded-xl border border-[#252528]">
-              <div className="text-[10px] text-gray-500 uppercase">Yaw Rate</div>
+              <div className="text-xs text-zinc-400 uppercase">Yaw Rate</div>
               <div className="text-xl font-bold text-white mt-1">
                 {currentTelemPoint?.yaw_rate_degs} °/s
               </div>
@@ -1909,7 +1911,7 @@ export default function EvaluationPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-1 bg-[#111114] border border-[#222] rounded-2xl p-6 shadow-xl space-y-4">
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <Sliders size={16} className="text-ansys-yellow" /> Solver Configuration
+              <Sliders size={16} className="text-signal" /> Solver Configuration
             </h3>
             <p className="text-xs text-gray-400">
               Transient quarter-car 2-DOF ODE solver over high-speed turn-in disturbance.
@@ -1939,7 +1941,7 @@ export default function EvaluationPage() {
             <button
               onClick={handleRunSimulation}
               disabled={simulating || isExpired || simsUsed >= simsLimit}
-              className="w-full mt-4 py-3 bg-ansys-yellow text-black text-xs font-bold rounded-xl hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              className="w-full mt-4 py-3 bg-signal text-carbon text-xs font-bold rounded-xl hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {simulating ? "Executing ODE Solution…" : "Run Simulation"}
             </button>
@@ -1949,9 +1951,9 @@ export default function EvaluationPage() {
           <div className="lg:col-span-2 bg-[#111114] border border-[#222] rounded-2xl p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-bold text-white flex items-center gap-2">
-                <Gauge size={16} className="text-ansys-yellow" /> Solver Physical KPIs
+                <Gauge size={16} className="text-signal" /> Solver Physical KPIs
               </h3>
-              <span className="text-[10px] font-mono text-gray-500">
+              <span className="text-xs font-mono text-zinc-400">
                 Calculated by scipy.integrate.solve_ivp
               </span>
             </div>
@@ -1960,7 +1962,7 @@ export default function EvaluationPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
                 {Object.entries(simResult).map(([kpiKey, val]) => (
                   <div key={kpiKey} className="bg-[#17171b] p-3.5 rounded-xl border border-[#252528]">
-                    <div className="text-[10px] text-gray-400 uppercase font-bold truncate">
+                    <div className="text-xs text-gray-400 uppercase font-bold truncate">
                       {kpiKey.replace(/_/g, " ")}
                     </div>
                     <div className="text-lg font-mono font-bold text-white mt-1">
@@ -1970,7 +1972,7 @@ export default function EvaluationPage() {
                 ))}
               </div>
             ) : (
-              <div className="p-12 text-center text-gray-500 text-xs">
+              <div className="p-12 text-center text-zinc-400 text-xs">
                 No simulation results yet. Click &apos;Run Simulation&apos; to execute.
               </div>
             )}
@@ -1983,7 +1985,7 @@ export default function EvaluationPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
-              <MessageSquare size={18} className="text-ansys-yellow" /> Evaluation Feedback & Customer Discovery
+              <MessageSquare size={18} className="text-signal" /> Evaluation Feedback & Customer Discovery
             </h3>
             <p className="text-xs text-gray-400 mt-0.5">
               Help us tailor SuspensionLab PRO. Responses are saved directly to your evaluation organization.
@@ -2006,7 +2008,7 @@ export default function EvaluationPage() {
               value={feedbackValuable}
               onChange={(e) => setFeedbackValuable(e.target.value)}
               placeholder="e.g. Real-time Pareto frontier linking the Turn 4 telemetry spike directly to setup tradeoffs..."
-              className="w-full bg-[#17171b] border border-[#28282c] rounded-xl p-3 text-white text-xs placeholder:text-gray-600 focus:border-ansys-yellow/60 outline-none"
+              className="w-full bg-[#17171b] border border-[#28282c] rounded-xl p-3 text-white text-xs placeholder:text-zinc-300 focus:border-signal/60 outline-none"
             />
           </div>
           <div>
@@ -2018,7 +2020,7 @@ export default function EvaluationPage() {
               value={feedbackPrevented}
               onChange={(e) => setFeedbackPrevented(e.target.value)}
               placeholder="e.g. Would like custom CSV telemetry upload or multi-body suspension CAD kinematic geometry import..."
-              className="w-full bg-[#17171b] border border-[#28282c] rounded-xl p-3 text-white text-xs placeholder:text-gray-600 focus:border-ansys-yellow/60 outline-none"
+              className="w-full bg-[#17171b] border border-[#28282c] rounded-xl p-3 text-white text-xs placeholder:text-zinc-300 focus:border-signal/60 outline-none"
             />
           </div>
         </div>
@@ -2027,7 +2029,7 @@ export default function EvaluationPage() {
           <button
             onClick={handleSubmitFeedback}
             disabled={submittingFeedback || (!feedbackValuable.trim() && !feedbackPrevented.trim())}
-            className="px-6 py-2.5 bg-ansys-yellow text-black font-bold text-xs rounded-xl hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer shadow-md shadow-ansys-yellow/10"
+            className="px-6 py-2.5 bg-signal text-carbon font-bold text-xs rounded-xl hover:brightness-110 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer shadow-md shadow-signal/10"
           >
             {submittingFeedback ? "Saving Feedback…" : "Submit Engineering Feedback"} <ArrowRight size={14} />
           </button>
@@ -2040,7 +2042,7 @@ export default function EvaluationPage() {
           <div className="bg-[#111114] border border-[#26262a] rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-2xl animate-in zoom-in-95 duration-150">
             <div className="flex items-center justify-between border-b border-[#222] pb-3">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <PlusCircle size={16} className="text-ansys-yellow" /> Formulate Custom Engineering Question
+                <PlusCircle size={16} className="text-signal" /> Formulate Custom Engineering Question
               </h3>
               <button
                 onClick={() => setShowCustomModal(false)}
@@ -2085,7 +2087,7 @@ export default function EvaluationPage() {
                 <button
                   type="submit"
                   disabled={submittingCustomQ}
-                  className="px-4 py-2 bg-ansys-yellow text-black font-bold text-xs rounded-xl hover:brightness-110"
+                  className="px-4 py-2 bg-signal text-carbon font-bold text-xs rounded-xl hover:brightness-110"
                 >
                   {submittingCustomQ ? "Creating Question…" : "Create Question"}
                 </button>
