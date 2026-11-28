@@ -267,7 +267,7 @@ export default function DurabilityPage() {
               </div>
 
               {/* Wave 18 item 2: say what drives the ranking. */}
-              <p className="text-[10px] leading-relaxed text-gray-500" data-testid="durability-ranking-disclaimer">
+              <p className="text-xs leading-relaxed text-gray-500" data-testid="durability-ranking-disclaimer">
                 Ranking only: generic S-N exponents (shock 3.5, spring 8, bushings 2.5, bearing 3.0) with body
                 acceleration as the load proxy. Not a predicted service life. Valid for comparing setups on the
                 same road class and speed.

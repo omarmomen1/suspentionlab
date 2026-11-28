@@ -57,7 +57,7 @@ function StatusPill({ status }: { status?: string | null }) {
     ? "bg-amber-500/15 text-amber-300 border-amber-500/40"
     : "bg-rose-500/15 text-rose-300 border-rose-500/40";
   return (
-    <span className={`px-2 py-0.5 rounded border text-[10px] font-bold font-mono ${cls}`}>
+    <span className={`px-2 py-0.5 rounded border text-xs font-bold font-mono ${cls}`}>
       {status || "UNKNOWN"}
     </span>
   );
@@ -296,7 +296,7 @@ export default function TelemetrySessionsPage() {
         <section className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-4 space-y-3 lg:col-span-1">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-neutral-100">Your sessions</h2>
-            <span className="text-[10px] font-mono text-neutral-500">{sessions.length} stored</span>
+            <span className="text-xs font-mono text-neutral-500">{sessions.length} stored</span>
           </div>
           {listError && <p className="text-xs text-rose-400">{listError}</p>}
           {!listError && sessions.length === 0 && !loadingList && (
@@ -319,7 +319,7 @@ export default function TelemetrySessionsPage() {
                     <span className="text-xs font-semibold text-neutral-100 truncate">{row.name}</span>
                     <StatusPill status={row.health_status || row.pipeline_status} />
                   </div>
-                  <div className="text-[10px] font-mono text-neutral-500 mt-1 flex flex-wrap gap-x-3">
+                  <div className="text-xs font-mono text-neutral-500 mt-1 flex flex-wrap gap-x-3">
                     <span>{row.n_channels} channels</span>
                     <span>{fmt(row.duration_s, 1)} s</span>
                     <span>{row.n_segments} segments</span>
@@ -346,7 +346,7 @@ export default function TelemetrySessionsPage() {
               <div className="flex flex-wrap items-center gap-3">
                 <h2 className="text-sm font-semibold text-neutral-100">{detail.session_name || detail.name}</h2>
                 <StatusPill status={detail.pipeline_status} />
-                <span className="text-[10px] font-mono text-neutral-500">{detail.session_id}</span>
+                <span className="text-xs font-mono text-neutral-500">{detail.session_id}</span>
               </div>
 
               {Array.isArray(detail.blocking_reasons) && detail.blocking_reasons.length > 0 && (
@@ -369,7 +369,7 @@ export default function TelemetrySessionsPage() {
                   { label: "Peak vert (g)", value: fmt(summary?.peak_vert_g, 2) },
                 ].map((item) => (
                   <div key={item.label} className="bg-neutral-950 border border-neutral-800 rounded-lg p-2.5">
-                    <div className="text-[10px] uppercase tracking-wide text-neutral-500">{item.label}</div>
+                    <div className="text-xs uppercase tracking-wide text-neutral-500">{item.label}</div>
                     <div className="text-sm font-mono font-semibold text-neutral-100 mt-0.5">{item.value}</div>
                   </div>
                 ))}
@@ -380,7 +380,7 @@ export default function TelemetrySessionsPage() {
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-neutral-400 mb-2 flex items-center gap-1.5">
                   <Gauge className="w-3.5 h-3.5" /> QA
                 </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-[11px] font-mono">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs font-mono">
                   <div className="bg-neutral-950 border border-neutral-800 rounded p-2">
                     Dropout intervals: {qa?.dropout_intervals ?? "-"}
                   </div>
@@ -408,7 +408,7 @@ export default function TelemetrySessionsPage() {
                   <Activity className="w-3.5 h-3.5" /> Channel map ({channelRows.length})
                 </h3>
                 <div className="overflow-x-auto border border-neutral-800 rounded-lg">
-                  <table className="w-full text-[11px] font-mono">
+                  <table className="w-full text-xs font-mono">
                     <thead className="bg-neutral-950 text-neutral-500">
                       <tr>
                         <th className="text-left px-2 py-1.5">Standard key</th>
@@ -441,7 +441,7 @@ export default function TelemetrySessionsPage() {
                   <ShieldAlert className="w-3.5 h-3.5" /> Health per channel ({healthRows.length})
                 </h3>
                 <div className="overflow-x-auto border border-neutral-800 rounded-lg">
-                  <table className="w-full text-[11px] font-mono">
+                  <table className="w-full text-xs font-mono">
                     <thead className="bg-neutral-950 text-neutral-500">
                       <tr>
                         <th className="text-left px-2 py-1.5">Channel</th>
@@ -494,7 +494,7 @@ export default function TelemetrySessionsPage() {
                   <p className="text-xs text-neutral-500">No segments were detected in this session.</p>
                 ) : (
                   <div className="overflow-x-auto border border-neutral-800 rounded-lg">
-                    <table className="w-full text-[11px] font-mono">
+                    <table className="w-full text-xs font-mono">
                       <thead className="bg-neutral-950 text-neutral-500">
                         <tr>
                           <th className="text-left px-2 py-1.5">Label</th>
@@ -525,7 +525,7 @@ export default function TelemetrySessionsPage() {
               </div>
 
               {detail?.model_note && (
-                <p className="text-[11px] text-neutral-500 font-mono">{detail.model_note}</p>
+                <p className="text-xs text-neutral-500 font-mono">{detail.model_note}</p>
               )}
             </div>
           )}

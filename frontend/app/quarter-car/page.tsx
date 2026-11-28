@@ -501,12 +501,12 @@ function QuarterCarDashboard() {
                   {aiProposal.badges.length > 0 ? (
                     <span className="flex gap-1">
                       {aiProposal.badges.map((b) => (
-                        <span key={b} className="text-[10px] px-1.5 py-0.5 rounded bg-[#1a1a1a] text-gray-300 border border-[#2a2a2a]">{b}</span>
+                        <span key={b} className="text-xs px-1.5 py-0.5 rounded bg-[#1a1a1a] text-gray-300 border border-[#2a2a2a]">{b}</span>
                       ))}
                     </span>
                   ) : null}
                 </div>
-                <table className="w-full text-[11px] font-mono text-gray-300">
+                <table className="w-full text-xs font-mono text-gray-300">
                   <tbody>
                     {aiProposal.changes.map((c) => (
                       <tr key={c.key}>

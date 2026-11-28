@@ -1219,7 +1219,7 @@ function CorrelationCockpitContent() {
 
                 {/* Wave 19 item 4: with a synthetic reference, ask for the real file. */}
                 {referenceIsSynthetic ? (
-                  <div className="text-[10px] font-mono text-amber-300" data-testid="correlation-upload-cta">
+                  <div className="text-xs font-mono text-amber-300" data-testid="correlation-upload-cta">
                     Upload your CSV to run a real correlation
                   </div>
                 ) : null}

@@ -168,7 +168,7 @@ function NVHDashboard() {
           </div>
 
           {/* Wave 17: say what this model is and is not. */}
-          <p className="text-[10px] leading-relaxed text-gray-500 shrink-0" data-testid="nvh-scope-note">
+          <p className="text-xs leading-relaxed text-gray-500 shrink-0" data-testid="nvh-scope-note">
             Relative trend from a 2-DOF transmissibility model with A-weighting. Not an absolute
             sound-pressure prediction; no cavity or panel model. Use for setup-to-setup comparison only.
           </p>
@@ -185,7 +185,7 @@ function NVHDashboard() {
                 <Plot
                   data={[
                     { x: Array.from(results.freqs), y: Array.from(results.tx_mag), type: "scatter", mode: "lines", name: "Structural Transmissibility", line: { color: "#00aeff", width: 2 } },
-                    { x: Array.from(results.freqs), y: Array.from(results.a_weighted_db), type: "scatter", mode: "lines", name: "Boom-region response (dB, A-weighted, relative)", yaxis: "y2", line: { color: "#ff2d55", width: 2 } }
+                    { x: Array.from(results.freqs), y: Array.from(results.a_weighted_db), type: "scatter", mode: "lines", name: "A-Weighted Transfer Gain (dB)", yaxis: "y2", line: { color: "#ff2d55", width: 2 } }
                   ]}
                   layout={darkLayout({
                     title: { text: "High-Frequency NVH Transfer Gain (0 – 250 Hz)", font: { color: "#D4D4D8", size: 12 } },

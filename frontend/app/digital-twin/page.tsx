@@ -986,7 +986,7 @@ export default function DigitalTwinPage() {
                     >
                       <Play className="w-4 h-4 fill-current" />
                       <span>Play sample replay</span>
-                      <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-black/25">SAMPLE</span>
+                      <span className="text-xs font-mono px-1.5 py-0.5 rounded bg-black/25">SAMPLE</span>
                     </button>
                     <button
                       onClick={startStream}

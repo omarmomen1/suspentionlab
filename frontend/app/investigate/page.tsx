@@ -348,7 +348,7 @@ function InvestigateContent() {
                 onClick={createTwinFromEmptyState}
                 disabled={creatingTwin}
                 data-testid="create-twin-cta"
-                className="px-3 py-1.5 rounded-lg bg-ansys-yellow text-black text-xs font-bold disabled:opacity-50"
+                className="px-3 py-1.5 rounded-lg bg-signal text-carbon border border-signal text-xs font-bold disabled:opacity-50"
               >
                 {creatingTwin ? "Creating twin..." : "Create Twin"}
               </button>

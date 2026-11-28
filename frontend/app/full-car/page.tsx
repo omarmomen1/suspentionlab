@@ -574,7 +574,7 @@ function FullCarDashboard() {
               </div>
 
               {/* Wave 11 item 2: say where roll and load transfer come from. */}
-              <p className="text-[10px] leading-relaxed text-gray-500" data-testid="lateral-g-model-note">
+              <p className="text-xs leading-relaxed text-gray-500" data-testid="lateral-g-model-note">
                 Ride-and-attitude model: roll and load transfer are computed from the lateral g you enter
                 here, not solved.
               </p>
