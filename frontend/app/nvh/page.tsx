@@ -163,9 +163,15 @@ function NVHDashboard() {
 
         <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-hidden">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 shrink-0">
-            <KPICard label="Peak Cabin Boom" value={results.max_boom} unit="dBA" sub="30-50 Hz Region" status={results.max_boom > 40 ? "warn" : "good"} />
-            <KPICard label="Peak Cavity Roar" value={results.max_roar} unit="dBA" sub="100-200 Hz Region" status={results.max_roar > 45 ? "warn" : "good"} />
+            <KPICard label="Boom-region response" value={results.max_boom} unit="dB (A-wtd, rel.)" sub="30-50 Hz Region" status={results.max_boom > 40 ? "warn" : "good"} />
+            <KPICard label="Roar-region response" value={results.max_roar} unit="dB (A-wtd, rel.)" sub="100-200 Hz Region" status={results.max_roar > 45 ? "warn" : "good"} />
           </div>
+
+          {/* Wave 17: say what this model is and is not. */}
+          <p className="text-[10px] leading-relaxed text-gray-500 shrink-0" data-testid="nvh-scope-note">
+            Relative trend from a 2-DOF transmissibility model with A-weighting. Not an absolute
+            sound-pressure prediction; no cavity or panel model. Use for setup-to-setup comparison only.
+          </p>
 
           <div className="flex gap-1.5 shrink-0">
             <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-signal text-carbon border border-signal">
@@ -179,13 +185,13 @@ function NVHDashboard() {
                 <Plot
                   data={[
                     { x: Array.from(results.freqs), y: Array.from(results.tx_mag), type: "scatter", mode: "lines", name: "Structural Transmissibility", line: { color: "#00aeff", width: 2 } },
-                    { x: Array.from(results.freqs), y: Array.from(results.a_weighted_db), type: "scatter", mode: "lines", name: "Acoustic Response (dBA)", yaxis: "y2", line: { color: "#ff2d55", width: 2 } }
+                    { x: Array.from(results.freqs), y: Array.from(results.a_weighted_db), type: "scatter", mode: "lines", name: "Boom-region response (dB, A-weighted, relative)", yaxis: "y2", line: { color: "#ff2d55", width: 2 } }
                   ]}
                   layout={darkLayout({
                     title: { text: "High-Frequency NVH Spectrogram (0 - 250 Hz)", font: { color: "#888", size: 11 } },
                     xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#444", size: 10 } } },
                     yaxis: { ...DARK_BASE.yaxis, title: { text: "Transmissibility (m/m)", font: { color: "#444", size: 10 } }, type: "log", color: "#00aeff" },
-                    yaxis2: { title: { text: "Acoustic Noise (dBA)", font: { color: "#444", size: 10 } }, overlaying: "y", side: "right", color: "#ff2d55", showgrid: false },
+                    yaxis2: { title: { text: "Relative A-weighted response (dB, not SPL)", font: { color: "#444", size: 10 } }, overlaying: "y", side: "right", color: "#ff2d55", showgrid: false },
                     shapes: [
                       { type: "rect", xref: "x", yref: "paper", x0: 30, x1: 50, y0: 0, y1: 1, fillcolor: "rgba(242,169,0,0.08)", line: { width: 0 }, layer: "below" },
                       { type: "rect", xref: "x", yref: "paper", x0: 100, x1: 200, y0: 0, y1: 1, fillcolor: "rgba(0,174,255,0.08)", line: { width: 0 }, layer: "below" }
