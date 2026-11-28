@@ -2676,6 +2676,8 @@ export interface CaeSolverComparisonResult {
   >;
   engineering_interpretation: string;
   boundary_notes: string;
+  comparison_label?: string;
+  excitation_source?: string;
 }
 
 export interface CaeExportResponse {

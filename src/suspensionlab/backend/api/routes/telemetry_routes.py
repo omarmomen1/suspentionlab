@@ -92,7 +92,11 @@ def _annotate_frame_source(payload: Any, source: Optional[str]) -> Any:
 # then have nowhere to reopen it. Each successful analysis is now kept under
 # data/telemetry_sessions/<org>/<session_id>.json so /telemetry/sessions can
 # list it and /telemetry/sessions/{id} can hand the full result back.
-_TELEMETRY_SESSION_DIR = os.path.join(_repo_root(), "data", "telemetry_sessions")
+# On Vercel / serverless environments, writes fall back to /tmp to avoid read-only FS crashes.
+def _base_session_dir() -> str:
+    if os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        return os.path.join("/tmp", "suspensionlab_telemetry", "telemetry_sessions")
+    return os.path.join(_repo_root(), "data", "telemetry_sessions")
 
 
 def _safe_component(value: Any) -> str:
@@ -100,12 +104,16 @@ def _safe_component(value: Any) -> str:
 
 
 def _session_store_dir(org_id: Any) -> str:
-    return os.path.join(_TELEMETRY_SESSION_DIR, _safe_component(org_id) or "default")
+    return os.path.join(_base_session_dir(), _safe_component(org_id) or "default")
 
 
 def _save_session_record(org_id: Any, record: Dict[str, Any]) -> None:
     directory = _session_store_dir(org_id)
-    os.makedirs(directory, exist_ok=True)
+    try:
+        os.makedirs(directory, exist_ok=True)
+    except OSError:
+        directory = os.path.join("/tmp", "suspensionlab_telemetry", "telemetry_sessions", _safe_component(org_id) or "default")
+        os.makedirs(directory, exist_ok=True)
     path = os.path.join(directory, f"{_safe_component(record['session_id'])}.json")
     tmp = f"{path}.tmp"
     with open(tmp, "w", encoding="utf-8") as f:
@@ -117,43 +125,58 @@ def _load_session_record(org_id: Any, session_id: Any) -> Optional[Dict[str, Any
     safe_id = _safe_component(session_id)
     if not safe_id:
         return None
-    path = os.path.join(_session_store_dir(org_id), f"{safe_id}.json")
-    if not os.path.exists(path):
-        return None
-    try:
-        with open(path, encoding="utf-8") as f:
-            return json.load(f)
-    except (OSError, json.JSONDecodeError):
-        return None
+    candidates = [_session_store_dir(org_id)]
+    tmp_fallback = os.path.join("/tmp", "suspensionlab_telemetry", "telemetry_sessions", _safe_component(org_id) or "default")
+    if tmp_fallback not in candidates:
+        candidates.append(tmp_fallback)
+    for directory in candidates:
+        path = os.path.join(directory, f"{safe_id}.json")
+        if os.path.exists(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    return json.load(f)
+            except (OSError, json.JSONDecodeError):
+                continue
+    return None
 
 
 def _list_session_records(org_id: Any) -> list:
-    directory = _session_store_dir(org_id)
-    if not os.path.isdir(directory):
-        return []
+    candidates = [_session_store_dir(org_id)]
+    tmp_fallback = os.path.join("/tmp", "suspensionlab_telemetry", "telemetry_sessions", _safe_component(org_id) or "default")
+    if tmp_fallback not in candidates:
+        candidates.append(tmp_fallback)
+
+    seen = set()
     rows = []
-    for name in os.listdir(directory):
-        if not name.endswith(".json"):
+    for directory in candidates:
+        if not os.path.isdir(directory):
             continue
-        rec = _load_session_record(org_id, name[:-5])
-        if not rec:
-            continue
-        summary = rec.get("summary") or {}
-        health = rec.get("health") or {}
-        rows.append({
-            "session_id": rec.get("session_id"),
-            "name": rec.get("name"),
-            "filename": rec.get("filename"),
-            "uploaded_at": rec.get("uploaded_at"),
-            "pipeline_status": rec.get("pipeline_status"),
-            "n_samples": summary.get("n_samples"),
-            "duration_s": summary.get("duration_s"),
-            "sample_rate_hz": summary.get("sample_rate_hz"),
-            "n_channels": len(rec.get("channel_map") or {}),
-            "n_segments": len(rec.get("segments") or []),
-            "health_status": health.get("pipeline_status"),
-            "blocking_reasons": health.get("blocking_reasons") or [],
-        })
+        for name in os.listdir(directory):
+            if not name.endswith(".json"):
+                continue
+            sess_name = name[:-5]
+            if sess_name in seen:
+                continue
+            seen.add(sess_name)
+            rec = _load_session_record(org_id, sess_name)
+            if not rec:
+                continue
+            summary = rec.get("summary") or {}
+            health = rec.get("health") or {}
+            rows.append({
+                "session_id": rec.get("session_id"),
+                "name": rec.get("name"),
+                "filename": rec.get("filename"),
+                "uploaded_at": rec.get("uploaded_at"),
+                "pipeline_status": rec.get("pipeline_status"),
+                "n_samples": summary.get("n_samples"),
+                "duration_s": summary.get("duration_s"),
+                "sample_rate_hz": summary.get("sample_rate_hz"),
+                "n_channels": len(rec.get("channel_map") or {}),
+                "n_segments": len(rec.get("segments") or []),
+                "health_status": health.get("pipeline_status"),
+                "blocking_reasons": health.get("blocking_reasons") or [],
+            })
     rows.sort(key=lambda r: str(r.get("uploaded_at") or ""), reverse=True)
     return rows
 

@@ -502,6 +502,21 @@ export default function CaeInteroperabilityPage() {
                   </button>
                 </div>
 
+                {/* Excitation Alignment / Comparison Label (Wave 10) */}
+                {comparisonResult.comparison_label && (
+                  <div
+                    data-testid="cae-comparison-label-banner"
+                    className={`p-3.5 rounded-xl border text-xs flex items-center gap-2.5 font-mono ${
+                      comparisonResult.comparison_label.includes("Different excitation")
+                        ? "bg-amber-950/40 border-amber-500/40 text-amber-300"
+                        : "bg-emerald-950/40 border-emerald-500/40 text-emerald-300"
+                    }`}
+                  >
+                    <Activity className="w-4 h-4 shrink-0" />
+                    <span>{comparisonResult.comparison_label}</span>
+                  </div>
+                )}
+
                 {/* Solvers Identity Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
                   {/* External */}

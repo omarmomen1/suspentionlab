@@ -83,6 +83,11 @@ export default function TelemetrySessionsPage() {
     setLoadingList(true);
     try {
       const res = await apiFetch("/api/v1/telemetry/sessions");
+      if (res.status === 401) {
+        setSessions([]);
+        setListError(null);
+        return;
+      }
       if (!res.ok) {
         throw new Error(`Could not load sessions (HTTP ${res.status})`);
       }
@@ -102,6 +107,11 @@ export default function TelemetrySessionsPage() {
     setDetailError(null);
     try {
       const res = await apiFetch(`/api/v1/telemetry/sessions/${encodeURIComponent(sessionId)}`);
+      if (res.status === 401) {
+        setDetail(null);
+        setDetailError("Sign in to view stored session details.");
+        return;
+      }
       if (!res.ok) {
         throw new Error(`Could not open session (HTTP ${res.status})`);
       }
@@ -136,6 +146,10 @@ export default function TelemetrySessionsPage() {
         form.append("session_name", sessionName.trim());
       }
       const res = await apiFetch("/api/v1/telemetry/analyse", { method: "POST", body: form });
+      if (res.status === 401) {
+        setUploadError("Sign in to upload and store telemetry sessions.");
+        return;
+      }
       const body = await res.json().catch(() => null);
       if (!res.ok) {
         const reasons: string[] = body?.detail?.blocking_reasons ?? [];
