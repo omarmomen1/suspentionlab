@@ -223,6 +223,26 @@ function QuarterCarDashboard() {
   const [isMagicModalOpen, setIsMagicModalOpen] = useState(false);
   const [magicGoal, setMagicGoal] = useState("");
 
+  // Wave 11 item 3: an AI suggestion is a proposal, never a silent write.
+  // Nothing reaches the parameters until the engineer clicks Apply.
+  const [aiProposal, setAiProposal] = useState<{
+    changes: { key: string; from: number; to: number }[];
+    label: string;
+    badges: string[];
+  } | null>(null);
+
+  const applyAiProposal = () => {
+    if (!aiProposal) return;
+    const next: Record<string, number> = {};
+    aiProposal.changes.forEach((c) => { next[c.key] = c.to; });
+    setParams((prev) => ({ ...prev, ...next }));
+    showToast("AI suggestion applied", "success");
+    setAiProposal(null);
+    setIsMagicModalOpen(false);
+    setMagicGoal("");
+    setTimeout(() => document.getElementById("btn-run")?.click(), 800);
+  };
+
   const autoTune = async () => {
     if (!magicGoal.trim() || isTuning) return;
     setIsTuning(true);
@@ -255,21 +275,37 @@ function QuarterCarDashboard() {
           });
         }
 
-        setParams((prev) => ({ 
-          ...prev, 
-          m_s: recMap["m_s"] ?? (typeof data.m_s === "number" ? data.m_s : prev.m_s),
-          m_u: recMap["m_u"] ?? (typeof data.m_u === "number" ? data.m_u : prev.m_u),
-          k_s: recMap["k_s"] ?? (typeof data.k_s === "number" ? data.k_s : prev.k_s),
-          c:   recMap["c"]   ?? (typeof data.c === "number" ? data.c : prev.c),
-          k_t: recMap["k_t"] ?? (typeof data.k_t === "number" ? data.k_t : prev.k_t),
-          MR:  recMap["MR"]  ?? (typeof data.MR === "number" ? data.MR : prev.MR),
-        }));
+        const resolved: Record<string, number> = {};
+        ["m_s", "m_u", "k_s", "c", "k_t", "MR"].forEach((k) => {
+          const direct = (data as Record<string, unknown>)[k];
+          const value = recMap[k] !== undefined ? recMap[k] : typeof direct === "number" ? direct : undefined;
+          if (typeof value === "number") resolved[k] = value;
+        });
 
-        const explanationText = data.explanation || data.answer || data.setup_summary || "Setup optimized based on vehicle physics.";
-        showToast(`AI Tuned: ${String(explanationText).slice(0, 90)}`, "success");
-        setIsMagicModalOpen(false);
-        setMagicGoal("");
-        setTimeout(() => document.getElementById("btn-run")?.click(), 800);
+        const current = params as unknown as Record<string, number>;
+        const changes = Object.entries(resolved)
+          .filter(([k, v]) => current[k] !== v)
+          .map(([k, v]) => ({ key: k, from: Number(current[k]), to: Number(v) }));
+
+        const rawBadges = (data.evidence_badges ?? data.badges ?? data.evidence ?? []) as unknown;
+        const badges: string[] = Array.isArray(rawBadges)
+          ? rawBadges
+              .map((b: unknown) => (typeof b === "string" ? b : String((b as Record<string, unknown>)?.type ?? (b as Record<string, unknown>)?.badge ?? "")))
+              .filter((b: string) => b.length > 0)
+          : [];
+        const backedByToolRun = badges.some((b) => /^(SIMULATED|MEASURED)$/i.test(b));
+
+        if (changes.length === 0) {
+          showToast("AI returned no parameter change", "error");
+          return;
+        }
+
+        setAiProposal({
+          changes,
+          label: backedByToolRun ? "AI suggestion - backed by a tool run" : "AI suggestion - unverified",
+          badges,
+        });
+        showToast(`AI proposed ${changes.length} change${changes.length === 1 ? "" : "s"} - review and apply`, "success");
       } else {
         showToast(data.detail || data.message || "Auto-tune failed", "error");
       }
@@ -458,10 +494,53 @@ function QuarterCarDashboard() {
               value={magicGoal}
               onChange={(e) => setMagicGoal(e.target.value)}
             />
+            {aiProposal ? (
+              <div className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/5 p-3" data-testid="ai-proposal-panel">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-amber-300">{aiProposal.label}</span>
+                  {aiProposal.badges.length > 0 ? (
+                    <span className="flex gap-1">
+                      {aiProposal.badges.map((b) => (
+                        <span key={b} className="text-xs px-1.5 py-0.5 rounded bg-[#1a1a1a] text-gray-300 border border-[#2a2a2a]">{b}</span>
+                      ))}
+                    </span>
+                  ) : null}
+                </div>
+                <table className="w-full text-xs font-mono text-gray-300">
+                  <tbody>
+                    {aiProposal.changes.map((c) => (
+                      <tr key={c.key}>
+                        <td className="py-0.5 pr-2 text-gray-500">{c.key}</td>
+                        <td className="py-0.5 pr-2 line-through text-red-300">{c.from}</td>
+                        <td className="py-0.5 pr-2 text-gray-500">&rarr;</td>
+                        <td className="py-0.5 text-emerald-300">{c.to}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="flex justify-end gap-2 mt-3">
+                  <button
+                    type="button"
+                    onClick={() => setAiProposal(null)}
+                    className="px-3 py-1.5 text-xs text-gray-300 hover:text-white transition-colors"
+                  >
+                    Discard
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyAiProposal}
+                    data-testid="ai-proposal-apply"
+                    className="px-3 py-1.5 text-xs font-bold rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
+                  >
+                    Apply changes
+                  </button>
+                </div>
+              </div>
+            ) : null}
             <div className="flex justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setIsMagicModalOpen(false)}
+                onClick={() => { setIsMagicModalOpen(false); setAiProposal(null); }}
                 className="px-4 py-2 text-sm text-gray-300 hover:text-white transition-colors"
               >
                 Cancel

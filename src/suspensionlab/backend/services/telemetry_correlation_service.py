@@ -163,8 +163,11 @@ class TelemetryCorrelationService:
         # Load or generate telemetry trace
         if telemetry_data and "time" in telemetry_data and "vert_g" in telemetry_data:
             telem = {k: np.asarray(v, dtype=float) for k, v in telemetry_data.items() if isinstance(v, (list, tuple, np.ndarray))}
+            reference_source = "uploaded"
         else:
+            # Wave 19 item 1: no silent substitution - the response says which trace this is.
             telem = TelemetryCorrelationService.generate_canonical_telemetry_trace()
+            reference_source = "synthetic_canonical"
 
         t = telem.get("time", np.array([], dtype=float))
         dt = float(np.median(np.diff(t))) if len(t) > 1 else 0.01
@@ -420,6 +423,8 @@ class TelemetryCorrelationService:
 
         return {
             "session_id": session_id,
+            "reference_source": reference_source,
+            "verdict_allowed": reference_source == "uploaded",
             "vehicle_id": "CAR-2026-07",
             "setup_id": "SETUP-HIGH-DF-R4",
             "model_version": "QCAR-ODE-RK45-v2.4",
@@ -646,7 +651,9 @@ class TelemetryCorrelationService:
         Detailed single-channel signal, FFT frequency spectrum, events,
         and operating envelope inspection (Section 5).
         """
+        # Wave 19 item 1: this endpoint has no upload path, so it declares its synthetic reference.
         telem = TelemetryCorrelationService.generate_canonical_telemetry_trace()
+        reference_source = "synthetic_canonical"
         t = telem["time"]
         n_samples = len(t)
 
@@ -758,6 +765,8 @@ class TelemetryCorrelationService:
         step = max(1, n_samples // 1000)
         return {
             "channel_key": channel_key,
+            "reference_source": reference_source,
+            "verdict_allowed": False,
             "name": name,
             "unit": unit,
             "time": [round(float(x), 3) for x in t[::step]],
@@ -796,10 +805,13 @@ class TelemetryCorrelationService:
         No telemetry is copied into simulated channels.
         """
         # 1. Resolve telemetry data
+        # Wave 19 item 1: the response declares which reference it correlated against.
         if telemetry_data and "time" in telemetry_data and len(telemetry_data["time"]) > 1:
             telem = {k: np.asarray(v, dtype=float) for k, v in telemetry_data.items() if isinstance(v, (list, np.ndarray))}
+            reference_source = "uploaded"
         else:
             telem = TelemetryCorrelationService.generate_canonical_telemetry_trace()
+            reference_source = "synthetic_canonical"
 
         t_full = telem["time"]
         
@@ -1135,6 +1147,8 @@ class TelemetryCorrelationService:
 
         return {
             "model_type": model_type,
+            "reference_source": reference_source,
+            "verdict_allowed": reference_source == "uploaded",
             "sensor_alignment_manifest": manifest,
             "event_window": list(event_window) if event_window else None,
             "overall_correlation_r2": round(mean_r2, 3),

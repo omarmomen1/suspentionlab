@@ -608,10 +608,19 @@ function CorrelationCockpitContent() {
   // Zero-lie gate: never show green CORRELATED below the R^2 >= 0.70 acceptance threshold.
   const activeR2 = Number(activeChannelData?.metrics?.r_squared);
   const r2Ok = Number.isFinite(activeR2) && activeR2 >= 0.70;
-  const displayEpistemicLabel =
-    activeChannelData?.epistemic_label === "CORRELATED" && !r2Ok
-      ? "UNVERIFIED (R\u00b2 < 0.70)"
-      : activeChannelData?.epistemic_label;
+
+  // Wave 19 items 1-3: the response declares its reference source and wins over the
+  // local sample flag. A verdict requires uploaded telemetry, never the canned trace.
+  const referenceSource: string | undefined = (modelComparisonData as any)?.reference_source;
+  const referenceIsSynthetic =
+    referenceSource !== undefined ? referenceSource !== "uploaded" : isSampleDataset;
+  const verdictAllowed = r2Ok && !referenceIsSynthetic;
+
+  const displayEpistemicLabel = referenceIsSynthetic
+    ? "SAMPLE - NO VERDICT (upload telemetry to correlate)"
+    : activeChannelData?.epistemic_label === "CORRELATED" && !r2Ok
+    ? "UNVERIFIED (R\u00b2 < 0.70)"
+    : activeChannelData?.epistemic_label;
 
   const { channelYMin, channelYMax, dynamicTimeLabels, scaleChannelY, scaleResidualY, channelZeroY } = useMemo(() => {
     const meas = (activeChannelData?.measured || []) as number[];
@@ -1178,7 +1187,7 @@ function CorrelationCockpitContent() {
                       <span className="text-neutral-400 uppercase">Synchronized Signal Comparison</span>
                       <span
                         className={`px-2 py-0.5 rounded text-xs font-bold ${
-                          activeChannelData.epistemic_label === "CORRELATED" && r2Ok
+                          activeChannelData.epistemic_label === "CORRELATED" && verdictAllowed
                             ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                             : activeChannelData.epistemic_label === "INFERRED"
                             ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
@@ -1208,12 +1217,19 @@ function CorrelationCockpitContent() {
                   </div>
                 </div>
 
+                {/* Wave 19 item 4: with a synthetic reference, ask for the real file. */}
+                {referenceIsSynthetic ? (
+                  <div className="text-xs font-mono text-amber-300" data-testid="correlation-upload-cta">
+                    Upload your CSV to run a real correlation
+                  </div>
+                ) : null}
+
                 {/* SVG Visual Graph: MEASURED (solid blue), MODEL (dashed purple), RESIDUAL (dotted amber) */}
                 <div className="bg-neutral-950/80 border border-neutral-800 rounded-xl p-4 space-y-3">
                   <div className="flex items-center justify-between text-xs font-mono">
                     <div className="flex items-center gap-4">
                       <span className="flex items-center gap-1 text-cyan-400">
-                        <span className="w-3 h-0.5 bg-cyan-400 inline-block" /> {isSampleDataset ? "SAMPLE (Demo CSV)" : "UPLOADED CSV"}
+                        <span className="w-3 h-0.5 bg-cyan-400 inline-block" /> {referenceIsSynthetic ? "SAMPLE (Demo CSV)" : "UPLOADED CSV"}
                       </span>
                       <span className="flex items-center gap-1 text-amber-400">
                         <span className="w-3 h-0.5 bg-amber-400 inline-block border-t border-dashed" /> MODEL (ODE)

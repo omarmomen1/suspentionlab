@@ -3,6 +3,7 @@ import asyncio
 import logging
 import os
 import time
+import uuid
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, UploadFile, File, Form, HTTPException, Depends, Query, status
 from fastapi.responses import JSONResponse
 from typing import Dict, Any, Optional
@@ -40,6 +41,144 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/telemetry", tags=["Telemetry"])
 gateway = TelemetryIngestionGateway()
+
+# ── Wave 15: replay provenance ────────────────────────────────────────────────
+# A session's replay source is tracked per session id so that the response, the
+# streamed JSON frames and the polling fallback all say the same thing: the
+# bundled Spa session is a SAMPLE_REPLAY, anything else is a DATASET_REPLAY.
+SAMPLE_REPLAY_SOURCE = "SAMPLE_REPLAY"
+DATASET_REPLAY_SOURCE = "DATASET_REPLAY"
+BUNDLED_SAMPLE_REL = "sample_data/motec_spa_session.csv"
+SAMPLE_REPLAY_BANNER = "SAMPLE REPLAY - bundled Spa session, not your car"
+
+_REPLAY_SOURCE_BY_SESSION: Dict[str, str] = {}
+
+
+def _repo_root() -> str:
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../.."))
+
+
+def _bundled_sample_path() -> str:
+    return os.path.join(_repo_root(), BUNDLED_SAMPLE_REL)
+
+
+def _is_bundled_sample(csv_file: str) -> bool:
+    """True only for the bundled Spa demo file - the one thing we may replay unasked."""
+    try:
+        return os.path.realpath(csv_file) == os.path.realpath(_bundled_sample_path())
+    except OSError:
+        return False
+
+
+def _replay_source_for(session_id: str) -> Optional[str]:
+    return _REPLAY_SOURCE_BY_SESSION.get(session_id)
+
+
+def _annotate_frame_source(payload: Any, source: Optional[str]) -> Any:
+    """Attach replay provenance to a JSON frame.
+
+    Binary SLTP v1 frames are left untouched: the v1 wire format carries no
+    provenance field, so the banner for those comes from the replay response.
+    """
+    if source and isinstance(payload, dict) and payload.get("type") == "telemetry_frame":
+        enriched = dict(payload)
+        enriched["source"] = source
+        return enriched
+    return payload
+
+
+# ── Wave 15: uploaded-session store ───────────────────────────────────────────
+# /analyse used to be fire-and-forget: an engineer could analyse a session and
+# then have nowhere to reopen it. Each successful analysis is now kept under
+# data/telemetry_sessions/<org>/<session_id>.json so /telemetry/sessions can
+# list it and /telemetry/sessions/{id} can hand the full result back.
+# On Vercel / serverless environments, writes fall back to /tmp to avoid read-only FS crashes.
+def _base_session_dir() -> str:
+    if os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+        return os.path.join("/tmp", "suspensionlab_telemetry", "telemetry_sessions")
+    return os.path.join(_repo_root(), "data", "telemetry_sessions")
+
+
+def _safe_component(value: Any) -> str:
+    return "".join(c for c in str(value) if c.isalnum() or c in "-_")
+
+
+def _session_store_dir(org_id: Any) -> str:
+    return os.path.join(_base_session_dir(), _safe_component(org_id) or "default")
+
+
+def _save_session_record(org_id: Any, record: Dict[str, Any]) -> None:
+    directory = _session_store_dir(org_id)
+    try:
+        os.makedirs(directory, exist_ok=True)
+    except OSError:
+        directory = os.path.join("/tmp", "suspensionlab_telemetry", "telemetry_sessions", _safe_component(org_id) or "default")
+        os.makedirs(directory, exist_ok=True)
+    path = os.path.join(directory, f"{_safe_component(record['session_id'])}.json")
+    tmp = f"{path}.tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(record, f)
+    os.replace(tmp, path)
+
+
+def _load_session_record(org_id: Any, session_id: Any) -> Optional[Dict[str, Any]]:
+    safe_id = _safe_component(session_id)
+    if not safe_id:
+        return None
+    candidates = [_session_store_dir(org_id)]
+    tmp_fallback = os.path.join("/tmp", "suspensionlab_telemetry", "telemetry_sessions", _safe_component(org_id) or "default")
+    if tmp_fallback not in candidates:
+        candidates.append(tmp_fallback)
+    for directory in candidates:
+        path = os.path.join(directory, f"{safe_id}.json")
+        if os.path.exists(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    return json.load(f)
+            except (OSError, json.JSONDecodeError):
+                continue
+    return None
+
+
+def _list_session_records(org_id: Any) -> list:
+    candidates = [_session_store_dir(org_id)]
+    tmp_fallback = os.path.join("/tmp", "suspensionlab_telemetry", "telemetry_sessions", _safe_component(org_id) or "default")
+    if tmp_fallback not in candidates:
+        candidates.append(tmp_fallback)
+
+    seen = set()
+    rows = []
+    for directory in candidates:
+        if not os.path.isdir(directory):
+            continue
+        for name in os.listdir(directory):
+            if not name.endswith(".json"):
+                continue
+            sess_name = name[:-5]
+            if sess_name in seen:
+                continue
+            seen.add(sess_name)
+            rec = _load_session_record(org_id, sess_name)
+            if not rec:
+                continue
+            summary = rec.get("summary") or {}
+            health = rec.get("health") or {}
+            rows.append({
+                "session_id": rec.get("session_id"),
+                "name": rec.get("name"),
+                "filename": rec.get("filename"),
+                "uploaded_at": rec.get("uploaded_at"),
+                "pipeline_status": rec.get("pipeline_status"),
+                "n_samples": summary.get("n_samples"),
+                "duration_s": summary.get("duration_s"),
+                "sample_rate_hz": summary.get("sample_rate_hz"),
+                "n_channels": len(rec.get("channel_map") or {}),
+                "n_segments": len(rec.get("segments") or []),
+                "health_status": health.get("pipeline_status"),
+                "blocking_reasons": health.get("blocking_reasons") or [],
+            })
+    rows.sort(key=lambda r: str(r.get("uploaded_at") or ""), reverse=True)
+    return rows
 
 
 @router.websocket("/live")
@@ -106,7 +245,10 @@ async def websocket_telemetry_endpoint(
                 if binary_mode and isinstance(payload, (bytes, bytearray)):
                     await websocket.send_bytes(payload)
                 elif isinstance(payload, dict):
-                    await websocket.send_json(payload)
+                    # Wave 15 item 1: every JSON frame says whether it is a sample replay.
+                    await websocket.send_json(
+                        _annotate_frame_source(payload, _replay_source_for(session_id))
+                    )
                 elif isinstance(payload, str):
                     await websocket.send_text(payload)
                 subscriber.frames_sent += 1
@@ -248,8 +390,12 @@ async def start_telemetry_replay(
     Start streaming recorded MoTeC/AiM telemetry session at calibrated 100 Hz.
     """
     org_id = user.organization_id or user.user_id
-    effective_ds = (req.dataset or req.dataset_path) if req else dataset
-    effective_ds = effective_ds or dataset or "sample_data/motec_spa_session.csv"
+    requested_ds = (req.dataset or req.dataset_path) if req else dataset
+    requested_ds = requested_ds or dataset
+    explicit_dataset = bool(requested_ds and str(requested_ds).strip())
+    # Wave 15 item 1: the bundled Spa file is only ever reached as a labeled
+    # SAMPLE_REPLAY fallback; any other dataset must be named explicitly.
+    effective_ds = str(requested_ds).strip() if explicit_dataset else BUNDLED_SAMPLE_REL
     if req and req.session_id:
         session_id = req.session_id
     if req and req.rate_hz is not None:
@@ -266,6 +412,22 @@ async def start_telemetry_replay(
         if os.path.exists(candidate):
             csv_file = candidate
 
+    if not os.path.exists(csv_file):
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "Replay dataset not found.",
+                "dataset": effective_ds,
+                "hint": (
+                    "Name a stored dataset explicitly to replay it, or omit the dataset "
+                    "for the bundled sample replay."
+                ),
+            },
+        )
+
+    is_sample = _is_bundled_sample(csv_file)
+    source = SAMPLE_REPLAY_SOURCE if is_sample else DATASET_REPLAY_SOURCE
+
     st = await global_replay_engine.start_replay(
         csv_path=csv_file,
         session_id=session_id,
@@ -273,11 +435,16 @@ async def start_telemetry_replay(
         rate_hz=rate_hz,
         loop_playback=True,
     )
+    _REPLAY_SOURCE_BY_SESSION[session_id] = source
     return {
         "status": "started",
         "session_id": session_id,
         "target_rate_hz": rate_hz,
         "dataset": os.path.basename(csv_file),
+        "source": source,
+        "is_sample": is_sample,
+        "explicit_dataset": explicit_dataset,
+        "banner": SAMPLE_REPLAY_BANNER if is_sample else f"DATASET REPLAY - {os.path.basename(csv_file)}",
     }
 
 
@@ -287,17 +454,23 @@ async def stop_telemetry_replay(
     user: UserContext = Depends(verify_api_key),
 ):
     """Stop active telemetry replay."""
+    source = _REPLAY_SOURCE_BY_SESSION.pop(session_id, None)
     await global_replay_engine.stop_replay(session_id)
-    return {"status": "stopped", "session_id": session_id}
+    return {"status": "stopped", "session_id": session_id, "source": source}
 
 
 @router.get("/replay/status")
 async def get_replay_status(session_id: str = "sess-live"):
     """Get status of active telemetry replay."""
     st = global_replay_engine.get_status(session_id)
+    source = _replay_source_for(session_id)
     return {
         "is_running": st.is_running,
         "session_id": st.session_id,
+        "source": source,
+        "is_sample": source == SAMPLE_REPLAY_SOURCE,
+        "banner": SAMPLE_REPLAY_BANNER if source == SAMPLE_REPLAY_SOURCE else None,
+        "dataset": st.dataset_name,
         "current_index": st.current_index,
         "total_samples": st.total_samples,
         "target_rate_hz": st.target_rate_hz,
@@ -305,6 +478,106 @@ async def get_replay_status(session_id: str = "sess-live"):
         "elapsed_seconds": st.elapsed_seconds,
         "error": st.error,
     }
+
+
+@router.get(
+    "/live/poll",
+    dependencies=[Depends(require_permission(Permission.TELEMETRY_READ))],
+)
+async def poll_live_telemetry(
+    session_id: str = "sess-live",
+    max_frames: int = 25,
+    timeout_ms: int = 750,
+    user: UserContext = Depends(verify_api_key),
+):
+    """
+    Polling fallback for hosts where the WebSocket cannot be established
+    (Wave 15 item 4).
+
+    Subscribes to the hub for the duration of one request, drains up to
+    ``max_frames`` frames for at most ``timeout_ms``, then unsubscribes. Frames
+    carry the same ``source`` provenance as the WebSocket JSON stream. Tenant
+    isolation is enforced by the hub exactly as it is for the socket.
+    """
+    org_id = user.organization_id or user.user_id
+    source = _replay_source_for(session_id)
+    frame_budget = max(1, min(int(max_frames), 200))
+    wait_budget_s = max(0.0, min(float(timeout_ms), 5000.0) / 1000.0)
+
+    frames: list = []
+    subscriber = None
+    try:
+        subscriber = await global_telemetry_hub.subscribe(
+            # Polling has no socket; the hub stores the handle but never writes to it.
+            websocket=None,  # type: ignore[arg-type]
+            user_id=str(user.user_id),
+            organization_id=str(org_id),
+            session_id=session_id,
+            is_admin=bool(user.is_admin),
+            binary_mode=False,
+        )
+        deadline = time.monotonic() + wait_budget_s
+        while len(frames) < frame_budget:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            try:
+                payload = await asyncio.wait_for(subscriber.queue.get(), timeout=remaining)
+            except asyncio.TimeoutError:
+                break
+            if isinstance(payload, dict):
+                frames.append(_annotate_frame_source(payload, source))
+    except TenantIsolationError as tie:
+        raise HTTPException(status_code=403, detail=str(tie))
+    finally:
+        if subscriber is not None:
+            await global_telemetry_hub.unsubscribe(subscriber)
+
+    st = global_replay_engine.get_status(session_id)
+    return {
+        "mode": "polling",
+        "session_id": session_id,
+        "source": source,
+        "is_sample": source == SAMPLE_REPLAY_SOURCE,
+        "banner": SAMPLE_REPLAY_BANNER if source == SAMPLE_REPLAY_SOURCE else None,
+        "frames": frames,
+        "count": len(frames),
+        "is_running": st.is_running,
+        "current_index": st.current_index,
+        "total_samples": st.total_samples,
+        "target_rate_hz": st.target_rate_hz,
+        "error": st.error,
+    }
+
+
+@router.get(
+    "/sessions",
+    dependencies=[Depends(require_permission(Permission.TELEMETRY_READ))],
+)
+async def list_telemetry_sessions(user: UserContext = Depends(verify_api_key)):
+    """List the uploaded telemetry sessions kept for this organization (Wave 15 item 3)."""
+    org_id = user.organization_id or user.user_id
+    rows = _list_session_records(org_id)
+    return {"count": len(rows), "sessions": rows}
+
+
+@router.get(
+    "/sessions/{session_id}",
+    dependencies=[Depends(require_permission(Permission.TELEMETRY_READ))],
+)
+async def get_telemetry_session(
+    session_id: str,
+    user: UserContext = Depends(verify_api_key),
+):
+    """Full stored /analyse output for one uploaded session (Wave 15 item 3)."""
+    org_id = user.organization_id or user.user_id
+    record = _load_session_record(org_id, session_id)
+    if record is None:
+        raise HTTPException(
+            status_code=404,
+            detail={"error": "Telemetry session not found.", "session_id": session_id},
+        )
+    return record
 
 
 @router.get("/stats")
@@ -443,6 +716,8 @@ async def channel_map_preview(
 async def analyse_telemetry(
     file: UploadFile = File(..., description="Telemetry CSV file (AiM, MoTeC, generic)"),
     model_params: Optional[str] = Form(None, description="JSON string of quarter-car model parameters"),
+    session_name: Optional[str] = Form(None, description="Label for the stored session"),
+    user: UserContext = Depends(verify_api_key),
 ):
     """
     Analyse an uploaded telemetry CSV session.
@@ -556,7 +831,7 @@ async def analyse_telemetry(
             step = max(1, len(arr) // 2000)
             channels_preview[key] = arr[::step]
 
-    return JSONResponse(content={
+    payload = {
         "summary": {
             "n_samples":      result.n_samples,
             "duration_s":     result.duration_s,
@@ -576,7 +851,38 @@ async def analyse_telemetry(
         "comparison":   comparison_list,
         "model_note":   result.model_note,
         "channels_preview": channels_preview,
-    })
+    }
+
+    # Wave 15 item 3: keep the session so an engineer can reopen it later.
+    org_id = user.organization_id or user.user_id
+    session_id = f"ts-{uuid.uuid4().hex[:12]}"
+    stored = dict(payload)
+    stored_preview = {}
+    for key, arr in (payload.get("channels_preview") or {}).items():
+        if isinstance(arr, list):
+            step = max(1, len(arr) // 200)
+            stored_preview[key] = arr[::step]
+    stored["channels_preview"] = stored_preview
+
+    record = dict(stored)
+    record["session_id"] = session_id
+    record["name"] = (session_name or file.filename or "session").strip()
+    record["filename"] = file.filename
+    record["uploaded_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    record["org_id"] = str(org_id)
+
+    stored_ok = True
+    try:
+        _save_session_record(org_id, record)
+    except (OSError, TypeError, ValueError) as exc:
+        stored_ok = False
+        logger.warning("Could not persist telemetry session %s: %s", session_id, exc)
+
+    payload["session_id"] = session_id
+    payload["session_name"] = record["name"]
+    payload["uploaded_at"] = record["uploaded_at"]
+    payload["stored"] = stored_ok
+    return JSONResponse(content=payload)
 
 
 @router.post(

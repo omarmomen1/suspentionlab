@@ -31,7 +31,8 @@ async def simulate_full_car(
         # Pass B: record usage (Redis primary, DB fallback) so the meter reflects actual runs.
         await meter_simulation(db, str(user.user_id), str(getattr(user, "plan", "FREE")))
         pdump = payload.params.model_dump()
-        asymmetry = pdump.pop("road_asymmetry", 0.3)
+        # Wave 11 item 1: no silent 30% asymmetry. A default run is symmetric.
+        asymmetry = pdump.pop("road_asymmetry", 1.0)
         if "lateral_accel_mps2" in pdump and "lateral_accel_g" not in pdump:
             pdump["lateral_accel_g"] = float(pdump.pop("lateral_accel_mps2")) / 9.81
         else:
@@ -59,6 +60,22 @@ async def simulate_full_car(
         )
         raw_res = await bounded_run(run_full_car_analysis, p, profile, timeout=45.0, model="full_car")
         res_dict = _serialize_numpy(raw_res)
+        # Wave 11 item 1: echo the excitation actually used so the page can show it.
+        # Wave 11 item 2: state where roll and load transfer come from.
+        meta = res_dict.get("metadata") if isinstance(res_dict.get("metadata"), dict) else {}
+        meta.update({
+            "road_asymmetry": float(asymmetry),
+            "road_asymmetry_note": "Road asymmetry: {:.2f} (right = {:.0f}% of left)".format(
+                float(asymmetry), float(asymmetry) * 100.0
+            ),
+            "lateral_g_source": "input",
+            "lateral_g_model_note": (
+                "Ride-and-attitude model: roll and load transfer are computed from the "
+                "lateral g you enter here, not solved."
+            ),
+        })
+        res_dict["metadata"] = meta
+        res_dict["road_asymmetry"] = float(asymmetry)
         return res_dict
     except HTTPException:
         raise
