@@ -65,7 +65,7 @@ def run() -> dict:
                 checks.append({
                     "test": nodeid.split("::")[1],
                     "verdict": r.get("verdict", "FAIL"),
-                    "measured": r.get("measured", {}),
+                    "measured": _norm_val(r.get("measured", {})),
                     "tolerance": r.get("tolerance", {}),
                     "reference": r.get("reference", ""),
                 })
@@ -89,8 +89,10 @@ def run() -> dict:
 
 
 def _norm_val(v):
-    if isinstance(v, float) and abs(v) < 1e-12:
-        return 0.0
+    if isinstance(v, float):
+        if abs(v) < 1e-6:
+            return 0.0
+        return round(v, 6)
     if isinstance(v, dict):
         return {k: _norm_val(val) for k, val in v.items()}
     if isinstance(v, list):
@@ -113,7 +115,7 @@ def main() -> int:
         if not OUT.exists():
             print("benchmark-status.json missing; run scripts/generate_benchmark_status.py")
             return 1
-        if _stable(json.loads(OUT.read_text())) != _stable(data):
+        if _stable(json.loads(OUT.read_text(encoding="utf-8"))) != _stable(data):
             print("benchmark-status.json is stale; run scripts/generate_benchmark_status.py and commit it")
             return 1
         print("benchmark-status.json matches a fresh run")

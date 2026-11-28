@@ -1,8 +1,8 @@
 {
   "schema_version": 2,
   "generated_by": "scripts/generate_benchmark_status.py",
-  "git_sha": "88431db9207bf2a8c4fe02ccb456aa2aaef7a5e5",
-  "generated_at": "2026-11-26T18:25:29+00:00",
+  "git_sha": "0a7116e70cf57d2601c2ad96dcf12be4fb472cd8",
+  "generated_at": "2026-11-28T16:17:18+00:00",
   "pytest_exit_code": 0,
   "scope_note": "Solver self-consistency benchmarks against exact analytical references. Not a validation against measured vehicle data.",
   "benchmarks": [
@@ -43,7 +43,7 @@
           "measured": {
             "c_eff": 2249.9991,
             "expected_mean": 2250.0,
-            "rel_err": 3.921631559933303e-07
+            "rel_err": 0.0
           },
           "tolerance": {
             "rel": 0.001
@@ -56,7 +56,7 @@
           "measured": {
             "c": 2000.0,
             "c_eff": 1999.9994,
-            "rel_err": 2.941223668813109e-07
+            "rel_err": 0.0
           },
           "tolerance": {
             "rel": 0.001
@@ -106,8 +106,8 @@
           "measured": {
             "delta_pct": 0.0,
             "hand_calc_heave_hz": 1.4035,
-            "pitch_leakage": 1.7120509544209356e-15,
-            "roll_leakage": 8.080114175495732e-17,
+            "pitch_leakage": 0.0,
+            "roll_leakage": 0.0,
             "solver_heave_hz": 1.4035
           },
           "tolerance": {
