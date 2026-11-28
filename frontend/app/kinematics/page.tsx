@@ -525,9 +525,10 @@ export default function KinematicsPage() {
     solver_version?: string;
     execution_time_ms?: number;
   }>({
-    backend: "C++ kinematics_core",
-    cpp_loaded: true,
-    solver_version: "2.1.0-simd",
+    backend: "python_reference",
+    cpp_loaded: false,
+    fallback: false,
+    solver_version: "3.0",
   });
 
   const [loading, setLoading] = useState<boolean>(false);
@@ -671,10 +672,13 @@ export default function KinematicsPage() {
       const elapsedMs = performance.now() - startTime;
 
       setResult(data);
+      const active = (data.active_backend || data.backend || "").toLowerCase();
+      const isCppActive = active === "cpp" || active.includes("c++");
+      const isFallback = Boolean(data.fallback_reason) || ((data.requested_backend === "cpp" || data.requested_backend === "auto") && !isCppActive);
       setBackendInfo({
         backend: data.active_backend || data.backend,
-        cpp_loaded: data.backend.toLowerCase().includes("c++"),
-        fallback: data.fallback_reason !== null,
+        cpp_loaded: isCppActive,
+        fallback: isFallback,
         solver_version: data.solver_version,
         execution_time_ms: elapsedMs,
       });
@@ -770,6 +774,20 @@ export default function KinematicsPage() {
 
   // Solve automatically on initial mount
   useEffect(() => {
+    fetchWithAuth("/api/v1/kinematics/info")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((info) => {
+        if (info) {
+          const isCpp = Boolean(info.cpp_loaded);
+          setBackendInfo((prev) => ({
+            ...prev,
+            backend: info.backend || (isCpp ? "cpp" : "python_reference"),
+            cpp_loaded: isCpp,
+            solver_version: info.version || prev.solver_version,
+          }));
+        }
+      })
+      .catch(() => {});
     solve();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -977,7 +995,7 @@ export default function KinematicsPage() {
               <NextStepLink />
             </div>
             <p className="text-[10px] text-gray-500">
-              Multibody kinematics · C++ Newton–Raphson solver · Derivatives & Setup Causal Attribution
+              Multibody kinematics · {((result?.active_backend || backendInfo.backend || "").toLowerCase().includes("cpp") || (result?.active_backend || backendInfo.backend || "").toLowerCase().includes("c++")) ? "C++ Newton–Raphson solver" : "Python Reference solver"} · Derivatives & Setup Causal Attribution
             </p>
           </div>
         </div>
@@ -1211,6 +1229,73 @@ export default function KinematicsPage() {
         {/* ── MAIN VIEWPORT AREA ────────────────────────────────────────────── */}
         <ShellCenter>
         <main className="flex-1 flex flex-col overflow-y-auto bg-[#07080c] p-4 space-y-4">
+          {/* ── Results Provenance & Scope Header ─────────────────────────── */}
+          <div data-testid="results-provenance-header" className="bg-[#0b0c12] border border-[#1e2230] rounded-xl p-3.5 space-y-2.5 shadow-md">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#181a24] pb-2.5">
+              <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-1.5 font-mono text-xs">
+                  <span className="text-gray-400">Solver:</span>
+                  <span
+                    data-testid="active-backend-display"
+                    className={`font-bold px-2 py-0.5 rounded text-[11px] ${
+                      ((result?.active_backend || backendInfo.backend || "").toLowerCase().includes("cpp") || (result?.active_backend || backendInfo.backend || "").toLowerCase().includes("c++"))
+                        ? "bg-cyan-950/60 text-cyan-300 border border-cyan-800/50"
+                        : "bg-amber-950/40 text-amber-300 border border-amber-800/50"
+                    }`}
+                  >
+                    {result?.active_backend || backendInfo.backend || "python_reference"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 font-mono text-xs">
+                  <span className="text-gray-400">Version:</span>
+                  <span data-testid="solver-version-display" className="font-semibold text-gray-200">
+                    {result?.solver_version || backendInfo.solver_version || "3.0"}
+                  </span>
+                </div>
+                {result?.geometry_hash && (
+                  <div className="flex items-center gap-1.5 font-mono text-xs hidden sm:flex">
+                    <span className="text-gray-400">Geometry Hash:</span>
+                    <span data-testid="geometry-hash-display" className="text-gray-400 text-[11px] truncate max-w-[140px]" title={result.geometry_hash}>
+                      {result.geometry_hash}
+                    </span>
+                  </div>
+                )}
+              </div>
+              {result?.active_backend && (
+                <div className="text-[11px] font-mono text-gray-400">
+                  Status: <span className="text-signal font-semibold">{result.convergence_summary || "Calculated"}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Solver Fallback Banner when Python reference answered while C++ was requested or expected */}
+            {((!((result?.active_backend || backendInfo.backend || "").toLowerCase().includes("cpp") || (result?.active_backend || backendInfo.backend || "").toLowerCase().includes("c++"))) &&
+              (backendInfo.fallback || Boolean(result?.fallback_reason) || result?.requested_backend === "cpp" || result?.requested_backend === "auto" || !backendInfo.cpp_loaded)) && (
+              <div
+                data-testid="solver-fallback-banner"
+                className="bg-amber-950/30 border border-amber-500/40 rounded-lg p-2.5 flex items-center gap-2.5 text-xs text-amber-200"
+              >
+                <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+                <span>Python reference solver active (C++ module not deployed on this host). Results identical, computation slower.</span>
+              </div>
+            )}
+
+            {/* Model Scope Notes */}
+            <div data-testid="model-scope-notes" className="space-y-1 text-[11px] text-gray-400 font-sans leading-relaxed pt-0.5">
+              <div className="flex items-start gap-1.5">
+                <span className="text-cyan-400 font-semibold">•</span>
+                <p data-testid="rigid-body-scope-note">
+                  Rigid-body kinematics. Bushing compliance (elastokinematics) is not included in these curves.
+                </p>
+              </div>
+              <div className="flex items-start gap-1.5">
+                <span className="text-cyan-400 font-semibold">•</span>
+                <p data-testid="corner-model-scope-note">
+                  Single-corner sweep; roll centre from a 2-D front-view construction. Left/right interaction and steering-rack compliance are not modeled.
+                </p>
+              </div>
+            </div>
+          </div>
           {/* Decoupled Model Validity Component */}
           <KinematicsModelValidity
             report={result?.validation_report}
@@ -1510,7 +1595,11 @@ export default function KinematicsPage() {
                 <div className="p-3 bg-[#0a0c12] border border-[#1c1f2e] rounded-xl flex flex-wrap items-center justify-between gap-4 text-xs">
                   <div className="flex items-center gap-2 text-gray-400">
                     <span className="w-2 h-2 rounded-full bg-signal inline-block" />
-                    <span>Rigid-Body Kinematic Parity: C++ Newton-Raphson & Python fallback matched.</span>
+                    <span>
+                      {((result?.active_backend || backendInfo.backend || "").toLowerCase().includes("cpp") || (result?.active_backend || backendInfo.backend || "").toLowerCase().includes("c++"))
+                        ? "Rigid-Body Kinematic Parity: C++ Newton-Raphson active."
+                        : "Rigid-Body Kinematics: Python reference solver active."}
+                    </span>
                   </div>
                   <div className="flex items-center gap-4 text-gray-500 font-mono text-[11px]">
                     <span>Left Drag: Orbit 3D</span>

@@ -29,6 +29,18 @@ import numpy as np
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Model Scope Notes & Boundaries
+# ─────────────────────────────────────────────────────────────────────────────
+
+RIGID_BODY_SCOPE_NOTE = (
+    "Rigid-body kinematics. Bushing compliance (elastokinematics) is not included in these curves."
+)
+CORNER_MODEL_SCOPE_NOTE = (
+    "Single-corner sweep; roll centre from a 2-D front-view construction. Left/right interaction and steering-rack compliance are not modeled."
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Result Structures
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -156,6 +168,11 @@ class KinematicsResult:
             "selected_backend": self.selected_backend,
             "active_backend": self.active_backend,
             "fallback_reason": self.fallback_reason,
+            "nonconverged_steps": self.nonconverged_steps,
+            "nonconverged_count": self.nonconverged_count,
+            "rigid_body_scope_note": self.rigid_body_scope_note,
+            "corner_model_scope_note": self.corner_model_scope_note,
+            "scope_note": self.corner_model_scope_note,
             "solver_version": self.solver_version,
             "native_library_version": self.native_library_version,
             "build_identifier": self.build_identifier,
@@ -241,6 +258,22 @@ class KinematicsResult:
     @property
     def all_converged(self) -> bool:
         return bool(all(self.converged))
+
+    @property
+    def nonconverged_steps(self) -> int:
+        return sum(1 for c in self.converged if not c)
+
+    @property
+    def nonconverged_count(self) -> int:
+        return self.nonconverged_steps
+
+    @property
+    def rigid_body_scope_note(self) -> str:
+        return RIGID_BODY_SCOPE_NOTE
+
+    @property
+    def corner_model_scope_note(self) -> str:
+        return CORNER_MODEL_SCOPE_NOTE
 
     @property
     def overall_model_status(self) -> str:
@@ -998,13 +1031,14 @@ def solve_kinematics(
                 "Native C++ kinematics binary required in production mode; automatic fallback disabled."
             )
 
-    backend = KinematicsBackendFactory.create(mode=mode, topology=resolved_topology, strict_mode=is_prod)
-
     # Validate geometry
-    val_report = backend.validate_hardpoints(resolved_hardpoints, tire_radius_m=tire_radius_m)
+    from suspensionlab.physics.kinematics import validate_hardpoints_py
+    val_report = validate_hardpoints_py(resolved_topology, resolved_hardpoints, tire_radius_m=tire_radius_m)
     if not val_report.get("is_valid", True) and is_prod:
         err_msg = "; ".join(val_report.get("errors", ["Invalid hardpoints"]))
         raise ValueError(f"Hardpoint validation failed: {err_msg}")
+
+    backend = KinematicsBackendFactory.create(mode=mode, topology=resolved_topology, strict_mode=is_prod)
 
     res = backend.sweep(
         hardpoints=resolved_hardpoints,
@@ -1017,4 +1051,7 @@ def solve_kinematics(
     )
     res.metadata["strict_mode"] = is_prod
     res.metadata["validation"] = val_report
+    res.metadata["rigid_body_scope_note"] = RIGID_BODY_SCOPE_NOTE
+    res.metadata["corner_model_scope_note"] = CORNER_MODEL_SCOPE_NOTE
+    res.metadata["scope_note"] = CORNER_MODEL_SCOPE_NOTE
     return res

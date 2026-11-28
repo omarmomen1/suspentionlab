@@ -154,3 +154,123 @@ async def test_kinematics_defaults_and_info_endpoints(authenticated_client):
     info_data = res_info.json()
     assert "backend" in info_data
     assert "cpp_loaded" in info_data
+
+
+@pytest.mark.asyncio
+async def test_solve_response_reports_active_backend_and_fallback_reason(authenticated_client):
+    """
+    Wave 8: /solve must always report requested_backend, active_backend,
+    fallback_reason, solver_version, and geometry_hash.
+    When C++ is requested but not deployed on the host, active_backend must report
+    'python' (or reference) with an explicit fallback_reason, and never claim C++.
+    Scope notes must be included in the response.
+    """
+    payload = {
+        "hardpoints": DEFAULT_HARDPOINTS,
+        "z_min_mm": -30.0,
+        "z_max_mm": 30.0,
+        "n_steps": 15,
+        "backend": "cpp",
+        "strict_mode": False,
+    }
+    response = await authenticated_client.post("/api/v1/kinematics/solve", json=payload)
+    assert response.status_code == 200, f"Solve failed: {response.text}"
+    data = response.json()
+
+    # Requested C++, but on this host C++ module is unavailable -> fallback to python
+    assert data["requested_backend"] == "cpp"
+    assert data["active_backend"] in ["python", "python_reference"]
+    assert data["fallback_reason"] is not None
+    assert len(data["fallback_reason"]) > 0
+    assert "cpp" not in data["active_backend"].lower()
+
+    # Provenance fields
+    assert "solver_version" in data and len(data["solver_version"]) > 0
+    assert "geometry_hash" in data and len(data["geometry_hash"]) > 0
+
+    # Scope notes
+    assert data["rigid_body_scope_note"] == (
+        "Rigid-body kinematics. Bushing compliance (elastokinematics) is not included in these curves."
+    )
+    assert data["corner_model_scope_note"] == (
+        "Single-corner sweep; roll centre from a 2-D front-view construction. Left/right interaction and steering-rack compliance are not modeled."
+    )
+    assert data["scope_note"] == data["corner_model_scope_note"]
+
+
+@pytest.mark.asyncio
+async def test_nonconverged_sweep_steps_are_counted_not_hidden(authenticated_client):
+    """
+    Wave 8: When geometry causes continuation solver steps to diverge,
+    non-converged steps must be counted (nonconverged_steps, nonconverged_count)
+    and preserved in the arrays with converged=False, rather than silently dropped.
+    """
+    bad_hp = dict(DEFAULT_HARDPOINTS)
+    # Move UWO inboard and down to stress the linkage into non-convergence at travel extremes
+    bad_hp["UWO"] = [-19.0, 450.0, 360.0]
+
+    payload = {
+        "hardpoints": bad_hp,
+        "z_min_mm": -150.0,
+        "z_max_mm": 150.0,
+        "n_steps": 15,
+        "backend": "python",
+        "strict_mode": False,
+    }
+    response = await authenticated_client.post("/api/v1/kinematics/solve", json=payload)
+    assert response.status_code == 200, f"Solve failed: {response.text}"
+    data = response.json()
+
+    # Non-converged steps must be counted
+    assert "nonconverged_steps" in data
+    assert "nonconverged_count" in data
+    assert data["nonconverged_steps"] > 0
+    assert data["nonconverged_count"] == data["nonconverged_steps"]
+    assert data["all_converged"] is False
+
+    # Steps are not hidden or dropped
+    assert len(data["wheel_travel_mm"]) == 15
+    assert len(data["converged"]) == 15
+    n_false = sum(1 for c in data["converged"] if not c)
+    assert n_false == data["nonconverged_steps"]
+
+
+@pytest.mark.asyncio
+async def test_kinematics_scope_notes_in_solve_and_export(authenticated_client):
+    """
+    Wave 8: Model scope notes must be present in both CSV and JSON export headers.
+    """
+    # 1. Export CSV via /export
+    export_csv_payload = {
+        "hardpoints": DEFAULT_HARDPOINTS,
+        "format": "csv",
+        "z_min_mm": -30.0,
+        "z_max_mm": 30.0,
+        "n_steps": 11,
+    }
+    res_csv = await authenticated_client.post("/api/v1/kinematics/export", json=export_csv_payload)
+    assert res_csv.status_code == 200
+    csv_text = res_csv.text
+    assert "Single-corner sweep; roll centre from a 2-D front-view construction. Left/right interaction and steering-rack compliance are not modeled." in csv_text
+    assert "Rigid-body kinematics. Bushing compliance (elastokinematics) is not included in these curves." in csv_text
+
+    # 2. Export CSV via /export/csv
+    res_csv2 = await authenticated_client.post("/api/v1/kinematics/export/csv", json=export_csv_payload)
+    assert res_csv2.status_code == 200
+    assert "Single-corner sweep; roll centre from a 2-D front-view construction. Left/right interaction and steering-rack compliance are not modeled." in res_csv2.text
+
+    # 3. Export JSON via /export/json
+    export_json_payload = {
+        "hardpoints": DEFAULT_HARDPOINTS,
+        "format": "json",
+        "z_min_mm": -30.0,
+        "z_max_mm": 30.0,
+        "n_steps": 11,
+    }
+    res_json = await authenticated_client.post("/api/v1/kinematics/export/json", json=export_json_payload)
+    assert res_json.status_code == 200
+    json_data = res_json.json()
+    assert "Single-corner sweep; roll centre from a 2-D front-view construction. Left/right interaction and steering-rack compliance are not modeled." in (
+        json_data.get("scope_note") or json_data.get("metadata", {}).get("scope_note", "")
+    )
+

@@ -30,7 +30,11 @@ from suspensionlab.physics.kinematics import (
     compute_kinematic_derivatives,
     compute_geometry_hash,
 )
-from suspensionlab.physics.kinematics_facade import solve_kinematics
+from suspensionlab.physics.kinematics_facade import (
+    solve_kinematics,
+    RIGID_BODY_SCOPE_NOTE,
+    CORNER_MODEL_SCOPE_NOTE,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/kinematics", tags=["kinematics"])
@@ -180,6 +184,11 @@ class KinematicsResponse(BaseModel):
     native_library_version: Optional[str] = None
     build_identifier:      str
     all_converged:         bool
+    nonconverged_steps:    int = Field(default=0, description="Count of sweep steps that did not converge")
+    nonconverged_count:    int = Field(default=0, description="Count of sweep steps that did not converge")
+    rigid_body_scope_note: str = Field(default=RIGID_BODY_SCOPE_NOTE)
+    corner_model_scope_note: str = Field(default=CORNER_MODEL_SCOPE_NOTE)
+    scope_note:            str = Field(default=CORNER_MODEL_SCOPE_NOTE)
     ic_y_mm:               list[float] = Field(default_factory=list)
     ic_z_mm:               list[float] = Field(default_factory=list)
     ic_sv_x_mm:            list[float] = Field(default_factory=list)
@@ -572,6 +581,11 @@ async def solve(
         native_library_version = curves.native_library_version,
         build_identifier      = curves.build_identifier,
         all_converged         = all_conv,
+        nonconverged_steps    = n_total - n_conv,
+        nonconverged_count    = n_total - n_conv,
+        rigid_body_scope_note = RIGID_BODY_SCOPE_NOTE,
+        corner_model_scope_note = CORNER_MODEL_SCOPE_NOTE,
+        scope_note            = CORNER_MODEL_SCOPE_NOTE,
         ic_y_mm               = d.get("ic_y_mm", []),
         ic_z_mm               = d.get("ic_z_mm", []),
         ic_sv_x_mm            = d.get("ic_sv_x_mm", []),
@@ -801,6 +815,28 @@ def _resolve_sweep_data_for_export(req: KinematicsExportRequest) -> dict:
     )
 
 
+def _inject_csv_scope_header(csv_content: str) -> str:
+    scope_block = (
+        f"# Scope Note:      {CORNER_MODEL_SCOPE_NOTE}\n"
+        f"# Rigid-Body Note: {RIGID_BODY_SCOPE_NOTE}\n"
+    )
+    if "# Units:" in csv_content:
+        return csv_content.replace("# Units:", scope_block + "# Units:", 1)
+    return scope_block + csv_content
+
+
+def _inject_json_scope_header(data: dict) -> dict:
+    if isinstance(data, dict):
+        if "metadata" in data and isinstance(data["metadata"], dict):
+            data["metadata"]["scope_note"] = CORNER_MODEL_SCOPE_NOTE
+            data["metadata"]["corner_model_scope_note"] = CORNER_MODEL_SCOPE_NOTE
+            data["metadata"]["rigid_body_scope_note"] = RIGID_BODY_SCOPE_NOTE
+        data["scope_note"] = CORNER_MODEL_SCOPE_NOTE
+        data["corner_model_scope_note"] = CORNER_MODEL_SCOPE_NOTE
+        data["rigid_body_scope_note"] = RIGID_BODY_SCOPE_NOTE
+    return data
+
+
 @router.post("/export", summary="Export Kinematic Sweep Data as CSV or JSON")
 async def export_sweep_endpoint(
     req: KinematicsExportRequest,
@@ -810,8 +846,8 @@ async def export_sweep_endpoint(
     sweep_data = _resolve_sweep_data_for_export(req)
     fmt = (req.format or "csv").strip().lower()
     if fmt == "json":
-        return KinematicsStudyService.export_json(sweep_data)
-    csv_content = KinematicsStudyService.export_csv(sweep_data)
+        return _inject_json_scope_header(KinematicsStudyService.export_json(sweep_data))
+    csv_content = _inject_csv_scope_header(KinematicsStudyService.export_csv(sweep_data))
     run_id = sweep_data.get("run_id", "sweep")
     return Response(
         content=csv_content,
@@ -827,7 +863,7 @@ async def export_sweep_csv_endpoint(
     """Generate downloadable CSV containing sweep channels, rates, and provenance headers."""
     from suspensionlab.backend.services.kinematics_study_service import KinematicsStudyService
     sweep_data = _resolve_sweep_data_for_export(req)
-    csv_content = KinematicsStudyService.export_csv(sweep_data)
+    csv_content = _inject_csv_scope_header(KinematicsStudyService.export_csv(sweep_data))
     run_id = sweep_data.get("run_id", "sweep")
     return Response(
         content=csv_content,
@@ -843,7 +879,7 @@ async def export_sweep_json_endpoint(
     """Generate structured JSON schema dictionary containing sweep data and metadata."""
     from suspensionlab.backend.services.kinematics_study_service import KinematicsStudyService
     sweep_data = _resolve_sweep_data_for_export(req)
-    return KinematicsStudyService.export_json(sweep_data)
+    return _inject_json_scope_header(KinematicsStudyService.export_json(sweep_data))
 
 
 @router.get("/setups", summary="List Available Persisted Setups and Benchmarks")
