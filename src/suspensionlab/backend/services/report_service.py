@@ -290,7 +290,7 @@ async def create_baseline_quarter_car_run(
             params=params_dict,
             profile=profile_dict,
             result=clean_res,
-            model_validity={"status": "UNVALIDATED", "score": None},
+            model_validity={"status": "UNVALIDATED", "score": None, "is_default_vehicle_baseline": True},
             tire_snapshot={"k_t": p.k_t, "c_t": p.c_t},
             track_geometry_hash=canonical_hash(profile_dict),
             software_version=SOFTWARE_VERSION,
@@ -954,6 +954,9 @@ async def hydrate_engineering_report(
             "aerodynamics": aero_curves,
             "gg_envelope": gg_data,
         },
+        "is_default_vehicle_baseline": bool(
+            isinstance(run.model_validity, dict) and run.model_validity.get("is_default_vehicle_baseline")
+        ),
         "created_at": run.created_at.isoformat() if run.created_at else datetime.datetime.now(datetime.timezone.utc).isoformat(),
     }
 

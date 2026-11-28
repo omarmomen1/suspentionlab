@@ -65,8 +65,11 @@ async def test_anti_lying_gate_blocks_synthetic_payload_without_db_run():
             headers={"Authorization": f"Bearer {token}", "X-API-Key": "dev_secret_key"}
         )
 
-        assert res.status_code == 400, f"Expected 400 Bad Request, got {res.status_code}: {res.text}"
-        assert "must be backed by a verified database SimulationRun record" in res.json().get("detail", "")
+        # Wave 9 item 2: a decision report without a persisted run is refused with 422
+        # before any approval logic runs. The invariant (no report without a DB run) is
+        # unchanged; only the status code and message moved.
+        assert res.status_code == 422, f"Expected 422 Unprocessable Entity, got {res.status_code}: {res.text}"
+        assert "requires a persisted simulation run" in res.json().get("detail", "")
 
 
 @pytest.mark.asyncio
