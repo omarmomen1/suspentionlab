@@ -75,10 +75,10 @@ export function SolverInteropWorkspace() {
   const [recoveringJobs, setRecoveringJobs] = useState<boolean>(false);
 
   // Import form state (Phase 7.2)
-  const [importFilename, setImportFilename] = useState<string>("quarter_car.adm");
-  const [importContent, setImportContent] = useState<string>(
-    "! MSC ADAMS / Solver Dataset\nADAMS/View model dataset export\nPART/1, MASS = 300.0\nPART/2, MASS = 35.0\nSPRING/1, K = 25000.0, C = 2050.0\nEND"
-  );
+  // Wave 10 item 1: the import form starts empty. No typed-in demo dataset is offered
+  // as if it were the user's own export.
+  const [importFilename, setImportFilename] = useState<string>("");
+  const [importContent, setImportContent] = useState<string>("");
   const [expectedSha256, setExpectedSha256] = useState<string>("");
 
   // Export form state (Phase 7.2)
@@ -1367,6 +1367,7 @@ export function SolverInteropWorkspace() {
                       rows={7}
                       value={importContent}
                       onChange={(e) => setImportContent(e.target.value)}
+                      placeholder="Paste your .adm / .cmd / .fmu export here"
                       className="w-full bg-slate-950 border border-slate-700 rounded p-2.5 text-xs font-mono text-slate-200 focus:outline-none focus:border-indigo-500"
                     />
                   </div>
