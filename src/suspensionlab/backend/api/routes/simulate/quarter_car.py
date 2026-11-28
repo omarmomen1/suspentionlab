@@ -26,6 +26,9 @@ async def simulate(
     db: AsyncSession = Depends(get_db_dependency)
 ):
     try:
+        # Pass B: record usage (Redis primary, DB fallback) so the meter reflects actual runs.
+        from suspensionlab.backend.core.compute_governance import meter_simulation
+        await meter_simulation(db, str(user.user_id), str(getattr(user, "plan", "FREE")))
         job_res = await SimulationService.execute_or_enqueue(
             user_id=user.user_id,
             plan=user.plan,

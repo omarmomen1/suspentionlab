@@ -17,9 +17,20 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/billing", tags=["billing-compatibility"])
 
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
-STRIPE_PRO_PRICE_ID = os.getenv("STRIPE_PRO_PRICE_ID")
-STRIPE_ENTERPRISE_PRICE_ID = os.getenv("STRIPE_ENTERPRISE_PRICE_ID")
+from suspensionlab.backend.config import settings
+
+
+def _stripe_webhook_secret() -> str | None:
+    """Lazy read (Pass B): never bind secrets/price IDs at import time."""
+    return os.getenv("STRIPE_WEBHOOK_SECRET") or settings.stripe_webhook_secret
+
+
+def _stripe_pro_price_id() -> str | None:
+    return os.getenv("STRIPE_PRO_PRICE_ID") or settings.stripe_pro_price_id
+
+
+def _stripe_enterprise_price_id() -> str | None:
+    return os.getenv("STRIPE_ENTERPRISE_PRICE_ID") or settings.stripe_enterprise_price_id
 
 def _get_user_id_from_request(request: Request) -> str:
     """Extract authenticated user ID from JWT state (set by auth middleware)."""
@@ -45,7 +56,7 @@ async def checkout(
     if not user_id:
         raise HTTPException(status_code=401, detail="Authentication required")
 
-    price_id = STRIPE_ENTERPRISE_PRICE_ID if req.plan == "enterprise" else STRIPE_PRO_PRICE_ID
+    price_id = _stripe_enterprise_price_id() if req.plan == "enterprise" else _stripe_pro_price_id()
     if not price_id:
         logger.error("Stripe price ID not configured for plan: %s", req.plan)
         raise HTTPException(status_code=503, detail="Payment system not configured. Contact support.")
@@ -73,9 +84,7 @@ async def portal():
 
 @router.post("/webhooks/stripe")
 async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db_dependency)):
-    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET")
-    if not webhook_secret:
-        webhook_secret = STRIPE_WEBHOOK_SECRET
+    webhook_secret = _stripe_webhook_secret()
     if not webhook_secret or not webhook_secret.strip():
         logger.error("STRIPE_WEBHOOK_SECRET is not configured.")
         raise HTTPException(status_code=500, detail="Stripe webhook secret is not configured.")
@@ -90,36 +99,38 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db_dep
             payload, sig_header, webhook_secret
         )
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-        
-    # Extract event fields cleanly
-    if isinstance(event, dict):
-        event_id = event.get("id")
-        event_type = event.get("type")
-        event_data = event.get("data", {})
-    else:
-        event_id = getattr(event, "id", None) or (event.get("id") if hasattr(event, "get") else None)
-        event_type = getattr(event, "type", None) or (event.get("type") if hasattr(event, "get") else None)
-        event_data = getattr(event, "data", {}) or (event.get("data") if hasattr(event, "get") else {})
+        # Pass B: never leak the verifier's error text to the caller.
+        logger.warning("Stripe webhook signature verification failed: %s", e)
+        raise HTTPException(status_code=400, detail="Invalid webhook signature.")
 
-    if isinstance(event_data, dict):
-        obj = event_data.get("object", {})
-    else:
-        obj = getattr(event_data, "object", {}) or (event_data.get("object") if hasattr(event_data, "get") else {})
+    def _get(container, key, default=None):
+        if isinstance(container, dict):
+            return container.get(key, default)
+        val = getattr(container, key, None)
+        if val is None and hasattr(container, "get"):
+            try:
+                val = container.get(key, default)
+            except Exception:
+                val = default
+        return val if val is not None else default
 
-    # Extract customer_id and sub_id
-    if isinstance(obj, dict):
-        customer_id = obj.get("customer")
-        sub_id = obj.get("id")
-        items_obj = obj.get("items")
-    else:
-        customer_id = getattr(obj, "customer", None) or (obj.get("customer") if hasattr(obj, "get") else None)
-        sub_id = getattr(obj, "id", None) or (obj.get("id") if hasattr(obj, "get") else None)
-        items_obj = getattr(obj, "items", None) or (obj.get("items") if hasattr(obj, "get") else None)
+    event_id = _get(event, "id")
+    event_type = _get(event, "type")
+    event_created = _get(event, "created")  # epoch seconds, for stale-event ordering
+    try:
+        event_created = int(event_created) if event_created is not None else None
+    except (TypeError, ValueError):
+        event_created = None
+    event_data = _get(event, "data", {}) or {}
+    obj = _get(event_data, "object", {}) or {}
 
-    meta = obj.get("metadata") if isinstance(obj, dict) else (getattr(obj, "metadata", None) or (obj.get("metadata") if hasattr(obj, "get") else None))
-    meta_user_id = meta.get("user_id") if isinstance(meta, dict) else (getattr(meta, "user_id", None) if meta and hasattr(meta, "user_id") else (meta.get("user_id") if meta and hasattr(meta, "get") else None))
-    client_ref_id = obj.get("client_reference_id") if isinstance(obj, dict) else (getattr(obj, "client_reference_id", None) or (obj.get("client_reference_id") if hasattr(obj, "get") else None))
+    customer_id = _get(obj, "customer")
+    sub_id = _get(obj, "id")
+    items_obj = _get(obj, "items")
+
+    meta = _get(obj, "metadata")
+    meta_user_id = _get(meta, "user_id") if meta else None
+    client_ref_id = _get(obj, "client_reference_id")
     target_user_id = client_ref_id or meta_user_id
 
     from suspensionlab.backend.database.models.billing import StripeEvent
@@ -127,34 +138,66 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db_dep
         res = await db.execute(select(StripeEvent).where(StripeEvent.event_id == str(event_id)))
         if res.scalar_one_or_none():
             return {"received": True, "message": "Duplicate event ignored"}
-        db.add(StripeEvent(event_id=str(event_id)))
 
-    if event_type in ["customer.subscription.created", "customer.subscription.updated", "checkout.session.completed"]:
-        user = None
+    async def _find_user():
+        found = None
         if customer_id:
             res = await db.execute(select(User).where(User.billing_customer_id == str(customer_id)))
-            user = res.scalar_one_or_none()
-
-        # Fallback to client_reference_id or metadata["user_id"] when billing_customer_id is not yet stored
-        if not user and target_user_id:
+            found = res.scalar_one_or_none()
+        if not found and target_user_id:
             import uuid
             try:
                 uid = uuid.UUID(str(target_user_id))
                 res = await db.execute(select(User).where(User.id == uid))
-                user = res.scalar_one_or_none()
+                found = res.scalar_one_or_none()
             except (ValueError, TypeError):
                 res = await db.execute(select(User).where(User.id == str(target_user_id)))
-                user = res.scalar_one_or_none()
+                found = res.scalar_one_or_none()
+        return found
 
-        if user:
-            obj_status = (obj.get("status") if isinstance(obj, dict) else getattr(obj, "status", None)) or ""
-            payment_status = (obj.get("payment_status") if isinstance(obj, dict) else getattr(obj, "payment_status", None)) or ""
-            sub_ref = (obj.get("subscription") if isinstance(obj, dict) else getattr(obj, "subscription", None)) if event_type == "checkout.session.completed" else sub_id
+    def _is_stale(user) -> bool:
+        """Ordering guard (Pass B): a stale event must never override a newer one."""
+        last = getattr(user, "billing_last_event_created", None)
+        return bool(event_created is not None and last is not None and event_created < last)
+
+    def _mark_applied(user) -> None:
+        if event_created is not None:
+            last = getattr(user, "billing_last_event_created", None) or 0
+            if event_created > last:
+                user.billing_last_event_created = event_created
+
+    GRANT_EVENTS = {
+        "customer.subscription.created",
+        "customer.subscription.updated",
+        "checkout.session.completed",
+    }
+
+    if event_type in GRANT_EVENTS:
+        user = await _find_user()
+        if not user:
+            # Pass B: do NOT mark the event processed — roll back and 500 so
+            # Stripe retries instead of silently losing a paid upgrade.
+            await db.rollback()
+            logger.error(
+                "Stripe webhook %s: no user for customer=%s target=%s — returning 500 for retry.",
+                event_id, customer_id, target_user_id,
+            )
+            raise HTTPException(status_code=500, detail="Billing event could not be applied yet; please retry.")
+
+        if _is_stale(user):
+            logger.warning(
+                "Stripe webhook %s: stale %s (created=%s < last=%s) for user %s — skipped.",
+                event_id, event_type, event_created, user.billing_last_event_created, user.id,
+            )
+        else:
+            obj_status = str(_get(obj, "status", "") or "")
+            payment_status = str(_get(obj, "payment_status", "") or "")
+            sub_ref = _get(obj, "subscription") if event_type == "checkout.session.completed" else sub_id
 
             if event_type == "checkout.session.completed":
-                is_entitled = str(payment_status).lower() in ("paid", "no_payment_required")
+                is_entitled = payment_status.lower() in ("paid", "no_payment_required")
             else:
-                is_entitled = str(obj_status).lower() in ("active", "trialing")
+                is_entitled = obj_status.lower() in ("active", "trialing")
 
             # Persist billing_customer_id on first subscription event
             if customer_id and not user.billing_customer_id:
@@ -178,43 +221,93 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db_dep
                 price_id = None
                 if data_items and len(data_items) > 0:
                     first_item = data_items[0]
-                    if isinstance(first_item, dict):
-                        price_val = first_item.get("price")
-                        price_id = price_val.get("id") if isinstance(price_val, dict) else getattr(price_val, "id", None)
-                    else:
-                        price_val = getattr(first_item, "price", None) or (first_item.get("price") if hasattr(first_item, "get") else None)
-                        price_id = getattr(price_val, "id", None) if not isinstance(price_val, dict) else price_val.get("id")
+                    price_val = _get(first_item, "price")
+                    price_id = _get(price_val, "id") if price_val else None
 
                 if sub_ref:
                     user.billing_subscription_id = str(sub_ref)
 
-                if price_id == STRIPE_ENTERPRISE_PRICE_ID:
+                if price_id == _stripe_enterprise_price_id():
                     user.plan = PlanTier.ENTERPRISE
-                elif price_id == STRIPE_PRO_PRICE_ID:
+                    user.plan_source = "stripe"
+                elif price_id == _stripe_pro_price_id():
                     user.plan = PlanTier.PRO
+                    user.plan_source = "stripe"
                 else:
                     logger.warning(
                         "Stripe webhook: unknown price_id '%s' for customer %s — plan unchanged.",
                         price_id, customer_id
                     )
+            _mark_applied(user)
 
     elif event_type == "customer.subscription.deleted":
-        user = None
-        if customer_id:
-            res = await db.execute(select(User).where(User.billing_customer_id == str(customer_id)))
-            user = res.scalar_one_or_none()
-        if not user and target_user_id:
-            import uuid
-            try:
-                uid = uuid.UUID(str(target_user_id))
-                res = await db.execute(select(User).where(User.id == uid))
-                user = res.scalar_one_or_none()
-            except (ValueError, TypeError):
-                res = await db.execute(select(User).where(User.id == str(target_user_id)))
-                user = res.scalar_one_or_none()
+        user = await _find_user()
         if user:
-            user.plan = PlanTier.FREE
-            user.billing_subscription_id = None
+            if _is_stale(user):
+                logger.warning(
+                    "Stripe webhook %s: stale subscription.deleted for user %s — skipped.",
+                    event_id, user.id,
+                )
+            else:
+                # Pass B: only downgrade Stripe-sourced entitlements. A Gumroad
+                # or SLPRO license entitlement must survive a Stripe cancel.
+                source = getattr(user, "plan_source", None)
+                stripe_sourced = source == "stripe" or (source is None and not user.gumroad_license_key)
+                if stripe_sourced:
+                    user.plan = PlanTier.FREE
+                    user.billing_subscription_id = None
+                    user.plan_source = None
+                else:
+                    logger.warning(
+                        "Stripe webhook: subscription.deleted for user %s with plan_source='%s' — plan untouched.",
+                        user.id, source,
+                    )
+                _mark_applied(user)
+
+    elif event_type == "invoice.payment_failed":
+        user = await _find_user()
+        logger.warning(
+            "Stripe invoice.payment_failed for customer=%s user=%s invoice=%s — dunning left to Stripe; plan unchanged.",
+            customer_id, getattr(user, "id", None), sub_id,
+        )
+        if user:
+            _mark_applied(user)
+
+    elif event_type == "charge.refunded":
+        user = await _find_user()
+        if user:
+            source = getattr(user, "plan_source", None)
+            stripe_sourced = source == "stripe" or (source is None and not user.gumroad_license_key)
+            plan_val = user.plan.value if isinstance(user.plan, PlanTier) else str(user.plan)
+            if stripe_sourced and plan_val in (PlanTier.PRO.value, PlanTier.ENTERPRISE.value):
+                user.plan = PlanTier.FREE
+                user.billing_subscription_id = None
+                user.plan_source = None
+                logger.warning("Stripe charge.refunded: downgraded user %s to FREE.", user.id)
+            _mark_applied(user)
+        else:
+            logger.warning("Stripe charge.refunded for unknown customer=%s — recorded only.", customer_id)
+
+    elif event_type == "charge.dispute.created":
+        user = await _find_user()
+        logger.warning(
+            "Stripe charge.dispute.created for customer=%s user=%s — recorded; awaiting dispute outcome before plan action.",
+            customer_id, getattr(user, "id", None),
+        )
+        if user:
+            _mark_applied(user)
+
+    # Record the event in the SAME transaction as the plan mutation (Pass B):
+    # if anything above failed we already rolled back and returned 500.
+    if event_id:
+        db.add(StripeEvent(
+            event_id=str(event_id),
+            payload={
+                "type": event_type,
+                "created": event_created,
+                "customer": str(customer_id) if customer_id else None,
+            },
+        ))
 
     try:
         await db.commit()

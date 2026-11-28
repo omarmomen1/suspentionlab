@@ -136,18 +136,126 @@ def monthly_usage_key(user_id: str) -> str:
     return f"sim_usage:{user_id}:{_month_key()}"
 
 
-async def get_monthly_usage(user_id: str) -> int:
-    """Current-month simulation count for a user (0 when Redis is down)."""
+async def get_monthly_usage(user_id: str, db=None) -> int:
+    """
+    Current-month simulation count for a user. Redis first; when Redis is
+    unavailable falls back to the durable usage_counters table (Pass B) so the
+    meter reflects actual runs instead of sticking at 0/500.
+    """
     try:
         from suspensionlab.backend.core.redis_client import get_async_redis_conn
         redis_conn = get_async_redis_conn()
-        if redis_conn is None:
-            return 0
-        value = await redis_conn.get(monthly_usage_key(user_id))
-        return int(value or 0)
+        if redis_conn is not None:
+            value = await redis_conn.get(monthly_usage_key(user_id))
+            return int(value or 0)
     except Exception:
-        logger.warning("get_monthly_usage failed for user %s", user_id)
+        logger.warning("get_monthly_usage: Redis read failed for user %s", user_id)
+    return await _get_monthly_usage_db(user_id, db)
+
+
+async def _get_monthly_usage_db(user_id: str, db=None) -> int:
+    """Durable monthly usage read from usage_counters."""
+    import uuid as _uuid
+    from sqlalchemy import select
+    from suspensionlab.backend.database.models.usage_counter import UsageCounter
+
+    owns_session = db is None
+    if owns_session:
+        from suspensionlab.backend.database.core import SessionLocal
+        db = SessionLocal()
+    try:
+        result = await db.execute(
+            select(UsageCounter.count).where(
+                UsageCounter.user_id == _uuid.UUID(str(user_id)),
+                UsageCounter.month == _month_key(),
+            )
+        )
+        val = result.scalar_one_or_none()
+        return int(val or 0)
+    except Exception:
+        logger.warning("get_monthly_usage: DB fallback failed for user %s", user_id)
         return 0
+    finally:
+        if owns_session:
+            await db.close()
+
+
+async def record_monthly_usage_db(db, user_id: str) -> int:
+    """
+    Increment the durable monthly counter for a user. Returns the new count.
+    Caller owns the transaction (this function commits, since metering must
+    survive even when the request's own work later fails).
+    """
+    import uuid as _uuid
+    from sqlalchemy import select
+    from suspensionlab.backend.database.models.usage_counter import UsageCounter
+
+    uid = _uuid.UUID(str(user_id))
+    month = _month_key()
+    result = await db.execute(
+        select(UsageCounter).where(
+            UsageCounter.user_id == uid,
+            UsageCounter.month == month,
+        ).with_for_update()
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        row = UsageCounter(user_id=uid, month=month, count=0)
+        db.add(row)
+        try:
+            await db.flush()
+        except Exception:
+            # Concurrent first insert — re-read the winner's row.
+            await db.rollback()
+            result = await db.execute(
+                select(UsageCounter).where(
+                    UsageCounter.user_id == uid,
+                    UsageCounter.month == month,
+                ).with_for_update()
+            )
+            row = result.scalar_one_or_none()
+    row.count = int(row.count or 0) + 1
+    await db.commit()
+    return int(row.count)
+
+
+async def meter_simulation(db, user_id: str, plan: str) -> int:
+    """
+    Record one simulation run against the user's monthly quota and enforce it.
+    Redis primary, DB fallback when Redis is down (Pass B). Returns the usage
+    count after recording. Raises HTTP 402 when the quota is exceeded.
+    """
+    from fastapi import HTTPException
+
+    used: int | None = None
+    try:
+        from suspensionlab.backend.core.redis_client import get_async_redis_conn
+        redis_conn = get_async_redis_conn()
+    except Exception:
+        redis_conn = None
+
+    if redis_conn is not None:
+        try:
+            usage_key = monthly_usage_key(user_id)
+            used = int(await redis_conn.incr(usage_key))
+            await redis_conn.expire(usage_key, MONTHLY_USAGE_TTL_S)
+        except Exception:
+            logger.warning("meter_simulation: Redis incr failed for %s, using DB fallback", user_id)
+            used = None
+
+    if used is None:
+        used = await record_monthly_usage_db(db, user_id)
+
+    quota = SIM_QUOTAS.get(str(plan), SIM_QUOTAS["FREE"])
+    if used > quota:
+        raise HTTPException(
+            status_code=402,
+            detail=(
+                f"Monthly simulation quota reached ({quota}/{quota} on the {plan} plan "
+                f"for {_month_key()}). Upgrade your plan or buy simulation credits to continue."
+            ),
+        )
+    return used
 
 
 async def assert_user_concurrency(db, user_id: str, plan: str) -> None:
@@ -221,6 +329,16 @@ async def inline_compute_guard(
 
     if redis_conn is None:
         logger.warning("inline_compute_guard: Redis unavailable — inline concurrency cap not enforced.")
+        # Pass B: metering must NOT silently skip when Redis is down — record
+        # and enforce the monthly quota via the durable DB fallback.
+        from suspensionlab.backend.database.core import SessionLocal
+        try:
+            async with SessionLocal() as meter_db:
+                await meter_simulation(meter_db, user.user_id, str(user.plan))
+        except HTTPException:
+            raise
+        except Exception:
+            logger.warning("inline_compute_guard: DB metering fallback failed for user %s.", user.user_id)
         yield user
         return
 

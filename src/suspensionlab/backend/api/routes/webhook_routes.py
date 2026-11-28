@@ -25,6 +25,14 @@ from suspensionlab.backend.services.webhooks import dispatch_event
 
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
+
+def _parse_endpoint_id(endpoint_id: str) -> _uuid.UUID:
+    """Pass B: malformed ids are a 400, never an unhandled 500."""
+    try:
+        return _uuid.UUID(endpoint_id)
+    except (ValueError, AttributeError, TypeError):
+        raise HTTPException(status_code=400, detail="Malformed webhook endpoint id.")
+
 VALID_EVENTS = ("job.completed", "job.failed")
 MAX_ENDPOINTS = 10
 
@@ -104,7 +112,7 @@ async def delete_webhook(
 ):
     result = await db.execute(
         select(WebhookEndpoint).where(
-            WebhookEndpoint.id == _uuid.UUID(endpoint_id),
+            WebhookEndpoint.id == _parse_endpoint_id(endpoint_id),
             WebhookEndpoint.user_id == _uuid.UUID(user.user_id),
         )
     )
@@ -124,7 +132,7 @@ async def test_webhook(
     """Send a signed webhook.ping event so customers can verify their receiver."""
     result = await db.execute(
         select(WebhookEndpoint).where(
-            WebhookEndpoint.id == _uuid.UUID(endpoint_id),
+            WebhookEndpoint.id == _parse_endpoint_id(endpoint_id),
             WebhookEndpoint.user_id == _uuid.UUID(user.user_id),
         )
     )

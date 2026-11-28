@@ -11,6 +11,9 @@ Endpoints:
 from __future__ import annotations
 
 from typing import Any, Dict, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
@@ -67,7 +70,8 @@ async def import_cae_run_endpoint(
         )
         return dataset.to_dict()
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Failed to normalize external CAE dataset: {exc}")
+        logger.exception("Failed to normalize external CAE dataset: %s", exc)
+        raise HTTPException(status_code=400, detail="Failed to normalize external CAE dataset.")
 
 
 @router.post("/compare-solver")
@@ -102,7 +106,8 @@ async def compare_cae_solver_endpoint(
 
         return CaeIntegrationService.compare_external_vs_native(dataset, nat_p)
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"CAE solver comparison failed: {exc}")
+        logger.exception("CAE solver comparison failed: %s", exc)
+        raise HTTPException(status_code=400, detail="CAE solver comparison failed.")
 
 
 @router.post("/export/{format_type}")
@@ -127,4 +132,5 @@ async def export_cae_deck_endpoint(
     except ValueError as val_err:
         raise HTTPException(status_code=400, detail=str(val_err))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Export failed: {exc}")
+        logger.exception("Export failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Export failed.")

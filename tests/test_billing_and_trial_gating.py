@@ -302,8 +302,9 @@ async def test_verify_license_self_issued_pro_and_ent_without_gumroad_call(
             "/api/v1/billing/verify-license",
             json={"license_key": pro_key},
         )
-        assert replay_resp.status_code == 400
-        assert "already been redeemed" in replay_resp.json()["detail"].lower()
+        # Pass B (audit B1): replays are rejected with 409 and a generic message.
+        assert replay_resp.status_code == 409
+        assert "already redeemed" in replay_resp.json()["detail"].lower()
 
         # Valid SLPRO-ENT key upgrades user2 to ENTERPRISE
         with patch.object(gumroad_routes, "httpx", mock_httpx):

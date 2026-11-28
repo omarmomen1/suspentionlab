@@ -181,7 +181,11 @@ class TokenRevocationRegistry:
 
 
 async def is_jti_revoked(jti: str | None) -> bool:
-    """Check if JTI is revoked via in-memory registry or Redis."""
+    """
+    Check if JTI is revoked. Lookup order: in-memory registry, Redis, then the
+    durable revoked_tokens table so revocation does not fail open when Redis
+    is unavailable (Pass B).
+    """
     if not jti:
         return False
     if TokenRevocationRegistry.is_revoked(jti):
@@ -192,9 +196,45 @@ async def is_jti_revoked(jti: str | None) -> bool:
         if async_redis:
             val = await async_redis.get(f"revoked:{jti}")
             return val is not None
-        return False
     except Exception:
+        pass  # fall through to the durable DB fallback
+    try:
+        from sqlalchemy import select
+        from suspensionlab.backend.database.core import SessionLocal
+        from suspensionlab.backend.database.models.revoked_token import RevokedToken
+        async with SessionLocal() as session:
+            res = await session.execute(
+                select(RevokedToken.jti).where(RevokedToken.jti == jti)
+            )
+            return res.scalar_one_or_none() is not None
+    except Exception:
+        # DB fallback unavailable; nothing more we can verify against.
         return False
+
+
+async def record_revoked_jti(jti: str, exp: float | int | None, reason: str) -> None:
+    """
+    Persist a revoked JTI to the durable revoked_tokens table (best effort).
+    This is the fallback `is_jti_revoked` consults when Redis is down.
+    """
+    if not jti:
+        return
+    try:
+        from sqlalchemy import select
+        from suspensionlab.backend.database.core import SessionLocal
+        from suspensionlab.backend.database.models.revoked_token import RevokedToken
+        expires_at = None
+        if exp:
+            expires_at = datetime.fromtimestamp(float(exp), tz=timezone.utc).replace(tzinfo=None)
+        async with SessionLocal() as session:
+            existing = await session.execute(
+                select(RevokedToken.jti).where(RevokedToken.jti == jti)
+            )
+            if existing.scalar_one_or_none() is None:
+                session.add(RevokedToken(jti=jti, reason=reason, expires_at=expires_at))
+                await session.commit()
+    except Exception:
+        pass  # durable persistence is best effort; Redis/memory already hold it
 
 
 def get_public_jwks() -> dict[str, Any]:

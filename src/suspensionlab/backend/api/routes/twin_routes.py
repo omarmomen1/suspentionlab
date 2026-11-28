@@ -12,6 +12,9 @@ from __future__ import annotations
 
 from typing import Optional
 
+import logging
+
+logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from pydantic import BaseModel, Field
 
@@ -32,7 +35,7 @@ class CreateTwinRequest(BaseModel):
 
 
 def _not_found(exc: LookupError) -> HTTPException:
-    return HTTPException(status_code=404, detail=str(exc))
+    return HTTPException(status_code=404, detail="The requested resource was not found.")
 
 
 @router.post("", status_code=201)
@@ -113,7 +116,7 @@ async def calibrate_twin(
     except Exception as exc:
         logger = __import__("logging").getLogger(__name__)
         logger.exception("Twin calibration failed")
-        raise HTTPException(status_code=500, detail=f"Calibration failed: {exc}")
+        raise HTTPException(status_code=500, detail="Calibration failed.")
     return result
 
 
@@ -429,6 +432,7 @@ async def execute_track_loop_endpoint(
         )
         return report
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Track loop closure failed: {exc}")
+        logger.exception("Track loop closure failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Track loop closure failed.")
 
 

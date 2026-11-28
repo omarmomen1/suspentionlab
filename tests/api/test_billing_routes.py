@@ -4,8 +4,9 @@ from unittest.mock import patch, MagicMock
 
 @pytest.mark.asyncio
 async def test_checkout(authenticated_client: AsyncClient):
-    with patch("stripe.checkout.Session.create") as mock_create, \
-         patch("suspensionlab.backend.api.routes.billing_routes.STRIPE_PRO_PRICE_ID", "price_dummy"):
+    import os
+    os.environ["STRIPE_PRO_PRICE_ID"] = "price_dummy"
+    with patch("stripe.checkout.Session.create") as mock_create:
         mock_create.return_value = MagicMock(url="http://mock-stripe/checkout")
         response = await authenticated_client.post("/api/v1/billing/checkout", json={"plan": "pro"})
         assert response.status_code == 200

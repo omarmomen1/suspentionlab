@@ -6,7 +6,7 @@ import numpy as np
 from suspensionlab.backend.database.core import get_db_dependency
 from suspensionlab.backend.security.auth import verify_api_key, require_permission
 from suspensionlab.backend.security.permissions import Permission
-from suspensionlab.backend.core.compute_governance import bounded_run, assert_user_concurrency
+from suspensionlab.backend.core.compute_governance import bounded_run, assert_user_concurrency, meter_simulation
 from suspensionlab.shared.models import FullCarSimulateRequest
 from suspensionlab.physics.full_car import FullCarParams, run_full_car_analysis, FourCornerRoadProfile, FullCarDivergedError
 from suspensionlab.physics.quarter_car import RoadProfile, _road_profile_fn
@@ -28,6 +28,8 @@ async def simulate_full_car(
 ):
     try:
         await assert_user_concurrency(db, str(user.user_id), getattr(user, "plan", "FREE"))
+        # Pass B: record usage (Redis primary, DB fallback) so the meter reflects actual runs.
+        await meter_simulation(db, str(user.user_id), str(getattr(user, "plan", "FREE")))
         pdump = payload.params.model_dump()
         asymmetry = pdump.pop("road_asymmetry", 0.3)
         if "lateral_accel_mps2" in pdump and "lateral_accel_g" not in pdump:
@@ -72,4 +74,4 @@ async def simulate_full_car(
         raise HTTPException(status_code=504, detail="Full-car simulation timed out.")
     except Exception as e:
         logger.exception("Unhandled error in /simulate/full-car: %s", e)
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Full-car simulation failed. Check the submitted parameters and try again.")

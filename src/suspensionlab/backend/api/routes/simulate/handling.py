@@ -180,7 +180,7 @@ async def get_handling_diagram(
         }
     except Exception as exc:
         logger.exception("Handling diagram generation failed: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Handling diagram calculation failed: {exc}")
+        raise HTTPException(status_code=500, detail="Handling diagram calculation failed.")
 
 
 @router.post("/handling/scenario")
@@ -216,7 +216,7 @@ async def run_handling_scenario(
         return res
     except Exception as exc:
         logger.exception("Handling scenario failed: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Handling scenario simulation failed: {exc}")
+        raise HTTPException(status_code=500, detail="Handling scenario simulation failed.")
 
 
 @router.post("/handling/compare")
@@ -252,7 +252,7 @@ async def compare_setups_endpoint(
         return report
     except Exception as exc:
         logger.exception("Handling setup comparison failed: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Setup comparison failed: {exc}")
+        raise HTTPException(status_code=500, detail="Setup comparison failed.")
 
 
 @router.post("/handling/sweep")
@@ -296,7 +296,7 @@ async def parameter_sweep_endpoint(
         }
     except Exception as exc:
         logger.exception("Handling parameter sweep failed: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Parameter sweep failed: {exc}")
+        raise HTTPException(status_code=500, detail="Parameter sweep failed.")
 
 
 @router.post("/handling/investigate")
@@ -351,4 +351,4 @@ async def investigate_handling_finding(
         }
     except Exception as exc:
         logger.exception("Investigate handling question creation failed: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Question creation failed: {exc}")
+        raise HTTPException(status_code=500, detail="Question creation failed.")

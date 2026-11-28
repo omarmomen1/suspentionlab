@@ -159,13 +159,19 @@ async def record_login_failure(request: Request, email: str):
     now = time.time()
     ip = request.client.host if request.client else "unknown"
     redis_key = f"login_failures:{email.lower()}:{ip}"
+    # Pass B: per-account (email-only) counter so rotating IPs cannot bypass
+    # the brute-force lockout. 15-minute window, 20-failure ceiling.
+    email_key = f"login_failures_email:{email.lower()}"
     try:
+        import uuid
         pipeline = async_redis_conn.pipeline(transaction=True)
         # Keep failures for 1 hour window
         pipeline.zremrangebyscore(redis_key, 0, now - 3600)
-        import uuid
         pipeline.zadd(redis_key, {f"{now}:{uuid.uuid4()}": now})
         pipeline.expire(redis_key, 3600)
+        pipeline.zremrangebyscore(email_key, 0, now - 900)
+        pipeline.zadd(email_key, {f"{now}:{uuid.uuid4()}": now})
+        pipeline.expire(email_key, 900)
         await pipeline.execute()
     except Exception:
         pass
@@ -179,6 +185,15 @@ async def check_progressive_penalty(request: Request, email: str):
     ip = request.client.host if request.client else "unknown"
     redis_key = f"login_failures:{email.lower()}:{ip}"
     try:
+        # Pass B: per-account ceiling checked first — independent of source IP.
+        email_key = f"login_failures_email:{email.lower()}"
+        try:
+            await async_redis_conn.zremrangebyscore(email_key, 0, now - 900)
+            email_count = await async_redis_conn.zcard(email_key)
+        except Exception:
+            email_count = 0
+        if email_count >= 20:
+            raise RateLimitExceededError("Too many failed attempts on this account. Try again in 15 minutes.")
         count = await async_redis_conn.zcard(redis_key)
         if count >= 20:
             raise RateLimitExceededError("Too many failed attempts. Try again in 1 hour.")

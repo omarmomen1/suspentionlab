@@ -16,6 +16,8 @@ from suspensionlab.backend.database.models.setup_score import SetupScore
 from suspensionlab.backend.database.models.webhook import WebhookEndpoint
 from suspensionlab.backend.database.models.vehicle_twin import VehicleTwin
 from suspensionlab.backend.database.models.billing import LemonEvent, StripeEvent
+from suspensionlab.backend.database.models.revoked_token import RevokedToken
+from suspensionlab.backend.database.models.usage_counter import UsageCounter
 from suspensionlab.backend.database.models.experiment import ExperimentRecord
 from suspensionlab.backend.database.models.engineering_decision import EngineeringDecision
 from suspensionlab.backend.database.models.timeline_event import TimelineEventRecord

@@ -470,7 +470,8 @@ async def analyse_telemetry(
     try:
         csv_content = content_bytes.decode("utf-8", errors="replace")
     except Exception as exc:
-        raise HTTPException(status_code=400, detail=f"Cannot decode file: {exc}")
+        logger.exception("Cannot decode file: %s", exc)
+        raise HTTPException(status_code=400, detail="Cannot decode file.")
 
     # Validate telemetry CSV schema before running analysis
     _validate_telemetry_csv_schema(csv_content)
@@ -488,7 +489,8 @@ async def analyse_telemetry(
         from suspensionlab.physics.telemetry_analysis import analyse_session
         result = analyse_session(csv_content, params_dict)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Analysis failed: {exc}")
+        logger.exception("Analysis failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Analysis failed.")
 
     # Enforce Scientific Integrity Gate: Blocked or corrupt data must NOT return HTTP 200
     if result.is_blocked or (result.health and not result.health.can_proceed):
@@ -711,7 +713,8 @@ async def calibrate_forward_model_endpoint(
             evidence_sessions=evidence_sessions,
         )
     except Exception as exc:
-        raise HTTPException(status_code=422, detail=f"Parameter calibration failed: {exc}")
+        logger.exception("Parameter calibration failed: %s", exc)
+        raise HTTPException(status_code=422, detail="Parameter calibration failed.")
 
     return report.to_dict()
 

@@ -2018,7 +2018,7 @@ async def approve_ai_decision(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(exc))
     except Exception as exc:
         logger.exception("Approval gate execution failed: %s", exc)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The request could not be processed. Check the submitted parameters and try again.")
 
 
 @router.get("/health")

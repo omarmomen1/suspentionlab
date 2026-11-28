@@ -32,7 +32,8 @@ async def test_register_duplicate(client: AsyncClient):
         json={"email": "dupuser@test.com", "password": "Password123!"}
     )
     assert response.status_code == 409
-    assert response.json()["detail"] == "An account with this email already exists."
+    # Pass B (audit): generic anti-enumeration message, does not confirm the account exists.
+    assert response.json()["detail"] == "Registration could not be completed. If you already have an account, sign in or use password reset."
 
 @pytest.mark.asyncio
 async def test_login(client: AsyncClient):

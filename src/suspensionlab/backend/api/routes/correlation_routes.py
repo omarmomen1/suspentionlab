@@ -56,7 +56,8 @@ async def get_correlation_cockpit_endpoint(
         )
         return report
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Correlation cockpit calculation failed: {exc}")
+        logger.exception("Correlation cockpit calculation failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Correlation cockpit calculation failed.")
 
 
 @router.post("/investigate-divergence")
@@ -76,7 +77,8 @@ async def investigate_divergence_endpoint(
         )
         return report
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Divergence investigation failed: {exc}")
+        logger.exception("Divergence investigation failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Divergence investigation failed.")
 
 
 @router.get("/channel-detail")
@@ -96,7 +98,8 @@ async def get_channel_detail_endpoint(
         )
         return detail
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Channel detail extraction failed: {exc}")
+        logger.exception("Channel detail extraction failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Channel detail extraction failed.")
 
 
 # ── Step 2-5 Upgrades: Multi-Model, Events, Session Comparison, and Direct Investigation ──
@@ -173,7 +176,7 @@ async def compare_model_endpoint(
         return report
     except Exception as exc:
         logger.error("Compare model failed: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Model comparison calculation failed: {exc}")
+        raise HTTPException(status_code=500, detail="Model comparison calculation failed.")
 
 
 @router.post("/events")
@@ -236,7 +239,7 @@ async def detect_events_endpoint(
         raise
     except Exception as exc:
         logger.error("Event detection failed: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Vehicle dynamics event detection failed: {exc}")
+        raise HTTPException(status_code=500, detail="Vehicle dynamics event detection failed.")
 
 
 @router.post("/compare-sessions")
@@ -258,7 +261,7 @@ async def compare_sessions_endpoint(
         return report.to_dict()
     except Exception as exc:
         logger.error("Session comparison failed: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Session comparison failed: {exc}")
+        raise HTTPException(status_code=500, detail="Session comparison failed.")
 
 
 @router.post("/investigate-event")
@@ -320,7 +323,7 @@ async def investigate_event_endpoint(
         }
     except Exception as exc:
         logger.error("Investigate event failed: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Failed to create engineering question from event: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to create engineering question from event.")
 
 
 @router.post("/investigate-residual")
@@ -385,5 +388,5 @@ async def investigate_residual_endpoint(
         }
     except Exception as exc:
         logger.error("Investigate residual failed: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Failed to create engineering question from residual: {exc}")
+        raise HTTPException(status_code=500, detail="Failed to create engineering question from residual.")
 

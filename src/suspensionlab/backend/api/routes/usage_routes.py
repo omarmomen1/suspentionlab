@@ -9,6 +9,9 @@ Powers the in-app UsageBadge and any future billing reconciliation.
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from suspensionlab.backend.database.core import get_db_dependency
 
 from suspensionlab.backend.core.compute_governance import (
     SIM_QUOTAS,
@@ -21,9 +24,9 @@ router = APIRouter(prefix="/usage", tags=["usage"])
 
 
 @router.get("")
-async def get_usage(user: UserContext = Depends(verify_api_key)):
+async def get_usage(user: UserContext = Depends(verify_api_key), db: AsyncSession = Depends(get_db_dependency)):
     """Current-month simulation usage for the authenticated principal."""
-    used = await get_monthly_usage(user.user_id)
+    used = await get_monthly_usage(user.user_id, db=db)
     quota = SIM_QUOTAS.get(str(user.plan), SIM_QUOTAS["FREE"])
     remaining = max(0, quota - used)
     return {

@@ -86,20 +86,34 @@ def normalize_license_plan(plan: str | PlanTier) -> PlanTier:
 
 
 def get_license_signing_secret(override: Optional[str] = None) -> str:
-    """Resolve the HMAC signing secret from settings or environment without fallbacks."""
+    """
+    Resolve the license HMAC signing secret (Pass B: separated from JWT).
+
+    Order of precedence:
+      1. explicit override (tests / tooling)
+      2. LICENSE_SIGNING_SECRET (settings / env) — required in PROD
+      3. non-prod only: legacy fallback to the JWT secret so pre-Pass-B keys
+         still verify in DEV/TRIAL. In PROD a missing dedicated secret is a
+         hard configuration error, never a JWT reuse.
+    """
     signing_material: Optional[str] = override
     if not signing_material:
-        signing_material = settings.jwt_secret_key
+        signing_material = settings.license_signing_secret or os.getenv("LICENSE_SIGNING_SECRET")
     if not signing_material:
-        signing_material = os.getenv("JWT_SECRET_KEY")
-    if not signing_material:
-        try:
-            keys = get_jwt_keys()
-            signing_material = keys.get(JWT_ACTIVE_KEY)
-        except RuntimeError:
-            signing_material = None
+        env = (settings.environment or os.getenv("ENVIRONMENT", "DEV")).upper()
+        if env == "PROD":
+            raise LicenseConfigError(
+                "LICENSE_SIGNING_SECRET is not configured. Refusing to fall back to the JWT secret in PROD."
+            )
+        signing_material = settings.jwt_secret_key or os.getenv("JWT_SECRET_KEY")
+        if not signing_material:
+            try:
+                keys = get_jwt_keys()
+                signing_material = keys.get(JWT_ACTIVE_KEY)
+            except RuntimeError:
+                signing_material = None
     if not signing_material or not str(signing_material).strip():
-        raise LicenseConfigError("JWT signing secret is not configured for license verification.")
+        raise LicenseConfigError("License signing secret is not configured for license verification.")
     return str(signing_material)
 
 

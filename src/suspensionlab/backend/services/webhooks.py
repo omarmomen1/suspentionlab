@@ -45,6 +45,13 @@ def validate_webhook_url(url: str) -> str | None:
     Returns the first verified safe IP string.
     """
     if os.getenv("ALLOW_PRIVATE_WEBHOOKS", "false").lower() == "true":
+        # Pass B: the SSRF bypass can never be enabled in production.
+        env = os.getenv("ENVIRONMENT", "DEV").strip().upper()
+        if env == "PROD":
+            raise ValueError(
+                "ALLOW_PRIVATE_WEBHOOKS is set while ENVIRONMENT=production; "
+                "SSRF checks cannot be disabled in production."
+            )
         return None
 
     parsed = urlparse(url)
@@ -89,16 +96,34 @@ def sign_payload(secret: str, timestamp: str, body: str) -> str:
 
 async def _deliver_once(url: str, headers: dict, body: str) -> bool:
     try:
-        validate_webhook_url(url)
+        pinned_ip = validate_webhook_url(url)
     except ValueError as val_err:
         logger.warning("Blocked outbound webhook to %s due to SSRF policy: %s", url, val_err)
         return False
+
+    # Pass B: DNS-rebinding (TOCTOU) defense — connect to the IP we validated
+    # instead of letting httpx resolve the hostname a second time.
+    target_url = url
+    send_headers = dict(headers)
+    extensions: dict = {}
+    if pinned_ip:
+        parsed = urlparse(url)
+        hostname = parsed.hostname or ""
+        port = parsed.port
+        ip_literal = f"[{pinned_ip}]" if ":" in pinned_ip else pinned_ip
+        netloc = ip_literal if port is None else f"{ip_literal}:{port}"
+        target_url = parsed._replace(netloc=netloc).geturl()
+        send_headers["Host"] = hostname if port is None else f"{hostname}:{port}"
+        if parsed.scheme == "https":
+            # Keep TLS SNI/verification bound to the real hostname while the
+            # TCP connection goes to the pinned IP.
+            extensions["sni_hostname"] = hostname
 
     try:
         import httpx
         # Explicitly disallow redirects (follow_redirects=False) to prevent redirect-based SSRF bypass
         async with httpx.AsyncClient(timeout=TIMEOUT_S, follow_redirects=False) as client:
-            resp = await client.post(url, content=body, headers=headers)
+            resp = await client.post(target_url, content=body, headers=send_headers, extensions=extensions or None)
         return 200 <= resp.status_code < 300
     except Exception as exc:
         logger.warning("Webhook delivery to %s failed: %s", url, exc)
