@@ -174,7 +174,7 @@ class EngineeringDecisionRequest(BaseModel):
     selected_setup: str = Field("SETUP-P3L-CAND-01")
     alternatives: Optional[List[str]] = None
     outcome: str = Field("ACCEPT", description="ACCEPT | REJECT | INCONCLUSIVE | UNSUPPORTED")
-    author: str = Field("Elena Rostova")
+    author: str = Field("", description="Ignored: the server sets the author from the authenticated user")
     evidence: Optional[Dict[str, Any]] = None
     simulation_results: Optional[Dict[str, Any]] = None
     blind_validation_results: Optional[Dict[str, Any]] = None
@@ -182,8 +182,8 @@ class EngineeringDecisionRequest(BaseModel):
 
 class ApprovalRequest(BaseModel):
     decision_code: str = Field("DEC-P3L-01")
-    approver_name: str = Field("Elena Rostova")
-    approver_role: str = Field("Chief Race Engineer & Technical Director")
+    approver_name: str = Field("", description="Ignored: the server sets the approver from the authenticated user")
+    approver_role: str = Field("", description="Ignored: the server sets the role from the authenticated user")
     approval_code: str = Field("APPR-P3L-01")
     notes: Optional[str] = None
 
@@ -405,6 +405,28 @@ async def validate_holdout_endpoint(
         raise HTTPException(status_code=500, detail=str(exc))
 
 
+def _authenticated_identity(user: Any) -> Any:
+    """Wave 12 item 1: the only source of an author or approver identity is the session."""
+    email = getattr(user, "email", None)
+    name = getattr(user, "name", None) or (email.split("@")[0].replace(".", " ").title() if email else "Authenticated Engineer")
+    role = str(getattr(user, "team_role", None) or getattr(user, "org_role", None) or "ENGINEER").upper()
+    return name, role
+
+
+def _reject_identity_spoof(client_value: Any, server_value: str, field: str) -> None:
+    if client_value is None:
+        return
+    text = str(client_value).strip()
+    if text and text.lower() != str(server_value).strip().lower():
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                f"Identity spoofing detected: client-supplied {field} '{text}' does not match "
+                f"authenticated user '{server_value}'."
+            ),
+        )
+
+
 @router.post("/decision")
 async def create_decision_endpoint(
     req: EngineeringDecisionRequest,
@@ -412,6 +434,8 @@ async def create_decision_endpoint(
     db: AsyncSession = Depends(get_db_dependency),
 ):
     """Phase 3L Section 10: Formulate engineering decision record."""
+    author_name, _author_role = _authenticated_identity(user)
+    _reject_identity_spoof(req.author, author_name, "author")
     try:
         return await Phase3LSetupEngineeringService.create_engineering_decision(
             db=db,
@@ -421,7 +445,7 @@ async def create_decision_endpoint(
             selected_setup=req.selected_setup,
             alternatives=req.alternatives,
             outcome=req.outcome,
-            author=req.author,
+            author=author_name,
             evidence=req.evidence,
             simulation_results=req.simulation_results,
             blind_validation_results=req.blind_validation_results,
@@ -438,14 +462,17 @@ async def approve_decision_endpoint(
     db: AsyncSession = Depends(get_db_dependency),
 ):
     """Phase 3L Section 10: Request human engineering sign-off with HMAC-SHA256 signature."""
+    approver_name, approver_role = _authenticated_identity(user)
+    _reject_identity_spoof(req.approver_name, approver_name, "approver name")
+    _reject_identity_spoof(req.approver_role, approver_role, "approver role")
     try:
         return await Phase3LSetupEngineeringService.request_human_approval(
             db=db,
             user_id=str(user.user_id),
             team_id=str(user.team_id) if getattr(user, "team_id", None) else None,
             decision_code=req.decision_code,
-            approver_name=req.approver_name,
-            approver_role=req.approver_role,
+            approver_name=approver_name,
+            approver_role=approver_role,
             approval_code=req.approval_code,
             notes=req.notes,
         )
@@ -519,19 +546,22 @@ async def diagnose_failure_endpoint(
 
 @router.post("/execute-workflow")
 async def execute_full_workflow_endpoint(
-    approver_name: str = Query("Elena Rostova", description="Approver full name"),
-    approver_role: str = Query("Chief Race Engineer & Technical Director", description="Approver seat title"),
+    approver_name: str = Query("", description="Ignored: the server sets the approver from the authenticated user"),
+    approver_role: str = Query("", description="Ignored: the server sets the role from the authenticated user"),
     user: UserContext = Depends(require_permission(Permission.SETUP_CREATE)),
     db: AsyncSession = Depends(get_db_dependency),
 ):
     """Phase 3L Final Gate: Executes complete end-to-end setup engineering workflow."""
+    server_name, server_role = _authenticated_identity(user)
+    _reject_identity_spoof(approver_name, server_name, "approver name")
+    _reject_identity_spoof(approver_role, server_role, "approver role")
     try:
         bundle = await Phase3LSetupEngineeringService.execute_full_workflow(
             db=db,
             user_id=str(user.user_id),
             team_id=str(user.team_id) if getattr(user, "team_id", None) else None,
-            approver_name=approver_name,
-            approver_role=approver_role,
+            approver_name=server_name,
+            approver_role=server_role,
         )
         Phase3LSetupEngineeringService.export_manifest(bundle)
         return bundle

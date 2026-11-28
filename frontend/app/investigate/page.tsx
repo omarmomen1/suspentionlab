@@ -121,6 +121,10 @@ function InvestigateContent() {
   const [activeProposal, setActiveProposal] = useState<SetupProposalResponse | null>(null);
   const [isGeneratingProposal, setIsGeneratingProposal] = useState<boolean>(false);
   const [proposalLoading, setProposalLoading] = useState<boolean>(true);
+  // Wave 12 item 3: a missing active twin is a normal empty state, not an error and
+  // never a silent auto-create.
+  const [twinMissing, setTwinMissing] = useState<boolean>(false);
+  const [creatingTwin, setCreatingTwin] = useState<boolean>(false);
 
   // Fetch real question details
   useEffect(() => {
@@ -163,6 +167,11 @@ function InvestigateContent() {
         setActiveProposal(null);
       }
     } catch (err: any) {
+      const status = err?.status ?? err?.statusCode ?? err?.response?.status;
+      const text = String(err?.message || err?.detail || "").toUpperCase();
+      if (status === 404 || text.includes("TWIN_NOT_FOUND") || text.includes("NOT FOUND")) {
+        setTwinMissing(true);
+      }
       console.warn("Could not load twin proposals:", err);
       setActiveProposal(null);
     } finally {
@@ -174,12 +183,31 @@ function InvestigateContent() {
     loadActiveProposal();
   }, []);
 
+  // Wave 12 item 3: the empty state creates the twin explicitly, on a click.
+  const createTwinFromEmptyState = async () => {
+    if (creatingTwin) return;
+    setCreatingTwin(true);
+    try {
+      await DigitalTwinApi.createTwin("Active Vehicle Twin");
+      setTwinMissing(false);
+      await loadActiveProposal();
+    } catch (err: any) {
+      setSimError(err?.message || "Could not create a twin");
+    } finally {
+      setCreatingTwin(false);
+    }
+  };
+
   const handleGenerateProposal = async () => {
     setIsGeneratingProposal(true);
     try {
-      const headline = question
-        ? `Setup Proposal for ${question.title}`
-        : "Rear entry platform instability under trail braking";
+      // Wave 12 item 2: never invent an engineering question. Without one, there is
+      // nothing to investigate, so we ask for the question instead of fabricating it.
+      if (!question) {
+        setSimError("Enter an investigation question first - no proposal can be raised without one.");
+        return;
+      }
+      const headline = `Setup Proposal for ${question.title}`;
       const created = await DigitalTwinApi.createProposal("active", headline);
       setActiveProposal(created);
       setProposalStatus(created.status as any);
@@ -308,6 +336,24 @@ function InvestigateContent() {
           >
             <ArrowLeft size={14} /> Back to Command Center
           </Link>
+
+          {twinMissing ? (
+            <div className="mb-6 rounded-xl border border-amber-500/40 bg-amber-500/5 p-4" data-testid="twin-empty-state">
+              <div className="text-sm font-semibold text-amber-300 mb-1">No digital twin yet</div>
+              <p className="text-xs text-gray-400 mb-3">
+                This workspace has no active twin, so there is nothing to investigate against. Create one to start.
+              </p>
+              <button
+                type="button"
+                onClick={createTwinFromEmptyState}
+                disabled={creatingTwin}
+                data-testid="create-twin-cta"
+                className="px-3 py-1.5 rounded-lg bg-ansys-yellow text-black text-xs font-bold disabled:opacity-50"
+              >
+                {creatingTwin ? "Creating twin..." : "Create Twin"}
+              </button>
+            </div>
+          ) : null}
 
           {/* Active Vehicle Context Badges */}
           <div className="flex flex-wrap items-center gap-2 text-xs font-mono">
