@@ -138,9 +138,9 @@ export default function VehiclePresets({ onSelect }: VehiclePresetsProps) {
         aria-haspopup="dialog"
         aria-expanded={open}
         className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-[#141416] border border-[#252525]
-          hover:bg-[#1e1e20] hover:border-ansys-yellow/30 rounded-lg text-xs font-bold transition-all shadow-sm"
+          hover:bg-[#1e1e20] hover:border-signal/30 rounded-lg text-xs font-bold transition-all shadow-sm"
       >
-        <Zap size={14} className="text-ansys-yellow" /> Vehicle Library
+        <Zap size={14} className="text-signal" /> Vehicle Library
       </button>
 
       {open && (
@@ -156,16 +156,16 @@ export default function VehiclePresets({ onSelect }: VehiclePresetsProps) {
               type="button"
               onClick={() => setOpen(false)}
               aria-label="Close vehicle preset library"
-              className="absolute top-3 right-3 text-gray-400 hover:text-white p-1 rounded focus-visible:ring-1 focus-visible:ring-ansys-yellow"
+              className="absolute top-3 right-3 text-gray-400 hover:text-white p-1 rounded focus-visible:ring-1 focus-visible:ring-signal"
             >
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
             </button>
             <div className="px-4 py-3 border-b border-[#1e1e1e]">
               <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                <Zap size={14} className="text-ansys-yellow" />
+                <Zap size={14} className="text-signal" />
                 Vehicle Preset Library
               </h3>
-              <p className="text-[11px] text-gray-400 mt-1">Select a configuration to load parameters. Then run the solver.</p>
+              <p className="text-xs text-gray-400 mt-1">Select a configuration to load parameters. Then run the solver.</p>
             </div>
             <div className="max-h-[500px] overflow-y-auto custom-scrollbar py-1">
               {VEHICLE_PRESETS.map((preset) => (
@@ -176,13 +176,13 @@ export default function VehiclePresets({ onSelect }: VehiclePresetsProps) {
                   <div className="text-left min-w-0 pr-4">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-xs font-bold text-white">{preset.name}</span>
-                      <span className={`text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-[#111] ${CATEGORY_COLOURS[preset.category] ?? "text-gray-500"}`}>
+                      <span className={`text-xs font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-sm bg-[#111] ${CATEGORY_COLOURS[preset.category] ?? "text-zinc-400"}`}>
                         {preset.category}
                       </span>
                     </div>
-                    <p className="text-[11px] text-gray-500 leading-snug">{preset.description}</p>
+                    <p className="text-xs text-zinc-400 leading-snug">{preset.description}</p>
                   </div>
-                  <ChevronRight size={14} className="text-gray-700 shrink-0" />
+                  <ChevronRight size={14} className="text-zinc-300 shrink-0" />
                 </button>
               ))}
             </div>

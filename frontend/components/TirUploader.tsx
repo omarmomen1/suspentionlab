@@ -47,8 +47,8 @@ export default function TirUploader({ onParsed, onClear, hasCoeffs }: TirUploade
   return (
     <div className="flex flex-col gap-1.5 mt-2 p-2 bg-[#0d0d0f] border border-[#252525] rounded-lg">
       <div className="flex justify-between items-center">
-        <label className="text-[11px] text-gray-400 flex items-center gap-1.5 font-semibold">
-          <FileText size={12} className={hasCoeffs ? "text-emerald-400" : "text-gray-500"} />
+        <label className="text-xs text-gray-400 flex items-center gap-1.5 font-semibold">
+          <FileText size={12} className={hasCoeffs ? "text-emerald-400" : "text-zinc-400"} />
           Pacejka .tir File
           {hasCoeffs && <Check size={10} className="text-emerald-400" />}
         </label>
@@ -58,7 +58,7 @@ export default function TirUploader({ onParsed, onClear, hasCoeffs }: TirUploade
             type="button"
             onClick={onClear}
             aria-label="Clear Pacejka tire file"
-            className="text-[10px] bg-red-950/30 text-red-400 border border-red-900/40 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-red-900/50 transition-colors"
+            className="text-xs bg-red-950/30 text-red-400 border border-red-900/40 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-red-900/50 transition-colors"
           >
             <X size={10} /> Clear
           </button>
@@ -68,7 +68,7 @@ export default function TirUploader({ onParsed, onClear, hasCoeffs }: TirUploade
             onClick={() => fileInputRef.current?.click()}
             disabled={isUploading}
             aria-label="Upload Pacejka tire file"
-            className="text-[10px] bg-ansys-yellow text-black px-2 py-0.5 rounded flex items-center gap-1 font-bold hover:brightness-110 disabled:opacity-50 transition-all shadow-[0_0_10px_rgba(242,169,0,0.2)]"
+            className="text-xs bg-signal text-carbon px-2 py-0.5 rounded flex items-center gap-1 font-bold hover:brightness-110 disabled:opacity-50 transition-all shadow-[0_0_10px_rgba(242,169,0,0.2)]"
           >
             {isUploading ? "..." : <><Upload size={10} /> Upload</>}
           </button>
@@ -78,15 +78,15 @@ export default function TirUploader({ onParsed, onClear, hasCoeffs }: TirUploade
       <input type="file" accept=".tir,.txt" ref={fileInputRef} className="hidden" aria-label="Pacejka file input" onChange={handleUpload} />
       
       {uploadError && (
-        <p role="alert" aria-live="polite" className="text-[9px] text-red-400 leading-tight mt-1">{uploadError}</p>
+        <p role="alert" aria-live="polite" className="text-xs text-red-400 leading-tight mt-1">{uploadError}</p>
       )}
 
       {hasCoeffs ? (
-        <p className="text-[9px] text-emerald-400 leading-tight">
+        <p className="text-xs text-emerald-400 leading-tight">
           Custom tire coefficients loaded.
         </p>
       ) : (
-        <p className="text-[9px] text-gray-400 leading-tight">
+        <p className="text-xs text-gray-400 leading-tight">
           Upload a standard Pacejka Property File (.tir) to override default tires.
         </p>
       )}

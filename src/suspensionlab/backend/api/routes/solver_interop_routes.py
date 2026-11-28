@@ -480,9 +480,10 @@ async def start_import_operation_endpoint(
             try:
                 content_bytes = base64.b64decode(req.content)
             except Exception as e:
+                logger.warning("Invalid base64 payload: %s", e)
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Invalid base64 payload: {e}",
+                    detail="Invalid base64 payload.",
                 )
         else:
             content_bytes = req.content.encode("utf-8")
@@ -509,7 +510,7 @@ async def start_import_operation_endpoint(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.exception("Unexpected error in solver import: %s", e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Import operation failed: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Import operation failed.")
 
 
 @router.post("/import/file", response_model=OperationResponseDTO)
@@ -546,7 +547,7 @@ async def upload_import_file_endpoint(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.exception("Unexpected error in file upload import: %s", e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"File import failed: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="File import failed.")
 
 
 @router.post("/export", response_model=OperationResponseDTO)
@@ -581,7 +582,7 @@ async def start_export_operation_endpoint(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.exception("Unexpected error in solver export: %s", e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Export operation failed: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Export operation failed.")
 
 
 @router.get("/operations/{operation_id}", response_model=OperationResponseDTO)
@@ -833,7 +834,7 @@ async def submit_execution_job(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.exception("Unexpected error submitting execution job: %s", e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Execution error: {e}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Execution error.")
 
 
 @router.get("/jobs", response_model=List[JobResponseDTO])
@@ -1125,7 +1126,7 @@ async def preflight_cosim_contract(
     except FileNotFoundError as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The request could not be processed. Check the submitted parameters and try again.")
 
 
 @router.post("/cosim/contracts/{contract_id}/execute", response_model=JobResponseDTO)
@@ -1162,7 +1163,7 @@ async def execute_cosim_job(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         logger.error("Co-simulation execution failed: %s", e, exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.get("/cosim/jobs/{job_id}/diagnostics")

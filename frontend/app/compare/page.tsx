@@ -252,12 +252,12 @@ function CompareContent() {
         {/* Navigation Breadcrumbs & Top Meta */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/[0.08] pb-5">
           <div>
-            <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+            <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
               <Link href="/" className="hover:text-white transition-colors">Command Center</Link>
               <span>/</span>
               <Link href="/experiment" className="hover:text-white transition-colors">Hypothesis Testing</Link>
               <span>/</span>
-              <span className="text-ansys-yellow font-medium">Comparative Intelligence</span>
+              <span className="text-signal font-medium">Comparative Intelligence</span>
             </div>
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-purple-500/10 border border-purple-500/30 flex items-center justify-center text-purple-400">
@@ -284,7 +284,7 @@ function CompareContent() {
               disabled={isLoading}
               className="px-3 py-2 rounded-lg bg-white/[0.05] hover:bg-white/[0.1] border border-white/10 text-xs font-medium text-gray-300 flex items-center gap-2 transition-all disabled:opacity-50"
             >
-              <RotateCcw size={13} className={isLoading ? "animate-spin text-ansys-yellow" : ""} />
+              <RotateCcw size={13} className={isLoading ? "animate-spin text-signal" : ""} />
               <span>Re-evaluate ODE</span>
             </button>
 
@@ -328,12 +328,12 @@ function CompareContent() {
                 <span className="font-bold text-white font-sans text-xs">
                   [ DURABLE EXPERIMENT LINKED: {durableExpId} ]
                 </span>
-                <span className="ml-2 text-[10px] px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase">
+                <span className="ml-2 text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30 uppercase">
                   VERIFIED RUN
                 </span>
               </div>
             </div>
-            <div className="text-[11px] text-zinc-400">
+            <div className="text-xs text-zinc-400">
               Comparative ODE evaluation derived from recorded parent & candidate setups
             </div>
           </div>
@@ -342,11 +342,11 @@ function CompareContent() {
         {/* Preset Selector Bar */}
         <div className="bg-[#0e0e12] border border-white/10 rounded-xl p-3.5 space-y-2.5">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Sliders size={12} className="text-ansys-yellow" />
+            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+              <Sliders size={12} className="text-signal" />
               Pre-Configured Engineering Hypotheses
             </span>
-            <span className="text-[10px] text-gray-500">
+            <span className="text-xs text-zinc-400">
               Select an archetype or fine-tune parameters below
             </span>
           </div>
@@ -366,10 +366,10 @@ function CompareContent() {
                 >
                   <div className="flex items-center justify-between text-xs font-semibold text-white mb-0.5">
                     <span>{p.title}</span>
-                    {active && <span className="text-[10px] text-purple-400 font-mono">ACTIVE</span>}
+                    {active && <span className="text-xs text-purple-400 font-mono">ACTIVE</span>}
                   </div>
-                  <div className="text-[10px] text-gray-400 line-clamp-1 mb-1">{p.scenario}</div>
-                  <div className="text-[9px] text-gray-500 font-mono">
+                  <div className="text-xs text-gray-400 line-clamp-1 mb-1">{p.scenario}</div>
+                  <div className="text-xs text-zinc-400 font-mono">
                     k_s: {p.setupA.k_s / 1000}k → {p.setupB.k_s / 1000}k N/m | c: {p.setupA.c} → {p.setupB.c} Ns/m
                   </div>
                 </button>
@@ -395,7 +395,7 @@ function CompareContent() {
             {/* Background ambient glow */}
             <div className={`absolute top-0 left-0 w-full h-1 ${
               comparisonResult.constraints_passed
-                ? "bg-gradient-to-r from-emerald-500 via-ansys-yellow to-purple-500"
+                ? "bg-gradient-to-r from-emerald-500 via-signal to-purple-500"
                 : "bg-gradient-to-r from-amber-500 to-red-500"
             }`} />
 
@@ -403,14 +403,16 @@ function CompareContent() {
               {/* Verdict Summary */}
               <div className="lg:col-span-3 space-y-2">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold tracking-wider uppercase border ${
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold tracking-wider uppercase border ${
                     comparisonResult.verdict === "SETUP_B_FAVORED"
                       ? "bg-emerald-950/60 text-emerald-400 border-emerald-500/30"
+                      : comparisonResult.verdict === "NO_CHANGE"
+                      ? "bg-zinc-900/70 text-zinc-200 border-zinc-600/50"
                       : comparisonResult.verdict === "CONSTRAINT_VIOLATED"
                       ? "bg-red-950/60 text-red-400 border-red-500/30"
                       : "bg-amber-950/60 text-amber-400 border-amber-500/30"
                   }`}>
-                    {comparisonResult.verdict.replace(/_/g, " ")}
+                    {comparisonResult.verdict === "NO_CHANGE" ? "NO CHANGE" : comparisonResult.verdict.replace(/_/g, " ")}
                   </span>
 
                   <ValidationBadge
@@ -422,7 +424,7 @@ function CompareContent() {
                     sourceTag="ODE SOLVER CONFIDENCE"
                   />
 
-                  <span className="text-[10px] text-gray-500 font-mono">
+                  <span className="text-xs text-zinc-400 font-mono">
                     Rig R²: {comparisonResult.evidence.correlation_r2 != null
                       ? comparisonResult.evidence.correlation_r2.toFixed(2)
                       : "N/A"}
@@ -441,9 +443,13 @@ function CompareContent() {
               {/* Action Decision Pill */}
               <div className="lg:col-span-1 flex flex-col sm:flex-row lg:flex-col items-start lg:items-end justify-center gap-2 border-t lg:border-t-0 lg:border-l border-white/10 pt-3 lg:pt-0 lg:pl-6">
                 <div className="text-left lg:text-right">
-                  <div className="text-[10px] text-gray-400 uppercase tracking-wider font-semibold">Decision Recommendation</div>
-                  <div className="text-xs font-bold text-ansys-yellow mt-0.5">
-                    {comparisonResult.constraints_passed ? "Ready for 4-Post Rig / Dyno Test" : "Reject: Constraint Violation"}
+                  <div className="text-xs text-zinc-300 uppercase tracking-wider font-semibold">Decision Recommendation</div>
+                  <div className="text-xs font-bold text-signal mt-0.5">
+                    {comparisonResult.verdict === "NO_CHANGE"
+                      ? "No change (identical setups)"
+                      : comparisonResult.constraints_passed
+                      ? "Ready for 4-Post Rig / Dyno Test"
+                      : "Reject: Constraint Violation"}
                   </div>
                 </div>
                 <button
@@ -476,7 +482,7 @@ function CompareContent() {
                       1. What Changed (Inputs)
                     </h3>
                   </div>
-                  <span className="text-[10px] font-mono text-gray-400">
+                  <span className="text-xs font-mono text-gray-400">
                     {comparisonResult.what_changed.length} altered
                   </span>
                 </div>
@@ -495,12 +501,12 @@ function CompareContent() {
                           {change.delta_pct > 0 ? "+" : ""}{change.delta_pct.toFixed(1)}%
                         </span>
                       </div>
-                      <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono mt-1">
+                      <div className="flex items-center justify-between text-xs text-gray-400 font-mono mt-1">
                         <span>Setup A: {change.setup_a} {change.unit}</span>
-                        <ArrowRight size={10} className="text-gray-600" />
+                        <ArrowRight size={10} className="text-zinc-300" />
                         <span className="text-gray-200 font-semibold">Setup B: {change.setup_b} {change.unit}</span>
                       </div>
-                      <div className="text-[10px] text-gray-500 mt-1">
+                      <div className="text-xs text-zinc-400 mt-1">
                         Δ Absolute: {change.delta_abs > 0 ? "+" : ""}{change.delta_abs} {change.unit}
                       </div>
                     </div>
@@ -519,14 +525,14 @@ function CompareContent() {
                       2. What Improved
                     </h3>
                   </div>
-                  <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/30">
+                  <span className="text-xs font-mono text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-500/30">
                     {comparisonResult.what_improved.length} advantages
                   </span>
                 </div>
 
                 <div className="space-y-2 flex-1 overflow-y-auto max-h-[360px] pr-1">
                   {comparisonResult.what_improved.length === 0 ? (
-                    <div className="text-center py-8 text-xs text-gray-500">
+                    <div className="text-center py-8 text-xs text-zinc-400">
                       No quantified metrics showed net improvement.
                     </div>
                   ) : (
@@ -537,16 +543,16 @@ function CompareContent() {
                       >
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-semibold text-white">{imp.metric}</span>
-                          <span className="font-mono font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded text-[11px]">
+                          <span className="font-mono font-bold text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded text-xs">
                             {imp.delta_pct > 0 ? "+" : ""}{imp.delta_pct.toFixed(1)}%
                           </span>
                         </div>
-                        <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono">
+                        <div className="flex items-center justify-between text-xs text-gray-400 font-mono">
                           <span>A: {imp.baseline.toFixed(2)} {imp.unit}</span>
                           <ArrowRight size={10} className="text-emerald-500/50" />
                           <span className="text-emerald-300 font-semibold">B: {imp.candidate.toFixed(2)} {imp.unit}</span>
                         </div>
-                        <div className="text-[10px] text-gray-400 leading-tight">
+                        <div className="text-xs text-gray-400 leading-tight">
                           {imp.explanation || imp.reason}
                         </div>
                         <div className="pt-1 flex justify-end">
@@ -581,7 +587,7 @@ function CompareContent() {
                       3. What Got Worse (Tradeoffs)
                     </h3>
                   </div>
-                  <span className="text-[10px] font-mono text-amber-400 bg-amber-950/50 px-2 py-0.5 rounded border border-amber-500/30">
+                  <span className="text-xs font-mono text-amber-400 bg-amber-950/50 px-2 py-0.5 rounded border border-amber-500/30">
                     Mandatory Exposure
                   </span>
                 </div>
@@ -599,16 +605,16 @@ function CompareContent() {
                       >
                         <div className="flex items-center justify-between text-xs">
                           <span className="font-semibold text-white">{reg.metric}</span>
-                          <span className="font-mono font-bold text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded text-[11px]">
+                          <span className="font-mono font-bold text-amber-400 bg-amber-950/80 px-2 py-0.5 rounded text-xs">
                             {reg.delta_pct > 0 ? "+" : ""}{reg.delta_pct.toFixed(1)}%
                           </span>
                         </div>
-                        <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono">
+                        <div className="flex items-center justify-between text-xs text-gray-400 font-mono">
                           <span>A: {reg.baseline.toFixed(2)} {reg.unit}</span>
                           <ArrowRight size={10} className="text-amber-500/50" />
                           <span className="text-amber-300 font-semibold">B: {reg.candidate.toFixed(2)} {reg.unit}</span>
                         </div>
-                        <div className="text-[10px] text-gray-400 leading-tight">
+                        <div className="text-xs text-gray-400 leading-tight">
                           {reg.explanation || reg.reason}
                         </div>
                         <div className="pt-1 flex justify-end">
@@ -645,13 +651,13 @@ function CompareContent() {
                     <h3 className="text-xs font-bold text-white tracking-wider uppercase">
                       4. Engineering Causality Chain
                     </h3>
-                    <p className="text-[10px] text-gray-500">
+                    <p className="text-xs text-zinc-400">
                       Step-by-step physical mechanism linking input parameter delta to dynamic chassis reaction.
                     </p>
                   </div>
                 </div>
 
-                <span className="text-[10px] font-mono text-purple-400 bg-purple-950/40 px-2.5 py-1 rounded border border-purple-500/30">
+                <span className="text-xs font-mono text-purple-400 bg-purple-950/40 px-2.5 py-1 rounded border border-purple-500/30">
                   Epistemic Phrasing: &quot;Associated With&quot;
                 </span>
               </div>
@@ -663,15 +669,15 @@ function CompareContent() {
                     className="p-3 rounded-lg bg-white/[0.02] border border-white/5 relative flex flex-col justify-between space-y-2 group hover:border-purple-500/30 transition-colors"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-mono font-bold text-purple-400 bg-purple-950/60 px-1.5 py-0.5 rounded">
+                      <span className="text-xs font-mono font-bold text-purple-400 bg-purple-950/60 px-1.5 py-0.5 rounded">
                         Step 0{idx + 1}
                       </span>
-                      <span className="text-[9px] text-gray-500 uppercase font-mono">Causality Node</span>
+                      <span className="text-xs text-zinc-400 uppercase font-mono">Causality Node</span>
                     </div>
                     <p className="text-xs text-gray-300 leading-relaxed">
                       {clause}
                     </p>
-                    <div className="text-[9px] text-gray-500 pt-1 border-t border-white/5 font-mono">
+                    <div className="text-xs text-zinc-400 pt-1 border-t border-white/5 font-mono">
                       Mechanics Rule: Verified
                     </div>
                   </div>
@@ -686,20 +692,20 @@ function CompareContent() {
               <div className="bg-[#0e0e12] border border-white/10 rounded-xl p-5 space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-white/10">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-md bg-ansys-yellow/10 border border-ansys-yellow/30 flex items-center justify-center text-ansys-yellow">
+                    <div className="w-6 h-6 rounded-md bg-signal/10 border border-signal/30 flex items-center justify-center text-signal">
                       <FileCheck2 size={13} />
                     </div>
                     <div>
                       <h3 className="text-xs font-bold text-white tracking-wider uppercase">
                         5. Evidence & Boundary Constraints
                       </h3>
-                      <p className="text-[10px] text-gray-500">
+                      <p className="text-xs text-zinc-400">
                         Physical travel envelopes, normal load margins, and 7-post rig correlation.
                       </p>
                     </div>
                   </div>
 
-                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded border ${
+                  <span className={`text-xs font-mono px-2 py-0.5 rounded border ${
                     comparisonResult.constraints_passed
                       ? "bg-emerald-950/50 text-emerald-400 border-emerald-500/30"
                       : "bg-red-950/50 text-red-400 border-red-500/30"
@@ -727,12 +733,12 @@ function CompareContent() {
                           )}
                           <span className="text-xs font-semibold text-white">{con.constraint}</span>
                         </div>
-                        <p className="text-[10px] text-gray-400 pl-5">{con.detail}</p>
+                        <p className="text-xs text-gray-400 pl-5">{con.detail}</p>
                       </div>
 
                       <div className="text-right shrink-0">
                         <div className="text-xs font-mono font-bold text-white">{con.actual}</div>
-                        <div className="text-[10px] text-gray-500 font-mono">Limit: {con.limit}</div>
+                        <div className="text-xs text-zinc-400 font-mono">Limit: {con.limit}</div>
                       </div>
                     </div>
                   ))}
@@ -740,19 +746,19 @@ function CompareContent() {
 
                 {/* Evidence Rig Provenance */}
                 <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1.5 text-xs">
-                  <div className="flex items-center justify-between text-[11px] text-gray-400">
+                  <div className="flex items-center justify-between text-xs text-gray-400">
                     <span>Validation Benchmarks:</span>
                     <span className="text-white font-mono">{comparisonResult.evidence.benchmarks}</span>
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-gray-400">
+                  <div className="flex items-center justify-between text-xs text-gray-400">
                     <span>Rig Correlation (R²):</span>
-                    <span className="text-ansys-yellow font-mono font-bold">
+                    <span className="text-signal font-mono font-bold">
                       {comparisonResult.evidence.correlation_r2.toFixed(3)}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-gray-400">
+                  <div className="flex items-center justify-between text-xs text-gray-400">
                     <span>Numerical Solver:</span>
-                    <span className="text-gray-300 font-mono text-[10px]">{comparisonResult.evidence.solver}</span>
+                    <span className="text-gray-300 font-mono text-xs">{comparisonResult.evidence.solver}</span>
                   </div>
                 </div>
               </div>
@@ -768,13 +774,13 @@ function CompareContent() {
                       <h3 className="text-xs font-bold text-white tracking-wider uppercase">
                         6. Confidence & Model Domain Limitations
                       </h3>
-                      <p className="text-[10px] text-gray-500">
+                      <p className="text-xs text-zinc-400">
                         Never overstate confidence. Explicit boundary conditions.
                       </p>
                     </div>
                   </div>
 
-                  <span className="text-[10px] font-mono text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/30">
+                  <span className="text-xs font-mono text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-500/30">
                     Domain Bounded
                   </span>
                 </div>
@@ -785,24 +791,24 @@ function CompareContent() {
                       <Info size={13} />
                       <span>Decisive Readiness: Track Test Ready (with Caveats)</span>
                     </div>
-                    <p className="text-[11px] text-gray-300 leading-relaxed">
+                    <p className="text-xs text-gray-300 leading-relaxed">
                       Numerical state stability confirmed under nominal road harmonic inputs. Prior to high-speed curbs, physical bump stop rubber progressive stiffness should be measured on damper dyno.
                     </p>
                   </div>
 
                   <div className="space-y-2">
-                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                    <div className="text-xs font-bold text-gray-400 uppercase tracking-wider">
                       Physics Engine Domain Limitations:
                     </div>
                     <ul className="space-y-1.5">
                       {comparisonResult.evidence.limitations.map((lim, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-[11px] text-gray-400">
-                          <span className="text-ansys-yellow mt-0.5">•</span>
+                        <li key={idx} className="flex items-start gap-2 text-xs text-gray-400">
+                          <span className="text-signal mt-0.5">•</span>
                           <span>{lim}</span>
                         </li>
                       ))}
-                      <li className="flex items-start gap-2 text-[11px] text-gray-400">
-                        <span className="text-ansys-yellow mt-0.5">•</span>
+                      <li className="flex items-start gap-2 text-xs text-gray-400">
+                        <span className="text-signal mt-0.5">•</span>
                         <span>Damper cavitation and blow-off bypass under severe kerb strikes exceeding 1.8 m/s are linearized.</span>
                       </li>
                     </ul>
@@ -810,7 +816,7 @@ function CompareContent() {
 
                   {/* Test CTA inside card */}
                   <div className="pt-2 border-t border-white/10 flex items-center justify-between">
-                    <span className="text-[10px] text-gray-500">
+                    <span className="text-xs text-zinc-400">
                       Want to verify this candidate in the 1-Click Builder?
                     </span>
                     <button

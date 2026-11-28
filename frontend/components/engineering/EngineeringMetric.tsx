@@ -54,7 +54,7 @@ export default function EngineeringMetric({
     >
       {/* Top Header: Label, State Badge, Why Button */}
       <div className="flex items-center justify-between gap-2 mb-2">
-        <div className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider truncate font-sans">
+        <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider truncate font-sans">
           {label}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -105,10 +105,10 @@ export default function EngineeringMetric({
               {delta.value > 0 ? `+${delta.value}` : delta.value}
               {delta.unit || "%"}
             </span>
-            {delta.label && <span className="text-[10px] text-gray-500 font-normal font-sans">({delta.label})</span>}
+            {delta.label && <span className="text-xs text-zinc-400 font-normal font-sans">({delta.label})</span>}
           </div>
         ) : (
-          <div className="text-[10px] text-gray-500 truncate font-sans">{subtext || ""}</div>
+          <div className="text-xs text-zinc-400 truncate font-sans">{subtext || ""}</div>
         )}
       </div>
     </div>

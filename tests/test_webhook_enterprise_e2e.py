@@ -1,3 +1,4 @@
+import os
 import pytest
 from httpx import AsyncClient
 from unittest.mock import patch, MagicMock, AsyncMock
@@ -21,8 +22,8 @@ async def test_webhook_enterprise_e2e_upgrade_downgrade(client: AsyncClient, db_
     await db_session.refresh(user)
 
     from suspensionlab.backend.api.routes import billing_routes
-    billing_routes.STRIPE_WEBHOOK_SECRET = "whsec_test"
-    billing_routes.STRIPE_ENTERPRISE_PRICE_ID = "price_ent_test"
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+    os.environ["STRIPE_ENTERPRISE_PRICE_ID"] = "price_ent_test"
 
     class MockStripeObject(dict):
         def __init__(self, **kwargs):

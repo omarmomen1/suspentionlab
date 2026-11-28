@@ -48,7 +48,7 @@ export default function VerdictRail({
   return (
     <aside data-testid="verdict-rail" aria-label="Verdict" className="flex flex-col gap-3 rounded border border-hairline bg-panel p-4">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">Verdict</span>
+        <span className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Verdict</span>
         <StatusPill status={status} detail={statusDetail} label={statusLabel} />
       </div>
       <dl className="space-y-2.5">
@@ -56,7 +56,7 @@ export default function VerdictRail({
           const text = formatHero(h);
           return (
             <div key={h.label} className="border-t border-hairline pt-2 first:border-t-0 first:pt-0">
-              <dt className="text-[10px] uppercase tracking-wider text-gray-500">{h.label}</dt>
+              <dt className="text-xs uppercase tracking-wider text-zinc-400">{h.label}</dt>
               <dd className="mt-0.5">
                 {text === null ? (
                   <EmptyState kind="unavailable" />
@@ -80,7 +80,7 @@ export default function VerdictRail({
           onClick={action.onClick}
           disabled={action.disabled || action.loading}
           data-testid="verdict-action"
-          className="rounded border border-signal bg-signal px-4 py-2.5 text-sm font-bold text-carbon transition-colors hover:bg-[#d6f56e] disabled:cursor-not-allowed disabled:border-hairline disabled:bg-transparent disabled:text-gray-500"
+          className="rounded border border-signal bg-signal px-4 py-2.5 text-sm font-bold text-carbon transition-colors hover:bg-[#d6f56e] disabled:cursor-not-allowed disabled:border-hairline disabled:bg-transparent disabled:text-zinc-400"
         >
           {action.loading ? "Solving..." : action.label}
         </button>

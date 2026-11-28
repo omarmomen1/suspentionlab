@@ -617,7 +617,7 @@ async def hydrate_report_endpoint(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.exception("Failed to hydrate report: %s", e)
-        raise HTTPException(status_code=500, detail=f"Hydration error: {e}")
+        raise HTTPException(status_code=500, detail="Hydration error.")
 
 
 @router.post("/create_from_run")
@@ -669,7 +669,7 @@ async def create_from_run_endpoint(
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
         logger.exception("Error in create_from_run: %s", e)
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.get("/record/{report_id_or_token}")

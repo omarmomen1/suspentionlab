@@ -14,9 +14,9 @@ export interface EmptyStateProps {
  */
 export default function EmptyState({ kind = "unavailable", reason, className = "" }: EmptyStateProps) {
   return (
-    <span data-testid="empty-state" data-kind={kind} className={`text-gray-500 ${className}`}>
+    <span data-testid="empty-state" data-kind={kind} className={`text-zinc-400 ${className}`}>
       <span className="text-sm">{kind === "not_run" ? "Not run" : "Not available"}</span>
-      {reason && <span className="ml-2 text-[11px] text-gray-600">{reason}</span>}
+      {reason && <span className="ml-2 text-xs text-zinc-300">{reason}</span>}
     </span>
   );
 }

@@ -33,7 +33,7 @@ export default function TrustPage() {
     <main className="min-h-screen bg-[#0a0a0b] text-white">
       {/* Hero */}
       <section className="max-w-4xl mx-auto px-6 pt-28 pb-16">
-        <span className="text-[10px] font-bold tracking-[0.25em] text-ansys-yellow uppercase">Enterprise readiness</span>
+        <span className="text-xs font-bold tracking-[0.25em] text-signal uppercase">Enterprise readiness</span>
         <h1 className="text-4xl md:text-5xl font-bold mt-3 leading-tight">
           Trust & Security at<br />SuspensionLab PRO
         </h1>
@@ -41,7 +41,7 @@ export default function TrustPage() {
           Everything on this page is implemented in the product — every control
           names the module that enforces it, and the machine-readable posture is
           available at{" "}
-          <code className="text-ansys-yellow/90 text-xs">GET /api/v1/trust</code>{" "}
+          <code className="text-signal/90 text-xs">GET /api/v1/trust</code>{" "}
           for your automated vendor review.
         </p>
       </section>
@@ -54,9 +54,9 @@ export default function TrustPage() {
             const Icon = c.icon;
             return (
               <div key={c.name} className="rounded-2xl border border-[#1e1e1e] bg-[#111113] p-5">
-                <Icon size={18} className="text-ansys-yellow mb-3" />
+                <Icon size={18} className="text-signal mb-3" />
                 <h3 className="text-sm font-semibold">{c.name}</h3>
-                <p className="text-xs text-gray-500 mt-2 leading-relaxed">{c.evidence}</p>
+                <p className="text-xs text-zinc-400 mt-2 leading-relaxed">{c.evidence}</p>
               </div>
             );
           })}
@@ -66,10 +66,10 @@ export default function TrustPage() {
       {/* Data residency */}
       <section className="max-w-4xl mx-auto px-6 pb-16">
         <div className="flex items-center gap-2 mb-2">
-          <Globe size={16} className="text-ansys-yellow" />
+          <Globe size={16} className="text-signal" />
           <h2 className="text-xl font-semibold">Data residency</h2>
         </div>
-        <p className="text-xs text-gray-500 mb-6 max-w-2xl">
+        <p className="text-xs text-zinc-400 mb-6 max-w-2xl">
           Enterprise teams choose where their data lives. Each region runs an
           isolated stack with its own database and storage; selection is recorded
           per team and audited.
@@ -78,8 +78,8 @@ export default function TrustPage() {
           {REGIONS.map((r) => (
             <div key={r.id} className="rounded-2xl border border-[#1e1e1e] bg-[#111113] p-5">
               <p className="text-sm font-semibold">{r.label}</p>
-              <p className="text-xs text-gray-500 mt-2">{r.detail}</p>
-              <p className="text-[10px] font-mono text-gray-700 mt-3">{r.id}</p>
+              <p className="text-xs text-zinc-400 mt-2">{r.detail}</p>
+              <p className="text-xs font-mono text-zinc-300 mt-3">{r.id}</p>
             </div>
           ))}
         </div>
@@ -90,12 +90,12 @@ export default function TrustPage() {
         <div className="rounded-2xl border border-[#1e1e1e] bg-[#111113] p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-sm font-semibold">Responsible disclosure</h2>
-            <p className="text-xs text-gray-500 mt-1 flex items-center gap-1.5">
+            <p className="text-xs text-zinc-400 mt-1 flex items-center gap-1.5">
               <Mail size={12} /> security@suspensionlab.com — we respond within one business day.
             </p>
           </div>
           <Link href="/pricing"
-            className="shrink-0 px-5 py-2.5 bg-ansys-yellow text-black text-xs font-bold rounded-xl hover:brightness-110 transition-all">
+            className="shrink-0 px-5 py-2.5 bg-signal text-carbon text-xs font-bold rounded-xl hover:brightness-110 transition-all">
             View plans
           </Link>
         </div>

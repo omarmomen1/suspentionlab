@@ -13,6 +13,9 @@ POST /api/v1/experiments/batch-optimize → Batch optimization & multi-objective
 from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -88,7 +91,8 @@ async def run_experiment(
     except ValueError as val_err:
         raise HTTPException(status_code=400, detail=str(val_err))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Experiment simulation failed: {exc}")
+        logger.exception("Experiment simulation failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Experiment simulation failed.")
 
 
 @router.get("")
@@ -172,7 +176,8 @@ async def compare_setups(
             road_profile=req.road_profile,
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Comparison evaluation failed: {exc}")
+        logger.exception("Comparison evaluation failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Comparison evaluation failed.")
 
 
 @router.post("/batch-optimize")
@@ -190,4 +195,5 @@ async def batch_optimize(
             road_profile=req.road_profile,
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Batch optimization failed: {exc}")
+        logger.exception("Batch optimization failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Batch optimization failed.")

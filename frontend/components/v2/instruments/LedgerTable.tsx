@@ -37,10 +37,10 @@ export function ledgerDelta(row: Pick<LedgerRow, "value" | "base">): number | nu
 export default function LedgerTable({ rows, caption, pinnedIds = [], onTogglePin }: LedgerTableProps) {
   return (
     <div data-testid="ledger-table" className="overflow-x-auto rounded border border-hairline bg-panel">
-      <table className="w-full min-w-[560px] text-left text-[11px]">
-        {caption && <caption className="p-2 text-left text-[10px] uppercase tracking-wider text-gray-500">{caption}</caption>}
+      <table className="w-full min-w-[560px] text-left text-xs">
+        {caption && <caption className="p-2 text-left text-xs uppercase tracking-wider text-zinc-400">{caption}</caption>}
         <thead>
-          <tr className="border-b border-hairline text-[10px] uppercase tracking-wider text-gray-500">
+          <tr className="border-b border-hairline text-xs uppercase tracking-wider text-zinc-400">
             {onTogglePin && <th className="w-8 p-2" aria-label="Pin" />}
             <th className="p-2">Parameter</th>
             <th className="p-2 text-right">Value</th>
@@ -77,7 +77,7 @@ export default function LedgerTable({ rows, caption, pinnedIds = [], onTogglePin
                   {d === null ? <EmptyState /> : <span className="v2-num">{`${d > 0 ? "+" : ""}${d.toFixed(dp)}`}</span>}
                 </td>
                 <td className="p-2"><StatusPill status={r.status ?? null} /></td>
-                <td className="p-2 text-gray-500">{r.source}</td>
+                <td className="p-2 text-zinc-400">{r.source}</td>
               </tr>
             );
           })}

@@ -1,12 +1,11 @@
 "use client";
-import { useState, useEffect, useMemo } from "react";
-import { Car, Search, Trash2, Plus, ArrowRight, X, Layers } from "lucide-react";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Car, Search, Trash2, Plus, ArrowRight, X, Layers, RefreshCw, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 
 import { useAuth } from "../../contexts/AuthContext";
 import { apiFetch } from "../../lib/api";
-
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+import { formatApiError } from "../../lib/api_client";
 
 interface VehicleProfile {
   id: string;
@@ -21,8 +20,8 @@ type Toast = { msg: string; type: "success" | "error" };
 
 // Vehicle type metadata
 const VEHICLE_META: Record<string, { label: string; color: string; href: string }> = {
-  QUARTER_CAR: { label: "Quarter Car (2-DOF)", color: "text-ansys-yellow",   href: "/quarter-car" },
-  HALF_CAR:    { label: "Half Car (4-DOF)",    color: "text-[#0af]",          href: "/half-car"    },
+  QUARTER_CAR: { label: "Quarter Car (2-DOF)", color: "text-signal",          href: "/quarter-car" },
+  HALF_CAR:    { label: "Half Car (4-DOF)",    color: "text-[#57c8dc]",       href: "/half-car"    },
   FULL_CAR:    { label: "Full Car (7-DOF)",    color: "text-[#bf5af2]",       href: "/full-car"    },
 };
 
@@ -38,9 +37,10 @@ function SkeletonCard() {
 }
 
 export default function GarageDashboard() {
-  const { fetchWithAuth } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [profiles,     setProfiles]     = useState<VehicleProfile[]>([]);
   const [loading,      setLoading]      = useState(true);
+  const [loadError,    setLoadError]    = useState<string | null>(null);
   const [searchQuery,  setSearchQuery]  = useState("");
   const [filterType,   setFilterType]   = useState("ALL");
   const [toast,        setToast]        = useState<Toast | null>(null);
@@ -48,28 +48,37 @@ export default function GarageDashboard() {
 
   const showToast = (msg: string, type: Toast["type"]) => {
     setToast({ msg, type });
-    setTimeout(() => setToast(null), 3000);
+    setTimeout(() => setToast(null), 4000);
   };
 
-  useEffect(() => {
-    const fetchProfiles = async () => {
-      setLoading(true);
-      try {
-        const res = await apiFetch("/api/v1/profiles");
-        if (res.ok) {
-          const data = await res.json();
-          setProfiles(Array.isArray(data) ? data : []);
-        }
-        else showToast("Failed to load profiles — check API connection", "error");
-      } catch {
-        showToast("Cannot reach the API server", "error");
-      } finally {
-        setLoading(false);
+  const fetchProfiles = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await apiFetch("/api/v1/profiles/");
+      if (res.ok) {
+        const data = await res.json();
+        setProfiles(Array.isArray(data) ? data : []);
+      } else {
+        const errBody = await res.json().catch(() => null);
+        const msg = res.status === 401
+          ? "Sign in to view your saved Garage setups."
+          : (errBody?.detail ? String(errBody.detail) : formatApiError(errBody, `Failed to load profiles (${res.status})`));
+        setLoadError(msg);
       }
-    };
-    
-    fetchProfiles();
+    } catch (err) {
+      const msg = formatApiError(err, "Cannot reach the API server");
+      setLoadError(msg);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    if (!authLoading) {
+      fetchProfiles();
+    }
+  }, [authLoading, user?.user_id, fetchProfiles]);
 
   const deleteProfile = async (id: string) => {
     setDeletingId(id);
@@ -127,21 +136,30 @@ export default function GarageDashboard() {
       <div className="flex-1 overflow-y-auto custom-scrollbar p-6 md:p-10 max-w-7xl mx-auto w-full">
 
         {/* Header */}
-        <div className="flex items-start justify-between mb-8 gap-6">
+        <div className="flex flex-wrap items-start justify-between mb-8 gap-6">
           <div className="flex flex-col">
-            <span className="text-[10px] font-bold tracking-[0.2em] text-ansys-yellow uppercase mb-1">
+            <span className="text-xs font-bold tracking-[0.2em] text-signal uppercase mb-1">
               Fleet Management
             </span>
             <h1 className="text-4xl font-semibold tracking-tight text-white">Vehicle Garage</h1>
-            <p className="text-gray-400 text-sm mt-1.5">
+            <p className="text-zinc-300 text-sm mt-1.5">
               {profiles.length} saved configuration{profiles.length !== 1 ? "s" : ""} · Click any card to load it into the simulator
             </p>
           </div>
 
-          {/* Search + filter */}
+          {/* Search + filter + refresh */}
           <div className="flex items-center gap-3 flex-shrink-0">
+            <button
+              type="button"
+              onClick={fetchProfiles}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#111113] border border-[#27272a] text-xs font-semibold text-zinc-200 hover:border-signal/60 hover:text-white disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw size={13} className={loading ? "animate-spin" : ""} />
+              Refresh
+            </button>
             <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
               <input
                 type="text"
                 aria-label="Search setups"
@@ -149,24 +167,40 @@ export default function GarageDashboard() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search setups…"
                 className="bg-[#111113] border border-[#1e1e1e] text-sm rounded-xl pl-9 pr-9 py-2
-                  text-white focus:outline-none focus:border-ansys-yellow/60 focus:ring-1
-                  focus:ring-ansys-yellow/15 w-64 placeholder:text-gray-400 transition-all"
+                  text-white focus:outline-none focus:border-signal/60 focus:ring-1
+                  focus:ring-signal/15 w-64 placeholder:text-zinc-400 transition-all"
               />
               {searchQuery && (
                 <button onClick={() => setSearchQuery("")}
                   aria-label="Clear search"
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200">
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200">
                   <X size={13} />
                 </button>
               )}
             </div>
             <Link href="/quarter-car"
-              className="flex items-center gap-1.5 px-4 py-2 bg-ansys-yellow text-black text-xs font-bold
-                rounded-xl hover:brightness-110 transition-all shadow-[0_0_16px_rgba(242,169,0,0.15)]">
+              className="flex items-center gap-1.5 px-4 py-2 bg-signal text-carbon text-xs font-bold
+                rounded-xl hover:brightness-110 transition-all">
               <Plus size={14} /> New Setup
             </Link>
           </div>
         </div>
+
+        {loadError && (
+          <div role="alert" className="mb-6 flex items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+            <div className="flex items-center gap-2.5">
+              <AlertTriangle size={16} className="text-amber-400 shrink-0" />
+              <span>{loadError}</span>
+            </div>
+            <button
+              type="button"
+              onClick={fetchProfiles}
+              className="px-3 py-1 rounded-lg bg-signal text-carbon text-xs font-bold shrink-0 hover:brightness-110"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
         {/* Type filter pills */}
         {!loading && profiles.length > 0 && (
@@ -179,7 +213,7 @@ export default function GarageDashboard() {
                 <button key={type} onClick={() => setFilterType(type)}
                   className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all border ${
                     filterType === type
-                      ? "bg-ansys-yellow text-black border-ansys-yellow"
+                      ? "bg-signal text-carbon border-signal"
                       : "bg-[#111113] border-[#1e1e1e] text-gray-400 hover:text-gray-200"
                   }`}>
                   {meta?.label ?? "All Types"} <span className="opacity-60 ml-1">({count})</span>
@@ -206,7 +240,7 @@ export default function GarageDashboard() {
               Save a vehicle configuration from any simulation module to store and reload it here.
             </p>
             <Link href="/quarter-car"
-              className="px-4 py-2 bg-ansys-yellow text-black font-bold rounded-xl flex items-center gap-2 hover:brightness-110 transition-all">
+              className="px-4 py-2 bg-signal text-carbon font-bold rounded-xl flex items-center gap-2 hover:brightness-110 transition-all">
               <Plus size={16} /> Create Your First Setup
             </Link>
           </div>
@@ -218,7 +252,7 @@ export default function GarageDashboard() {
             <Layers size={40} className="mb-3 opacity-30" />
             <p className="text-sm">No profiles match &quot;<span className="text-gray-300">{searchQuery}</span>&quot;</p>
             <button onClick={() => { setSearchQuery(""); setFilterType("ALL"); }}
-              className="mt-3 text-xs text-ansys-yellow hover:underline">
+              className="mt-3 text-xs text-signal hover:underline">
               Clear filters
             </button>
           </div>
@@ -236,7 +270,7 @@ export default function GarageDashboard() {
                   <div className="flex justify-between items-start mb-3">
                     <div className="min-w-0 pr-2">
                       <h2 className="text-base font-bold text-white mb-0.5 truncate">{p.name}</h2>
-                      <span className={`text-[10px] font-bold uppercase tracking-wider ${meta.color}`}>
+                      <span className={`text-xs font-bold uppercase tracking-wider ${meta.color}`}>
                         {meta.label}
                       </span>
                     </div>
@@ -257,12 +291,12 @@ export default function GarageDashboard() {
                     <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                       {Object.entries(p.params).slice(0, 8).map(([k, v]) => (
                         <div key={k} className="flex justify-between gap-1 min-w-0">
-                          <span className="text-[10px] text-gray-600 truncate">{k}:</span>
-                          <span className="text-[10px] text-gray-300 font-mono shrink-0">{String(v)}</span>
+                          <span className="text-xs text-zinc-300 truncate">{k}:</span>
+                          <span className="text-xs text-gray-300 font-mono shrink-0">{String(v)}</span>
                         </div>
                       ))}
                       {Object.keys(p.params).length > 8 && (
-                        <div className="col-span-2 text-[9px] text-gray-700 text-center mt-1 italic">
+                        <div className="col-span-2 text-xs text-zinc-300 text-center mt-1 italic">
                           +{Object.keys(p.params).length - 8} more parameters
                         </div>
                       )}
@@ -270,7 +304,7 @@ export default function GarageDashboard() {
                   </div>
 
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-gray-700">
+                    <span className="text-xs text-zinc-300">
                       {new Date(p.updated_at).toLocaleDateString("en-GB", {
                         day: "numeric", month: "short", year: "numeric",
                       })}
@@ -278,7 +312,7 @@ export default function GarageDashboard() {
                     <Link
                       href={`${meta.href}?load=${p.id}`}
                       className="flex items-center gap-1 text-xs font-bold text-gray-400
-                        hover:text-ansys-yellow transition-colors">
+                        hover:text-signal transition-colors">
                       Load Setup <ArrowRight size={13} />
                     </Link>
                   </div>

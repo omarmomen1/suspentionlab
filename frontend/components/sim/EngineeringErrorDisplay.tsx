@@ -295,12 +295,12 @@ RAW DETAILS: ${diag.rawDetails || "N/A"}`;
               <h3 className="font-extrabold text-sm text-white tracking-tight">
                 Engineering Solver Diagnostics &amp; Failure Analysis
               </h3>
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold border ${getSeverityBadge()}`}>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold border ${getSeverityBadge()}`}>
                 {diag.severity}
               </span>
             </div>
-            <div className="text-[10px] font-mono text-gray-400 mt-0.5">
-              Ref: <span className="text-gray-300">{diag.requestId}</span> | Code: <span className="text-ansys-yellow">{diag.code}</span>
+            <div className="text-xs font-mono text-gray-400 mt-0.5">
+              Ref: <span className="text-gray-300">{diag.requestId}</span> | Code: <span className="text-signal">{diag.code}</span>
               {retryCount > 0 && <span className="ml-2 text-amber-400 font-bold">(Attempt #{retryCount})</span>}
             </div>
           </div>
@@ -332,13 +332,13 @@ RAW DETAILS: ${diag.rawDetails || "N/A"}`;
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
           {/* 1. WHAT FAILED */}
           <div className="p-3 rounded-xl bg-rose-950/20 border border-rose-500/30 space-y-1">
-            <span className="text-[10px] uppercase font-bold text-rose-400 flex items-center gap-1.5">
+            <span className="text-xs uppercase font-bold text-rose-400 flex items-center gap-1.5">
               <Bug size={12} /> 1. What Failed
             </span>
             <p className="text-gray-200 font-semibold leading-relaxed font-sans text-xs">{diag.whatFailed}</p>
             {diag.where && diag.where !== "Runtime Environment" && (
-              <div className="text-[10px] text-zinc-400 font-mono flex items-center gap-1 pt-1">
-                <Compass size={10} className="text-zinc-500" />
+              <div className="text-xs text-zinc-400 font-mono flex items-center gap-1 pt-1">
+                <Compass size={10} className="text-zinc-400" />
                 <span>Location: {diag.where}</span>
               </div>
             )}
@@ -346,7 +346,7 @@ RAW DETAILS: ${diag.rawDetails || "N/A"}`;
 
           {/* 2. WHY */}
           <div className="p-3 rounded-xl bg-amber-950/20 border border-amber-500/30 space-y-1">
-            <span className="text-[10px] uppercase font-bold text-amber-400 flex items-center gap-1.5">
+            <span className="text-xs uppercase font-bold text-amber-400 flex items-center gap-1.5">
               <HelpCircle size={12} /> 2. Why It Failed
             </span>
             <p className="text-gray-200 leading-relaxed font-sans text-xs">{diag.whyFailed}</p>
@@ -356,7 +356,7 @@ RAW DETAILS: ${diag.rawDetails || "N/A"}`;
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs font-mono">
           {/* 3. WHAT REMAINS VALID */}
           <div className="p-3 rounded-xl bg-emerald-950/20 border border-emerald-500/30 space-y-1">
-            <span className="text-[10px] uppercase font-bold text-emerald-400 flex items-center gap-1.5">
+            <span className="text-xs uppercase font-bold text-emerald-400 flex items-center gap-1.5">
               <CheckCircle2 size={12} /> 3. What Remains Valid
             </span>
             <p className="text-zinc-300 leading-relaxed font-sans text-xs">{diag.whatRemainsValid}</p>
@@ -364,7 +364,7 @@ RAW DETAILS: ${diag.rawDetails || "N/A"}`;
 
           {/* 4. WHAT CANNOT BE CLAIMED */}
           <div className="p-3 rounded-xl bg-purple-950/20 border border-purple-500/30 space-y-1">
-            <span className="text-[10px] uppercase font-bold text-purple-400 flex items-center gap-1.5">
+            <span className="text-xs uppercase font-bold text-purple-400 flex items-center gap-1.5">
               <AlertTriangle size={12} /> 4. What Cannot Be Claimed
             </span>
             <p className="text-zinc-300 leading-relaxed font-sans text-xs">{diag.whatCannotBeClaimed}</p>
@@ -373,7 +373,7 @@ RAW DETAILS: ${diag.rawDetails || "N/A"}`;
 
         {/* 5. WHAT THE USER CAN DO NEXT */}
         <div className="p-3 rounded-xl bg-cyan-950/20 border border-cyan-500/30 space-y-1">
-          <span className="text-[10px] uppercase font-bold text-cyan-400 flex items-center gap-1.5">
+          <span className="text-xs uppercase font-bold text-cyan-400 flex items-center gap-1.5">
             <Info size={12} /> 5. What You Can Do Next
           </span>
           <p className="text-cyan-200 font-semibold leading-relaxed font-sans text-xs">{diag.whatUserCanDoNext}</p>
@@ -384,7 +384,7 @@ RAW DETAILS: ${diag.rawDetails || "N/A"}`;
       <div className="flex items-center justify-between pt-2 border-t border-white/[0.06]">
         <button
           onClick={() => setShowRaw((v) => !v)}
-          className="text-[11px] font-mono text-gray-400 hover:text-white flex items-center gap-1 transition-colors"
+          className="text-xs font-mono text-gray-400 hover:text-white flex items-center gap-1 transition-colors"
         >
           <ChevronDown size={13} className={`transition-transform ${showRaw ? "rotate-180" : ""}`} />
           {showRaw ? "Hide Raw Stack Trace" : "View Raw Backend Stack Trace"}
@@ -412,7 +412,7 @@ RAW DETAILS: ${diag.rawDetails || "N/A"}`;
       </div>
 
       {showRaw && (
-        <div className="p-3 rounded-xl bg-black/60 border border-white/5 font-mono text-[11px] text-gray-400 whitespace-pre-wrap overflow-x-auto max-h-48 custom-scrollbar">
+        <div className="p-3 rounded-xl bg-black/60 border border-white/5 font-mono text-xs text-gray-400 whitespace-pre-wrap overflow-x-auto max-h-48 custom-scrollbar">
           {diag.rawDetails || "No raw details available."}
         </div>
       )}

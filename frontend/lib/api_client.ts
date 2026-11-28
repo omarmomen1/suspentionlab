@@ -2915,6 +2915,7 @@ export class HandlingApi {
     diagram: any;
     validity: any;
     provenance: any;
+    assumptions_warnings?: string[];
   }> {
     return apiJson("/api/v1/handling/diagram", {
       method: "POST",

@@ -32,10 +32,10 @@ export default function TimelineEvent({
     <div className={`p-4 rounded-2xl bg-[#111116] border border-white/[0.08] font-mono text-xs space-y-2 ${className}`}>
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-ansys-yellow" />
+          <span className="w-2 h-2 rounded-full bg-signal" />
           <span className="font-bold text-white text-sm font-sans">{event}</span>
         </div>
-        <div className="flex items-center gap-1 text-[11px] text-gray-400">
+        <div className="flex items-center gap-1 text-xs text-gray-400">
           <Clock size={11} />
           <span>{new Date(timestamp).toLocaleTimeString()}</span>
         </div>
@@ -43,7 +43,7 @@ export default function TimelineEvent({
 
       {description && <p className="text-xs text-gray-300 font-sans">{description}</p>}
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-[10px] text-gray-500 pt-2 border-t border-white/[0.06]">
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-400 pt-2 border-t border-white/[0.06]">
         <div className="flex items-center gap-1">
           <User size={11} /> <span>Actor:</span> <span className="text-gray-400">{actor}</span>
         </div>
@@ -53,7 +53,7 @@ export default function TimelineEvent({
         {onViewEvidenceGraph && (entityType || entityId) && (
           <button
             onClick={() => onViewEvidenceGraph(entityType || "", entityId || "")}
-            className="flex items-center gap-1 px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-[10px] font-sans font-medium transition-colors"
+            className="flex items-center gap-1 px-2 py-0.5 rounded bg-rose-500/10 border border-rose-500/30 text-rose-400 hover:bg-rose-500/20 text-xs font-sans font-medium transition-colors"
             title="View in Evidence Graph"
           >
             <ShieldCheck size={10} />

@@ -33,11 +33,27 @@ async def get_current_user_id(request: Request) -> uuid.UUID:
 
 @router.get("")
 async def get_sessions(request: Request, db: AsyncSession = Depends(get_db_dependency)):
-    """List all active sessions for the current user."""
+    """List all active (non-expired) sessions for the current user."""
     user_id = await get_current_user_id(request)
     result = await db.execute(select(UserSession).where(UserSession.user_id == user_id))
     sessions = result.scalars().all()
-    
+
+    # Pass B: expired sessions are not "active" — purge and exclude them.
+    from datetime import datetime, timezone
+    now = datetime.now(timezone.utc)
+    active = []
+    for s in sessions:
+        exp = s.expires_at
+        if exp is not None:
+            if exp.tzinfo is None:
+                exp = exp.replace(tzinfo=timezone.utc)
+            if exp <= now:
+                await db.execute(delete(UserSession).where(UserSession.id == s.id))
+                continue
+        active.append(s)
+    await db.commit()
+    sessions = active
+
     return {
         "sessions": [
             {

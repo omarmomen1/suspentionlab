@@ -28,9 +28,9 @@ async def test_stripe_webhook_updates_user_plan(client: AsyncClient, db_session)
     import os
     test_price_id = os.getenv("STRIPE_PRO_PRICE_ID", "price_pro_fake")
     
-    from suspensionlab.backend.api.routes import billing_routes
-    billing_routes.STRIPE_WEBHOOK_SECRET = "whsec_test"
-    billing_routes.STRIPE_PRO_PRICE_ID = "price_pro_test"
+    import os
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+    os.environ["STRIPE_PRO_PRICE_ID"] = "price_pro_test"
     
     class FakeObject:
         def __init__(self, **kwargs):
@@ -87,9 +87,9 @@ async def test_stripe_webhook_links_user_by_client_reference_id(client: AsyncCli
     user_id = str(user.id)
     new_customer_id = "cus_brand_new_999"
 
-    from suspensionlab.backend.api.routes import billing_routes
-    billing_routes.STRIPE_WEBHOOK_SECRET = "whsec_test"
-    billing_routes.STRIPE_PRO_PRICE_ID = "price_pro_test"
+    import os
+    os.environ["STRIPE_WEBHOOK_SECRET"] = "whsec_test"
+    os.environ["STRIPE_PRO_PRICE_ID"] = "price_pro_test"
 
     class FakeObject:
         def __init__(self, **kwargs):

@@ -38,7 +38,7 @@ import dynamic from "next/dynamic";
 // The only WebGL canvas on this route; browser-only.
 const TerrainElevation3D = dynamic(() => import("../../components/v2/instruments/TerrainElevation3D"), {
   ssr: false,
-  loading: () => <p className="text-[11px] text-zinc-500 m-0">Loading 3D view</p>,
+  loading: () => <p className="text-xs text-zinc-400 m-0">Loading 3D view</p>,
 });
 import LapDeltaView, { LapRunData, VehicleSetupParameters } from "../../components/sim/LapDeltaView";
 import { darkLayout } from "../../components/sim/theme";
@@ -1032,13 +1032,13 @@ function Section({
         onClick={() => setOpen(!open)}
         className="w-full flex items-center justify-between py-1 mb-1.5 group text-left cursor-pointer"
       >
-        <span className="text-[10px] font-bold text-zinc-300 uppercase tracking-[0.14em] group-hover:text-amber-400 transition-colors font-mono">
+        <span className="text-xs font-bold text-zinc-300 uppercase tracking-[0.14em] group-hover:text-amber-400 transition-colors font-mono">
           {title}
         </span>
         {open ? (
-          <ChevronDown size={12} className="text-zinc-500 group-hover:text-amber-400 transition-colors" />
+          <ChevronDown size={12} className="text-zinc-400 group-hover:text-amber-400 transition-colors" />
         ) : (
-          <ChevronRight size={12} className="text-zinc-500 group-hover:text-amber-400 transition-colors" />
+          <ChevronRight size={12} className="text-zinc-400 group-hover:text-amber-400 transition-colors" />
         )}
       </button>
       {open && <div className="space-y-1.5">{children}</div>}
@@ -1067,13 +1067,13 @@ function ParamSlider({
 }) {
   return (
     <div className="py-1">
-      <div className="flex items-center justify-between text-[11px] mb-1">
+      <div className="flex items-center justify-between text-xs mb-1">
         <span className="text-zinc-400 font-sans truncate">{label}</span>
         <div className="flex items-center gap-1 font-mono">
           <span className={`font-bold ${highlight ? "text-amber-400" : "text-white"}`}>
             {step < 0.1 ? value.toFixed(2) : value}
           </span>
-          <span className="text-[10px] text-zinc-500">{unit}</span>
+          <span className="text-xs text-zinc-400">{unit}</span>
         </div>
       </div>
       <input
@@ -1083,7 +1083,7 @@ function ParamSlider({
         step={step}
         value={value}
         onChange={(e) => onChange(parseFloat(e.target.value))}
-        className="w-full h-1 bg-[#1c2230] rounded-lg appearance-none cursor-pointer accent-[#f2a900]"
+        className="w-full h-1 bg-[#1c2230] rounded-lg appearance-none cursor-pointer accent-[#C8F04B]"
       />
     </div>
   );
@@ -1103,17 +1103,17 @@ function KpiPill({
   return (
     <div
       className={`px-3 py-2 rounded-xl border flex flex-col justify-between transition-colors ${
-        accent ? "bg-[#151922] border-[#f2a900]/40 shadow-sm" : "bg-[#0D1017] border-[#1f2430]"
+        accent ? "bg-[#151922] border-[#C8F04B]/40 shadow-sm" : "bg-[#0D1017] border-[#1f2430]"
       }`}
     >
-      <span className="text-[9px] font-bold uppercase tracking-wider text-zinc-500 font-mono">
+      <span className="text-xs font-bold uppercase tracking-wider text-zinc-400 font-mono">
         {label}
       </span>
       <div className="flex items-baseline gap-1 mt-0.5">
-        <span className={`text-base font-black font-mono leading-none ${accent ? "text-[#f2a900]" : "text-white"}`}>
+        <span className={`text-base font-black font-mono leading-none ${accent ? "text-[#C8F04B]" : "text-white"}`}>
           {value}
         </span>
-        {unit && <span className="text-[9px] text-zinc-500 font-mono">{unit}</span>}
+        {unit && <span className="text-xs text-zinc-400 font-mono">{unit}</span>}
       </div>
     </div>
   );
@@ -1785,16 +1785,16 @@ export default function LapSimPage() {
           {/* Header */}
           <div className="pb-2.5 border-b border-[#191F2B]">
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-5 h-5 rounded-md bg-[#f2a900]/15 border border-[#f2a900]/40 flex items-center justify-center">
-                <Timer size={12} className="text-[#f2a900]" />
+              <div className="w-5 h-5 rounded-md bg-[#C8F04B]/15 border border-[#C8F04B]/40 flex items-center justify-center">
+                <Timer size={12} className="text-[#C8F04B]" />
               </div>
               <h1 className="text-xs font-bold text-white tracking-wide">ApexSim Cockpit</h1>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 font-mono ml-auto">
+              <span className="text-xs px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30 font-mono ml-auto">
                 PRO SOLVER
               </span>
               <NextStepLink />
             </div>
-            <p className="text-[10px] text-zinc-400 leading-relaxed font-sans">
+            <p className="text-xs text-zinc-400 leading-relaxed font-sans">
               Coupled aero, mass, &amp; suspension multi-body lap solver
             </p>
           </div>
@@ -1956,7 +1956,7 @@ export default function LapSimPage() {
               onClick={() => handleSimulate()}
               disabled={running}
               id="run-lap-sim-btn"
-              className="w-full py-2.5 rounded-xl text-[11px] font-bold uppercase tracking-wider bg-signal text-carbon border border-signal hover:bg-[#d6f56e] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-signal text-carbon border border-signal hover:bg-[#d6f56e] transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
             >
               {running ? (
                 <>
@@ -1974,7 +1974,7 @@ export default function LapSimPage() {
             <button
               onClick={handlePinBaseline}
               disabled={!result}
-              className="w-full py-2 rounded-xl text-[10px] font-mono font-bold bg-[#141A25] hover:bg-[#1D2535] text-amber-300 border border-amber-500/35 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 shadow-sm"
+              className="w-full py-2 rounded-xl text-xs font-mono font-bold bg-[#141A25] hover:bg-[#1D2535] text-amber-300 border border-amber-500/35 transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-40 shadow-sm"
             >
               <Pin size={11} />
               {pinnedBaseline ? `Setup A Pinned (${pinnedBaseline.lap.lap_time_s.toFixed(3)}s)` : "Pin as Baseline (Setup A)"}
@@ -1984,7 +1984,7 @@ export default function LapSimPage() {
           {error && (
             <div className="p-2.5 rounded-lg bg-red-950/40 border border-red-900/50 flex items-start gap-2">
               <AlertCircle size={12} className="text-red-400 mt-0.5 flex-shrink-0" />
-              <p className="text-[10px] text-red-400 leading-relaxed font-mono">{error}</p>
+              <p className="text-xs text-red-400 leading-relaxed font-mono">{error}</p>
             </div>
           )}
         </aside>
@@ -2007,7 +2007,7 @@ export default function LapSimPage() {
                     onClick={() => setTrackInputTab(tab.id)}
                     className={`px-3 py-1.5 rounded-lg text-xs font-bold font-mono transition-all cursor-pointer ${
                       trackInputTab === tab.id
-                        ? "bg-[#f2a900] text-black shadow-md"
+                        ? "bg-signal text-carbon shadow-md"
                         : "text-zinc-400 hover:text-white"
                     }`}
                   >
@@ -2018,7 +2018,7 @@ export default function LapSimPage() {
 
               {/* Prominent Vehicle Context Badge & Overrides Lock */}
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#10141F] border border-[#232C3D] text-[10px] font-mono shadow-sm">
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#10141F] border border-[#232C3D] text-xs font-mono shadow-sm">
                   <Car size={12} className="text-[#06B6D4]" />
                   <span className="text-zinc-400 font-bold">VEHICLE:</span>
                   <span className="text-white font-bold">
@@ -2031,7 +2031,7 @@ export default function LapSimPage() {
                   type="button"
                   onClick={() => setManualOverridesLocked((prev) => !prev)}
                   title={manualOverridesLocked ? "Manual vehicle overrides locked" : "Auto-switch presets on track change active"}
-                  className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold border transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition-all cursor-pointer ${
                     manualOverridesLocked
                       ? "bg-amber-500/15 border-amber-500/40 text-amber-300"
                       : "bg-white/[0.04] border-white/10 text-zinc-400 hover:text-white"
@@ -2045,13 +2045,13 @@ export default function LapSimPage() {
             {/* Sub-controls depending on active Tab */}
             {trackInputTab === "preset" && (
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-zinc-400 font-mono">Circuit:</span>
+                <span className="text-xs text-zinc-400 font-mono">Circuit:</span>
                 <div className="flex rounded-lg border border-[#232B3D] overflow-hidden bg-[#0D1017]">
                   {CHAMPIONSHIP_CIRCUITS.map((c) => (
                     <button
                       key={c.id}
                       onClick={() => setSelectedCircuitId(c.id)}
-                      className={`px-2.5 py-1 text-[10px] font-mono font-bold transition-colors cursor-pointer ${
+                      className={`px-2.5 py-1 text-xs font-mono font-bold transition-colors cursor-pointer ${
                         selectedCircuitId === c.id
                           ? "bg-[#06B6D4] text-black"
                           : "text-zinc-400 hover:text-white"
@@ -2066,7 +2066,7 @@ export default function LapSimPage() {
 
             {trackInputTab === "custom" && (
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono text-zinc-400">
+                <span className="text-xs font-mono text-zinc-400">
                   Length: <strong className="text-amber-400">{architectTrack.totalLengthM.toFixed(0)}m</strong>
                 </span>
                 <button
@@ -2183,12 +2183,12 @@ export default function LapSimPage() {
             </div>
           )}
           {result?.front_lltd_estimated && (
-            <div className="flex-shrink-0 px-3 py-1 bg-[#0C1018] border-b border-[#1A202D] text-zinc-500 text-[10px] font-mono">
+            <div className="flex-shrink-0 px-3 py-1 bg-[#0C1018] border-b border-[#1A202D] text-zinc-400 text-xs font-mono">
               * Front LLTD marked with an asterisk is a mechanical estimate derived from spring/ARB rates (motion ratios 0.72/0.74 assumed) - not solver output.
             </div>
           )}
           {result && (
-            <div className="flex-shrink-0 px-3 py-1 bg-[#0C1018] border-b border-[#1A202D] text-zinc-600 text-[10px] font-mono">
+            <div className="flex-shrink-0 px-3 py-1 bg-[#0C1018] border-b border-[#1A202D] text-zinc-300 text-xs font-mono">
               QSS aero/tire baseline - verify against track telemetry before committing setup changes.
             </div>
           )}
@@ -2197,11 +2197,11 @@ export default function LapSimPage() {
           {trackInputTab === "custom" && (
             <div className="flex-shrink-0 p-3 bg-[#0C1018] border-b border-[#1A202D] overflow-x-auto custom-scrollbar">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono text-zinc-400 whitespace-nowrap">Segments:</span>
+                <span className="text-xs font-mono text-zinc-400 whitespace-nowrap">Segments:</span>
                 {architectSegments.map((seg, idx) => (
                   <div
                     key={seg.id}
-                    className="flex-shrink-0 p-2 rounded-lg bg-[#141A25] border border-[#222938] text-[10px] space-y-1 min-w-[130px]"
+                    className="flex-shrink-0 p-2 rounded-lg bg-[#141A25] border border-[#222938] text-xs space-y-1 min-w-[130px]"
                   >
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-white font-mono">
@@ -2209,12 +2209,12 @@ export default function LapSimPage() {
                       </span>
                       <button
                         onClick={() => handleRemoveSegment(seg.id)}
-                        className="text-zinc-500 hover:text-rose-400 transition-colors"
+                        className="text-zinc-400 hover:text-rose-400 transition-colors"
                       >
                         <Trash2 size={10} />
                       </button>
                     </div>
-                    <div className="flex justify-between items-center text-[9px] font-mono text-zinc-400">
+                    <div className="flex justify-between items-center text-xs font-mono text-zinc-400">
                       <span>L: {seg.length_m}m</span>
                       {seg.radius_m > 0 && <span>R: {seg.radius_m}m</span>}
                     </div>
@@ -2225,7 +2225,7 @@ export default function LapSimPage() {
                     <button
                       key={t}
                       onClick={() => handleAddSegment(t)}
-                      className="px-2 py-1.5 rounded-lg bg-[#161D2B] hover:bg-[#20293D] text-[10px] font-mono text-zinc-300 border border-zinc-700 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                      className="px-2 py-1.5 rounded-lg bg-[#161D2B] hover:bg-[#20293D] text-xs font-mono text-zinc-300 border border-zinc-700 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap"
                     >
                       <Plus size={10} />
                       {t.split(" ")[0]}
@@ -2240,7 +2240,7 @@ export default function LapSimPage() {
           {trackInputTab === "csv" && cornerOpportunities.length > 0 && (
             <div className="flex-shrink-0 p-3 bg-[#0A0D15] border-b border-[#1A202D]">
               <div className="flex items-center gap-2 mb-2">
-                <Target size={14} className="text-[#f2a900]" />
+                <Target size={14} className="text-[#C8F04B]" />
                 <span className="text-xs font-bold text-white font-mono uppercase tracking-wider">
                   Top 3 Corner Opportunity Finder (Driver vs. Optimal)
                 </span>
@@ -2253,15 +2253,15 @@ export default function LapSimPage() {
                   >
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-white font-mono">{opp.name}</span>
-                      <span className="text-[11px] font-black text-rose-400 font-mono bg-rose-950/80 px-2 py-0.5 rounded border border-rose-800/40">
+                      <span className="text-xs font-black text-rose-400 font-mono bg-rose-950/80 px-2 py-0.5 rounded border border-rose-800/40">
                         +{opp.time_loss_s.toFixed(3)}s
                       </span>
                     </div>
-                    <div className="text-[10px] font-mono text-zinc-400 flex justify-between">
+                    <div className="text-xs font-mono text-zinc-400 flex justify-between">
                       <span>Driver: {opp.driver_speed_kmh.toFixed(1)} km/h</span>
                       <span className="text-amber-400">Opt: {opp.optimal_speed_kmh.toFixed(1)} km/h</span>
                     </div>
-                    <div className="text-[9px] text-zinc-300 bg-[#161C28] p-1.5 rounded border border-[#252E3E]">
+                    <div className="text-xs text-zinc-300 bg-[#161C28] p-1.5 rounded border border-[#252E3E]">
                       {opp.recommendation}
                     </div>
                   </div>
@@ -2493,7 +2493,7 @@ export default function LapSimPage() {
                       <div className="absolute top-2.5 right-3 z-10 flex items-center gap-2">
                         {(result.setup_surface.optimal_setup.uncertainty_band || result.setup_surface.uncertainty_band) && (
                           <span
-                            className="px-2 py-0.5 rounded-lg text-[10px] font-mono bg-white/[0.05] border border-white/10 text-zinc-300 shadow-sm"
+                            className="px-2 py-0.5 rounded-lg text-xs font-mono bg-white/[0.05] border border-white/10 text-zinc-300 shadow-sm"
                             title="Uncertainty band evaluated across ±5% aero and ±3% tire grip perturbations"
                           >
                             Uncertainty: ±{(result.setup_surface.optimal_setup.uncertainty_band || result.setup_surface.uncertainty_band)!.uncertainty_s.toFixed(2)}s
@@ -2507,7 +2507,7 @@ export default function LapSimPage() {
                               result.setup_surface!.optimal_setup.aero_balance_front_pct
                             )
                           }
-                          className="px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold bg-[#10B981] hover:bg-[#34D399] text-black transition-all flex items-center gap-1 cursor-pointer shadow-sm"
+                          className="px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-[#10B981] hover:bg-[#34D399] text-black transition-all flex items-center gap-1 cursor-pointer shadow-sm"
                         >
                           <Zap size={10} className="fill-black" />
                           Apply Optimal Balance (-{result.setup_surface.optimal_setup.time_gain_s.toFixed(2)}s)
@@ -2605,7 +2605,7 @@ export default function LapSimPage() {
                       ) : (
                         <div data-testid="surface-compute" className="h-full flex flex-col items-center justify-center gap-2 px-4 text-center text-xs text-zinc-400 font-mono">
                           <p>Setup-response surface (front ARB x aero balance) is not computed on the fast solve.</p>
-                          <p className="text-[10px] text-zinc-600">The backend notes it takes roughly 21-51 s instead of 0.5-1.5 s.</p>
+                          <p className="text-xs text-zinc-300">The backend notes it takes roughly 21-51 s instead of 0.5-1.5 s.</p>
                           {surfaceBusy ? (
                             <button type="button" onClick={cancelSurface} className="rounded border border-hairline px-3 py-1.5 text-xs font-semibold text-white hover:bg-white/[0.06]">
                               Cancel
@@ -2615,8 +2615,8 @@ export default function LapSimPage() {
                               Compute Setup Grid (21–51 s)
                             </button>
                           )}
-                          {surfaceBusy && <p className="text-[10px] text-zinc-500">Computing the surface...</p>}
-                          {surfaceMsg && <p role="status" className="text-[10px] text-warning">{surfaceMsg}</p>}
+                          {surfaceBusy && <p className="text-xs text-zinc-400">Computing the surface...</p>}
+                          {surfaceMsg && <p role="status" className="text-xs text-warning">{surfaceMsg}</p>}
                         </div>
                       )}
                     </div>
@@ -2627,7 +2627,7 @@ export default function LapSimPage() {
                   <label className="flex items-center gap-2 text-xs text-zinc-300">
                     <input type="checkbox" checked={includeElevation} disabled={selectedCircuitId !== "spa"} onChange={(e) => setIncludeElevation(e.target.checked)} className="accent-[#C8F04B]" />
                     Include Elevation (Spa)
-                    <span className="text-[10px] text-zinc-500">{selectedCircuitId !== "spa" ? "Only Spa has elevation data." : "Applies on the next run. Also changes the grade term, so lap time changes."}</span>
+                    <span className="text-xs text-zinc-400">{selectedCircuitId !== "spa" ? "Only Spa has elevation data." : "Applies on the next run. Also changes the grade term, so lap time changes."}</span>
                   </label>
                   <TerrainElevation3D trace={result.trace as any} />
                 </section>
@@ -2667,7 +2667,7 @@ export default function LapSimPage() {
               </>
             ) : (
               <div className="h-full flex items-center justify-center p-8">
-                <Loader2 size={24} className="animate-spin text-[#f2a900]" />
+                <Loader2 size={24} className="animate-spin text-[#C8F04B]" />
               </div>
             )}
           </div>

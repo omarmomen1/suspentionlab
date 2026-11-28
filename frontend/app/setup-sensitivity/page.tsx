@@ -87,14 +87,14 @@ function Slider({
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <span className="text-[10px] text-gray-500">{label}</span>
-        <span className="text-[11px] font-mono text-white">
-          {fmt(value)} <span className="text-gray-600 text-[9px]">{unit}</span>
+        <span className="text-xs text-zinc-400">{label}</span>
+        <span className="text-xs font-mono text-white">
+          {fmt(value)} <span className="text-zinc-300 text-xs">{unit}</span>
         </span>
       </div>
       <div className="relative h-1.5 bg-[#1a1a1c] rounded-full">
         <div
-          className="absolute h-full bg-gradient-to-r from-[#f2a900]/60 to-[#f2a900] rounded-full"
+          className="absolute h-full bg-gradient-to-r from-[#C8F04B]/60 to-[#C8F04B] rounded-full"
           style={{ width: `${pct}%` }}
         />
         <input
@@ -103,7 +103,7 @@ function Slider({
           className="absolute inset-0 w-full opacity-0 cursor-pointer h-full"
         />
       </div>
-      <div className="flex justify-between text-[8px] text-gray-700">
+      <div className="flex justify-between text-xs text-zinc-300">
         <span>{min.toLocaleString()}</span>
         <span>{max.toLocaleString()}</span>
       </div>
@@ -116,14 +116,14 @@ function Badge({
 }: { label: string; value: string | number; ok?: boolean; unit?: string }) {
   return (
     <div className="flex items-center justify-between py-1 border-b border-[#1a1a1c] last:border-0">
-      <span className="text-[10px] text-gray-500">{label}</span>
+      <span className="text-xs text-zinc-400">{label}</span>
       <div className="flex items-center gap-1.5">
         {ok !== undefined && (
           ok
             ? <CheckCircle size={10} className="text-emerald-500" />
             : <AlertCircle size={10} className="text-red-500" />
         )}
-        <span className="text-[11px] font-mono text-white">{value}{unit && <span className="text-gray-600 ml-0.5 text-[9px]">{unit}</span>}</span>
+        <span className="text-xs font-mono text-white">{value}{unit && <span className="text-zinc-300 ml-0.5 text-xs">{unit}</span>}</span>
       </div>
     </div>
   );
@@ -139,7 +139,7 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <div className="text-[9px] font-bold text-gray-600 uppercase tracking-[0.16em] mb-3">{children}</div>
+    <div className="text-xs font-bold text-zinc-300 uppercase tracking-[0.16em] mb-3">{children}</div>
   );
 }
 
@@ -238,7 +238,7 @@ function SetupSensitivityContent() {
       name: "Baseline",
       x: ["Front Δ Load Transfer"],
       y: [0],
-      marker: { color: "#f2a900" },
+      marker: { color: "#C8F04B" },
     },
     {
       type: "bar" as const,
@@ -256,7 +256,7 @@ function SetupSensitivityContent() {
         values: [si.roll_stiffness_front_nmrad, si.roll_stiffness_rear_nmrad],
         labels: ["Front", "Rear"],
         hole: 0.62,
-        marker: { colors: ["#f2a900", "#3b82f6"] },
+        marker: { colors: ["#C8F04B", "#3b82f6"] },
         textinfo: "none",
         hovertemplate: "%{label}: %{value:.0f} N·m/rad<extra></extra>",
       } as any)]
@@ -294,10 +294,10 @@ function SetupSensitivityContent() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-lg font-bold text-white flex items-center gap-2">
-              <Sliders size={18} className="text-[#f2a900]" />
+              <Sliders size={18} className="text-[#C8F04B]" />
               Setup Sensitivity
             </h1>
-            <p className="text-[11px] text-gray-500 mt-0.5">
+            <p className="text-xs text-zinc-400 mt-0.5">
               Real-time suspension setup analysis — ARB balance, ride height, aero coupling
             </p>
           </div>
@@ -307,7 +307,7 @@ function SetupSensitivityContent() {
                 onClick={() => setViewMode("diff")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all ${
                   viewMode === "diff"
-                    ? "bg-ansys-yellow text-black shadow-md"
+                    ? "bg-signal text-carbon shadow-md"
                     : "text-gray-400 hover:text-white"
                 }`}
               >
@@ -318,7 +318,7 @@ function SetupSensitivityContent() {
                 onClick={() => setViewMode("sensitivity")}
                 className={`px-3 py-1.5 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 transition-all ${
                   viewMode === "sensitivity"
-                    ? "bg-ansys-yellow text-black shadow-md"
+                    ? "bg-signal text-carbon shadow-md"
                     : "text-gray-400 hover:text-white"
                 }`}
               >
@@ -326,9 +326,9 @@ function SetupSensitivityContent() {
                 Sensitivity Sliders
               </button>
             </div>
-            {loading && <RefreshCw size={13} className="text-[#f2a900] animate-spin" />}
+            {loading && <RefreshCw size={13} className="text-[#C8F04B] animate-spin" />}
             {error && (
-              <span className="text-[10px] text-red-400 flex items-center gap-1">
+              <span className="text-xs text-red-400 flex items-center gap-1">
                 <AlertCircle size={11} /> {error}
               </span>
             )}
@@ -437,22 +437,22 @@ function SetupSensitivityContent() {
                         stroke="#1a1a1c" strokeWidth="12" />
                       {/* Front (gold) */}
                       <circle cx="50" cy="50" r="40" fill="none"
-                        stroke="#f2a900" strokeWidth="12"
+                        stroke="#C8F04B" strokeWidth="12"
                         strokeDasharray={`${(si?.arb_balance_fraction ?? arb_bal_preview) * 251.2} 251.2`}
                         strokeLinecap="round" />
                     </svg>
                     <div className="absolute inset-0 flex flex-col items-center justify-center rotate-0">
-                      <span className="text-xl font-bold text-[#f2a900]">
+                      <span className="text-xl font-bold text-[#C8F04B]">
                         {((si?.arb_balance_fraction ?? arb_bal_preview) * 100).toFixed(1)}%
                       </span>
-                      <span className="text-[8px] text-gray-600">front</span>
+                      <span className="text-xs text-zinc-300">front</span>
                     </div>
                   </div>
-                  <div className="text-[9px] text-gray-500 text-center leading-relaxed">
-                    <span className="text-[#f2a900]">● </span> Front &nbsp;
+                  <div className="text-xs text-zinc-400 text-center leading-relaxed">
+                    <span className="text-[#C8F04B]">● </span> Front &nbsp;
                     <span className="text-blue-400">● </span> Rear
                   </div>
-                  <div className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${
+                  <div className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                     (si?.arb_balance_fraction ?? arb_bal_preview) > 0.52
                       ? "bg-red-500/10 text-red-400"
                       : (si?.arb_balance_fraction ?? arb_bal_preview) < 0.45
@@ -485,7 +485,7 @@ function SetupSensitivityContent() {
                     style={{ width: "100%", height: 160 }}
                   />
                 ) : (
-                  <div className="h-40 flex items-center justify-center text-[10px] text-gray-600">
+                  <div className="h-40 flex items-center justify-center text-xs text-zinc-300">
                     Loading…
                   </div>
                 )}
@@ -498,27 +498,27 @@ function SetupSensitivityContent() {
                   <>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-gray-400">Front Δ Load Transfer</span>
+                        <span className="text-xs text-gray-400">Front Δ Load Transfer</span>
                         <span className={`text-[13px] font-bold font-mono ${
                           ab.delta_lat_transfer_front_n > 0 ? "text-red-400" : "text-emerald-400"
                         }`}>
                           {ab.delta_lat_transfer_front_n > 0 ? "+" : ""}
                           {ab.delta_lat_transfer_front_n.toFixed(0)}
-                          <span className="text-[9px] ml-0.5 text-gray-600">N</span>
+                          <span className="text-xs ml-0.5 text-zinc-300">N</span>
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-gray-400">Rear Δ Load Transfer</span>
+                        <span className="text-xs text-gray-400">Rear Δ Load Transfer</span>
                         <span className={`text-[13px] font-bold font-mono ${
                           ab.delta_lat_transfer_rear_n > 0 ? "text-red-400" : "text-emerald-400"
                         }`}>
                           {ab.delta_lat_transfer_rear_n > 0 ? "+" : ""}
                           {ab.delta_lat_transfer_rear_n.toFixed(0)}
-                          <span className="text-[9px] ml-0.5 text-gray-600">N</span>
+                          <span className="text-xs ml-0.5 text-zinc-300">N</span>
                         </span>
                       </div>
                     </div>
-                    <div className={`text-[10px] font-medium px-2 py-1 rounded-lg text-center ${
+                    <div className={`text-xs font-medium px-2 py-1 rounded-lg text-center ${
                       ab.understeer_tendency === "more"
                         ? "bg-red-500/10 text-red-400 border border-red-500/20"
                         : ab.understeer_tendency === "less"
@@ -531,13 +531,13 @@ function SetupSensitivityContent() {
                           ? "↓ Less understeer"
                           : "Balanced response"}
                     </div>
-                    <div className="text-[9px] text-gray-400">
+                    <div className="text-xs text-gray-400">
                       Stiffening front ARB by{" "}
                       <span className="text-gray-200">{(operatingPoint.delta_arb_front/1000).toFixed(1)} kN/m</span>
                     </div>
                   </>
                 ) : (
-                  <div className="text-[10px] text-gray-400">Fetching…</div>
+                  <div className="text-xs text-gray-400">Fetching…</div>
                 )}
               </Card>
             </div>
@@ -557,7 +557,7 @@ function SetupSensitivityContent() {
                         ab ? (ab.baseline_arb_balance * 800 * operatingPoint.lateral_g * 9.81 * 0.30 / 1.55) : 0,
                         ab ? (ab.perturbed_arb_balance * 800 * operatingPoint.lateral_g * 9.81 * 0.30 / 1.55) : 0,
                       ],
-                      marker: { color: ["#f2a900", ab?.understeer_tendency === "more" ? "#ef4444" : "#22c55e"] },
+                      marker: { color: ["#C8F04B", ab?.understeer_tendency === "more" ? "#ef4444" : "#22c55e"] },
                       text: [
                         ab ? `${(ab.baseline_arb_balance * 100).toFixed(1)}% front` : "",
                         ab ? `${(ab.perturbed_arb_balance * 100).toFixed(1)}% front` : "",
@@ -575,7 +575,7 @@ function SetupSensitivityContent() {
                   style={{ width: "100%", height: 200 }}
                 />
               ) : (
-                <div className="h-40 flex items-center justify-center text-[10px] text-gray-600">Fetching…</div>
+                <div className="h-40 flex items-center justify-center text-xs text-zinc-300">Fetching…</div>
               )}
             </Card>
 
@@ -597,7 +597,7 @@ function SetupSensitivityContent() {
                     style={{ width: "100%", height: 200 }}
                   />
                 ) : (
-                  <div className="h-40 flex items-center justify-center text-[10px] text-gray-600">Fetching…</div>
+                  <div className="h-40 flex items-center justify-center text-xs text-zinc-300">Fetching…</div>
                 )}
               </Card>
 
@@ -630,7 +630,7 @@ function SetupSensitivityContent() {
                       value={result!.operating_point.q_dynamic_pa.toFixed(0)} unit=" Pa" />
                   </div>
                 ) : (
-                  <div className="h-40 flex items-center justify-center text-[10px] text-gray-600">Fetching…</div>
+                  <div className="h-40 flex items-center justify-center text-xs text-zinc-300">Fetching…</div>
                 )}
               </Card>
             </div>
@@ -640,7 +640,7 @@ function SetupSensitivityContent() {
               <Card className="border-blue-500/20 bg-blue-500/5">
                 <div className="flex gap-2">
                   <Info size={12} className="text-blue-400 mt-0.5 flex-shrink-0" />
-                  <p className="text-[10px] text-blue-300/70 leading-relaxed">{rh.note}</p>
+                  <p className="text-xs text-blue-300/70 leading-relaxed">{rh.note}</p>
                 </div>
               </Card>
             )}

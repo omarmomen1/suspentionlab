@@ -33,7 +33,7 @@ export function AttitudeReadout({ result, index }: AttitudeModel3DProps) {
   const a = attitudeAt(result, index);
   if (!a) return <EmptyState kind="not_run" reason="No 7-DOF heave, roll and pitch series." />;
   return (
-    <dl data-testid="attitude-readout" className="v2-num grid grid-cols-3 gap-2 text-[11px] text-zinc-200 m-0">
+    <dl data-testid="attitude-readout" className="v2-num grid grid-cols-3 gap-2 text-xs text-zinc-200 m-0">
       <div><dt className="text-[#8a909a]">Heave (true)</dt><dd className="m-0" data-heave={a.heave_mm.toFixed(4)}>{a.heave_mm.toFixed(2)} mm</dd></div>
       <div><dt className="text-[#8a909a]">Roll (true)</dt><dd className="m-0" data-roll={a.roll_deg.toFixed(5)}>{a.roll_deg.toFixed(3)}°</dd></div>
       <div><dt className="text-[#8a909a]">Pitch (true)</dt><dd className="m-0" data-pitch={a.pitch_deg.toFixed(5)}>{a.pitch_deg.toFixed(3)}°</dd></div>

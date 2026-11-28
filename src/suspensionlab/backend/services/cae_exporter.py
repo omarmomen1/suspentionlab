@@ -424,6 +424,8 @@ D = [ 0;
       0 ];
 
 %% 3. Create LTI State-Space Object for MATLAB & Simulink
+% Note: Eigenvalues of matrix A compute coupled 4-state modal frequency f_n_s
+% and damping ratio zeta_s (distinct from uncoupled sqrt(k_w/m_s) screen preview).
 sys_qc = ss(A, B, C, D);
 sys_qc.StateName = {{'z_s', 'dz_s', 'z_u', 'dz_u'}};
 sys_qc.InputName = {{'z_road'}};

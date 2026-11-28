@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 from fastapi import APIRouter, HTTPException, UploadFile, File, Depends
 from suspensionlab.physics.tir_parser import parse_tir_file
 from suspensionlab.shared.models import TireCoeffsSchema
@@ -20,7 +22,8 @@ async def parse_tir_endpoint(
         coeffs = parse_tir_file(text)
         return TireCoeffsSchema(**coeffs.__dict__)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.exception("parse endpoint failed: %s", e)
+        raise HTTPException(status_code=400, detail="The uploaded file could not be parsed. Check the file format and try again.")
 
 @router.post("/parse-telemetry", response_model=TelemetryDataSchema)
 async def parse_telemetry_endpoint(
@@ -33,4 +36,5 @@ async def parse_telemetry_endpoint(
         data = parse_telemetry_csv(text)
         return TelemetryDataSchema(**data)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.exception("parse endpoint failed: %s", e)
+        raise HTTPException(status_code=400, detail="The uploaded file could not be parsed. Check the file format and try again.")

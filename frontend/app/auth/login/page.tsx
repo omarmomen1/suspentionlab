@@ -37,7 +37,7 @@ export default function LoginPage() {
   return (
     <div className="bg-[#111113] border border-[#252525] rounded-2xl p-8 shadow-2xl">
       <h1 className="text-xl font-bold text-white mb-1">Welcome back</h1>
-      <p className="text-sm text-gray-500 mb-6">Sign in to your SuspensionLab account</p>
+      <p className="text-sm text-zinc-400 mb-6">Sign in to your SuspensionLab account</p>
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
@@ -50,15 +50,15 @@ export default function LoginPage() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@company.com"
             className="w-full bg-[#0d0d0f] border border-[#252525] rounded-xl px-3.5 py-2.5 text-sm text-white
-              placeholder:text-gray-500 focus:outline-none focus:border-ansys-yellow/60 focus:ring-1
-              focus:ring-ansys-yellow/15 transition-all"
+              placeholder:text-zinc-400 focus:outline-none focus:border-signal/60 focus:ring-1
+              focus:ring-signal/15 transition-all"
           />
         </div>
 
         <div>
           <div className="flex items-center justify-between mb-1.5">
             <label htmlFor="login-password" className="text-xs font-medium text-gray-300">Password</label>
-            <Link href="/auth/forgot" className="text-xs text-ansys-yellow hover:underline inline-flex items-center min-h-[24px]">
+            <Link href="/auth/forgot" className="text-xs text-signal hover:underline inline-flex items-center min-h-[24px]">
               Forgot password?
             </Link>
           </div>
@@ -71,8 +71,8 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="••••••••"
               className="w-full bg-[#0d0d0f] border border-[#252525] rounded-xl px-3.5 py-2.5 text-sm text-white
-                placeholder:text-gray-400 focus:outline-none focus:border-ansys-yellow/60 focus:ring-1
-                focus:ring-ansys-yellow/15 transition-all pr-12"
+                placeholder:text-gray-400 focus:outline-none focus:border-signal/60 focus:ring-1
+                focus:ring-signal/15 transition-all pr-12"
             />
             <button
               type="button"
@@ -109,7 +109,7 @@ export default function LoginPage() {
 
       <p className="text-center text-xs text-gray-400 mt-6">
         No account?{" "}
-        <Link href="/auth/register" className="text-ansys-yellow hover:underline font-semibold inline-flex items-center min-h-[24px]">
+        <Link href="/auth/register" className="text-signal hover:underline font-semibold inline-flex items-center min-h-[24px]">
           Create an account
         </Link>
       </p>
@@ -117,7 +117,7 @@ export default function LoginPage() {
       {/* Dev quick-fill */}
       {process.env.NODE_ENV === "development" && (
         <button type="button" onClick={() => { setEmail("james@company.com"); setPassword("admin123!"); }}
-          className="mt-4 w-full py-1.5 text-[10px] text-gray-700 hover:text-gray-500 border border-dashed
+          className="mt-4 w-full py-1.5 text-xs text-zinc-300 hover:text-gray-500 border border-dashed
             border-[#1e1e1e] rounded-lg transition-colors">
           [DEV] Fill demo credentials (james@company.com)
         </button>

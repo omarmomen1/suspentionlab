@@ -15,6 +15,7 @@ import {
   GitBranch, Crosshair, Undo2, Redo2, RotateCcw
 } from "lucide-react";
 import NextStepLink from "../../components/NextStepLink";
+import { apiFetch } from "../../lib/api";
 import { formatApiError } from "../../lib/api_client";
 import { useUndoRedo } from "../../hooks/useUndoRedo";
 import PDFExport, { type PinnedLedgerRow } from "../../components/PDFExport";
@@ -45,7 +46,7 @@ import type { FullCarLoadParams } from "../../lib/v2/phase4";
 // One WebGL canvas on this route, loaded only in the browser.
 const AttitudeModel3D = dynamic(() => import("../../components/v2/instruments/AttitudeModel3D"), {
   ssr: false,
-  loading: () => <p className="text-[11px] text-[#8a909a] m-0">Loading 3D view</p>,
+  loading: () => <p className="text-xs text-[#8a909a] m-0">Loading 3D view</p>,
 });
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
@@ -333,15 +334,23 @@ function FullCarDashboard() {
     if (!name) return;
     setIsSaving(true);
     try {
-      const r = await fetchWithAuth("/api/v1/profiles/", {
+      const r = await apiFetch("/api/v1/profiles/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, vehicle_type: "FULL_CAR", params })
       });
-      if (r.ok) showToast("Setup saved to Garage!", "success");
-      else showToast("Failed to save", "error");
-    } catch { showToast("Failed to save profile", "error"); }
-    finally { setIsSaving(false); }
+      if (r.ok) {
+        showToast("Setup saved to Garage!", "success");
+      } else {
+        const errBody = await r.json().catch(() => null);
+        const msg = errBody?.detail ? String(errBody.detail) : formatApiError(errBody, `Failed to save (${r.status})`);
+        showToast(msg, "error");
+      }
+    } catch (err) {
+      showToast(formatApiError(err, "Failed to save profile"), "error");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const psdRoll = useMemo(() => {
@@ -382,7 +391,7 @@ function FullCarDashboard() {
 
       <div className="flex items-center justify-between shrink-0 pb-3 border-b border-[#1e1e1e]">
         <div className="flex flex-col">
-          <span className="text-[9px] font-bold tracking-[0.25em] text-ansys-yellow uppercase">7-DOF Pitch, Roll, Heave</span>
+          <span className="text-xs font-bold tracking-[0.25em] text-signal uppercase">7-DOF Pitch, Roll, Heave</span>
           <h1 className="text-2xl font-semibold tracking-tight text-white leading-tight">Full Car</h1>
           <NextStepLink />
         </div>
@@ -422,13 +431,13 @@ function FullCarDashboard() {
             </button>
           </div>
           <button onClick={saveProfile} disabled={isSaving} className="px-3 py-1.5 bg-[#141416] border border-[#252525] hover:bg-[#1e1e20] rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40">
-            <Save size={13} className="text-ansys-yellow" /> Save Setup
+            <Save size={13} className="text-signal" /> Save Setup
           </button>
           <PDFExport captureId="sim-report" fileName={`FCar_${params.m_s}`} pinnedRows={pinnedPdfRows} />
           <DataExport results={results} fileName={`FCar_${params.m_s}`} />
 
           <button id="btn-run" onClick={runSimulation} disabled={isRunning}
-            className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${isRunning ? "bg-[#222] text-gray-500 cursor-not-allowed" : "bg-signal text-carbon border border-signal hover:bg-[#d6f56e]"}`}>
+            className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${isRunning ? "bg-[#222] text-zinc-400 cursor-not-allowed" : "bg-signal text-carbon border border-signal hover:bg-[#d6f56e]"}`}>
             {isRunning ? <><div className="w-3 h-3 border border-gray-600 border-t-gray-300 rounded-full animate-spin" />Solving…</> : <><Play size={13} fill="currentColor" /> Run Solver</>}
           </button>
         </div>
@@ -446,10 +455,10 @@ function FullCarDashboard() {
       <StudioShell>
         <ShellLeft className="lg:w-60">
         <div className="w-full lg:w-60 lg:shrink-0 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-y-auto custom-scrollbar">
-          <div className="px-4 py-3 border-b border-[#1e1e1e] sticky top-0 bg-[#0d0d0f] z-10"><h2 className="text-xs font-semibold text-gray-300 flex items-center gap-2"><Settings2 size={13} className="text-ansys-yellow" /> Parameters</h2></div>
+          <div className="px-4 py-3 border-b border-[#1e1e1e] sticky top-0 bg-[#0d0d0f] z-10"><h2 className="text-xs font-semibold text-gray-300 flex items-center gap-2"><Settings2 size={13} className="text-signal" /> Parameters</h2></div>
           <div className="p-4 space-y-5">
             <div className="space-y-1.5">
-              <label htmlFor="full-car-preset-select" className="text-[10px] font-bold uppercase tracking-wider text-gray-400 block">
+              <label htmlFor="full-car-preset-select" className="text-xs font-bold uppercase tracking-wider text-gray-400 block">
                 7-DOF Full-Car Presets
               </label>
               <select
@@ -462,7 +471,7 @@ function FullCarDashboard() {
                     showToast(`Loaded 7-DOF preset: ${found.name}`, "success");
                   }
                 }}
-                className="w-full bg-[#0d0d0f] border border-[#252525] rounded-lg px-2.5 py-1.5 text-xs font-medium text-white focus:outline-none focus:border-ansys-yellow/60"
+                className="w-full bg-[#0d0d0f] border border-[#252525] rounded-lg px-2.5 py-1.5 text-xs font-medium text-white focus:outline-none focus:border-signal/60"
               >
                 {FULL_CAR_PRESETS.map((p) => (
                   <option key={p.id} value={p.id}>
@@ -505,13 +514,13 @@ function FullCarDashboard() {
           {!results && !isRunning && (
             <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl flex flex-col items-center justify-center gap-4">
               <div className="w-16 h-16 rounded-2xl bg-signal/5 border border-signal/15 flex items-center justify-center"><Activity size={32} strokeWidth={1} className="text-signal/60" /></div>
-              <div className="text-center"><p className="text-sm font-semibold text-gray-400 mb-1">Configure parameters and click <span className="text-ansys-yellow">Run Solver</span></p><p className="text-xs text-gray-400">7-DOF full car · LTI State-Space · Pitch & Roll</p></div>
+              <div className="text-center"><p className="text-sm font-semibold text-gray-400 mb-1">Configure parameters and click <span className="text-signal">Run Solver</span></p><p className="text-xs text-gray-400">7-DOF full car · LTI State-Space · Pitch & Roll</p></div>
             </div>
           )}
 
           {isRunning && (
             <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl flex flex-col items-center justify-center gap-4">
-              <div className="w-10 h-10 border-2 border-ansys-yellow/20 border-t-ansys-yellow rounded-full animate-spin" />
+              <div className="w-10 h-10 border-2 border-signal/20 border-t-signal rounded-full animate-spin" />
               <div className="text-center"><p className="text-sm font-medium text-gray-400 mb-1">Running LTI Solver…</p></div>
             </div>
           )}
@@ -533,7 +542,7 @@ function FullCarDashboard() {
                     <AlertTriangle size={15} className="text-red-400 shrink-0" />
                     <div>
                       <span className="font-bold text-red-300">Last solve failed:</span> {simError}.
-                      <span className="text-gray-400 ml-1.5 text-[11px]">(Preserving previous valid curves)</span>
+                      <span className="text-gray-400 ml-1.5 text-xs">(Preserving previous valid curves)</span>
                     </div>
                   </div>
                   <button
@@ -593,7 +602,7 @@ function FullCarDashboard() {
                   const lp = runLoadParamsRef.current;
                   return (
                     <div className="h-full overflow-y-auto p-4 flex flex-col gap-4" data-testid="footprints-attitude-tab">
-                      <label className="text-[11px] text-[#8a909a] flex items-center gap-3">
+                      <label className="text-xs text-[#8a909a] flex items-center gap-3">
                         Time
                         <input type="range" min={0} max={Math.max(0, n - 1)} value={idx} onChange={(e) => setScrubIdx(Number(e.target.value))} aria-label="Scrub time index" className="flex-1 accent-[#C8F04B]" />
                         <span className="font-mono text-[#cfd3da]">{Array.isArray(r.time) && typeof r.time[idx] === "number" ? `${r.time[idx].toFixed(3)} s` : "n/a"}</span>
@@ -678,12 +687,12 @@ function FullCarDashboard() {
                     </PlotBox>
                     <PlotBox>
                       <div className="h-full p-5 flex flex-col justify-center gap-4">
-                        <p className="text-[10px] font-bold tracking-widest text-gray-700 uppercase">Roll Characteristics</p>
+                        <p className="text-xs font-bold tracking-widest text-zinc-300 uppercase">Roll Characteristics</p>
                         <div className="space-y-3 font-mono text-xs">
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Elastic Roll Dist. (K_φ,f / K_φ,tot)</span><span className="text-[#10B981]">{r.roll_stiffness_dist.toFixed(1)}% Front</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Dynamic LLTD (ΔFz,f / ΔFz,tot)</span><span className="text-cyan-400 font-bold">{((maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[])) > 0 ? (maxOf(r.lateral_load_transfer_f as number[]) / (maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[]))) * 100 : 50).toFixed(1)}% Front</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Front Track</span><span className="text-white">{params.tw_f} m</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Rear Track</span><span className="text-white">{params.tw_r} m</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Elastic Roll Dist. (K_φ,f / K_φ,tot)</span><span className="text-[#10B981]">{r.roll_stiffness_dist.toFixed(1)}% Front</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Dynamic LLTD (ΔFz,f / ΔFz,tot)</span><span className="text-cyan-400 font-bold">{((maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[])) > 0 ? (maxOf(r.lateral_load_transfer_f as number[]) / (maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[]))) * 100 : 50).toFixed(1)}% Front</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Front Track</span><span className="text-white">{params.tw_f} m</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Rear Track</span><span className="text-white">{params.tw_r} m</span></div>
                         </div>
                       </div>
                     </PlotBox>
@@ -705,13 +714,13 @@ function FullCarDashboard() {
                     </PlotBox>
                     <PlotBox>
                       <div className="h-full p-5 flex flex-col justify-center gap-4">
-                        <p className="text-[10px] font-bold tracking-widest text-gray-700 uppercase">Load Transfer Summary</p>
+                        <p className="text-xs font-bold tracking-widest text-zinc-300 uppercase">Load Transfer Summary</p>
                         <div className="space-y-3 font-mono text-xs">
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Max Front LLT (ΔFz,f)</span><span className="text-[#06B6D4]">{maxOf(r.lateral_load_transfer_f as number[]).toFixed(0)} N</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Max Rear LLT (ΔFz,r)</span><span className="text-[#F43F5E]">{maxOf(r.lateral_load_transfer_r as number[]).toFixed(0)} N</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Total Dynamic LLT (ΔFz,tot)</span><span className="text-white">{(maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[])).toFixed(0)} N</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Dynamic LLTD (ΔFz,f / ΔFz,tot)</span><span className="text-cyan-400 font-bold">{((maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[])) > 0 ? (maxOf(r.lateral_load_transfer_f as number[]) / (maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[]))) * 100 : 50).toFixed(1)}% Front</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Elastic Roll Dist. (K_φ,f / K_φ,tot)</span><span className="text-[#10B981]">{r.roll_stiffness_dist.toFixed(1)}% Front</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Max Front LLT (ΔFz,f)</span><span className="text-[#06B6D4]">{maxOf(r.lateral_load_transfer_f as number[]).toFixed(0)} N</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Max Rear LLT (ΔFz,r)</span><span className="text-[#F43F5E]">{maxOf(r.lateral_load_transfer_r as number[]).toFixed(0)} N</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Total Dynamic LLT (ΔFz,tot)</span><span className="text-white">{(maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[])).toFixed(0)} N</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Dynamic LLTD (ΔFz,f / ΔFz,tot)</span><span className="text-cyan-400 font-bold">{((maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[])) > 0 ? (maxOf(r.lateral_load_transfer_f as number[]) / (maxOf(r.lateral_load_transfer_f as number[]) + maxOf(r.lateral_load_transfer_r as number[]))) * 100 : 50).toFixed(1)}% Front</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Elastic Roll Dist. (K_φ,f / K_φ,tot)</span><span className="text-[#10B981]">{r.roll_stiffness_dist.toFixed(1)}% Front</span></div>
                         </div>
                       </div>
                     </PlotBox>
@@ -758,7 +767,7 @@ function FullCarDashboard() {
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-600 text-sm">Loading simulation environment…</div>}>
+    <Suspense fallback={<div className="h-full flex items-center justify-center text-zinc-300 text-sm">Loading simulation environment…</div>}>
       <PlanGate required="PRO" feature="Full-Car (7-DOF) Multi-Body Solver">
         <FullCarDashboard />
       </PlanGate>

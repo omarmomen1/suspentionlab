@@ -169,7 +169,7 @@ async def create_session(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error("Failed to create blind session: %s", e)
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="The request could not be processed. Check the submitted parameters and try again.")
 
 
 @router.get("/{session_id}", response_model=BlindSessionResponse)

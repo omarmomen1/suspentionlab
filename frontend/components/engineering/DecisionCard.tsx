@@ -117,7 +117,7 @@ export default function DecisionCard({ decision, className = "" }: DecisionCardP
         {/* Expanded Layer 3: Specific Evidence Metrics */}
         {expanded && decision.layers?.evidence && decision.layers.evidence.length > 0 && (
           <div className="my-4 p-4 rounded-2xl bg-black/40 border border-white/5 space-y-2 font-mono text-xs">
-            <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+            <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">
               Layer 3 — Evidence Metrics:
             </div>
             {decision.layers.evidence.map((ev, i) => (
@@ -131,7 +131,7 @@ export default function DecisionCard({ decision, className = "" }: DecisionCardP
                     {ev.value} {ev.unit}
                   </span>
                   <span
-                    className={`text-[9px] px-1.5 py-0.2 rounded font-bold uppercase ${
+                    className={`text-xs px-1.5 py-0.2 rounded font-bold uppercase ${
                       ev.status === "pass"
                         ? "bg-emerald-950/60 text-emerald-400 border border-emerald-500/30"
                         : ev.status === "warn"
@@ -149,7 +149,7 @@ export default function DecisionCard({ decision, className = "" }: DecisionCardP
 
         {/* Expanded Layer 4: Raw Artifact Hashes */}
         {expanded && decision.layers?.raw_data && (
-          <div className="my-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] flex flex-wrap gap-4 text-[10px] font-mono text-gray-500">
+          <div className="my-3 p-3 rounded-xl bg-white/[0.02] border border-white/[0.04] flex flex-wrap gap-4 text-xs font-mono text-zinc-400">
             {decision.layers.raw_data.params_hash && (
               <div className="flex items-center gap-1">
                 <Hash size={11} /> Params Hash:{" "}

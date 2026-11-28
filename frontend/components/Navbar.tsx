@@ -95,7 +95,7 @@ export default function Navbar() {
       id={id}
       className={`absolute ${align === "right" ? "right-0" : "left-0"} top-full mt-2 w-80 bg-[#0e0e12] border border-white/10 rounded-xl shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-100`}
     >
-      <div className="px-2.5 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+      <div className="px-2.5 py-1 text-xs font-bold text-gray-400 uppercase tracking-wider">
         {heading}
       </div>
       <div
@@ -112,12 +112,12 @@ export default function Navbar() {
               aria-current={active ? "page" : undefined}
               className={`block px-3 py-2 rounded-lg transition-colors ${
                 active
-                  ? "bg-ansys-yellow/10 text-ansys-yellow border border-ansys-yellow/20"
+                  ? "bg-signal/10 text-signal border border-signal/20"
                   : "hover:bg-white/5 text-gray-300 hover:text-white"
               }`}
             >
               <div className="font-semibold text-xs text-white">{item.label}</div>
-              <div className="text-[10px] text-gray-400 mt-0.5 leading-tight">{item.desc}</div>
+              <div className="text-xs text-gray-400 mt-0.5 leading-tight">{item.desc}</div>
             </Link>
           );
         })}
@@ -144,7 +144,7 @@ export default function Navbar() {
               : "text-zinc-400 hover:text-white hover:bg-white/[0.04]"
           }`}
         >
-          <Icon size={13} className={`shrink-0 ${active ? "text-ansys-yellow" : "text-zinc-500"}`} />
+          <Icon size={13} className={`shrink-0 ${active ? "text-signal" : "text-zinc-400"}`} />
           <span>
             <StudioToolLabel id={tool.id} fallback={tool.label} />
           </span>
@@ -168,7 +168,7 @@ export default function Navbar() {
             aria-current={active ? "page" : undefined}
             className="flex items-center gap-1.5 pl-2 pr-0.5 py-1.5 font-medium whitespace-nowrap text-xs"
           >
-            <Icon size={13} className={`shrink-0 ${active ? "text-ansys-yellow" : "text-zinc-500"}`} />
+            <Icon size={13} className={`shrink-0 ${active ? "text-signal" : "text-zinc-400"}`} />
             <span className="whitespace-nowrap">
               <StudioToolLabel id={tool.id} fallback={tool.label} />
             </span>
@@ -192,7 +192,7 @@ export default function Navbar() {
             <ChevronDown
               size={11}
               className={`transition-transform duration-150 ${
-                isOpen ? "rotate-180 text-ansys-yellow" : ""
+                isOpen ? "rotate-180 text-signal" : ""
               }`}
             />
           </button>
@@ -215,27 +215,27 @@ export default function Navbar() {
       ref={navRef}
       aria-label="Main Navigation"
     >
-      <div className="max-w-[1560px] h-full mx-auto flex items-center justify-between gap-2 xl:gap-4">
+      <div className="max-w-[1560px] h-full mx-auto flex items-center justify-between gap-4 xl:gap-6">
         {/* Left: Brand Logo & Mobile Drawer */}
         <div className="flex items-center gap-3 shrink-0">
           <div className="lg:hidden">
             <MobileNav />
           </div>
-          <Link href="/" className="text-gray-300 hover:text-white transition-colors flex items-center gap-2 group">
-            <div className="w-7 h-7 rounded-lg bg-ansys-yellow/10 border border-ansys-yellow/30 flex items-center justify-center group-hover:border-ansys-yellow/60 transition-colors">
+          <Link href="/" className="text-gray-300 hover:text-white transition-colors flex items-center gap-2 group shrink-0">
+            <div className="w-7 h-7 rounded-lg bg-signal/10 border border-signal/30 flex items-center justify-center group-hover:border-signal/60 transition-colors">
               <svg viewBox="0 0 24 24" fill="none" height="15" width="15" role="img" aria-label="SuspensionLab logo">
                 <path
                   d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-                  stroke="#f2a900"
+                  stroke="#C8F04B"
                   strokeWidth="2.2"
                   strokeLinejoin="round"
                   strokeLinecap="round"
                 />
               </svg>
             </div>
-            <span className="text-xs font-bold text-white tracking-tight">
-              Suspension<span className="text-ansys-yellow">Lab</span>
-              <span className="ml-1.5 px-1.5 py-0.5 rounded text-[9px] font-semibold bg-ansys-yellow/20 text-ansys-yellow border border-ansys-yellow/30 uppercase tracking-widest hidden sm:inline-block">
+            <span className="text-xs font-bold text-white tracking-tight whitespace-nowrap">
+              Suspension<span className="text-signal">Lab</span>
+              <span className="ml-1.5 px-1.5 py-0.5 rounded text-xs font-semibold bg-signal/20 text-signal border border-signal/30 uppercase tracking-widest hidden 2xl:inline-block">
                 PRO
               </span>
             </span>
@@ -246,13 +246,13 @@ export default function Navbar() {
         <div
           data-nav-version="v2"
           data-studio-mode={studioMode ? "true" : undefined}
-          className="hidden lg:flex flex-1 min-w-0 items-center justify-center gap-0.5 xl:gap-1.5 px-1 xl:px-2 text-[11px] xl:text-xs font-medium overflow-visible"
+          className="hidden lg:flex flex-1 min-w-0 items-center justify-center gap-1 xl:gap-2 px-2 text-xs font-medium overflow-visible"
         >
           {getNavGroups().map(renderStudioTool)}
         </div>
 
         {/* Right Side: Docs & Pricing (standard) or highlighted Upgrade CTA (Studio Mode), Search & User Menu */}
-        <div className="flex items-center gap-2.5 shrink-0">
+        <div className="flex items-center gap-2.5 pl-2 shrink-0">
           <Link
             href="/docs"
             className={`hidden xl:inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium transition-all ${

@@ -588,7 +588,7 @@ export default function EvidenceGraph({
             <select
               value={relationshipFilter}
               onChange={(e) => setRelationshipFilter(e.target.value)}
-              className="bg-neutral-950 border border-neutral-800 rounded px-2 py-0.5 text-white font-mono text-[11px] focus:outline-none focus:border-rose-500"
+              className="bg-neutral-950 border border-neutral-800 rounded px-2 py-0.5 text-white font-mono text-xs focus:outline-none focus:border-rose-500"
               aria-label="Filter by relationship"
             >
               <option value="ALL">All Relationships ({availableRelationships.length})</option>
@@ -605,7 +605,7 @@ export default function EvidenceGraph({
             <select
               value={entityTypeFilter}
               onChange={(e) => setEntityTypeFilter(e.target.value)}
-              className="bg-neutral-950 border border-neutral-800 rounded px-2 py-0.5 text-white font-mono text-[11px] focus:outline-none focus:border-rose-500"
+              className="bg-neutral-950 border border-neutral-800 rounded px-2 py-0.5 text-white font-mono text-xs focus:outline-none focus:border-rose-500"
               aria-label="Filter by entity type"
             >
               <option value="ALL">All Entity Types ({availableEntityTypes.length})</option>
@@ -620,7 +620,7 @@ export default function EvidenceGraph({
 
         {/* Truncation & Limit UX (Explicit Requirement) */}
         {graphData?.traversal.limit_reached && (
-          <div className="flex items-center gap-1.5 text-amber-400 font-mono text-[11px] bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/30">
+          <div className="flex items-center gap-1.5 text-amber-400 font-mono text-xs bg-amber-500/10 px-2.5 py-1 rounded border border-amber-500/30">
             <AlertTriangle size={13} />
             <span>
               TRUNCATED: Limit reached ({graphData.traversal.limit_type || "LIMIT_EXCEEDED"}). Returned{" "}
@@ -631,7 +631,7 @@ export default function EvidenceGraph({
 
         {/* Stats */}
         {graphData && (
-          <div className="text-neutral-400 font-mono text-[11px] flex items-center gap-2">
+          <div className="text-neutral-400 font-mono text-xs flex items-center gap-2">
             <span>Nodes: {graphData.nodes.length}</span>
             <span>•</span>
             <span>Edges: {graphData.edges.length}</span>
@@ -659,7 +659,7 @@ export default function EvidenceGraph({
               <div className="max-w-md space-y-3">
                 <AlertCircle size={40} className="mx-auto text-amber-500" />
                 <h3 className="text-base font-bold text-white">Entity Not Found in Evidence Graph</h3>
-                <p className="text-xs text-neutral-400 leading-relaxed font-mono">
+                <p className="text-xs text-neutral-400 leading-relaxed font-sans leading-relaxed">
                   {effectiveRoot.type}:{effectiveRoot.id} does not exist in the authoritative database.
                 </p>
               </div>
@@ -677,7 +677,7 @@ export default function EvidenceGraph({
               <div className="max-w-md space-y-3">
                 <ShieldAlert size={40} className="mx-auto text-rose-500" />
                 <h3 className="text-base font-bold text-white">Workspace Isolation Boundary</h3>
-                <p className="text-xs text-neutral-400 leading-relaxed font-mono">
+                <p className="text-xs text-neutral-400 leading-relaxed font-sans leading-relaxed">
                   Traversal rejected. Requested entity belongs to another tenant or private workspace.
                 </p>
               </div>
@@ -702,7 +702,7 @@ export default function EvidenceGraph({
         {/* Empty State */}
         {!loading && errorStatus === "NONE" && (!graphData || graphData.nodes.length === 0) && (
           <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-neutral-400">
-            <Network size={40} className="mx-auto text-neutral-600 mb-3" />
+            <Network size={40} className="mx-auto text-zinc-300 mb-3" />
             <h3 className="text-base font-bold text-white mb-1">No Evidence Relationships Recorded</h3>
             <p className="text-xs max-w-sm leading-relaxed">
               No authoritative relationships originate from or target {effectiveRoot.type}:{effectiveRoot.id} within
@@ -737,7 +737,7 @@ export default function EvidenceGraph({
               <button
                 type="button"
                 onClick={() => setZoom(1)}
-                className="p-1.5 hover:bg-neutral-800 rounded text-neutral-300 hover:text-white text-[10px] font-mono"
+                className="p-1.5 hover:bg-neutral-800 rounded text-neutral-300 hover:text-white text-xs font-mono"
                 title="Reset zoom"
                 aria-label="Reset zoom"
               >
@@ -856,10 +856,10 @@ export default function EvidenceGraph({
                         : `${cfg.border} hover:border-neutral-500`
                     }`}
                   >
-                    <div className="flex items-center justify-between text-[10px] font-mono mb-1">
+                    <div className="flex items-center justify-between text-xs font-mono mb-1">
                       <div className="flex items-center gap-1 font-bold">
                         {isRoot && (
-                          <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-[9px]">
+                          <span className="px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 text-xs">
                             ROOT
                           </span>
                         )}
@@ -868,11 +868,11 @@ export default function EvidenceGraph({
                       <IconComponent size={13} className={cfg.text} />
                     </div>
 
-                    <div className="text-[11px] font-bold text-white truncate font-sans" title={node.entity_type}>
+                    <div className="text-xs font-bold text-white truncate font-sans" title={node.entity_type}>
                       {cfg.label}
                     </div>
 
-                    <div className="text-[11px] font-mono text-neutral-300 truncate mt-0.5" title={node.entity_id}>
+                    <div className="text-xs font-mono text-neutral-300 truncate mt-0.5" title={node.entity_id}>
                       {node.entity_id}
                     </div>
                   </div>
@@ -896,12 +896,12 @@ export default function EvidenceGraph({
                   className="p-3 bg-neutral-950 border border-neutral-800 rounded-xl flex items-center justify-between gap-4"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-neutral-500">{idx + 1}.</span>
+                    <span className="text-zinc-400">{idx + 1}.</span>
                     <span className="text-amber-400 font-bold">{edge.source_type}</span>
                     <span className="text-neutral-300">{edge.source_id}</span>
                   </div>
 
-                  <div className="px-2 py-0.5 rounded bg-rose-500/15 border border-rose-500/40 text-rose-400 font-bold text-[11px]">
+                  <div className="px-2 py-0.5 rounded bg-rose-500/15 border border-rose-500/40 text-rose-400 font-bold text-xs">
                     -- {edge.relationship} --&gt;
                   </div>
 
@@ -928,7 +928,7 @@ export default function EvidenceGraph({
                 </div>
                 {selectedNode.entity_type === effectiveRoot.type &&
                   selectedNode.entity_id === effectiveRoot.id && (
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
+                    <span className="text-xs font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-bold">
                       ROOT
                     </span>
                   )}
@@ -937,40 +937,40 @@ export default function EvidenceGraph({
               {/* Entity Type & ID */}
               <div className="space-y-2">
                 <div>
-                  <div className="text-[10px] font-mono text-neutral-400 uppercase">Entity Type</div>
+                  <div className="text-xs font-mono text-neutral-400 uppercase">Entity Type</div>
                   <div className="text-xs font-bold text-white font-mono mt-0.5">
                     {selectedNode.entity_type}
                   </div>
                 </div>
 
                 <div>
-                  <div className="text-[10px] font-mono text-neutral-400 uppercase">Identifier</div>
+                  <div className="text-xs font-mono text-neutral-400 uppercase">Identifier</div>
                   <div className="text-xs font-mono text-neutral-200 break-all bg-neutral-950 p-2 rounded-lg border border-neutral-800 mt-0.5">
                     {selectedNode.entity_id}
                   </div>
                 </div>
 
                 <div>
-                  <div className="text-[10px] font-mono text-neutral-400 uppercase">Traversal Depth</div>
+                  <div className="text-xs font-mono text-neutral-400 uppercase">Traversal Depth</div>
                   <div className="text-xs font-mono text-neutral-300 mt-0.5">{selectedNode.depth} hops from root</div>
                 </div>
 
                 {/* Artifact Hash */}
                 {selectedArtifactHash && (
                   <div>
-                    <div className="text-[10px] font-mono text-neutral-400 uppercase flex items-center justify-between">
+                    <div className="text-xs font-mono text-neutral-400 uppercase flex items-center justify-between">
                       <span>Artifact SHA-256</span>
                       <button
                         type="button"
                         onClick={() => copyHash(selectedArtifactHash)}
-                        className="text-neutral-400 hover:text-white flex items-center gap-1 text-[9px]"
+                        className="text-neutral-400 hover:text-white flex items-center gap-1 text-xs"
                       >
                         <Copy size={10} />
                         <span>{copiedHash ? "COPIED" : "COPY"}</span>
                       </button>
                     </div>
                     <div
-                      className="text-[11px] font-mono text-emerald-400 break-all bg-neutral-950 p-2 rounded-lg border border-neutral-800 mt-0.5"
+                      className="text-xs font-mono text-emerald-400 break-all bg-neutral-950 p-2 rounded-lg border border-neutral-800 mt-0.5"
                       title={selectedArtifactHash}
                     >
                       {selectedArtifactHash.slice(0, 24)}...
@@ -982,11 +982,11 @@ export default function EvidenceGraph({
               {/* Upstream & Downstream Counts */}
               <div className="grid grid-cols-2 gap-2 pt-2 border-t border-neutral-800 text-xs font-mono">
                 <div className="p-2 rounded bg-neutral-950 border border-neutral-800/80">
-                  <div className="text-[10px] text-neutral-500">INBOUND</div>
+                  <div className="text-xs text-zinc-400">INBOUND</div>
                   <div className="text-sm font-bold text-white">{selectedNodeEdges.inbound.length}</div>
                 </div>
                 <div className="p-2 rounded bg-neutral-950 border border-neutral-800/80">
-                  <div className="text-[10px] text-neutral-500">OUTBOUND</div>
+                  <div className="text-xs text-zinc-400">OUTBOUND</div>
                   <div className="text-sm font-bold text-white">{selectedNodeEdges.outbound.length}</div>
                 </div>
               </div>
@@ -1067,7 +1067,7 @@ export default function EvidenceGraph({
                       key={edge.id || idx}
                       className="p-3 bg-neutral-950/80 border border-neutral-800 rounded-xl text-xs font-mono space-y-1.5"
                     >
-                      <div className="flex items-center justify-between text-[11px] text-neutral-400">
+                      <div className="flex items-center justify-between text-xs text-neutral-400">
                         <span>STEP {idx + 1}</span>
                         <span className="text-rose-400 font-bold">{edge.relationship}</span>
                       </div>
@@ -1075,7 +1075,7 @@ export default function EvidenceGraph({
                         <span>
                           {edge.source_type} ({edge.source_id})
                         </span>
-                        <span className="text-neutral-500">→</span>
+                        <span className="text-zinc-400">→</span>
                         <span className="text-teal-400">
                           {edge.target_type} ({edge.target_id})
                         </span>

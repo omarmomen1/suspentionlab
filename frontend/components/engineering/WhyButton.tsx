@@ -22,14 +22,14 @@ export default function WhyButton({
   const [isOpen, setIsOpen] = useState(false);
 
   const sizeClasses = {
-    xs: "px-1.5 py-0.5 text-[9px] gap-1",
-    sm: "px-2 py-1 text-[10px] gap-1",
+    xs: "px-1.5 py-0.5 text-xs gap-1",
+    sm: "px-2 py-1 text-xs gap-1",
     md: "px-2.5 py-1.5 text-xs gap-1.5",
   }[size];
 
   const variantClasses = {
     badge: "bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white border border-white/15",
-    outline: "bg-transparent hover:bg-white/5 text-gray-400 hover:text-ansys-yellow border border-white/10 hover:border-ansys-yellow/40",
+    outline: "bg-transparent hover:bg-white/5 text-gray-400 hover:text-signal border border-white/10 hover:border-signal/40",
     ghost: "bg-transparent hover:bg-white/10 text-gray-400 hover:text-white",
   }[variant];
 
@@ -44,7 +44,7 @@ export default function WhyButton({
         className={`inline-flex items-center rounded-md font-mono font-bold uppercase transition-all shrink-0 cursor-pointer ${sizeClasses} ${variantClasses} ${className}`}
         title={`Click to inspect mathematical provenance for ${title}`}
       >
-        <HelpCircle size={size === "xs" ? 10 : 12} className="text-ansys-yellow" />
+        <HelpCircle size={size === "xs" ? 10 : 12} className="text-signal" />
         <span>WHY?</span>
       </button>
 

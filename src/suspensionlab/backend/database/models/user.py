@@ -2,7 +2,7 @@
 backend/database/models/user.py  (upgraded)
 Added: email, password_hash, name, plan, team_id, billing_customer_id, billing_subscription_id
 """
-from sqlalchemy import String, Boolean, DateTime, func, Column, Text, ForeignKey
+from sqlalchemy import String, Boolean, DateTime, func, Column, Text, ForeignKey, BigInteger
 from sqlalchemy import UUID
 from sqlalchemy.orm import synonym, relationship
 import uuid
@@ -31,6 +31,9 @@ class User(Base):
     plan                   = Column(String(20), default=PlanTier.FREE, nullable=False)  # FREE | PRO | ENTERPRISE
     billing_customer_id    = Column(String(255), nullable=True)
     billing_subscription_id = Column(String(255), nullable=True)
+    # Pass B: entitlement provenance & Stripe event ordering guard.
+    plan_source            = Column(String(32), nullable=True)   # stripe | gumroad | license_key | None
+    billing_last_event_created = Column(BigInteger, nullable=True)  # last applied Stripe event.created (epoch s)
     trial_ends_at          = Column(DateTime(timezone=True), nullable=True)
 
     # Legacy single API key (kept for backwards-compat with existing rows)

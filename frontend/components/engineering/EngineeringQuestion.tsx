@@ -88,18 +88,18 @@ export default function EngineeringQuestion({
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2">
           <span
-            className={`px-2 py-0.5 rounded-md border text-[10px] font-mono font-bold uppercase tracking-wider flex items-center gap-1 ${sev.badgeClass}`}
+            className={`px-2 py-0.5 rounded-md border text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1 ${sev.badgeClass}`}
           >
             <SevIcon size={11} />
             {question.severity}
           </span>
           <span className="text-xs font-semibold text-gray-300 flex items-center gap-1">
-            <Compass size={12} className="text-ansys-yellow" />
+            <Compass size={12} className="text-signal" />
             {question.affectedSubsystem}
           </span>
         </div>
 
-        <div className="flex items-center gap-2 text-[11px] font-mono text-gray-400">
+        <div className="flex items-center gap-2 text-xs font-mono text-gray-400">
           <span className="flex items-center gap-1">
             <Clock size={11} /> {question.timestamp}
           </span>
@@ -115,7 +115,7 @@ export default function EngineeringQuestion({
       {/* Evidence Residuals Chips */}
       {question.evidence && question.evidence.length > 0 && (
         <div className="mb-4">
-          <div className="text-[10px] font-mono uppercase tracking-wider text-gray-400 mb-1.5">
+          <div className="text-xs font-mono uppercase tracking-wider text-gray-400 mb-1.5">
             Measured Evidence & Residuals:
           </div>
           <div className="flex flex-wrap gap-2">
@@ -127,7 +127,7 @@ export default function EngineeringQuestion({
                 <span className="text-gray-400">{ev.label}:</span>
                 <span className="font-bold text-white">{ev.value}</span>
                 {ev.residual && (
-                  <span className="text-amber-400 font-semibold text-[11px]">
+                  <span className="text-amber-400 font-semibold text-xs">
                     (Residual: {ev.residual})
                   </span>
                 )}
@@ -140,7 +140,7 @@ export default function EngineeringQuestion({
       {/* Next Action & Investigation Trigger */}
       <div className="pt-3 border-t border-white/[0.06] flex flex-wrap items-center justify-between gap-3">
         <div className="text-xs text-gray-300 font-sans max-w-lg">
-          <strong className="text-ansys-yellow font-mono text-[11px] uppercase mr-1">
+          <strong className="text-signal font-mono text-xs uppercase mr-1">
             Recommended Action:
           </strong>
           {question.recommendedNextAction}
@@ -149,7 +149,7 @@ export default function EngineeringQuestion({
         {onInvestigate ? (
           <button
             onClick={() => onInvestigate(question)}
-            className="px-4 py-2 rounded-xl bg-ansys-yellow text-black font-bold text-xs hover:brightness-110 transition-all flex items-center gap-1.5 font-mono shadow-[0_0_15px_rgba(242,169,0,0.2)] shrink-0 cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-signal text-carbon font-bold text-xs hover:brightness-110 transition-all flex items-center gap-1.5 font-mono shadow-[0_0_15px_rgba(242,169,0,0.2)] shrink-0 cursor-pointer"
           >
             <span>Launch Investigation</span>
             <ArrowRight size={13} />
@@ -157,7 +157,7 @@ export default function EngineeringQuestion({
         ) : (
           <Link
             href={question.investigationRoute || `/investigate?id=${encodeURIComponent(question.id)}`}
-            className="px-4 py-2 rounded-xl bg-ansys-yellow text-black font-bold text-xs hover:brightness-110 transition-all flex items-center gap-1.5 font-mono shadow-[0_0_15px_rgba(242,169,0,0.2)] shrink-0"
+            className="px-4 py-2 rounded-xl bg-signal text-carbon font-bold text-xs hover:brightness-110 transition-all flex items-center gap-1.5 font-mono shadow-[0_0_15px_rgba(242,169,0,0.2)] shrink-0"
           >
             <span>Launch Investigation</span>
             <ArrowRight size={13} />

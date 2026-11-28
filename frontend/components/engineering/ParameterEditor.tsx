@@ -35,12 +35,12 @@ export default function ParameterEditor({
       {/* Header */}
       <div className="flex items-center justify-between gap-2 mb-2">
         <span className="font-bold text-gray-300 flex items-center gap-1.5 font-sans">
-          <Sliders size={13} className="text-ansys-yellow shrink-0" />
+          <Sliders size={13} className="text-signal shrink-0" />
           {label}
         </span>
         <div className="flex items-center gap-1 font-bold">
           <span className="text-white text-sm">{value}</span>
-          <span className="text-gray-500 font-normal">{unit}</span>
+          <span className="text-zinc-400 font-normal">{unit}</span>
         </div>
       </div>
 
@@ -53,9 +53,9 @@ export default function ParameterEditor({
           step={step}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-ansys-yellow"
+          className="w-full h-1.5 bg-white/10 rounded-lg appearance-none cursor-pointer accent-signal"
         />
-        <div className="flex items-center justify-between text-[10px] text-gray-500 mt-1">
+        <div className="flex items-center justify-between text-xs text-zinc-400 mt-1">
           <span>{min} {unit}</span>
           <span>Baseline: {baselineValue} {unit}</span>
           <span>{max} {unit}</span>
@@ -63,8 +63,8 @@ export default function ParameterEditor({
       </div>
 
       {/* Delta Row */}
-      <div className="flex items-center justify-between pt-2 border-t border-white/[0.06] text-[11px]">
-        <span className="text-gray-500">Delta vs Baseline:</span>
+      <div className="flex items-center justify-between pt-2 border-t border-white/[0.06] text-xs">
+        <span className="text-zinc-400">Delta vs Baseline:</span>
         <div className="flex items-center gap-1 font-bold">
           <span
             className={
@@ -81,7 +81,7 @@ export default function ParameterEditor({
       </div>
 
       {isOutOfLimits && (
-        <div className="mt-2 text-[10px] text-rose-400 flex items-center gap-1">
+        <div className="mt-2 text-xs text-rose-400 flex items-center gap-1">
           <AlertTriangle size={11} /> Value exceeds physically calibrated domain!
         </div>
       )}

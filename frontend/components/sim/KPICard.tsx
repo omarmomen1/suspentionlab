@@ -58,7 +58,7 @@ export default function KPICard({
       className={`bg-[#141416] border ${borderClass} rounded-xl p-3 flex flex-col gap-0.5 min-w-0 overflow-hidden`}
       aria-label={`${label}: ${displayValue} ${unit || ''}${status !== 'neutral' ? `, status: ${status}` : ''}`}
     >
-      <span className="text-[9px] font-bold tracking-[0.16em] text-gray-400 uppercase truncate">{label}</span>
+      <span className="text-xs font-bold tracking-[0.16em] text-gray-400 uppercase truncate">{label}</span>
       <span
         className={`text-[1.1rem] font-bold font-mono leading-tight truncate overflow-hidden whitespace-nowrap ${valueClass}`}
         style={color ? { color } : undefined}
@@ -67,7 +67,7 @@ export default function KPICard({
         {unit && <span className="text-[0.65rem] text-gray-400 ml-1 font-sans">{unit}</span>}
         {status !== "neutral" && <span className="sr-only"> ({status})</span>}
       </span>
-      {sub && <span className="text-[10px] text-gray-400 truncate">{sub}</span>}
+      {sub && <span className="text-xs text-gray-400 truncate">{sub}</span>}
     </div>
   );
 }

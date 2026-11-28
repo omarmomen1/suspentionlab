@@ -96,10 +96,10 @@ const STATE_CONFIG: Record<
     desc: "Solver divergence or hard kinematic constraint violation",
   },
   APPROVED: {
-    bg: "bg-ansys-yellow/15",
-    border: "border-ansys-yellow/50",
-    text: "text-ansys-yellow",
-    dot: "bg-ansys-yellow",
+    bg: "bg-signal/15",
+    border: "border-signal/50",
+    text: "text-signal",
+    dot: "bg-signal",
     desc: "Formally signed off by engineering authority with HMAC signature",
   },
   REJECTED: {
@@ -121,8 +121,8 @@ export default function EvidenceBadge({
   const cfg = STATE_CONFIG[normState] || STATE_CONFIG.UNVALIDATED;
 
   const sizeClasses = {
-    xs: "px-1.5 py-0.5 text-[9px] gap-1",
-    sm: "px-2 py-0.5 text-[10px] gap-1.5",
+    xs: "px-1.5 py-0.5 text-xs gap-1",
+    sm: "px-2 py-0.5 text-xs gap-1.5",
     md: "px-2.5 py-1 text-xs gap-2",
   }[size];
 

@@ -118,7 +118,7 @@ export default function SimHistory({ storageKey, onRestore, renderParams }: SimH
       >
         <History size={13} aria-hidden="true" /> History
         {history.length > 0 && (
-          <span className="ml-0.5 text-[9px] font-bold bg-ansys-yellow/20 text-ansys-yellow
+          <span className="ml-0.5 text-xs font-bold bg-signal/20 text-signal
             rounded-full px-1.5 min-w-[18px] text-center">
             {history.length}
           </span>
@@ -140,7 +140,7 @@ export default function SimHistory({ storageKey, onRestore, renderParams }: SimH
                 <button
                   type="button"
                   onClick={clearHistory}
-                  className="text-[10px] text-gray-400 hover:text-red-400 transition-colors"
+                  className="text-xs text-gray-400 hover:text-red-400 transition-colors"
                 >
                   Clear all
                 </button>
@@ -159,8 +159,8 @@ export default function SimHistory({ storageKey, onRestore, renderParams }: SimH
           <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
             {history.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 gap-2">
-                <Clock size={28} className="text-gray-700" />
-                <p className="text-xs text-gray-600">No simulations yet. Run the solver to start building history.</p>
+                <Clock size={28} className="text-zinc-300" />
+                <p className="text-xs text-zinc-300">No simulations yet. Run the solver to start building history.</p>
               </div>
             ) : (
               history.map((entry) => (
@@ -168,8 +168,8 @@ export default function SimHistory({ storageKey, onRestore, renderParams }: SimH
                   className="px-4 py-3 border-b border-[#1a1a1a] flex items-start justify-between gap-2 hover:bg-[#111113]">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-1.5 mb-1">
-                      <Clock size={10} className="text-gray-700 shrink-0" />
-                      <span className="text-[10px] text-gray-500">
+                      <Clock size={10} className="text-zinc-300 shrink-0" />
+                      <span className="text-xs text-zinc-400">
                         {new Date(entry.timestamp).toLocaleString("en-GB", {
                           day: "numeric", month: "short", hour: "2-digit", minute: "2-digit",
                         })}
@@ -185,8 +185,8 @@ export default function SimHistory({ storageKey, onRestore, renderParams }: SimH
                         ["fₙ",  entry.metrics.f_n_s],
                       ]).map(([label, val]) => (
                         <div key={String(label)} className="flex items-center gap-1">
-                          <span className="text-[9px] text-gray-700">{label}:</span>
-                          <span className="text-[9px] font-mono text-gray-400">
+                          <span className="text-xs text-zinc-300">{label}:</span>
+                          <span className="text-xs font-mono text-gray-400">
                             {typeof val === "number" ? val.toFixed(2) : (val ?? "N/A")}
                           </span>
                         </div>
@@ -195,12 +195,12 @@ export default function SimHistory({ storageKey, onRestore, renderParams }: SimH
                   </div>
                   <div className="flex flex-col items-end gap-1 shrink-0">
                     <button onClick={() => { onRestore(entry.params); setOpen(false); }}
-                      className="flex items-center gap-0.5 text-[10px] text-ansys-yellow hover:text-white
+                      className="flex items-center gap-0.5 text-xs text-signal hover:text-white
                         font-bold transition-colors">
                       Load <ChevronRight size={11} />
                     </button>
                     <button onClick={() => removeEntry(entry.id)}
-                      className="text-[9px] text-gray-700 hover:text-red-400 transition-colors">
+                      className="text-xs text-zinc-300 hover:text-red-400 transition-colors">
                       Remove
                     </button>
                   </div>

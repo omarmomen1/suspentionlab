@@ -174,7 +174,7 @@ class EngineeringDecisionRequest(BaseModel):
     selected_setup: str = Field("SETUP-P3L-CAND-01")
     alternatives: Optional[List[str]] = None
     outcome: str = Field("ACCEPT", description="ACCEPT | REJECT | INCONCLUSIVE | UNSUPPORTED")
-    author: str = Field("Elena Rostova")
+    author: str = Field("", description="Decision author")
     evidence: Optional[Dict[str, Any]] = None
     simulation_results: Optional[Dict[str, Any]] = None
     blind_validation_results: Optional[Dict[str, Any]] = None
@@ -182,7 +182,7 @@ class EngineeringDecisionRequest(BaseModel):
 
 class ApprovalRequest(BaseModel):
     decision_code: str = Field("DEC-P3L-01")
-    approver_name: str = Field("Elena Rostova")
+    approver_name: str = Field("", description="Approver full name")
     approver_role: str = Field("Chief Race Engineer & Technical Director")
     approval_code: str = Field("APPR-P3L-01")
     notes: Optional[str] = None
@@ -240,7 +240,7 @@ async def define_engineering_problem_endpoint(
         )
     except Exception as exc:
         logger.error("Error defining engineering problem: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail="The request could not be processed. Check the submitted parameters and try again.")
 
 
 @router.post("/gate-parameters")
@@ -284,7 +284,7 @@ async def formulate_causal_hypothesis_endpoint(
         raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:
         logger.error("Error formulating hypothesis: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail="The request could not be processed. Check the submitted parameters and try again.")
 
 
 @router.post("/experiment")
@@ -312,7 +312,7 @@ async def design_controlled_experiment_endpoint(
         )
     except Exception as exc:
         logger.error("Error designing experiment: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail="The request could not be processed. Check the submitted parameters and try again.")
 
 
 @router.post("/setup-candidate")
@@ -340,7 +340,7 @@ async def create_setup_candidate_endpoint(
         raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:
         logger.error("Error creating setup candidate: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail="The request could not be processed. Check the submitted parameters and try again.")
 
 
 @router.post("/simulate")
@@ -361,7 +361,7 @@ async def simulate_candidate_endpoint(
         raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:
         logger.error("Error running simulation: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.post("/compare")
@@ -402,7 +402,7 @@ async def validate_holdout_endpoint(
         raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:
         logger.error("Error executing blind validation: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.post("/decision")
@@ -428,7 +428,7 @@ async def create_decision_endpoint(
         )
     except Exception as exc:
         logger.error("Error creating engineering decision: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail="The request could not be processed. Check the submitted parameters and try again.")
 
 
 @router.post("/approve")
@@ -451,7 +451,7 @@ async def approve_decision_endpoint(
         )
     except Exception as exc:
         logger.error("Error approving decision: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail="The request could not be processed. Check the submitted parameters and try again.")
 
 
 @router.post("/prediction")
@@ -478,7 +478,7 @@ async def generate_prediction_endpoint(
         )
     except Exception as exc:
         logger.error("Error generating track prediction: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail="The request could not be processed. Check the submitted parameters and try again.")
 
 
 @router.post("/reconcile")
@@ -502,7 +502,7 @@ async def reconcile_post_track_endpoint(
         raise HTTPException(status_code=422, detail=str(exc))
     except Exception as exc:
         logger.error("Error reconciling track session: %s", exc)
-        raise HTTPException(status_code=400, detail=str(exc))
+        raise HTTPException(status_code=400, detail="The request could not be processed. Check the submitted parameters and try again.")
 
 
 @router.post("/diagnose-failure")
@@ -537,7 +537,7 @@ async def execute_full_workflow_endpoint(
         return bundle
     except Exception as exc:
         logger.error("Phase 3L full workflow execution failed: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.get("/manifest")

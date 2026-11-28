@@ -175,7 +175,7 @@ function OptimizeContent() {
         {/* Top Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/[0.08] pb-5">
           <div>
-            <div className="flex items-center gap-2 text-xs text-gray-500 mb-1">
+            <div className="flex items-center gap-2 text-xs text-zinc-400 mb-1">
               <Link href="/" className="hover:text-white transition-colors">Command Center</Link>
               <span>/</span>
               <Link href="/experiment" className="hover:text-white transition-colors">Hypothesis Testing</Link>
@@ -240,7 +240,7 @@ function OptimizeContent() {
                 Pareto Frontier generated: <strong>{frontierData?.total_evaluated || ksSteps * cSteps} setups evaluated</strong> ({frontierData?.pareto_optimal_count || 0} non-dominated Pareto designs found).
               </span>
             </div>
-            <span className="text-[10px] text-emerald-500 font-mono">
+            <span className="text-xs text-emerald-500 font-mono">
               Computed at {lastOptimizedAt}
             </span>
           </div>
@@ -254,27 +254,27 @@ function OptimizeContent() {
                 <RotateCcw size={13} className="animate-spin text-purple-400" />
                 Batch Optimization Pipeline in Progress
               </span>
-              <span className="font-mono text-purple-300 text-[11px]">
+              <span className="font-mono text-purple-300 text-xs">
                 Stage {currentStep} of 4
               </span>
             </div>
 
             <div className="grid grid-cols-4 gap-2 text-center text-xs">
-              <div className={`p-2 rounded border ${currentStep >= 1 ? "bg-purple-950/60 border-purple-500 text-white" : "bg-white/[0.02] border-white/5 text-gray-500"}`}>
-                <div className="text-[10px] uppercase font-mono">1. Generation</div>
-                <div className="font-bold text-[11px] mt-0.5">{ksSteps * cSteps} Candidates</div>
+              <div className={`p-2 rounded border ${currentStep >= 1 ? "bg-purple-950/60 border-purple-500 text-white" : "bg-white/[0.02] border-white/5 text-zinc-400"}`}>
+                <div className="text-xs uppercase font-mono">1. Generation</div>
+                <div className="font-bold text-xs mt-0.5">{ksSteps * cSteps} Candidates</div>
               </div>
-              <div className={`p-2 rounded border ${currentStep >= 2 ? "bg-purple-950/60 border-purple-500 text-white" : "bg-white/[0.02] border-white/5 text-gray-500"}`}>
-                <div className="text-[10px] uppercase font-mono">2. ODE Simulation</div>
-                <div className="font-bold text-[11px] mt-0.5">Vectorized solve_ivp</div>
+              <div className={`p-2 rounded border ${currentStep >= 2 ? "bg-purple-950/60 border-purple-500 text-white" : "bg-white/[0.02] border-white/5 text-zinc-400"}`}>
+                <div className="text-xs uppercase font-mono">2. ODE Simulation</div>
+                <div className="font-bold text-xs mt-0.5">Vectorized solve_ivp</div>
               </div>
-              <div className={`p-2 rounded border ${currentStep >= 3 ? "bg-purple-950/60 border-purple-500 text-white" : "bg-white/[0.02] border-white/5 text-gray-500"}`}>
-                <div className="text-[10px] uppercase font-mono">3. Constraints</div>
-                <div className="font-bold text-[11px] mt-0.5">Travel &lt; 150mm</div>
+              <div className={`p-2 rounded border ${currentStep >= 3 ? "bg-purple-950/60 border-purple-500 text-white" : "bg-white/[0.02] border-white/5 text-zinc-400"}`}>
+                <div className="text-xs uppercase font-mono">3. Constraints</div>
+                <div className="font-bold text-xs mt-0.5">Travel &lt; 150mm</div>
               </div>
-              <div className={`p-2 rounded border ${currentStep >= 4 ? "bg-purple-950/60 border-purple-500 text-white" : "bg-white/[0.02] border-white/5 text-gray-500"}`}>
-                <div className="text-[10px] uppercase font-mono">4. Pareto Rank</div>
-                <div className="font-bold text-[11px] mt-0.5">Non-Dominated Sort</div>
+              <div className={`p-2 rounded border ${currentStep >= 4 ? "bg-purple-950/60 border-purple-500 text-white" : "bg-white/[0.02] border-white/5 text-zinc-400"}`}>
+                <div className="text-xs uppercase font-mono">4. Pareto Rank</div>
+                <div className="font-bold text-xs mt-0.5">Non-Dominated Sort</div>
               </div>
             </div>
           </div>
@@ -287,7 +287,7 @@ function OptimizeContent() {
               <Sliders size={13} className="text-purple-400" />
               Batch Candidate Grid Parameters
             </span>
-            <span className="text-[10px] text-gray-500 font-mono">
+            <span className="text-xs text-zinc-400 font-mono">
               Total Grid Size: {ksSteps * cSteps} setups
             </span>
           </div>
@@ -299,9 +299,9 @@ function OptimizeContent() {
                 <span>Spring Rate (k_s)</span>
                 <span className="font-mono text-purple-300">{ksMin / 1000}k – {ksMax / 1000}k N/m</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+              <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                 <div>
-                  <label className="text-gray-500 text-[10px]">Min (N/m)</label>
+                  <label className="text-zinc-400 text-xs">Min (N/m)</label>
                   <input
                     type="number"
                     value={ksMin}
@@ -311,7 +311,7 @@ function OptimizeContent() {
                   />
                 </div>
                 <div>
-                  <label className="text-gray-500 text-[10px]">Max (N/m)</label>
+                  <label className="text-zinc-400 text-xs">Max (N/m)</label>
                   <input
                     type="number"
                     value={ksMax}
@@ -321,7 +321,7 @@ function OptimizeContent() {
                   />
                 </div>
               </div>
-              <div className="flex items-center justify-between text-[10px] text-gray-500 pt-1">
+              <div className="flex items-center justify-between text-xs text-zinc-400 pt-1">
                 <span>Grid Steps:</span>
                 <span className="font-mono text-white">{ksSteps} samples</span>
               </div>
@@ -333,9 +333,9 @@ function OptimizeContent() {
                 <span>Damping Coeff (c)</span>
                 <span className="font-mono text-purple-300">{cMin} – {cMax} Ns/m</span>
               </div>
-              <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
+              <div className="grid grid-cols-2 gap-2 text-xs pt-1">
                 <div>
-                  <label className="text-gray-500 text-[10px]">Min (Ns/m)</label>
+                  <label className="text-zinc-400 text-xs">Min (Ns/m)</label>
                   <input
                     type="number"
                     value={cMin}
@@ -345,7 +345,7 @@ function OptimizeContent() {
                   />
                 </div>
                 <div>
-                  <label className="text-gray-500 text-[10px]">Max (Ns/m)</label>
+                  <label className="text-zinc-400 text-xs">Max (Ns/m)</label>
                   <input
                     type="number"
                     value={cMax}
@@ -355,7 +355,7 @@ function OptimizeContent() {
                   />
                 </div>
               </div>
-              <div className="flex items-center justify-between text-[10px] text-gray-500 pt-1">
+              <div className="flex items-center justify-between text-xs text-zinc-400 pt-1">
                 <span>Grid Steps:</span>
                 <span className="font-mono text-white">{cSteps} samples</span>
               </div>
@@ -365,7 +365,7 @@ function OptimizeContent() {
             <div className="space-y-1.5 bg-white/[0.02] p-3 rounded-lg border border-white/5">
               <div className="flex items-center justify-between font-semibold text-white">
                 <span>Vehicle Speed</span>
-                <span className="font-mono text-ansys-yellow">{(roadSpeed * 3.6).toFixed(0)} km/h</span>
+                <span className="font-mono text-signal">{(roadSpeed * 3.6).toFixed(0)} km/h</span>
               </div>
               <div>
                 <input
@@ -377,11 +377,11 @@ function OptimizeContent() {
                   className="w-full accent-purple-500 mt-2"
                 />
               </div>
-              <div className="flex items-center justify-between text-[10px] text-gray-400 pt-2 border-t border-white/5">
+              <div className="flex items-center justify-between text-xs text-gray-400 pt-2 border-t border-white/5">
                 <span>Objective 1:</span>
                 <span className="text-emerald-400 font-semibold">Min RMS Accel (Comfort)</span>
               </div>
-              <div className="flex items-center justify-between text-[10px] text-gray-400">
+              <div className="flex items-center justify-between text-xs text-gray-400">
                 <span>Objective 2:</span>
                 <span className="text-cyan-400 font-semibold">Min Tire Load Var (Grip)</span>
               </div>
@@ -395,11 +395,11 @@ function OptimizeContent() {
             {/* Card 1: Best Compromise (Closest to Utopia) */}
             <div className="p-4 rounded-xl bg-gradient-to-b from-purple-950/40 to-[#0e0e12] border border-purple-500/40 space-y-3 relative shadow-lg shadow-purple-950/20">
               <div className="flex items-center justify-between">
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500 text-black uppercase tracking-wider flex items-center gap-1">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-purple-500 text-black uppercase tracking-wider flex items-center gap-1">
                   <Award size={11} />
                   Best Compromise
                 </span>
-                <span className="text-[10px] text-purple-300 font-mono">Utopia Optimum</span>
+                <span className="text-xs text-purple-300 font-mono">Utopia Optimum</span>
               </div>
 
               {archetypeBestCompromise ? (
@@ -410,11 +410,11 @@ function OptimizeContent() {
                   <div className="text-xs text-gray-300 font-mono mb-2">
                     k_s: {archetypeBestCompromise.params.k_s} N/m | c: {archetypeBestCompromise.params.c} Ns/m
                   </div>
-                  <p className="text-[11px] text-gray-400 leading-relaxed">
+                  <p className="text-xs text-gray-400 leading-relaxed">
                     {frontierData.best_compromise_explanation}
                   </p>
                   <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between">
-                    <span className="text-[10px] text-gray-500">Pareto Rank: 0 (Non-dominated)</span>
+                    <span className="text-xs text-zinc-400">Pareto Rank: 0 (Non-dominated)</span>
                     <button
                       onClick={() => handleTestCandidate(archetypeBestCompromise)}
                       className="px-2.5 py-1 rounded bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 text-xs font-semibold flex items-center gap-1 transition-colors"
@@ -425,17 +425,17 @@ function OptimizeContent() {
                   </div>
                 </div>
               ) : (
-                <div className="text-xs text-gray-500">No compromise setup found.</div>
+                <div className="text-xs text-zinc-400">No compromise setup found.</div>
               )}
             </div>
 
             {/* Card 2: Maximum Grip (Race Focus) */}
             <div className="p-4 rounded-xl bg-gradient-to-b from-cyan-950/30 to-[#0e0e12] border border-cyan-500/30 space-y-3 relative">
               <div className="flex items-center justify-between">
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 uppercase tracking-wider">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 uppercase tracking-wider">
                   Maximum Grip Archetype
                 </span>
-                <span className="text-[10px] text-cyan-400 font-mono">Min Dynamic Load Var</span>
+                <span className="text-xs text-cyan-400 font-mono">Min Dynamic Load Var</span>
               </div>
 
               {archetypeMaxGrip ? (
@@ -446,11 +446,11 @@ function OptimizeContent() {
                   <div className="text-xs text-gray-300 font-mono mb-2">
                     k_s: {archetypeMaxGrip.params.k_s} N/m | c: {archetypeMaxGrip.params.c} Ns/m
                   </div>
-                  <p className="text-[11px] text-gray-400 leading-relaxed">
+                  <p className="text-xs text-gray-400 leading-relaxed">
                     Minimizes normal load oscillations over kerbs and bumps. Yields maximum tire friction coefficient consistency at the expense of higher chassis heave excitation.
                   </p>
                   <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between">
-                    <span className="text-[10px] text-gray-500">Tire Var: {archetypeMaxGrip.objectives.tire_load_variation?.toFixed(0)} N</span>
+                    <span className="text-xs text-zinc-400">Tire Var: {archetypeMaxGrip.objectives.tire_load_variation?.toFixed(0)} N</span>
                     <button
                       onClick={() => handleTestCandidate(archetypeMaxGrip)}
                       className="px-2.5 py-1 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-300 text-xs font-semibold flex items-center gap-1 transition-colors"
@@ -461,17 +461,17 @@ function OptimizeContent() {
                   </div>
                 </div>
               ) : (
-                <div className="text-xs text-gray-500">Evaluating...</div>
+                <div className="text-xs text-zinc-400">Evaluating...</div>
               )}
             </div>
 
             {/* Card 3: Maximum Comfort (Ride Focus) */}
             <div className="p-4 rounded-xl bg-gradient-to-b from-emerald-950/30 to-[#0e0e12] border border-emerald-500/30 space-y-3 relative">
               <div className="flex items-center justify-between">
-                <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase tracking-wider">
+                <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 uppercase tracking-wider">
                   Maximum Comfort Archetype
                 </span>
-                <span className="text-[10px] text-emerald-400 font-mono">Min Heave RMS Accel</span>
+                <span className="text-xs text-emerald-400 font-mono">Min Heave RMS Accel</span>
               </div>
 
               {archetypeMaxComfort ? (
@@ -482,11 +482,11 @@ function OptimizeContent() {
                   <div className="text-xs text-gray-300 font-mono mb-2">
                     k_s: {archetypeMaxComfort.params.k_s} N/m | c: {archetypeMaxComfort.params.c} Ns/m
                   </div>
-                  <p className="text-[11px] text-gray-400 leading-relaxed">
+                  <p className="text-xs text-gray-400 leading-relaxed">
                     Maximizes road bump isolation and reduces driver vibration dose value (VDV). Causes higher pitch and roll gradients under transient braking.
                   </p>
                   <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between">
-                    <span className="text-[10px] text-gray-500">Ride RMS: {archetypeMaxComfort.objectives.rms_body_accel?.toFixed(2)} m/s²</span>
+                    <span className="text-xs text-zinc-400">Ride RMS: {archetypeMaxComfort.objectives.rms_body_accel?.toFixed(2)} m/s²</span>
                     <button
                       onClick={() => handleTestCandidate(archetypeMaxComfort)}
                       className="px-2.5 py-1 rounded bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 text-xs font-semibold flex items-center gap-1 transition-colors"
@@ -497,7 +497,7 @@ function OptimizeContent() {
                   </div>
                 </div>
               ) : (
-                <div className="text-xs text-gray-500">Evaluating...</div>
+                <div className="text-xs text-zinc-400">Evaluating...</div>
               )}
             </div>
           </div>
@@ -518,7 +518,7 @@ function OptimizeContent() {
                     <h3 className="text-xs font-bold text-white tracking-wider uppercase">
                       Pareto Frontier: Ride Comfort vs Grip Consistency
                     </h3>
-                    <p className="text-[10px] text-gray-500">
+                    <p className="text-xs text-zinc-400">
                       Gold stars denote non-dominated optimal tradeoffs. Lower-left is ideal.
                     </p>
                   </div>
@@ -527,11 +527,11 @@ function OptimizeContent() {
                 <div className="flex items-center gap-3 text-xs">
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
-                    <span className="text-[10px] text-gray-400">Pareto Optimal</span>
+                    <span className="text-xs text-gray-400">Pareto Optimal</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-2.5 h-2.5 rounded-full bg-blue-500/60"></span>
-                    <span className="text-[10px] text-gray-400">Feasible Dominated</span>
+                    <span className="text-xs text-gray-400">Feasible Dominated</span>
                   </div>
                 </div>
               </div>
@@ -612,7 +612,7 @@ function OptimizeContent() {
                         onMouseLeave={() => setHoveredCandidate(null)}
                       >
                         {isSelected && (
-                          <circle cx={cx} cy={cy} r="14" fill="none" stroke="#f2a900" strokeWidth="2" opacity="0.7" />
+                          <circle cx={cx} cy={cy} r="14" fill="none" stroke="#C8F04B" strokeWidth="2" opacity="0.7" />
                         )}
                         <circle
                           cx={cx}
@@ -645,7 +645,7 @@ function OptimizeContent() {
                   <div className="absolute top-4 right-4 bg-[#14141c] border border-white/20 p-2.5 rounded-lg shadow-xl text-xs space-y-1 z-10 pointer-events-none">
                     <div className="font-bold text-white flex items-center justify-between gap-3">
                       <span>{hoveredCandidate.candidate_id}</span>
-                      <span className={`text-[10px] font-mono px-1 rounded ${
+                      <span className={`text-xs font-mono px-1 rounded ${
                         (hoveredCandidate.pareto_rank === 0 || hoveredCandidate.is_pareto_optimal)
                           ? "bg-amber-500/20 text-amber-300"
                           : "bg-blue-500/20 text-blue-300"
@@ -655,10 +655,10 @@ function OptimizeContent() {
                           : "FEASIBLE"}
                       </span>
                     </div>
-                    <div className="text-[11px] text-gray-300 font-mono">
+                    <div className="text-xs text-gray-300 font-mono">
                       k_s: {hoveredCandidate.params.k_s} N/m | c: {hoveredCandidate.params.c} Ns/m
                     </div>
-                    <div className="text-[10px] text-gray-400">
+                    <div className="text-xs text-gray-400">
                       Ride RMS: <strong className="text-white">{hoveredCandidate.objectives.rms_body_accel?.toFixed(2)} m/s²</strong> | Tire Var: <strong className="text-white">{hoveredCandidate.objectives.tire_load_variation?.toFixed(0)} N</strong>
                     </div>
                   </div>
@@ -671,7 +671,7 @@ function OptimizeContent() {
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-white/10 mb-3">
                   <div className="flex items-center gap-2">
-                    <div className="w-6 h-6 rounded-md bg-ansys-yellow/10 border border-ansys-yellow/30 flex items-center justify-center text-ansys-yellow">
+                    <div className="w-6 h-6 rounded-md bg-signal/10 border border-signal/30 flex items-center justify-center text-signal">
                       <Sliders size={13} />
                     </div>
                     <h3 className="text-xs font-bold text-white tracking-wider uppercase">
@@ -679,7 +679,7 @@ function OptimizeContent() {
                     </h3>
                   </div>
                   {selectedCandidate && (
-                    <span className="text-xs font-mono font-bold text-ansys-yellow">
+                    <span className="text-xs font-mono font-bold text-signal">
                       {selectedCandidate.candidate_id}
                     </span>
                   )}
@@ -689,7 +689,7 @@ function OptimizeContent() {
                   <div className="space-y-3 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="text-gray-400">Classification:</span>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold font-mono ${
+                      <span className={`px-2 py-0.5 rounded text-xs font-bold font-mono ${
                         selectedCandidate.pareto_rank === 0 || selectedCandidate.is_pareto_optimal
                           ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
                           : "bg-blue-500/20 text-blue-300 border border-blue-500/40"
@@ -701,8 +701,8 @@ function OptimizeContent() {
                     </div>
 
                     {/* Parameters Box */}
-                    <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1.5 font-mono text-[11px]">
-                      <div className="text-gray-400 text-[10px] uppercase tracking-wider font-semibold font-sans">
+                    <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1.5 font-mono text-xs">
+                      <div className="text-gray-400 text-xs uppercase tracking-wider font-semibold font-sans">
                         Setup Parameters:
                       </div>
                       <div className="flex justify-between">
@@ -716,8 +716,8 @@ function OptimizeContent() {
                     </div>
 
                     {/* KPIs Box */}
-                    <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1.5 font-mono text-[11px]">
-                      <div className="text-gray-400 text-[10px] uppercase tracking-wider font-semibold font-sans">
+                    <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5 space-y-1.5 font-mono text-xs">
+                      <div className="text-gray-400 text-xs uppercase tracking-wider font-semibold font-sans">
                         Simulated Objectives:
                       </div>
                       <div className="flex justify-between">
@@ -741,18 +741,18 @@ function OptimizeContent() {
                     </div>
 
                     {/* Physical Explanation */}
-                    <div className="p-3 rounded-lg bg-purple-950/20 border border-purple-500/20 text-[11px] text-gray-300 leading-relaxed">
+                    <div className="p-3 rounded-lg bg-purple-950/20 border border-purple-500/20 text-xs text-gray-300 leading-relaxed">
                       {selectedCandidate.explanation}
                     </div>
 
                     {/* Epistemic disclaimer */}
-                    <div className="flex items-center gap-1.5 text-[10px] text-gray-500">
-                      <ShieldCheck size={12} className="text-ansys-yellow shrink-0" />
+                    <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+                      <ShieldCheck size={12} className="text-signal shrink-0" />
                       <span>UNVALIDATED: Numerical simulation requires damper dyno sign-off.</span>
                     </div>
                   </div>
                 ) : (
-                  <div className="text-center py-12 text-xs text-gray-500">
+                  <div className="text-center py-12 text-xs text-zinc-400">
                     Click any point on the scatter plot to inspect its tradeoffs.
                   </div>
                 )}
@@ -785,7 +785,7 @@ function OptimizeContent() {
                   <h3 className="text-xs font-bold text-white tracking-wider uppercase">
                     Evaluated Candidate Ranking Table
                   </h3>
-                  <p className="text-[10px] text-gray-500">
+                  <p className="text-xs text-zinc-400">
                     Sorted by Pareto optimality and Euclidean distance to Utopia point.
                   </p>
                 </div>
@@ -795,7 +795,7 @@ function OptimizeContent() {
               <div className="flex items-center gap-1.5 bg-black/40 p-1 rounded-lg border border-white/5 text-xs">
                 <button
                   onClick={() => setFilterMode("pareto")}
-                  className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
                     filterMode === "pareto"
                       ? "bg-signal text-carbon font-bold shadow-sm"
                       : "text-gray-400 hover:text-white"
@@ -805,7 +805,7 @@ function OptimizeContent() {
                 </button>
                 <button
                   onClick={() => setFilterMode("feasible")}
-                  className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
                     filterMode === "feasible"
                       ? "bg-signal text-carbon font-bold shadow-sm"
                       : "text-gray-400 hover:text-white"
@@ -815,7 +815,7 @@ function OptimizeContent() {
                 </button>
                 <button
                   onClick={() => setFilterMode("all")}
-                  className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors ${
+                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
                     filterMode === "all"
                       ? "bg-signal text-carbon font-bold shadow-sm"
                       : "text-gray-400 hover:text-white"
@@ -830,7 +830,7 @@ function OptimizeContent() {
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs font-mono">
                 <thead>
-                  <tr className="border-b border-white/10 text-[10px] text-gray-400 uppercase">
+                  <tr className="border-b border-white/10 text-xs text-gray-400 uppercase">
                     <th className="py-2.5 px-3">Candidate ID</th>
                     <th className="py-2.5 px-3">Spring (k_s)</th>
                     <th className="py-2.5 px-3">Damping (c)</th>
@@ -856,7 +856,7 @@ function OptimizeContent() {
                         }`}
                       >
                         <td className="py-2.5 px-3 font-bold text-white flex items-center gap-1.5">
-                          {isBest && <Award size={13} className="text-ansys-yellow" />}
+                          {isBest && <Award size={13} className="text-signal" />}
                           <span>{cand.candidate_id}</span>
                         </td>
                         <td className="py-2.5 px-3 text-gray-300">{cand.params.k_s} N/m</td>
@@ -871,7 +871,7 @@ function OptimizeContent() {
                           {cand.constraints.peak_susp_travel?.toFixed(1)} mm
                         </td>
                         <td className="py-2.5 px-3">
-                          <span className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                          <span className={`px-1.5 py-0.5 rounded text-xs font-bold ${
                             (cand.pareto_rank === 0 || cand.is_pareto_optimal) ? "bg-amber-500/20 text-amber-300" : "bg-white/5 text-gray-400"
                           }`}>
                             Rank {cand.pareto_rank}
@@ -879,13 +879,13 @@ function OptimizeContent() {
                         </td>
                         <td className="py-2.5 px-3">
                           {isBest ? (
-                            <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-[10px] font-semibold border border-purple-500/30 font-sans">
+                            <span className="px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 text-xs font-semibold border border-purple-500/30 font-sans">
                               Best Compromise
                             </span>
                           ) : (cand.pareto_rank === 0 || cand.is_pareto_optimal) ? (
-                            <span className="text-amber-400 text-[11px] font-sans">Pareto Optimal</span>
+                            <span className="text-amber-400 text-xs font-sans">Pareto Optimal</span>
                           ) : (
-                            <span className="text-gray-500 text-[11px] font-sans">Dominated</span>
+                            <span className="text-zinc-400 text-xs font-sans">Dominated</span>
                           )}
                         </td>
                         <td className="py-2.5 px-3 text-right">
@@ -895,7 +895,7 @@ function OptimizeContent() {
                               e.stopPropagation();
                               handleTestCandidate(cand);
                             }}
-                            className="px-2.5 py-1 rounded bg-signal/15 hover:bg-signal/25 border border-signal/30 text-signal text-[11px] font-sans font-semibold transition-colors inline-flex items-center gap-1"
+                            className="px-2.5 py-1 rounded bg-signal/15 hover:bg-signal/25 border border-signal/30 text-signal text-xs font-sans font-semibold transition-colors inline-flex items-center gap-1"
                           >
                             <Zap size={11} />
                             <span>Test</span>

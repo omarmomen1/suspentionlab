@@ -202,7 +202,12 @@ async def verify_api_key(
             if request.method not in ("GET", "HEAD", "OPTIONS"):
                 csrf_token_header = request.headers.get("X-CSRF-Token")
                 csrf_token_cookie = request.cookies.get("csrf_token")
-                if not csrf_token_header or not csrf_token_cookie or csrf_token_header != csrf_token_cookie:
+                import hmac as _hmac
+                if (
+                    not csrf_token_header
+                    or not csrf_token_cookie
+                    or not _hmac.compare_digest(str(csrf_token_header), str(csrf_token_cookie))
+                ):
                     from suspensionlab.backend.core.errors import AuthenticationError
                     raise AuthenticationError("CSRF token missing or mismatch.")
             bearer = f"Bearer {sl_token}"
@@ -406,7 +411,9 @@ async def verify_api_key(
                             permissions=sorted(list(perms)),
                         )
 
-        # 2d. Fallback for legacy user.api_key verification (supports both SHA-256 hashed and plaintext)
+        # 2d. Fallback for legacy user.api_key verification (hashed-only; Pass B
+        # removed the plaintext comparison so a stored plaintext key no longer
+        # authenticates).
         import hashlib
         hashed_api_key = hashlib.sha256(api_key.encode()).hexdigest()
         from sqlalchemy.orm import joinedload
@@ -416,7 +423,7 @@ async def verify_api_key(
                 joinedload(User.team),
                 joinedload(User.organization)
             ).where(
-                or_(User.api_key == hashed_api_key, User.api_key == api_key),
+                User.api_key == hashed_api_key,
                 User.deleted_at == None
             )
         )

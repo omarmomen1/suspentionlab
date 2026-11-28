@@ -49,20 +49,20 @@ export default function KinematicsComparisonPanel({
     const t = String(type || "").toUpperCase();
     if (t.includes("DIRECT")) {
       return (
-        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
           <CheckCircle2 className="w-3 h-3" /> [DIRECTLY COMPUTED]
         </span>
       );
     }
     if (t.includes("INFER")) {
       return (
-        <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-mono font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40">
+        <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-mono font-bold bg-sky-500/20 text-sky-300 border border-sky-500/40">
           <Activity className="w-3 h-3" /> [INFERRED]
         </span>
       );
     }
     return (
-      <span className="inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+      <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded font-mono font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
         <HelpCircle className="w-3 h-3" /> [HYPOTHESIZED]
       </span>
     );
@@ -214,7 +214,7 @@ export default function KinematicsComparisonPanel({
                 <CheckCircle2 className="w-3.5 h-3.5" /> What Improved in Candidate (Setup B)
               </div>
               {!comparison.what_improved || comparison.what_improved.length === 0 ? (
-                <div className="text-xs text-slate-500">No primary improvements detected over baseline.</div>
+                <div className="text-xs text-zinc-400">No primary improvements detected over baseline.</div>
               ) : (
                 <ul className="text-xs text-slate-300 space-y-1">
                   {comparison.what_improved.map((item: any, idx: number) => {
@@ -236,7 +236,7 @@ export default function KinematicsComparisonPanel({
                 <AlertTriangle className="w-3.5 h-3.5" /> Tradeoffs & Degradations in Setup B
               </div>
               {!comparison.what_got_worse || comparison.what_got_worse.length === 0 ? (
-                <div className="text-xs text-slate-500">No kinematic degradations observed.</div>
+                <div className="text-xs text-zinc-400">No kinematic degradations observed.</div>
               ) : (
                 <ul className="text-xs text-slate-300 space-y-1">
                   {comparison.what_got_worse.map((item: any, idx: number) => {
@@ -288,15 +288,15 @@ export default function KinematicsComparisonPanel({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs pt-2 border-t border-slate-700/50">
                         <div className="bg-slate-900/50 p-2 rounded border border-slate-800">
                           <span className="text-slate-400 font-bold block mb-0.5">Physical Mechanism:</span>
-                          <span className="text-slate-300 font-mono text-[11px]">{mechanism}</span>
+                          <span className="text-slate-300 font-mono text-xs">{mechanism}</span>
                         </div>
                         <div className="bg-slate-900/50 p-2 rounded border border-slate-800">
                           <span className="text-slate-400 font-bold block mb-0.5">Direct Evidence:</span>
-                          <span className="text-slate-300 font-mono text-[11px]">{evidence}</span>
+                          <span className="text-slate-300 font-mono text-xs">{evidence}</span>
                         </div>
                       </div>
                       {item.recommendation && (
-                        <div className="text-[11px] text-indigo-300/90 bg-indigo-950/20 p-1.5 rounded border border-indigo-900/30">
+                        <div className="text-xs text-indigo-300/90 bg-indigo-950/20 p-1.5 rounded border border-indigo-900/30">
                           <strong>Race Engineer Recommendation:</strong> {item.recommendation}
                         </div>
                       )}
@@ -311,7 +311,7 @@ export default function KinematicsComparisonPanel({
           {activeTab === "metrics" && (
             <div data-testid="metric-deltas-table" className="overflow-x-auto rounded-lg border border-slate-800">
               <table className="w-full text-xs text-left border-collapse">
-                <thead className="bg-slate-800/90 text-slate-300 font-semibold uppercase tracking-wider text-[10px]">
+                <thead className="bg-slate-800/90 text-slate-300 font-semibold uppercase tracking-wider text-xs">
                   <tr>
                     <th className="p-2.5">Kinematic Quantity</th>
                     <th className="p-2.5 text-right">Setup A (Static)</th>
@@ -321,7 +321,7 @@ export default function KinematicsComparisonPanel({
                     <th className="p-2.5 text-right">RMS Difference</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800 font-mono text-[11px]">
+                <tbody className="divide-y divide-slate-800 font-mono text-xs">
                   {(() => {
                     const rows = Array.isArray(comparison.metric_comparisons)
                       ? comparison.metric_comparisons
@@ -391,7 +391,7 @@ export default function KinematicsComparisonPanel({
           {activeTab === "hardpoints" && (
             <div className="overflow-x-auto rounded-lg border border-slate-800">
               <table className="w-full text-xs text-left border-collapse">
-                <thead className="bg-slate-800/90 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">
+                <thead className="bg-slate-800/90 text-slate-400 font-semibold uppercase tracking-wider text-xs">
                   <tr>
                     <th className="p-2.5">Hardpoint</th>
                     <th className="p-2.5">Description</th>
@@ -401,7 +401,7 @@ export default function KinematicsComparisonPanel({
                     <th className="p-2.5 text-right">3D Distance (mm)</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-800 font-mono text-[11px]">
+                <tbody className="divide-y divide-slate-800 font-mono text-xs">
                   {Object.entries(comparison.hardpoint_deltas).map(([hpKey, delta], idx) => {
                     const isChanged = delta.distance_mm > 0.01;
                     return (
@@ -437,32 +437,32 @@ export default function KinematicsComparisonPanel({
               <div className="flex items-center gap-2 text-indigo-400 font-semibold mb-2">
                 <Cpu className="w-4 h-4" /> Solver Audit & Verification Provenance
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-[11px]">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
                 <div>
-                  <span className="text-slate-500">Comparison ID:</span> {comparison.comparison_id}
+                  <span className="text-zinc-400">Comparison ID:</span> {comparison.comparison_id}
                 </div>
                 <div>
-                  <span className="text-slate-500">Timestamp:</span> {comparison.timestamp}
+                  <span className="text-zinc-400">Timestamp:</span> {comparison.timestamp}
                 </div>
                 <div>
-                  <span className="text-slate-500">Setup A Hash:</span>{" "}
+                  <span className="text-zinc-400">Setup A Hash:</span>{" "}
                   <span className="text-sky-300">{comparison.geometry_hash_a}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500">Setup B Hash:</span>{" "}
+                  <span className="text-zinc-400">Setup B Hash:</span>{" "}
                   <span className="text-amber-300">{comparison.geometry_hash_b}</span>
                 </div>
                 <div>
-                  <span className="text-slate-500">Sweep Range:</span> [{comparison.provenance.z_min_mm} mm, {comparison.provenance.z_max_mm} mm]
+                  <span className="text-zinc-400">Sweep Range:</span> [{comparison.provenance.z_min_mm} mm, {comparison.provenance.z_max_mm} mm]
                 </div>
                 <div>
-                  <span className="text-slate-500">Evaluation Steps:</span> {comparison.provenance.n_steps} monotonic points
+                  <span className="text-zinc-400">Evaluation Steps:</span> {comparison.provenance.n_steps} monotonic points
                 </div>
                 <div>
-                  <span className="text-slate-500">Backend A:</span> {comparison.provenance.backend_a}
+                  <span className="text-zinc-400">Backend A:</span> {comparison.provenance.backend_a}
                 </div>
                 <div>
-                  <span className="text-slate-500">Backend B:</span> {comparison.provenance.backend_b}
+                  <span className="text-zinc-400">Backend B:</span> {comparison.provenance.backend_b}
                 </div>
               </div>
             </div>

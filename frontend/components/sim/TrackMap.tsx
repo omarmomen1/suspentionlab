@@ -427,10 +427,10 @@ export default function TrackMap({
 
   if (!segments.length) {
     return (
-      <div className="w-full h-[460px] flex flex-col items-center justify-center bg-[#0D1017] border border-[#1f2430] rounded-xl text-zinc-500 text-xs p-6 text-center">
-        <MapPin size={28} className="text-zinc-600 mb-2 opacity-50" />
+      <div className="w-full h-[460px] flex flex-col items-center justify-center bg-[#0D1017] border border-[#1f2430] rounded-xl text-zinc-400 text-xs p-6 text-center">
+        <MapPin size={28} className="text-zinc-300 mb-2 opacity-50" />
         <span className="font-medium text-zinc-400">No Track Coordinates Loaded</span>
-        <span className="text-[11px] text-zinc-600 mt-1">
+        <span className="text-xs text-zinc-300 mt-1">
           Select a championship circuit or run a simulation to render the 2D bottleneck track map.
         </span>
       </div>
@@ -452,11 +452,11 @@ export default function TrackMap({
               <span className="text-xs font-bold text-white tracking-wide">
                 {circuitName ? `${circuitName} Circuit Map` : "Interactive 2D Circuit Map"}
               </span>
-              <span className="text-[9px] font-mono text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-800/40">
+              <span className="text-xs font-mono text-cyan-400 bg-cyan-950/40 px-2 py-0.5 rounded border border-cyan-800/40">
                 {trackLengthM.toFixed(0)} m
               </span>
             </div>
-            <p className="text-[10px] text-zinc-500 font-sans">
+            <p className="text-xs text-zinc-400 font-sans">
               Color-coded active bottleneck regimes &middot; S/F &amp; Sector 1/2/3 splits
             </p>
           </div>
@@ -466,7 +466,7 @@ export default function TrackMap({
         <div className="flex items-center gap-1 bg-[#151922] p-1 rounded-lg border border-[#252c3b]">
           <button
             onClick={() => setColorMode("bottleneck")}
-            className={`px-2.5 py-1 text-[10px] font-bold rounded transition-all cursor-pointer ${
+            className={`px-2.5 py-1 text-xs font-bold rounded transition-all cursor-pointer ${
               colorMode === "bottleneck"
                 ? "bg-[#06B6D4] text-black shadow-md"
                 : "text-zinc-400 hover:text-white"
@@ -476,16 +476,16 @@ export default function TrackMap({
           </button>
           <button
             onClick={() => setColorMode("speed")}
-            className={`px-2 py-1 text-[10px] font-semibold rounded transition-all cursor-pointer ${
-              colorMode === "speed" ? "bg-[#f2a900] text-black" : "text-zinc-400 hover:text-white"
+            className={`px-2 py-1 text-xs font-semibold rounded transition-all cursor-pointer ${
+              colorMode === "speed" ? "bg-signal text-carbon" : "text-zinc-400 hover:text-white"
             }`}
           >
             Speed
           </button>
           <button
             onClick={() => setColorMode("lateral_g")}
-            className={`px-2 py-1 text-[10px] font-semibold rounded transition-all cursor-pointer ${
-              colorMode === "lateral_g" ? "bg-[#f2a900] text-black" : "text-zinc-400 hover:text-white"
+            className={`px-2 py-1 text-xs font-semibold rounded transition-all cursor-pointer ${
+              colorMode === "lateral_g" ? "bg-signal text-carbon" : "text-zinc-400 hover:text-white"
             }`}
           >
             Lateral G
@@ -493,7 +493,7 @@ export default function TrackMap({
           {driverSpeedsKmh && (
             <button
               onClick={() => setColorMode("driver_delta")}
-              className={`px-2 py-1 text-[10px] font-semibold rounded transition-all cursor-pointer ${
+              className={`px-2 py-1 text-xs font-semibold rounded transition-all cursor-pointer ${
                 colorMode === "driver_delta" ? "bg-rose-500 text-white" : "text-zinc-400 hover:text-white"
               }`}
             >
@@ -503,7 +503,7 @@ export default function TrackMap({
           <button
             type="button"
             onClick={() => setRightPanelMode((m) => (m === "ggv" ? "gg" : "ggv"))}
-            className="px-2 py-1 text-[10px] font-semibold rounded transition-all flex items-center gap-1 cursor-pointer border bg-[#1f2635] text-amber-400 border-amber-500/40 hover:text-white"
+            className="px-2 py-1 text-xs font-semibold rounded transition-all flex items-center gap-1 cursor-pointer border bg-[#1f2635] text-amber-400 border-amber-500/40 hover:text-white"
             title="Toggle between GGV Performance Envelope and G-G Friction Circle"
           >
             <Activity size={10} />
@@ -519,7 +519,7 @@ export default function TrackMap({
           <div className="flex items-center gap-2 px-2.5 py-1.5 rounded bg-[#06B6D4]/10 border border-[#06B6D4]/30">
             <div className="w-2.5 h-2.5 rounded-full bg-[#06B6D4] shadow-sm shadow-[#06B6D4]/50" />
             <div className="min-w-0">
-              <div className="text-[9px] text-zinc-400 font-mono uppercase">Power %</div>
+              <div className="text-xs text-zinc-400 font-mono uppercase">Power %</div>
               <div className="text-xs font-black text-[#06B6D4] font-mono leading-none mt-0.5">
                 {bottleneckStats.powerPct.toFixed(1)}%
               </div>
@@ -530,7 +530,7 @@ export default function TrackMap({
           <div className="flex items-center gap-2 px-2.5 py-1.5 rounded bg-[#F43F5E]/10 border border-[#F43F5E]/30">
             <div className="w-2.5 h-2.5 rounded-full bg-[#F43F5E] shadow-sm shadow-[#F43F5E]/50" />
             <div className="min-w-0">
-              <div className="text-[9px] text-zinc-400 font-mono uppercase">Braking %</div>
+              <div className="text-xs text-zinc-400 font-mono uppercase">Braking %</div>
               <div className="text-xs font-black text-[#F43F5E] font-mono leading-none mt-0.5">
                 {bottleneckStats.brakingPct.toFixed(1)}%
               </div>
@@ -541,7 +541,7 @@ export default function TrackMap({
           <div className="flex items-center gap-2 px-2.5 py-1.5 rounded bg-[#F59E0B]/10 border border-[#F59E0B]/30">
             <div className="w-2.5 h-2.5 rounded-full bg-[#F59E0B] shadow-sm shadow-[#F59E0B]/50" />
             <div className="min-w-0">
-              <div className="text-[9px] text-zinc-400 font-mono uppercase">Understeer %</div>
+              <div className="text-xs text-zinc-400 font-mono uppercase">Understeer %</div>
               <div className="text-xs font-black text-[#F59E0B] font-mono leading-none mt-0.5">
                 {bottleneckStats.understeerPct.toFixed(1)}%
               </div>
@@ -552,7 +552,7 @@ export default function TrackMap({
           <div className="flex items-center gap-2 px-2.5 py-1.5 rounded bg-[#10B981]/10 border border-[#10B981]/30">
             <div className="w-2.5 h-2.5 rounded-full bg-[#10B981] shadow-sm shadow-[#10B981]/50" />
             <div className="min-w-0">
-              <div className="text-[9px] text-zinc-400 font-mono uppercase">Oversteer %</div>
+              <div className="text-xs text-zinc-400 font-mono uppercase">Oversteer %</div>
               <div className="text-xs font-black text-[#10B981] font-mono leading-none mt-0.5">
                 {bottleneckStats.oversteerPct.toFixed(1)}%
               </div>
@@ -618,13 +618,13 @@ export default function TrackMap({
           {startFinishPos && (
             <g transform={`translate(${startFinishPos.svgX}, ${startFinishPos.svgY})`}>
               <line x1={-10} y1={-10} x2={10} y2={10} stroke="#ffffff" strokeWidth={3} strokeDasharray="3,3" />
-              <rect x={-14} y={-24} width={28} height={15} rx={3} fill="#090c10" stroke="#f2a900" strokeWidth={1.5} />
+              <rect x={-14} y={-24} width={28} height={15} rx={3} fill="#090c10" stroke="#C8F04B" strokeWidth={1.5} />
               <text
                 textAnchor="middle"
                 dy={-13}
                 fontSize={8}
                 fontWeight="900"
-                fill="#f2a900"
+                fill="#C8F04B"
                 className="font-mono pointer-events-none tracking-widest"
               >
                 S/F
@@ -661,9 +661,9 @@ export default function TrackMap({
               <circle
                 r={10}
                 fill="#0D1017"
-                stroke="#f2a900"
+                stroke="#C8F04B"
                 strokeWidth={2}
-                className="group-hover:fill-[#f2a900] group-hover:stroke-white transition-all shadow-md"
+                className="group-hover:fill-[#C8F04B] group-hover:stroke-white transition-all shadow-md"
               />
               <text
                 textAnchor="middle"
@@ -692,34 +692,34 @@ export default function TrackMap({
         {hoverPos && (
           <div className="absolute top-3 right-3 bg-[#0D1017]/95 border border-[#252c3b] backdrop-blur-md rounded-xl p-3 text-xs shadow-2xl pointer-events-none min-w-[200px]">
             <div className="flex items-center justify-between border-b border-[#1f2533] pb-1.5 mb-1.5">
-              <span className="text-[10px] text-zinc-400 font-mono">TRACK STATION</span>
-              <span className="text-[11px] font-bold text-amber-400 font-mono">
+              <span className="text-xs text-zinc-400 font-mono">TRACK STATION</span>
+              <span className="text-xs font-bold text-amber-400 font-mono">
                 {hoverPos.dist.toFixed(0)} m
               </span>
             </div>
 
-            <div className="space-y-1 font-mono text-[11px]">
+            <div className="space-y-1 font-mono text-xs">
               <div className="flex justify-between">
-                <span className="text-zinc-500">Speed:</span>
+                <span className="text-zinc-400">Speed:</span>
                 <span className="text-white font-bold">{hoverPos.speed.toFixed(1)} km/h</span>
               </div>
               {hoverPos.latG !== undefined && (
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Lateral G:</span>
+                  <span className="text-zinc-400">Lateral G:</span>
                   <span className="text-zinc-300">{hoverPos.latG.toFixed(2)} g</span>
                 </div>
               )}
               {hoverPos.longG !== undefined && (
                 <div className="flex justify-between">
-                  <span className="text-zinc-500">Longitudinal G:</span>
+                  <span className="text-zinc-400">Longitudinal G:</span>
                   <span className="text-zinc-300">{hoverPos.longG.toFixed(2)} g</span>
                 </div>
               )}
               {hoverPos.factor && (
                 <div className="pt-1.5 border-t border-[#1f2533] flex items-center justify-between">
-                  <span className="text-[9px] text-zinc-500 uppercase">Limit:</span>
+                  <span className="text-xs text-zinc-400 uppercase">Limit:</span>
                   <span
-                    className="text-[9px] font-bold px-1.5 py-0.5 rounded font-mono"
+                    className="text-xs font-bold px-1.5 py-0.5 rounded font-mono"
                     style={{
                       color: getBottleneckColor(hoverPos.factor),
                       backgroundColor: `${getBottleneckColor(hoverPos.factor)}20`,
@@ -747,8 +747,8 @@ export default function TrackMap({
               <button
                 type="button"
                 onClick={() => setRightPanelMode("ggv")}
-                className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
-                  rightPanelMode === "ggv" ? "bg-[#f2a900] text-black shadow" : "text-zinc-400 hover:text-white"
+                className={`px-2 py-0.5 text-xs font-bold rounded transition-all cursor-pointer ${
+                  rightPanelMode === "ggv" ? "bg-signal text-carbon shadow" : "text-zinc-400 hover:text-white"
                 }`}
               >
                 GGV Envelope
@@ -756,7 +756,7 @@ export default function TrackMap({
               <button
                 type="button"
                 onClick={() => setRightPanelMode("gg")}
-                className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                className={`px-2 py-0.5 text-xs font-bold rounded transition-all cursor-pointer ${
                   rightPanelMode === "gg" ? "bg-[#06B6D4] text-black shadow" : "text-zinc-400 hover:text-white"
                 }`}
               >

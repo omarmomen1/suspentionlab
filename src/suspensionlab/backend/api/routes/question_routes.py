@@ -92,7 +92,7 @@ async def create_question_endpoint(
         return created
     except Exception as exc:
         logger.error("Failed creating question: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Failed creating question: {exc}")
+        raise HTTPException(status_code=500, detail="Failed creating question.")
 
 
 @router.get("")
@@ -122,7 +122,7 @@ async def list_questions_endpoint(
         return {"total": len(questions), "questions": questions}
     except Exception as exc:
         logger.error("Failed listing questions: %s", exc)
-        raise HTTPException(status_code=500, detail=f"Failed listing questions: {exc}")
+        raise HTTPException(status_code=500, detail="Failed listing questions.")
 
 
 @router.get("/kpis/command-center")
@@ -460,7 +460,7 @@ async def get_question_endpoint(
         raise HTTPException(status_code=403, detail=str(exc))
     except Exception as exc:
         logger.error("Error retrieving question %s: %s", id, exc)
-        raise HTTPException(status_code=500, detail=f"Failed retrieving question: {exc}")
+        raise HTTPException(status_code=500, detail="Failed retrieving question.")
 
 
 @router.patch("/{id}")
@@ -493,4 +493,4 @@ async def update_question_endpoint(
         raise HTTPException(status_code=403, detail=str(exc))
     except Exception as exc:
         logger.error("Error updating question %s: %s", id, exc)
-        raise HTTPException(status_code=500, detail=f"Failed updating question: {exc}")
+        raise HTTPException(status_code=500, detail="Failed updating question.")

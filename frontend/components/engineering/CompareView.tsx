@@ -63,7 +63,7 @@ export default function CompareView({
             <span>Side-by-Side Comparative Intelligence</span>
           </div>
           <h2 className="text-xl font-bold mt-1">
-            {setupAName} <span className="text-neutral-500 font-normal">vs</span> {setupBName}
+            {setupAName} <span className="text-zinc-400 font-normal">vs</span> {setupBName}
           </h2>
         </div>
 
@@ -92,7 +92,7 @@ export default function CompareView({
         <div className="overflow-x-auto">
           <table className="w-full text-left font-mono text-xs border-collapse">
             <thead>
-              <tr className="border-b border-neutral-800 text-[10px] text-neutral-400 uppercase">
+              <tr className="border-b border-neutral-800 text-xs text-neutral-400 uppercase">
                 <th className="py-2.5 px-3">Parameter</th>
                 <th className="py-2.5 px-3">{setupAName}</th>
                 <th className="py-2.5 px-3">{setupBName}</th>

@@ -65,7 +65,7 @@ async def yaw_analysis(
         C_alpha_rear=float(raw.get("C_r", raw.get("C_alpha_rear", 140_000.0))),
     )
 
-    v          = float(request_data.get("v_ms", 50.0))
+    v          = float(request_data.get("v_ms", 27.78))
     beta_range = tuple(request_data.get("beta_range",  [-10.0, 10.0]))
     delta_range = tuple(request_data.get("delta_range", [-5.0, 5.0]))
     n_beta     = int(request_data.get("n_beta",  21))
@@ -150,10 +150,14 @@ async def yaw_transient(
         C_alpha_rear=float(raw.get("C_r", raw.get("C_alpha_rear", 140_000.0))),
     )
 
-    v        = float(request_data.get("v_ms",      50.0))
-    radius   = float(request_data.get("radius_m",  50.0))
+    v        = float(request_data.get("v_ms",      27.78))
+    radius   = float(request_data.get("radius_m",  100.0))
     t_total  = float(request_data.get("t_total_s",  3.0))
     dt       = float(request_data.get("dt_s",      0.005))
+
+    ay_required_g = round((v ** 2) / (max(abs(radius), 0.1) * 9.81), 3)
+    mu_limit_g = float(raw.get("mu_limit", request_data.get("mu_limit", 1.35)))
+    infeasible = ay_required_g > mu_limit_g
 
     import asyncio
     loop = asyncio.get_running_loop()
@@ -165,6 +169,16 @@ async def yaw_transient(
         )
     except Exception as e:
         raise HTTPException(500, f"Transient yaw simulation failed: {e}")
+
+    if isinstance(result, dict):
+        result["ay_required_g"] = ay_required_g
+        result["mu_limit_g"] = round(mu_limit_g, 3)
+        result["infeasible"] = infeasible
+        if infeasible:
+            result["feasibility_warning"] = (
+                f"INFEASIBLE — EXCEEDS TIRE GRIP: {ay_required_g:.2f} g lateral demand exceeds "
+                f"{mu_limit_g:.2f} g tire grip ceiling; linear bicycle model saturates."
+            )
 
     return result
 

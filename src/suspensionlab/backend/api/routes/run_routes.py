@@ -36,7 +36,7 @@ class CreateRunRequest(BaseModel):
 
 
 def _not_found(exc: LookupError) -> HTTPException:
-    return HTTPException(status_code=404, detail=str(exc))
+    return HTTPException(status_code=404, detail="The requested resource was not found.")
 
 
 @router.post("", status_code=201)

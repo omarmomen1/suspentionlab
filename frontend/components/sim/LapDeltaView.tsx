@@ -228,7 +228,7 @@ export default function LapDeltaView({
           <Pin size={20} className="text-amber-400" />
         </div>
         <div className="text-sm font-bold text-white">Ghost Car Comparison Inactive</div>
-        <p className="text-xs text-zinc-500 max-w-md">
+        <p className="text-xs text-zinc-400 max-w-md">
           Click <strong className="text-amber-400">&quot;Pin as Baseline (Setup A)&quot;</strong> after running a simulation, then tweak vehicle sliders to inspect live delta time, sector splits, and continuous time gain/loss.
         </p>
         {onPinBaseline && (
@@ -248,7 +248,7 @@ export default function LapDeltaView({
     return (
       <div className="w-full p-8 text-center bg-[#0D1017] border border-[#1f2430] rounded-xl flex flex-col items-center justify-center space-y-3">
         <div className="text-sm font-bold text-amber-400">Incompatible Track Lengths - Delta N/A</div>
-        <p className="text-xs text-zinc-500 max-w-md">
+        <p className="text-xs text-zinc-400 max-w-md">
           Baseline A ran {((comparison.lenA ?? 0) / 1000).toFixed(2)} km but Candidate B ran {((comparison.lenB ?? 0) / 1000).toFixed(2)} km
           (&gt;10% length mismatch). Lap-time deltas across different tracks are meaningless.
           Re-pin a baseline on the same track to compare setups.
@@ -267,10 +267,10 @@ export default function LapDeltaView({
       <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 rounded-xl bg-[#121620] border border-[#1f2533]">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-[10px] text-zinc-400 uppercase tracking-widest font-mono">
+            <span className="text-xs text-zinc-400 uppercase tracking-widest font-mono">
               Live Ghost Comparison
             </span>
-            <span className="text-[10px] px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono">
+            <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono">
               Setup B vs. Setup A
             </span>
           </div>
@@ -288,7 +288,7 @@ export default function LapDeltaView({
 
             {/* Faster/Slower Badge */}
             <span
-              className={`px-2.5 py-1 rounded-md text-[10px] font-black uppercase tracking-wider border font-mono ${
+              className={`px-2.5 py-1 rounded-md text-xs font-black uppercase tracking-wider border font-mono ${
                 isFaster
                   ? "bg-[#10B981]/15 text-[#10B981] border-[#10B981]/40"
                   : isSlower
@@ -305,11 +305,11 @@ export default function LapDeltaView({
           </div>
 
           {comparison && (
-            <div className="flex items-center gap-3 mt-1.5 text-[11px] font-mono text-zinc-400">
+            <div className="flex items-center gap-3 mt-1.5 text-xs font-mono text-zinc-400">
               <span>
                 Baseline A: <strong className="text-white">{comparison.timeA.toFixed(3)}s</strong>
               </span>
-              <ArrowRight size={11} className="text-zinc-600" />
+              <ArrowRight size={11} className="text-zinc-300" />
               <span>
                 Candidate B: <strong className="text-amber-400">{comparison.timeB.toFixed(3)}s</strong>
               </span>
@@ -348,7 +348,7 @@ export default function LapDeltaView({
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           {/* ΔS1 */}
           <div className="p-2.5 rounded-lg bg-[#121620] border border-[#1f2533] flex flex-col justify-between">
-            <span className="text-[9px] uppercase tracking-wider font-mono text-zinc-500">Δ Sector 1</span>
+            <span className="text-xs uppercase tracking-wider font-mono text-zinc-400">Δ Sector 1</span>
             <span
               className={`text-sm font-black font-mono mt-0.5 ${
                 comparison.deltaS1 < 0 ? "text-[#10B981]" : comparison.deltaS1 > 0 ? "text-[#F43F5E]" : "text-zinc-300"
@@ -361,7 +361,7 @@ export default function LapDeltaView({
 
           {/* ΔS2 */}
           <div className="p-2.5 rounded-lg bg-[#121620] border border-[#1f2533] flex flex-col justify-between">
-            <span className="text-[9px] uppercase tracking-wider font-mono text-zinc-500">Δ Sector 2</span>
+            <span className="text-xs uppercase tracking-wider font-mono text-zinc-400">Δ Sector 2</span>
             <span
               className={`text-sm font-black font-mono mt-0.5 ${
                 comparison.deltaS2 < 0 ? "text-[#10B981]" : comparison.deltaS2 > 0 ? "text-[#F43F5E]" : "text-zinc-300"
@@ -374,7 +374,7 @@ export default function LapDeltaView({
 
           {/* ΔS3 */}
           <div className="p-2.5 rounded-lg bg-[#121620] border border-[#1f2533] flex flex-col justify-between">
-            <span className="text-[9px] uppercase tracking-wider font-mono text-zinc-500">Δ Sector 3</span>
+            <span className="text-xs uppercase tracking-wider font-mono text-zinc-400">Δ Sector 3</span>
             <span
               className={`text-sm font-black font-mono mt-0.5 ${
                 comparison.deltaS3 < 0 ? "text-[#10B981]" : comparison.deltaS3 > 0 ? "text-[#F43F5E]" : "text-zinc-300"
@@ -387,7 +387,7 @@ export default function LapDeltaView({
 
           {/* ΔV_max */}
           <div className="p-2.5 rounded-lg bg-[#121620] border border-[#1f2533] flex flex-col justify-between">
-            <span className="text-[9px] uppercase tracking-wider font-mono text-zinc-500">Δ V_max</span>
+            <span className="text-xs uppercase tracking-wider font-mono text-zinc-400">Δ V_max</span>
             <span
               className={`text-sm font-black font-mono mt-0.5 ${
                 comparison.deltaVMax > 0 ? "text-[#10B981]" : comparison.deltaVMax < 0 ? "text-[#F43F5E]" : "text-zinc-300"
@@ -400,7 +400,7 @@ export default function LapDeltaView({
 
           {/* ΔV_min */}
           <div className="p-2.5 rounded-lg bg-[#121620] border border-[#1f2533] flex flex-col justify-between">
-            <span className="text-[9px] uppercase tracking-wider font-mono text-zinc-500">Δ V_min (Apex)</span>
+            <span className="text-xs uppercase tracking-wider font-mono text-zinc-400">Δ V_min (Apex)</span>
             <span
               className={`text-sm font-black font-mono mt-0.5 ${
                 comparison.deltaVMin > 0 ? "text-[#10B981]" : comparison.deltaVMin < 0 ? "text-[#F43F5E]" : "text-zinc-300"
@@ -413,7 +413,7 @@ export default function LapDeltaView({
 
           {/* ΔEnergy */}
           <div className="p-2.5 rounded-lg bg-[#121620] border border-[#1f2533] flex flex-col justify-between">
-            <span className="text-[9px] uppercase tracking-wider font-mono text-zinc-500">Δ Energy</span>
+            <span className="text-xs uppercase tracking-wider font-mono text-zinc-400">Δ Energy</span>
             <span
               className={`text-sm font-black font-mono mt-0.5 ${
                 comparison.deltaEnergy < 0 ? "text-[#10B981]" : comparison.deltaEnergy > 0 ? "text-[#F43F5E]" : "text-zinc-300"
@@ -497,7 +497,7 @@ export default function LapDeltaView({
       {/* Parameter Diff Table (Setup A vs Setup B) */}
       {setupAParams && setupBParams && (
         <div className="pt-2 border-t border-[#1f2430]">
-          <div className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 mb-2 font-mono flex items-center gap-1.5">
+          <div className="text-xs font-bold uppercase tracking-wider text-zinc-400 mb-2 font-mono flex items-center gap-1.5">
             <Sliders size={12} className="text-amber-400" />
             <span>Setup Parameter Variance</span>
           </div>
@@ -527,23 +527,23 @@ export default function LapDeltaView({
               return (
                 <div
                   key={key}
-                  className={`p-2 rounded-lg border text-[10px] font-mono flex flex-col justify-between ${
+                  className={`p-2 rounded-lg border text-xs font-mono flex flex-col justify-between ${
                     hasDiff
                       ? "bg-[#161d2a] border-amber-500/40 text-zinc-200"
-                      : "bg-[#10141d] border-[#1c2230] text-zinc-500"
+                      : "bg-[#10141d] border-[#1c2230] text-zinc-400"
                   }`}
                 >
-                  <span className="text-zinc-400 font-sans text-[9px] uppercase truncate">{label}</span>
+                  <span className="text-zinc-400 font-sans text-xs uppercase truncate">{label}</span>
                   <div className="flex items-baseline justify-between mt-1">
                     <span className="text-zinc-400">{numA}</span>
-                    <span className="text-zinc-600">➔</span>
+                    <span className="text-zinc-300">➔</span>
                     <span className={hasDiff ? "text-amber-400 font-bold" : "text-zinc-400"}>
                       {numB} {unit}
                     </span>
                   </div>
                   {hasDiff && (
                     <div
-                      className={`text-[9px] mt-0.5 text-right font-bold ${
+                      className={`text-xs mt-0.5 text-right font-bold ${
                         diff > 0 ? "text-cyan-400" : "text-rose-400"
                       }`}
                     >

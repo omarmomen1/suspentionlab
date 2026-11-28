@@ -94,6 +94,37 @@ def validate_prod_secrets() -> None:
             raise RuntimeError("CRITICAL: OIDC_ENABLED=true but OIDC_CLIENT_SECRET is not configured.")
         _validate_secret_strength("OIDC_CLIENT_SECRET", oidc_secret, env)
 
+    # License-key signing secret (Pass B: separated from JWT). A JWT secret
+    # leak must never become license forgery, and JWT rotation must never
+    # invalidate issued licenses. PROD requires a distinct secret.
+    if env == "PROD":
+        lic_secret = os.getenv("LICENSE_SIGNING_SECRET")
+        if not lic_secret or not lic_secret.strip():
+            raise RuntimeError(
+                "CRITICAL: LICENSE_SIGNING_SECRET is not configured. "
+                "License keys must be signed with a secret distinct from the JWT keys."
+            )
+        _validate_secret_strength("LICENSE_SIGNING_SECRET", lic_secret, env)
+        if lic_secret in {str(v) for v in keys.values()}:
+            raise RuntimeError(
+                "CRITICAL: LICENSE_SIGNING_SECRET must be distinct from every JWT signing key."
+            )
+
+    # SAML RelayState HMAC secret (Pass B: separated from JWT).
+    saml_enabled = os.getenv("ENABLE_SAML_SSO", "false").lower() in ("1", "true", "yes")
+    if env == "PROD" and saml_enabled:
+        saml_secret = os.getenv("SAML_RELAY_STATE_SECRET")
+        if not saml_secret or not saml_secret.strip():
+            raise RuntimeError(
+                "CRITICAL: SAML is enabled but SAML_RELAY_STATE_SECRET is not configured. "
+                "RelayState HMAC must use a secret distinct from the JWT keys."
+            )
+        _validate_secret_strength("SAML_RELAY_STATE_SECRET", saml_secret, env)
+        if saml_secret in {str(v) for v in keys.values()}:
+            raise RuntimeError(
+                "CRITICAL: SAML_RELAY_STATE_SECRET must be distinct from every JWT signing key."
+            )
+
 
 class Settings(BaseSettings):
     environment: str = "DEV"
@@ -112,8 +143,21 @@ class Settings(BaseSettings):
     gumroad_product_permalink: str = "suspensionlab-pro"
     gumroad_product_id: Optional[str] = None
     gumroad_team_product_id: Optional[str] = None
+    gumroad_seller_id: Optional[str] = None            # Gumroad Ping webhook authenticity check
     jwt_secret_key: Optional[str] = None
     jwt_keys: Optional[str] = None
+
+    # Secrets separated from the JWT signing keys (Pass B): distinct so a JWT
+    # leak cannot forge licenses or RelayState, and JWT rotation never
+    # invalidates issued licenses. Required in PROD (validate_prod_secrets);
+    # non-prod falls back to the JWT key material.
+    license_signing_secret: Optional[str] = None
+    saml_relay_state_secret: Optional[str] = None
+
+    # Stripe configuration, read lazily by billing routes (never at import).
+    stripe_webhook_secret: Optional[str] = None
+    stripe_pro_price_id: Optional[str] = None
+    stripe_enterprise_price_id: Optional[str] = None
     
     database_url: str = "sqlite+aiosqlite:///./data/suspensionlab.db"
     app_base_url: str = "http://localhost:3000"

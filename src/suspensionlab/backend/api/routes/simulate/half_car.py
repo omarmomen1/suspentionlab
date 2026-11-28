@@ -6,7 +6,7 @@ import numpy as np
 from suspensionlab.backend.database.core import get_db_dependency
 from suspensionlab.backend.security.auth import verify_api_key, require_permission
 from suspensionlab.backend.security.permissions import Permission
-from suspensionlab.backend.core.compute_governance import bounded_run, assert_user_concurrency
+from suspensionlab.backend.core.compute_governance import bounded_run, assert_user_concurrency, meter_simulation
 from suspensionlab.shared.models import HalfCarSimulateRequest
 from suspensionlab.physics.half_car import HalfCarParams, RoadProfile, run_half_car_analysis
 from typing import Any
@@ -27,6 +27,8 @@ async def simulate_half_car(
 ):
     try:
         await assert_user_concurrency(db, str(user.user_id), getattr(user, "plan", "FREE"))
+        # Pass B: record usage (Redis primary, DB fallback) so the meter reflects actual runs.
+        await meter_simulation(db, str(user.user_id), str(getattr(user, "plan", "FREE")))
         p = HalfCarParams(**payload.params.model_dump())
         r = RoadProfile(**payload.profile.model_dump())
         raw_res = await bounded_run(run_half_car_analysis, p, r, timeout=30.0, model="half_car")
@@ -38,4 +40,4 @@ async def simulate_half_car(
         raise HTTPException(status_code=504, detail="Half-car simulation timed out.")
     except Exception as e:
         logger.exception("Unhandled error in /simulate/half-car: %s", e)
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Half-car simulation failed. Check the submitted parameters and try again.")

@@ -28,37 +28,37 @@ export default function SimulationStatus({
   return (
     <div className={`p-4 rounded-2xl bg-[#111116] border border-white/[0.08] font-mono text-xs flex flex-col justify-between ${className}`}>
       <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-white/[0.06]">
-        <div className="flex items-center gap-1.5 text-gray-400 font-bold uppercase text-[10px]">
-          <Cpu size={13} className="text-ansys-yellow" />
+        <div className="flex items-center gap-1.5 text-gray-400 font-bold uppercase text-xs">
+          <Cpu size={13} className="text-signal" />
           <span>Physics Solver Status</span>
         </div>
         <div className="flex items-center gap-1.5">
           {isRunning ? (
-            <span className="px-2 py-0.5 rounded bg-purple-950/60 border border-purple-500/40 text-purple-300 font-bold text-[10px] flex items-center gap-1">
+            <span className="px-2 py-0.5 rounded bg-purple-950/60 border border-purple-500/40 text-purple-300 font-bold text-xs flex items-center gap-1">
               <Loader2 size={10} className="animate-spin" /> RUNNING
             </span>
           ) : isFailed ? (
-            <span className="px-2 py-0.5 rounded bg-rose-950/60 border border-rose-500/40 text-rose-400 font-bold text-[10px] flex items-center gap-1">
+            <span className="px-2 py-0.5 rounded bg-rose-950/60 border border-rose-500/40 text-rose-400 font-bold text-xs flex items-center gap-1">
               <AlertCircle size={10} /> DIVERGED
             </span>
           ) : (
-            <span className="px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 font-bold text-[10px] flex items-center gap-1">
+            <span className="px-2 py-0.5 rounded bg-emerald-950/60 border border-emerald-500/40 text-emerald-400 font-bold text-xs flex items-center gap-1">
               <CheckCircle2 size={10} /> CONVERGED
             </span>
           )}
         </div>
       </div>
 
-      <div className="space-y-1.5 text-[11px]">
+      <div className="space-y-1.5 text-xs">
         <div>
-          <span className="text-gray-500">Solver:</span> <span className="text-white font-semibold">{solverName}</span>
+          <span className="text-zinc-400">Solver:</span> <span className="text-white font-semibold">{solverName}</span>
         </div>
         <div>
-          <span className="text-gray-500">Convergence:</span> <span className="text-emerald-400">{convergence}</span>
+          <span className="text-zinc-400">Convergence:</span> <span className="text-emerald-400">{convergence}</span>
         </div>
         <div className="flex items-center justify-between">
-          <span><span className="text-gray-500">Compute Time:</span> <span className="text-white">{executionTimeMs} ms</span></span>
-          <span><span className="text-gray-500">Run:</span> <span className="text-ansys-yellow font-bold">{lastRunLabel}</span></span>
+          <span><span className="text-zinc-400">Compute Time:</span> <span className="text-white">{executionTimeMs} ms</span></span>
+          <span><span className="text-zinc-400">Run:</span> <span className="text-signal font-bold">{lastRunLabel}</span></span>
         </div>
       </div>
 

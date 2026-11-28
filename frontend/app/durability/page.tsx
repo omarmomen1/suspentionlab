@@ -71,7 +71,7 @@ function ScoreGauge({ score }: { score: number }) {
       </svg>
       <div className="text-center z-10">
         <div className="text-3xl font-black" style={{ color }}>{score}</div>
-        <div className="text-[10px] text-gray-600 font-medium">/ 100</div>
+        <div className="text-xs text-zinc-300 font-medium">/ 100</div>
       </div>
     </div>
   );
@@ -118,12 +118,12 @@ export default function DurabilityPage() {
       {/* Header */}
       <div className="border-b border-[#1a1a1a] px-8 py-6">
         <div className="max-w-5xl mx-auto flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-orange-500 to-red-500 flex items-center justify-center shadow-lg shadow-orange-500/20">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br bg-signal/15 border border-signal/30 flex items-center justify-center shadow-lg shadow-orange-500/20">
             <Shield size={18} className="text-white" />
           </div>
           <div>
             <h1 className="text-xl font-bold text-white">Road Durability Analyzer</h1>
-            <p className="text-xs text-gray-500">ISO 8608 road profiles · Fatigue life prediction · ISO 2631-1 comfort rating</p>
+            <p className="text-xs text-zinc-400">ISO 8608 road profiles · Fatigue life prediction · ISO 2631-1 comfort rating</p>
           </div>
         </div>
       </div>
@@ -145,7 +145,7 @@ export default function DurabilityPage() {
                 style={{ "--rc": r.color } as React.CSSProperties}
               >
                 <div className="font-bold text-sm" style={{ color: r.color }}>{r.value}</div>
-                <div className="text-[10px] text-gray-500 mt-0.5 leading-tight">{r.desc}</div>
+                <div className="text-xs text-zinc-400 mt-0.5 leading-tight">{r.desc}</div>
                 {roadClass === r.value && (
                   <div className="absolute top-2 right-2 w-1.5 h-1.5 rounded-full" style={{ backgroundColor: r.color }} />
                 )}
@@ -162,9 +162,9 @@ export default function DurabilityPage() {
             <input
               type="range" min={10} max={200} step={5} value={speed}
               onChange={e => setSpeed(Number(e.target.value))}
-              className="w-full h-1.5 rounded-full appearance-none bg-[#222] accent-orange-500 cursor-pointer"
+              className="w-full h-1.5 rounded-full appearance-none bg-[#222] accent-signal cursor-pointer"
             />
-            <div className="flex justify-between text-[10px] text-gray-700">
+            <div className="flex justify-between text-xs text-zinc-300">
               <span>10 km/h</span><span>200 km/h</span>
             </div>
           </div>
@@ -177,7 +177,7 @@ export default function DurabilityPage() {
             className="w-full flex items-center justify-between px-6 py-4 hover:bg-[#0d0d0d] transition-colors"
           >
             <span className="text-sm font-medium text-gray-400">Vehicle Parameters (Optional)</span>
-            <ChevronDown size={14} className={`text-gray-600 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
+            <ChevronDown size={14} className={`text-zinc-300 transition-transform ${showAdvanced ? "rotate-180" : ""}`} />
           </button>
           {showAdvanced && (
             <div className="px-6 pb-6 grid grid-cols-3 gap-4 border-t border-[#111]">
@@ -190,7 +190,7 @@ export default function DurabilityPage() {
                 { key: "MR", label: "Motion Ratio", unit: "" },
               ].map(({ key, label, unit }) => (
                 <div key={key} className="space-y-1.5 pt-4">
-                  <label className="text-xs text-gray-500">{label} {unit && <span className="text-gray-700">[{unit}]</span>}</label>
+                  <label className="text-xs text-zinc-400">{label} {unit && <span className="text-zinc-300">[{unit}]</span>}</label>
                   <input
                     type="number"
                     value={params[key as keyof typeof params]}
@@ -207,7 +207,7 @@ export default function DurabilityPage() {
         <button
           onClick={handleAnalyze}
           disabled={loading}
-          className="w-full py-3.5 rounded-xl bg-gradient-to-r from-orange-600 to-red-600 text-white font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 hover:brightness-110 transition-all shadow-lg shadow-orange-500/20"
+          className="w-full py-3.5 rounded-xl bg-signal text-carbon border border-signal font-bold text-sm flex items-center justify-center gap-2 disabled:opacity-50 hover:bg-[#d6f56e] transition-all"
         >
           {loading ? <Loader2 size={16} className="animate-spin" /> : <Car size={16} />}
           {loading ? "Running Durability Analysis..." : `Analyze on ${selectedRoad.label}`}
@@ -228,7 +228,7 @@ export default function DurabilityPage() {
               {/* Durability Score */}
               <div className="col-span-1 rounded-2xl border border-[#1a1a1a] bg-[#0a0a0a] p-6 flex flex-col items-center justify-center gap-2">
                 <ScoreGauge score={result.durability_score} />
-                <p className="text-xs text-gray-500 text-center">Durability Score</p>
+                <p className="text-xs text-zinc-400 text-center">Durability Score</p>
               </div>
 
               {/* Key metrics */}
@@ -240,9 +240,9 @@ export default function DurabilityPage() {
                   { label: "Limiting Component Life", value: result.best_range_km >= 1000 ? `${(result.best_range_km/1000).toFixed(0)}k km` : `${result.best_range_km} km`, sub: result.worst_component },
                 ].map(({ label, value, sub }) => (
                   <div key={label} className="space-y-1">
-                    <p className="text-[10px] text-gray-600 uppercase tracking-wider">{label}</p>
+                    <p className="text-xs text-zinc-300 uppercase tracking-wider">{label}</p>
                     <p className="text-base font-bold text-white">{value}</p>
-                    <p className="text-[10px] text-gray-600">{sub}</p>
+                    <p className="text-xs text-zinc-300">{sub}</p>
                   </div>
                 ))}
               </div>
@@ -252,11 +252,11 @@ export default function DurabilityPage() {
             <div className="rounded-2xl border border-[#1a1a1a] bg-[#0a0a0a] p-6 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-gray-300">Component Life & Fatigue Predictions</h3>
-                  <p className="text-[10px] text-gray-600">Palmgren-Miner cumulative damage hypothesis (D = Σ nᵢ/Nᵢ)</p>
+                  <h3 className="text-sm font-semibold text-zinc-200">Component Life &amp; Fatigue Estimates</h3>
+                  <p className="text-xs text-zinc-400">Palmgren-Miner cumulative damage proxy (D = Σ nᵢ/Nᵢ) using schematic body-RMS scaling constants</p>
                 </div>
-                <span className="text-[9px] font-mono text-gray-500 bg-[#141416] px-2 py-1 rounded border border-[#252525]">
-                  Basquin S-N Formulation
+                <span className="text-xs font-mono text-amber-300 bg-amber-950/50 px-2.5 py-1 rounded border border-amber-500/40">
+                  SCHEMATIC / PLACEHOLDER CONSTANTS
                 </span>
               </div>
               <div className="space-y-3.5">
@@ -265,15 +265,15 @@ export default function DurabilityPage() {
                   const barPct = Math.min(100, (comp.life_km / 200000) * 100);
                   const damageFraction = Math.min(1.0, Math.max(0.01, 100000 / Math.max(comp.life_km, 1000)));
                   return (
-                    <div key={comp.name} className="space-y-1.5 p-2 rounded-xl bg-[#0e0e10] border border-[#1c1c1f]">
+                    <div key={comp.name} className="space-y-1.5 p-2.5 rounded-xl bg-[#0e0e10] border border-[#1c1c1f]">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Icon size={13} className="text-gray-500" />
-                          <span className="text-sm font-medium text-gray-300">{comp.display_name}</span>
+                          <Icon size={13} className="text-zinc-400" />
+                          <span className="text-sm font-medium text-zinc-200">{comp.display_name}</span>
                         </div>
                         <div className="flex items-center gap-3">
-                          <span className="text-xs font-mono text-gray-400">
-                            Miner D: <strong className="text-white">{damageFraction.toFixed(3)}/1.0</strong>
+                          <span className="text-xs font-mono text-zinc-300">
+                            Schematic Proxy D (100k ref): <strong className="text-white">{damageFraction.toFixed(3)}/1.0</strong>
                           </span>
                           <span className="text-sm font-bold text-white">{comp.life_label}</span>
                           <span className="text-xs font-medium px-2 py-0.5 rounded-full" style={{ color: comp.condition_color, backgroundColor: comp.condition_color + "15" }}>
@@ -294,8 +294,8 @@ export default function DurabilityPage() {
             </div>
 
             {/* Summary */}
-            <div className="rounded-2xl border border-orange-500/20 bg-orange-500/5 p-5 flex gap-3">
-              <CheckCircle size={16} className="text-orange-400 mt-0.5 shrink-0" />
+            <div className="rounded-2xl border border-signal/30 bg-signal p-5 flex gap-3">
+              <CheckCircle size={16} className="text-signal mt-0.5 shrink-0" />
               <p className="text-sm text-gray-200 leading-relaxed">{result.summary}</p>
             </div>
 
@@ -310,7 +310,7 @@ export default function DurabilityPage() {
                 { label: "Speed", value: `${result.speed_kph} km/h` },
               ].map(({ label, value }) => (
                 <div key={label} className="space-y-0.5">
-                  <p className="text-[10px] text-gray-600">{label}</p>
+                  <p className="text-xs text-zinc-300">{label}</p>
                   <p className="text-sm font-semibold text-white">{value}</p>
                 </div>
               ))}

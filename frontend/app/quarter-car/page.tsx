@@ -4,11 +4,12 @@
 import { useState, useEffect, Suspense, useMemo, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useSearchParams } from "next/navigation";
-import {
-  Play, Settings2, AlertTriangle,
+import { Play, Settings2, AlertTriangle,
   Activity, Save, Sparkles, X, TrendingUp, BarChart3,
   Zap, GitBranch, Crosshair, RefreshCw,
 } from "lucide-react";
+import { apiFetch } from "../../lib/api";
+import { formatApiError } from "../../lib/api_client";
 import PDFExport, { type PinnedLedgerRow } from "../../components/PDFExport";
 import DamperScope from "../../components/v2/instruments/DamperScope";
 import type { LedgerRow } from "../../components/v2/instruments/LedgerTable";
@@ -156,7 +157,7 @@ function QuarterCarDashboard() {
         y0: 0,
         y1: 1,
         yref: "paper" as const,
-        line: { color: "#f2a900", width: 1.5, dash: "dot" as const },
+        line: { color: "#C8F04B", width: 1.5, dash: "dot" as const },
       },
     ];
   }, [cursorTime]);
@@ -200,15 +201,23 @@ function QuarterCarDashboard() {
     if (!name) return;
     setIsSaving(true);
     try {
-      const r = await fetchWithAuth("/api/v1/profiles/", {
+      const r = await apiFetch("/api/v1/profiles/", {
         method:  "POST",
         headers: { "Content-Type": "application/json" },
         body:    JSON.stringify({ name, vehicle_type: "QUARTER_CAR", params }),
       });
-      if (r.ok) showToast("Setup saved to Garage!", "success");
-      else      showToast("Failed to save", "error");
-    } catch { showToast("Failed to save profile", "error"); }
-    finally { setIsSaving(false); }
+      if (r.ok) {
+        showToast("Setup saved to Garage!", "success");
+      } else {
+        const errBody = await r.json().catch(() => null);
+        const msg = errBody?.detail ? String(errBody.detail) : formatApiError(errBody, `Failed to save (${r.status})`);
+        showToast(msg, "error");
+      }
+    } catch (err) {
+      showToast(formatApiError(err, "Failed to save profile"), "error");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const [isMagicModalOpen, setIsMagicModalOpen] = useState(false);
@@ -368,21 +377,21 @@ function QuarterCarDashboard() {
 
 
       {/* Toolbar */}
-      <div className="flex items-center justify-between shrink-0 pb-3 border-b border-[#1e1e1e]">
+      <div className="flex flex-wrap items-center justify-between gap-3 shrink-0 pb-3 border-b border-[#1e1e1e]">
         <div className="flex flex-col">
-          <span className="text-[9px] font-bold tracking-[0.25em] text-ansys-yellow uppercase">
+          <span className="text-xs font-bold tracking-[0.25em] text-signal uppercase">
             2-DOF Vertical Dynamics · BDF Stiff ODE
           </span>
           <h1 className="text-2xl font-semibold tracking-tight text-white leading-tight">Quarter Car</h1>
           <NextStepLink />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <SimHistory storageKey="sl_sim_history_qcar" onRestore={(p) => { setParams(prev => ({ ...prev, ...p })); showToast("Restored from history", "success"); }} />
           <button onClick={saveProfile} disabled={isSaving}
             className="px-3 py-1.5 bg-[#141416] border border-[#252525] hover:bg-[#1e1e20] rounded-lg
               text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40">
-            <Save size={13} className="text-ansys-yellow" />
+            <Save size={13} className="text-signal" />
             {isSaving ? "Saving…" : "Save Setup"}
           </button>
           <PDFExport captureId="sim-report" fileName={`QCar_${Math.round(params.k_s)}_${Math.round(params.c)}`} pinnedRows={pinnedPdfRows} />
@@ -391,7 +400,7 @@ function QuarterCarDashboard() {
           <button id="btn-run" onClick={() => runSimulation()} disabled={isRunning}
             className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${
               isRunning
-                ? "bg-[#222] text-gray-500 cursor-not-allowed"
+                ? "bg-[#222] text-zinc-400 cursor-not-allowed"
                 : "bg-signal text-carbon border border-signal hover:bg-[#d6f56e]"
             }`}>
             {isRunning ? (
@@ -478,7 +487,7 @@ function QuarterCarDashboard() {
         <div className="w-full lg:w-60 lg:shrink-0 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-y-auto custom-scrollbar">
           <div className="px-4 py-3 border-b border-[#1e1e1e] sticky top-0 bg-[#0d0d0f] z-10">
             <h2 className="text-xs font-semibold text-gray-300 flex items-center gap-2">
-              <Settings2 size={13} className="text-ansys-yellow" /> Parameters
+              <Settings2 size={13} className="text-signal" /> Parameters
             </h2>
           </div>
           <div className="p-4 space-y-5">
@@ -493,7 +502,7 @@ function QuarterCarDashboard() {
               <ParameterInput label="Tire Stiffness" val={params.k_t} unit="N/m"   step={5000} hasError={params.k_t <= 0} onChange={(v) => setParams({ ...params, k_t: v })} />
               <ParameterInput label="Motion Ratio (spring/wheel)"   val={params.MR}  unit="—"     step={0.01} min={0.1} hasError={params.MR <= 0} onChange={(v) => setParams({ ...params, MR:  v })} />
               {paramValidationError && (
-                <div role="alert" data-testid="qcar-param-error" className="p-2.5 rounded-lg bg-red-950/40 border border-red-500/40 text-[11px] text-red-300 font-mono leading-snug">
+                <div role="alert" data-testid="qcar-param-error" className="p-2.5 rounded-lg bg-red-950/40 border border-red-500/40 text-xs text-red-300 font-mono leading-snug">
                   {paramValidationError}
                 </div>
               )}
@@ -506,10 +515,10 @@ function QuarterCarDashboard() {
             </ParamSection>
             <ParamSection title="Road Profile">
               <div className="flex justify-between items-center gap-2">
-                <label htmlFor="qcar-road-profile" className="text-[11px] text-gray-400 flex-1">Profile</label>
+                <label htmlFor="qcar-road-profile" className="text-xs text-gray-400 flex-1">Profile</label>
                 <select id="qcar-road-profile" aria-label="Road Profile Type" value={params.road_profile} onChange={(e) => setParams({ ...params, road_profile: e.target.value })}
-                  className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white w-[7.5rem]
-                    focus:outline-none focus:border-ansys-yellow/60 focus:ring-1 focus:ring-ansys-yellow/15">
+                  className="bg-[#0d0d0d] border border-[#252525] text-xs rounded-lg px-2 py-1.5 text-white w-[7.5rem]
+                    focus:outline-none focus:border-signal/60 focus:ring-1 focus:ring-signal/15">
                   {ROAD_PROFILES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
                 </select>
               </div>
@@ -522,13 +531,13 @@ function QuarterCarDashboard() {
               {params.road_profile === "iso8608" && (
                 <>
                   <div className="flex justify-between items-center gap-2">
-                    <label htmlFor="qcar-iso-class" className="text-[11px] text-gray-400 flex-1">Road Class</label>
+                    <label htmlFor="qcar-iso-class" className="text-xs text-gray-400 flex-1">Road Class</label>
                     <select
                       id="qcar-iso-class"
                       aria-label="ISO 8608 Road Class"
                       value={params.iso_class}
                       onChange={(e) => setParams({ ...params, iso_class: e.target.value as IsoClass })}
-                      className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white w-[7.5rem] focus:outline-none focus:border-ansys-yellow/60">
+                      className="bg-[#0d0d0d] border border-[#252525] text-xs rounded-lg px-2 py-1.5 text-white w-[7.5rem] focus:outline-none focus:border-signal/60">
                       {ISO_CLASSES.map((cls) => (
                         <option key={cls} value={cls}>Class {cls}</option>
                       ))}
@@ -538,7 +547,7 @@ function QuarterCarDashboard() {
                 </>
               )}
               <div className="pt-2 border-t border-[#1e1e1e]">
-                <span className="text-[10px] text-gray-400 block mb-1.5">Custom Road CSV</span>
+                <span className="text-xs text-gray-400 block mb-1.5">Custom Road CSV</span>
                 <RoadProfileUpload
                   loaded={customRoad}
                   onLoad={(prof) => {
@@ -568,32 +577,32 @@ function QuarterCarDashboard() {
                 const zeta = kw > 0 && cw > 0 ? cw / (2 * Math.sqrt(kw * params.m_s)) : null;
                 const staticDeflMm = kw > 0 ? (params.m_s * 9.81) / kw * 1000 : null;
                 return (
-                  <div className="space-y-1.5 font-mono text-[10px]">
-                    <div className="flex justify-between text-gray-500">
+                  <div className="space-y-1.5 font-mono text-xs">
+                    <div className="flex justify-between text-zinc-400">
                       <span>Sprung Freq f_s</span>
                       <span className="text-signal font-bold">{fs !== null && Number.isFinite(fs) ? `${fs.toFixed(2)} Hz` : "Not available"}</span>
                     </div>
-                    <div className="flex justify-between text-gray-500">
+                    <div className="flex justify-between text-zinc-400">
                       <span>Unsprung Freq f_u</span>
                       <span className="text-cyan-400 font-bold">{fu !== null && Number.isFinite(fu) ? `${fu.toFixed(2)} Hz` : "Not available"}</span>
                     </div>
-                    <div className="flex justify-between text-gray-500">
+                    <div className="flex justify-between text-zinc-400">
                       <span>Damping Ratio ζ</span>
                       <span className="text-emerald-400 font-bold">{zeta !== null && Number.isFinite(zeta) ? zeta.toFixed(3) : "Not available"}</span>
                     </div>
-                    <div className="flex justify-between text-gray-600">
+                    <div className="flex justify-between text-zinc-300">
                       <span>Wheel Rate k_w</span>
                       <span className="text-gray-400">{kw > 0 && Number.isFinite(kw) ? `${kw.toFixed(0)} N/m` : "Not available"}</span>
                     </div>
-                    <div className="flex justify-between text-gray-600">
+                    <div className="flex justify-between text-zinc-300">
                       <span>Mass Ratio μ</span>
                       <span className="text-gray-400">{params.m_s > 0 ? (params.m_u / params.m_s).toFixed(3) : "Not available"}</span>
                     </div>
-                    <div className="flex justify-between text-gray-600">
+                    <div className="flex justify-between text-zinc-300">
                       <span>Static Defl.</span>
                       <span className="text-gray-400">{staticDeflMm !== null && Number.isFinite(staticDeflMm) ? `${staticDeflMm.toFixed(1)} mm` : "Not available"}</span>
                     </div>
-                    <div className="pt-1 border-t border-[#1e1e1e] text-[9px] text-gray-700 leading-tight">
+                    <div className="pt-1 border-t border-[#1e1e1e] text-xs text-zinc-300 leading-tight">
                       k_w = k_s × MR²&nbsp;&nbsp;|&nbsp;&nbsp;MR = spring travel / wheel travel
                     </div>
                   </div>
@@ -618,25 +627,25 @@ function QuarterCarDashboard() {
             const zeta = kw > 0 && cw > 0 ? cw / (2 * Math.sqrt(kw * params.m_s)) : null;
             return (
               <div className="bg-[#111113] border border-[#1e1e1e] rounded-xl px-4 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 font-mono text-xs">
-                <span className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">
-                  Analytical Modal Preview
+                <span className="text-xs uppercase tracking-wider text-zinc-300 font-semibold">
+                  Analytical Preview (Uncoupled 1-DOF: k_w / m_s)
                 </span>
                 <div className="flex flex-wrap items-center gap-5">
                   <div>
-                    <span className="text-gray-500 mr-1.5">Sprung f_s:</span>
+                    <span className="text-zinc-400 mr-1.5">Sprung f_s (uncoupled):</span>
                     <span className="text-signal font-bold">{fs !== null && Number.isFinite(fs) ? `${fs.toFixed(2)} Hz` : "Not available"}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500 mr-1.5">Unsprung f_u:</span>
+                    <span className="text-zinc-400 mr-1.5">Unsprung f_u (uncoupled):</span>
                     <span className="text-cyan-400 font-bold">{fu !== null && Number.isFinite(fu) ? `${fu.toFixed(2)} Hz` : "Not available"}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500 mr-1.5">Damping ζ:</span>
+                    <span className="text-zinc-400 mr-1.5">Damping ζ (uncoupled):</span>
                     <span className="text-emerald-400 font-bold">{zeta !== null && Number.isFinite(zeta) ? zeta.toFixed(3) : "Not available"}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500 mr-1.5">Wheel Rate k_w:</span>
-                    <span className="text-gray-200">{kw > 0 && Number.isFinite(kw) ? `${kw.toFixed(0)} N/m` : "Not available"}</span>
+                    <span className="text-zinc-400 mr-1.5">Wheel Rate k_w:</span>
+                    <span className="text-zinc-100">{kw > 0 && Number.isFinite(kw) ? `${kw.toFixed(0)} N/m` : "Not available"}</span>
                   </div>
                 </div>
               </div>
@@ -645,20 +654,20 @@ function QuarterCarDashboard() {
 
           {/* Empty state (only when no results and no active validation/sim error) */}
           {!hasResults && !isRunning && !effectiveError && (
-            <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl flex flex-col items-center justify-center gap-4">
+            <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl p-6 flex flex-col items-center justify-center gap-4">
               <div className="w-16 h-16 rounded-2xl bg-signal/5 border border-signal/15 flex items-center justify-center">
                 <Activity size={32} strokeWidth={1} className="text-signal/50" />
               </div>
-              <div className="text-center">
+              <div className="text-center max-w-full">
                 <p className="text-sm font-semibold text-gray-400 mb-1">
                   Configure parameters and click <span className="text-signal">Run Solver</span>
                 </p>
-                <p className="text-xs text-gray-700">
+                <p className="text-xs text-zinc-300 leading-relaxed">
                   2-DOF quarter car · BDF implicit stiff solver · Impedance matrix FRF · ISO 2631-1 Wk weighting
                 </p>
-                <div className="flex items-center justify-center gap-4 mt-4">
+                <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 mt-4">
                   {["Transmissibility", "Bode Magnitude + Phase", "PSD", "Phase Portrait", "F-V Diagram"].map((t) => (
-                    <span key={t} className="text-[10px] text-gray-700 bg-[#141416] border border-[#252525] px-2 py-1 rounded-lg">{t}</span>
+                    <span key={t} className="text-xs text-zinc-300 bg-[#141416] border border-[#252525] px-2 py-1 rounded-lg">{t}</span>
                   ))}
                 </div>
               </div>
@@ -678,8 +687,8 @@ function QuarterCarDashboard() {
               <div className="flex-1 min-h-0 bg-[#111113] border border-[#1e1e1e] rounded-xl flex items-center justify-center relative overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-b from-[#111113] to-[#0a0a0c] animate-pulse" />
                 <div className="flex flex-col items-center gap-3 z-10">
-                  <Loader2 size={36} className="text-ansys-yellow animate-spin" />
-                  <p className="text-xs text-ansys-yellow font-mono tracking-widest font-bold">
+                  <Loader2 size={36} className="text-signal animate-spin" />
+                  <p className="text-xs text-signal font-sans leading-relaxed tracking-widest font-bold">
                     {loadingStage === "VALIDATING" && "VALIDATING PARAMETERS & BOUNDS"}
                     {loadingStage === "DISPATCHING" && "DISPATCHING TO PHYSICS CORE"}
                     {loadingStage === "SOLVING_ODE" && "SOLVING ADAPTIVE RK45 ODE SYSTEM"}
@@ -687,7 +696,7 @@ function QuarterCarDashboard() {
                     {loadingStage === "EVALUATING_KPIS" && "EVALUATING ISO 2631-1 KPIS"}
                     {!loadingStage && "SOLVING IMPLICIT ODE"}
                   </p>
-                  <p className="text-[11px] text-gray-400 font-mono">Real-time state integration in progress</p>
+                  <p className="text-xs text-gray-400 font-sans leading-relaxed">Real-time state integration in progress</p>
                   <button
                     type="button"
                     onClick={cancelSimulation}
@@ -1061,24 +1070,24 @@ function QuarterCarDashboard() {
                     {/* State-space eigenvalue info card */}
                     <PlotBox>
                       <div className="h-full p-5 flex flex-col justify-center gap-4">
-                        <p className="text-[10px] font-bold tracking-widest text-gray-700 uppercase">State-Space Summary</p>
+                        <p className="text-xs font-bold tracking-widest text-zinc-300 uppercase">State-Space Summary (Coupled 4-State Eigenvalues)</p>
                         <div className="space-y-3 font-mono text-xs">
                           {[
-                            { label: "Sprung ωₙ",   val: `${r.omega_n_s.toFixed(4)} rad/s`, color: "#f2a900" },
-                            { label: "Sprung ζ",    val: typeof r.zeta_s === "number" ? r.zeta_s.toFixed(4) : "Not available (overdamped)", color: typeof r.zeta_s === "number" && getDampingStatus(r.zeta_s) === "good" ? "#34d399" : "#f59e0b" },
-                            { label: "Sprung ωd",   val: typeof r.zeta_s === "number" ? `${(r.omega_n_s * Math.sqrt(Math.max(0, 1 - r.zeta_s**2))).toFixed(4)} rad/s` : "Not available (overdamped)", color: "#aaa" },
-                            { label: "Unsprung ωₙ", val: `${(r.f_n_u * 2 * Math.PI).toFixed(4)} rad/s`, color: "#00aeff" },
-                            { label: "Unsprung ζ",  val: (r.zeta_u as number).toFixed(4),  color: "#aaa" },
-                            { label: "k_w",          val: `${r.k_w.toFixed(0)} N/m`,        color: "#aaa" },
+                            { label: "Sprung ωₙ (coupled)",   val: `${r.omega_n_s.toFixed(4)} rad/s`, color: "#C8F04B" },
+                            { label: "Sprung ζ (coupled)",    val: typeof r.zeta_s === "number" ? r.zeta_s.toFixed(4) : "Not available (overdamped)", color: typeof r.zeta_s === "number" && getDampingStatus(r.zeta_s) === "good" ? "#34d399" : "#f59e0b" },
+                            { label: "Sprung ωd (coupled)",   val: typeof r.zeta_s === "number" ? `${(r.omega_n_s * Math.sqrt(Math.max(0, 1 - r.zeta_s**2))).toFixed(4)} rad/s` : "Not available (overdamped)", color: "#D4D4D8" },
+                            { label: "Unsprung ωₙ (coupled)", val: `${(r.f_n_u * 2 * Math.PI).toFixed(4)} rad/s`, color: "#00aeff" },
+                            { label: "Unsprung ζ (coupled)",  val: (r.zeta_u as number).toFixed(4),  color: "#D4D4D8" },
+                            { label: "k_w",          val: `${r.k_w.toFixed(0)} N/m`,        color: "#D4D4D8" },
                           ].map(({ label, val, color }) => (
                             <div key={label} className="flex justify-between items-center border-b border-[#1a1a1a] pb-2">
-                              <span className="text-gray-600">{label}</span>
+                              <span className="text-zinc-300">{label}</span>
                               <span style={{ color }}>{val}</span>
                             </div>
                           ))}
                         </div>
-                        <p className="text-[9px] text-gray-700 mt-2">
-                          Eigenvalues extracted from 4×4 state-space matrix A via scipy.linalg.eigvals
+                        <p className="text-xs text-zinc-400 mt-2">
+                          Coupled 4-state eigenvalues from matrix A (matches MATLAB export; differs from uncoupled k_w/m_s preview above).
                         </p>
                       </div>
                     </PlotBox>
@@ -1115,7 +1124,7 @@ function QuarterCarDashboard() {
                               fillcolor: "rgba(242,169,0,0.04)", line: { width: 0 } },
                           ],
                           annotations: [{ x: Math.log10(1.25), xref: "x", y: 0.95, yref: "paper",
-                            text: "Ride band", showarrow: false, font: { color: "#f2a90060", size: 9 } }],
+                            text: "Ride band", showarrow: false, font: { color: "#C8F04B60", size: 9 } }],
                         })}
                         useResizeHandler style={{ width: "100%", height: "100%" }}
                         config={{ responsive: true, displayModeBar: true }}
@@ -1127,7 +1136,7 @@ function QuarterCarDashboard() {
                       <Plot
                         data={[
                           { x: r.freq_hz, y: r.transmissibility_body, type: "scatter", mode: "lines",
-                            name: "Body TX", line: { color: "#f2a900", width: 2 } },
+                            name: "Body TX", line: { color: "#C8F04B", width: 2 } },
                           { x: r.freq_hz, y: r.transmissibility_wheel, type: "scatter", mode: "lines",
                             name: "Wheel TX", line: { color: "#00aeff", width: 1.5 } },
                         ]}
@@ -1152,7 +1161,7 @@ function QuarterCarDashboard() {
                     {/* ISO 2631 comfort info table */}
                     <PlotBox>
                       <div className="h-full p-5 flex flex-col justify-center gap-3">
-                        <p className="text-[10px] font-bold tracking-widest text-gray-700 uppercase">ISO 2631-1 Assessment</p>
+                        <p className="text-xs font-bold tracking-widest text-zinc-300 uppercase">ISO 2631-1 Assessment</p>
                         <div className="space-y-2">
                           {[
                             { range: "< 0.315",     label: "Not uncomfortable",       aw: r.rms_body_accel_wk },
@@ -1170,22 +1179,22 @@ function QuarterCarDashboard() {
                             return (
                               <div key={range}
                                 className={`flex items-center justify-between px-3 py-2 rounded-lg border text-xs font-mono
-                                  ${active ? "border-ansys-yellow/40 bg-ansys-yellow/5 text-ansys-yellow" : "border-[#1e1e1e] text-gray-700"}`}>
+                                  ${active ? "border-signal/40 bg-signal/5 text-signal" : "border-[#1e1e1e] text-zinc-300"}`}>
                                 <span>{range} m/s²</span>
                                 <span className={active ? "font-bold" : ""}>{label}</span>
-                                {active && <RefreshCw size={11} className="text-ansys-yellow" />}
+                                {active && <RefreshCw size={11} className="text-signal" />}
                               </div>
                             );
                           })}
                         </div>
                         <div className="mt-2 pt-3 border-t border-[#1a1a1a] font-mono text-xs">
-                          <div className="flex justify-between text-gray-600">
+                          <div className="flex justify-between text-zinc-300">
                             <span>Raw RMS a_z</span>
                             <span className="text-white">{r.rms_body_accel.toFixed(4)} m/s²</span>
                           </div>
-                          <div className="flex justify-between text-gray-600 mt-1">
+                          <div className="flex justify-between text-zinc-300 mt-1">
                             <span>Wk-weighted RMS</span>
-                            <span className="text-ansys-yellow">{(r.rms_body_accel_wk ?? 0).toFixed(4)} m/s²</span>
+                            <span className="text-signal">{(r.rms_body_accel_wk ?? 0).toFixed(4)} m/s²</span>
                           </div>
                         </div>
                       </div>
@@ -1289,8 +1298,8 @@ function QuarterCarDashboard() {
             status={verdict.status}
             statusLabel={verdict.label}
             heroes={[
-              { label: "Sprung ƒₙ", value: hasResults ? (r as any)?.f_n_s : null, unit: "Hz", decimals: 2 },
-              { label: "Sprung ζ", value: hasResults && typeof (r as any)?.zeta_s === "number" ? (r as any).zeta_s : null, decimals: 3 },
+              { label: "Sprung ƒₙ (coupled)", value: hasResults ? (r as any)?.f_n_s : null, unit: "Hz", decimals: 2 },
+              { label: "Sprung ζ (coupled)", value: hasResults && typeof (r as any)?.zeta_s === "number" ? (r as any).zeta_s : null, decimals: 3 },
               { label: "RMS body accel (Wk)", value: hasResults ? ((r as any)?.rms_body_accel_wk ?? (r as any)?.rms_body_accel) : null, unit: "m/s²", decimals: 3 },
               { label: "Peak suspension travel", value: hasResults && typeof (r as any)?.peak_susp_travel === "number" ? (r as any).peak_susp_travel * 1000 : null, unit: "mm", decimals: 1 },
             ]}
@@ -1309,7 +1318,7 @@ export default function Page() {
   return (
     <Suspense
       fallback={
-        <div className="h-full flex items-center justify-center text-gray-600 text-sm">
+        <div className="h-full flex items-center justify-center text-zinc-300 text-sm">
           Loading simulation environment…
         </div>
       }

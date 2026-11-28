@@ -45,6 +45,12 @@ async def _blacklist_jti(payload: dict, reason: str = "logout"):
     exp = payload.get("exp")
     if not jti or not exp: return
     TokenRevocationRegistry.revoke_jti(jti)
+    # Pass B: durable DB record so revocation survives Redis loss.
+    try:
+        from suspensionlab.backend.security.jwt_utils import record_revoked_jti
+        await record_revoked_jti(jti, exp, reason)
+    except Exception:
+        pass
     now = datetime.now(timezone.utc).timestamp()
     ttl = int(exp - now)
     if ttl > 0:
@@ -308,10 +314,12 @@ async def reset_password(req: ResetPasswordRequest, db: AsyncSession = Depends(g
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED, dependencies=[Depends(RateLimiter("rate_limit_login"))])
 async def register(request: Request, req: RegisterRequest, response: Response, db: AsyncSession = Depends(get_db_dependency)):
     """Create a new account. Free plan by default, 14-day Pro trial."""
-    # Check duplicate email
+    # Check duplicate email. Pass B: anti-enumeration — the same generic
+    # conflict message is returned whether the account exists or the insert
+    # races, without confirming that the email is registered.
     existing = await db.execute(select(User).where(User.email == req.email.lower()))
     if existing.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="An account with this email already exists.")
+        raise HTTPException(status_code=409, detail="Registration could not be completed. If you already have an account, sign in or use password reset.")
 
     user_id = uuid.uuid4()
     trial_end = datetime.now(timezone.utc) + timedelta(days=14)
@@ -336,7 +344,7 @@ async def register(request: Request, req: RegisterRequest, response: Response, d
         await db.refresh(user)
     except IntegrityError:
         await db.rollback()
-        raise HTTPException(status_code=409, detail="An account with this email already exists.")
+        raise HTTPException(status_code=409, detail="Registration could not be completed. If you already have an account, sign in or use password reset.")
 
     token = create_access_token({"sub": str(user.id), "email": user.email, "plan": user.plan})
     r_token = create_refresh_token({"sub": str(user.id), "email": user.email})

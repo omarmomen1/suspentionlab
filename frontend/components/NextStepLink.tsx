@@ -20,10 +20,10 @@ export default function NextStepLink() {
   return (
     <Link
       href={next.href}
-      className="inline-flex items-center gap-1.5 text-[11px] font-medium text-zinc-400 hover:text-ansys-yellow transition-colors"
+      className="inline-flex items-center gap-1.5 text-xs font-medium text-zinc-400 hover:text-signal transition-colors"
       aria-label={`Next step: ${next.label}`}
     >
-      <span className="uppercase tracking-widest text-[9px] text-zinc-600">Next Step</span>
+      <span className="uppercase tracking-widest text-xs text-zinc-300">Next Step</span>
       <span>{next.label}</span>
       <ArrowRight size={12} />
     </Link>

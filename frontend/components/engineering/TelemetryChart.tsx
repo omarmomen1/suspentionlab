@@ -102,7 +102,7 @@ export default function TelemetryChart({
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="text-[10px] font-mono text-ansys-yellow uppercase tracking-wider font-bold flex items-center gap-1.5">
+            <div className="text-xs font-mono text-signal uppercase tracking-wider font-bold flex items-center gap-1.5">
               <Activity size={12} /> High-Resolution Trace Overlay
             </div>
             {isUsingDemoTrace && <SampleDemoTelemetryBadge size="xs" />}
@@ -111,13 +111,13 @@ export default function TelemetryChart({
         </div>
 
         {/* Legend */}
-        <div className="flex items-center gap-4 text-[11px] font-mono">
+        <div className="flex items-center gap-4 text-xs font-mono">
           <div className="flex items-center gap-1.5 text-cyan-400">
             <span className="w-2.5 h-1 bg-cyan-400 rounded-full" />
             <span>{isUsingDemoTrace ? "DEMO TRACE (SYNTHETIC)" : "MEASURED"}</span>
           </div>
-          <div className="flex items-center gap-1.5 text-ansys-yellow">
-            <span className="w-2.5 h-1 bg-ansys-yellow rounded-full" />
+          <div className="flex items-center gap-1.5 text-signal">
+            <span className="w-2.5 h-1 bg-signal rounded-full" />
             <span>SIMULATED (RK45)</span>
           </div>
           {showResiduals && (
@@ -229,7 +229,7 @@ export default function TelemetryChart({
           <path
             d={simulatedPath}
             fill="none"
-            stroke="#f2a900"
+            stroke="#C8F04B"
             strokeWidth="2"
             strokeLinecap="round"
           />
@@ -265,7 +265,7 @@ export default function TelemetryChart({
                 cx={toX(hoverIndex)}
                 cy={toY(data.s[hoverIndex])}
                 r="3.5"
-                fill="#f2a900"
+                fill="#C8F04B"
               />
             </g>
           )}
@@ -273,12 +273,12 @@ export default function TelemetryChart({
 
         {/* Hover Inspector Readout */}
         {hoverIndex !== null && (
-          <div className="absolute top-2 right-2 p-2 rounded-xl bg-black/90 border border-white/20 font-mono text-[11px] shadow-xl space-y-0.5 pointer-events-none">
+          <div className="absolute top-2 right-2 p-2 rounded-xl bg-black/90 border border-white/20 font-mono text-xs shadow-xl space-y-0.5 pointer-events-none">
             <div className="text-gray-400">Time: {data.t[hoverIndex].toFixed(2)} s</div>
             <div className="text-cyan-400 font-bold">
               Measured: {data.m[hoverIndex]} {unit}
             </div>
-            <div className="text-ansys-yellow font-bold">
+            <div className="text-signal font-bold">
               Simulated: {data.s[hoverIndex]} {unit}
             </div>
             <div className="text-amber-400 font-bold">
@@ -289,7 +289,7 @@ export default function TelemetryChart({
       </div>
 
       {/* Footer / Operating Band Callout */}
-      <div className="mt-3 pt-2.5 border-t border-white/[0.06] flex items-center justify-between text-[10px] font-mono text-gray-500">
+      <div className="mt-3 pt-2.5 border-t border-white/[0.06] flex items-center justify-between text-xs font-mono text-zinc-400">
         <span>Channel: {channelName} ({unit})</span>
         <span>Sampling Rate: 100 Hz (Fixed-Step Synchronous)</span>
         <span className="text-amber-400">Peak Residual: +3.4 mm @ T = 2.16s</span>

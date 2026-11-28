@@ -54,7 +54,7 @@ export default function BenchmarkWall() {
     <section data-testid="benchmark-wall" aria-labelledby="benchmark-wall-title" className="border-b border-hairline px-4 py-14 sm:px-6">
       <div className="mx-auto max-w-[1280px] space-y-6">
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-signal">Benchmark Wall</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-signal">Benchmark Wall</p>
           <h2 id="benchmark-wall-title" className="mt-1 font-[var(--font-display)] text-2xl font-bold text-white">
             Solver checks, re-run on every pull request
           </h2>
@@ -71,24 +71,24 @@ export default function BenchmarkWall() {
                 <article key={b.id} data-testid={`benchmark-tile-${b.id}`} className="rounded border border-hairline bg-panel p-4">
                   <header className="flex items-start justify-between gap-3">
                     <div>
-                      <p className="text-[11px] text-gray-500 v2-num">{b.id}</p>
+                      <p className="text-xs text-zinc-400 v2-num">{b.id}</p>
                       <h3 className="text-base font-semibold text-white">{b.name}</h3>
                     </div>
                     <StatusPill status={b.verdict} />
                   </header>
                   <p className="mt-2 text-xs text-gray-400">{b.description}</p>
-                  <dl className="mt-3 space-y-1 text-[11px]">
+                  <dl className="mt-3 space-y-1 text-xs">
                     {b.checks.flatMap((c) =>
                       Object.entries(c.measured).map(([k, v]) => (
                         <div key={`${c.test}-${k}`} className="flex justify-between gap-3 border-t border-hairline pt-1">
-                          <dt className="text-gray-500">{k.replace(/_/g, " ")}</dt>
+                          <dt className="text-zinc-400">{k.replace(/_/g, " ")}</dt>
                           <dd className="text-gray-200 v2-num">{fmt(v)}</dd>
                         </div>
                       )),
                     )}
                   </dl>
                   {b.pending && (
-                    <p className="mt-3 flex items-center gap-2 text-[11px] text-gray-400">
+                    <p className="mt-3 flex items-center gap-2 text-xs text-gray-400">
                       <StatusPill status="NOT_RUN" label="In progress" />
                       <span>
                         Calspan TTC fit: {b.pending.reason}
@@ -98,7 +98,7 @@ export default function BenchmarkWall() {
                 </article>
               ))}
             </div>
-            <p className="text-[11px] text-gray-500 v2-num">
+            <p className="text-xs text-zinc-400 v2-num">
               commit {data.git_sha.slice(0, 12)} · generated {data.generated_at}
             </p>
           </>

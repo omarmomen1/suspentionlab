@@ -32,21 +32,21 @@ export default function LedgerDock({ rows, caption, onPinnedChange, pinnable = t
   return (
     <section data-testid="ledger-dock" className="space-y-2">
       <div className="flex items-center justify-between">
-        <h3 className="text-[10px] font-semibold uppercase tracking-[0.18em] text-gray-400">Ledger</h3>
+        <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">Ledger</h3>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => setBaseline(Object.fromEntries(rows.map((r) => [r.id, typeof r.value === "number" && Number.isFinite(r.value) ? r.value : null])))}
-            className="rounded border border-hairline px-2 py-1 text-[10px] font-semibold text-gray-300 hover:bg-white/[0.06]"
+            className="rounded border border-hairline px-2 py-1 text-xs font-semibold text-gray-300 hover:bg-white/[0.06]"
           >
             Set baseline
           </button>
           {baseline && (
-            <button type="button" onClick={() => setBaseline(null)} className="rounded border border-hairline px-2 py-1 text-[10px] text-gray-400 hover:bg-white/[0.06]">
+            <button type="button" onClick={() => setBaseline(null)} className="rounded border border-hairline px-2 py-1 text-xs text-gray-400 hover:bg-white/[0.06]">
               Clear baseline
             </button>
           )}
-          {pinnable && <span className="self-center text-[10px] text-gray-500">{pinned.length} pinned for PDF</span>}
+          {pinnable && <span className="self-center text-xs text-zinc-400">{pinned.length} pinned for PDF</span>}
         </div>
       </div>
       <LedgerTable

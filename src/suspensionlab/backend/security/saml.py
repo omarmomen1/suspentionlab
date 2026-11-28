@@ -23,6 +23,7 @@ import base64
 import hashlib
 import hmac
 import logging
+import os
 import secrets
 import time
 import urllib.parse
@@ -191,10 +192,31 @@ def generate_sp_metadata_xml(
     return ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
 
 
+def get_saml_relay_state_secret() -> bytes:
+    """
+    HMAC secret for RelayState signing (Pass B: separated from JWT).
+
+    Uses SAML_RELAY_STATE_SECRET (settings/env). In PROD a missing dedicated
+    secret is a hard error; non-prod falls back to the JWT key material so
+    existing dev flows keep working.
+    """
+    from suspensionlab.backend.config import settings
+    secret = settings.saml_relay_state_secret or os.getenv("SAML_RELAY_STATE_SECRET")
+    if secret and str(secret).strip():
+        return str(secret).encode()
+    env = (settings.environment or os.getenv("ENVIRONMENT", "DEV")).upper()
+    if env == "PROD":
+        raise RuntimeError(
+            "CRITICAL: SAML_RELAY_STATE_SECRET is not configured. "
+            "Refusing to sign RelayState with the JWT secret in PROD."
+        )
+    from suspensionlab.backend.security.jwt_utils import get_jwt_keys, JWT_ACTIVE_KEY
+    return get_jwt_keys()[JWT_ACTIVE_KEY].encode()
+
+
 def generate_relay_state(org_id: str, return_to: str = "/dashboard") -> str:
     """Create a signed, tamper-evident RelayState token."""
-    from suspensionlab.backend.security.jwt_utils import get_jwt_keys, JWT_ACTIVE_KEY
-    signing_key = get_jwt_keys()[JWT_ACTIVE_KEY].encode()
+    signing_key = get_saml_relay_state_secret()
     nonce = secrets.token_hex(8)
     expiry = int(time.time()) + 900  # 15 minutes
     payload = f"{org_id}|{return_to}|{expiry}|{nonce}"
@@ -215,8 +237,7 @@ def validate_relay_state(relay_state_b64: str) -> Tuple[str, str]:
         if time.time() > expiry:
             raise ValueError("RelayState expired")
 
-        from suspensionlab.backend.security.jwt_utils import get_jwt_keys, JWT_ACTIVE_KEY
-        signing_key = get_jwt_keys()[JWT_ACTIVE_KEY].encode()
+        signing_key = get_saml_relay_state_secret()
         payload = f"{org_id}|{return_to}|{expiry_str}|{nonce}"
         expected_sig = hmac.new(signing_key, payload.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(sig, expected_sig):

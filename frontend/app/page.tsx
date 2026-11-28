@@ -65,7 +65,7 @@ export default function HomePage() {
       <section className="border-b border-hairline px-4 pb-16 pt-14 sm:px-6">
         <div className="mx-auto grid max-w-[1280px] grid-cols-1 gap-10 lg:grid-cols-12">
           <div className="space-y-6 lg:col-span-7">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-signal">SuspensionLab Studio</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-signal">SuspensionLab Studio</p>
             <h1 className="font-[var(--font-display)] text-3xl font-bold leading-[1.1] tracking-tight sm:text-4xl lg:text-5xl">
               Suspension kinematics, ride and handling solvers, and a lap simulator in your browser.
             </h1>
@@ -118,12 +118,12 @@ export default function HomePage() {
                     </li>
                   ))}
                 </ul>
-                <p className="mt-3 text-[11px] text-gray-500">Live checks are on the Benchmark Wall below.</p>
+                <p className="mt-3 text-xs text-zinc-400">Live checks are on the Benchmark Wall below.</p>
               </details>
             </div>
 
             <div className="lg:hidden rounded border border-hairline bg-panel p-5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400">What runs today</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-gray-400">What runs today</p>
               <ul className="mt-3 space-y-3 text-sm">
                 {[
                   ["3D double-wishbone kinematics", "Camber gain, bump steer, roll center from hardpoints"],
@@ -137,7 +137,7 @@ export default function HomePage() {
                   </li>
                 ))}
               </ul>
-              <p className="mt-4 text-[11px] text-gray-500">Live checks are on the Benchmark Wall below.</p>
+              <p className="mt-4 text-xs text-zinc-400">Live checks are on the Benchmark Wall below.</p>
             </div>
           </aside>
         </div>
@@ -157,7 +157,7 @@ export default function HomePage() {
           <div className="overflow-x-auto rounded border border-hairline bg-panel">
             <table className="w-full text-left text-xs">
               <thead>
-                <tr className="border-b border-hairline text-[11px] text-gray-400">
+                <tr className="border-b border-hairline text-xs text-gray-400">
                   <th className="p-3">Claim</th>
                   <th className="p-3">Status</th>
                   <th className="p-3">Evidence</th>
@@ -209,7 +209,7 @@ export default function HomePage() {
                   <p className="text-xs font-semibold uppercase tracking-widest text-gray-400">{t.name}</p>
                   <p className="mt-2 flex items-baseline gap-2">
                     <span className="text-3xl font-bold text-white v2-num">{t.price}</span>
-                    <span className="text-xs text-gray-500">{t.cadence}</span>
+                    <span className="text-xs text-zinc-400">{t.cadence}</span>
                   </p>
                   <p className="mt-3 text-sm text-gray-400">{t.desc}</p>
                 </div>

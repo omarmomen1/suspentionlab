@@ -54,7 +54,7 @@ class DetectAnomalyRequest(BaseModel):
 class CreateLoopQuestionRequest(BaseModel):
     investigation_code: str = Field("INV-91", description="Linked investigation code")
     question_number: int = Field(17, description="Question sequence number")
-    question_text: str = Field("Why did front axle lateral performance decrease in Session 381?")
+    question_text: str = Field("", description="Engineering question for the current session")
     vehicle_id: Optional[str] = "CAR-2026-07"
     setup_id: Optional[str] = "SETUP-91"
 
@@ -100,16 +100,16 @@ class ExecuteBlindValidationRequest(BaseModel):
 class CreateLoopDecisionRequest(BaseModel):
     decision_number: int = Field(12)
     selected_setup_id: str = Field("SETUP-92")
-    question: Optional[str] = "Why did front axle lateral performance decrease in Session 381?"
+    question: Optional[str] = ""
     model_version: Optional[str] = "QCAR-ODE-RK45-v2.8"
 
 
 class ApproveLoopDecisionRequest(BaseModel):
     decision_code: str = Field("DEC-12")
     approval_number: int = Field(8)
-    approver_name: str = Field("James Wilson")
+    approver_name: str = Field("", description="Approver full name")
     approver_role: str = Field("Chief Race Engineer")
-    notes: Optional[str] = "Approved following blind holdout validation (R²=0.938)."
+    notes: Optional[str] = ""
 
 
 class NextTrackSessionRequest(BaseModel):
@@ -146,7 +146,7 @@ async def create_track_session_endpoint(
         )
     except Exception as exc:
         logger.error("Failed creating track session: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.post("/detect", status_code=status.HTTP_201_CREATED)
@@ -169,7 +169,7 @@ async def detect_anomaly_endpoint(
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:
         logger.error("Failed detecting anomaly: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.post("/question", status_code=status.HTTP_201_CREATED)
@@ -193,7 +193,7 @@ async def create_question_endpoint(
         )
     except Exception as exc:
         logger.error("Failed creating engineering question: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.get("/evidence/{question_id}")
@@ -214,7 +214,7 @@ async def gather_evidence_endpoint(
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:
         logger.error("Failed gathering evidence: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.post("/experiment", status_code=status.HTTP_201_CREATED)
@@ -240,7 +240,7 @@ async def create_experiment_endpoint(
         )
     except Exception as exc:
         logger.error("Failed creating experiment: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.post("/simulate", status_code=status.HTTP_201_CREATED)
@@ -261,7 +261,7 @@ async def execute_simulation_endpoint(
         )
     except Exception as exc:
         logger.error("Failed executing simulation: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.post("/compare", status_code=status.HTTP_201_CREATED)
@@ -284,7 +284,7 @@ async def compare_setups_endpoint(
         )
     except Exception as exc:
         logger.error("Failed comparing setups: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.post("/optimize", status_code=status.HTTP_201_CREATED)
@@ -307,7 +307,7 @@ async def run_optimization_endpoint(
         )
     except Exception as exc:
         logger.error("Failed running optimization: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.post("/validate", status_code=status.HTTP_201_CREATED)
@@ -328,7 +328,7 @@ async def execute_blind_validation_endpoint(
         )
     except Exception as exc:
         logger.error("Failed executing blind validation: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.post("/decision", status_code=status.HTTP_201_CREATED)
@@ -351,7 +351,7 @@ async def create_decision_endpoint(
         )
     except Exception as exc:
         logger.error("Failed creating engineering decision: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.post("/approve", status_code=status.HTTP_200_OK)
@@ -376,7 +376,7 @@ async def approve_decision_endpoint(
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:
         logger.error("Failed approving decision: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.get("/reconstruct/{identifier}")
@@ -393,7 +393,7 @@ async def reconstruct_lineage_endpoint(
         )
     except Exception as exc:
         logger.error("Failed reconstructing lineage: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.post("/next-track-session", status_code=status.HTTP_201_CREATED)
@@ -415,7 +415,7 @@ async def next_track_session_endpoint(
         raise HTTPException(status_code=400, detail=str(val_err))
     except Exception as exc:
         logger.error("Failed executing next track session: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.post("/diagnose-failure")
@@ -467,7 +467,7 @@ async def execute_phase3k1_case_endpoint(
         return bundle
     except Exception as exc:
         logger.error("Phase 3K.1 case execution failed: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.get("/phase3k1/case")
@@ -518,7 +518,7 @@ async def reconstruct_phase3k1_lineage(
     try:
         return await Phase3K1CaseService.reconstruct_complete_lineage(db=db, decision_code=decision_code)
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 # ── Phase 3L Setup Engineering Endpoints ─────────────────────────────────────
@@ -546,7 +546,7 @@ async def execute_phase3l_workflow_endpoint(
         return bundle
     except Exception as exc:
         logger.error("Phase 3L workflow execution failed: %s", exc)
-        raise HTTPException(status_code=500, detail=str(exc))
+        raise HTTPException(status_code=500, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.get("/phase3l/manifest")

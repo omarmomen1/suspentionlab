@@ -118,18 +118,18 @@ export default function ModelHealthIndicator({
             <div className="flex items-center gap-2">
               <span className="font-semibold text-zinc-100">{data.subsystem}</span>
               <span
-                className={`text-[10px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border ${cfg.badge}`}
+                className={`text-xs font-mono uppercase tracking-wider px-1.5 py-0.5 rounded border ${cfg.badge}`}
               >
                 {cfg.label}
               </span>
             </div>
             <div className="flex items-center gap-3 text-xs text-zinc-400 mt-0.5">
               <span className="flex items-center gap-1 font-mono">
-                <Clock className="w-3 h-3 text-zinc-500" />
+                <Clock className="w-3 h-3 text-zinc-400" />
                 {data.lastCalibration}
               </span>
               {data.modelVersion && (
-                <span className="text-[11px] text-zinc-500 font-mono">
+                <span className="text-xs text-zinc-400 font-mono">
                   v{data.modelVersion}
                 </span>
               )}
@@ -154,7 +154,7 @@ export default function ModelHealthIndicator({
                 {data.divergencePercent.toFixed(1)}%
               </span>
             </div>
-            <div className="text-[11px] text-zinc-500 font-mono flex items-center justify-end gap-1">
+            <div className="text-xs text-zinc-400 font-mono flex items-center justify-end gap-1">
               <span>Drift:</span>
               <span className="text-zinc-300 font-medium">
                 {data.driftScore.toFixed(2)}
@@ -195,23 +195,23 @@ export default function ModelHealthIndicator({
       {expanded && (
         <div className="mt-3 pt-3 border-t border-zinc-800 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
           <div className="bg-zinc-950/60 p-2 rounded border border-zinc-800/80">
-            <span className="text-[10px] text-zinc-500 uppercase block">Solver</span>
+            <span className="text-xs text-zinc-400 uppercase block">Solver</span>
             <span className="text-zinc-200">{data.solver || "RK45 (Native)"}</span>
           </div>
           <div className="bg-zinc-950/60 p-2 rounded border border-zinc-800/80">
-            <span className="text-[10px] text-zinc-500 uppercase block">RMS Residual</span>
+            <span className="text-xs text-zinc-400 uppercase block">RMS Residual</span>
             <span className="text-zinc-200">
               {data.rmsResidual !== undefined ? data.rmsResidual.toFixed(4) : "—"}
             </span>
           </div>
           <div className="bg-zinc-950/60 p-2 rounded border border-zinc-800/80">
-            <span className="text-[10px] text-zinc-500 uppercase block">Samples</span>
+            <span className="text-xs text-zinc-400 uppercase block">Samples</span>
             <span className="text-zinc-200">
               {data.sampleCount !== undefined ? data.sampleCount.toLocaleString() : "—"}
             </span>
           </div>
           <div className="bg-zinc-950/60 p-2 rounded border border-zinc-800/80">
-            <span className="text-[10px] text-zinc-500 uppercase block">Drift Threshold</span>
+            <span className="text-xs text-zinc-400 uppercase block">Drift Threshold</span>
             <span className="text-zinc-200">&lt; 0.20 Max</span>
           </div>
         </div>

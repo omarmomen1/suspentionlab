@@ -16,6 +16,9 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional
 
+import logging
+
+logger = logging.getLogger(__name__)
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -45,7 +48,10 @@ class CreateDecisionRequest(BaseModel):
 
 
 class ApproveDecisionRequest(BaseModel):
-    approver_name: str = Field(..., min_length=2, description="Approver's full name")
+    # Pass B: approver_name is IGNORED. The approver identity is derived
+    # strictly from the authenticated server user; this field remains only so
+    # older clients do not break, and it is never persisted.
+    approver_name: Optional[str] = Field(None, description="DEPRECATED: ignored, identity comes from the authenticated user")
     approver_role: str = Field("Chief Race Engineer", description="Sign-off role: Chief Race Engineer | Technical Director | Performance Lead")
 
 
@@ -124,7 +130,8 @@ async def compare_timeline_events_endpoint(
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Event comparison failed: {exc}")
+        logger.exception("Event comparison failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Event comparison failed.")
 
 
 @router.post("/timeline/events", status_code=status.HTTP_201_CREATED)
@@ -238,10 +245,13 @@ async def approve_decision_endpoint(
     Formal sign-off of an Engineering Decision with HMAC-SHA256 non-repudiable signature (Section 15).
     """
     try:
+        # Pass B: approver identity derives strictly from the authenticated
+        # server user, never from the client payload.
+        server_approver_name = (getattr(user, "name", "") or "").strip() or getattr(user, "email", "") or str(user.user_id)
         dec = await TimelineDecisionService.approve_decision(
             db=db,
             decision_id=id,
-            approver_name=req.approver_name,
+            approver_name=server_approver_name,
             approver_role=req.approver_role,
             user_id=user.user_id,
             team_id=getattr(user, "team_id", None),
@@ -252,7 +262,8 @@ async def approve_decision_endpoint(
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail=str(exc))
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Approval failed: {exc}")
+        logger.exception("Approval failed: %s", exc)
+        raise HTTPException(status_code=500, detail="Approval failed.")
 
 
 @router.get("/decisions/reconstruct/{identifier}")
@@ -274,5 +285,6 @@ async def reconstruct_decision_memory_endpoint(
             team_id=str(user.team_id) if getattr(user, "team_id", None) else None,
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Failed to reconstruct institutional memory: {exc}")
+        logger.exception("Failed to reconstruct institutional memory: %s", exc)
+        raise HTTPException(status_code=500, detail="Failed to reconstruct institutional memory.")
 

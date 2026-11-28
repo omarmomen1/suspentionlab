@@ -20,10 +20,10 @@ export function ParamSection({ title, children, defaultOpen = true }: { title: s
         onClick={() => setIsOpen(!isOpen)}
         aria-expanded={isOpen}
         aria-controls={sectionId}
-        className="w-full text-[9px] font-bold text-gray-400 uppercase tracking-[0.16em] pb-1.5 border-b border-[#1e1e1e] cursor-pointer hover:text-white transition-colors flex justify-between items-center text-left"
+        className="w-full text-xs font-bold text-gray-400 uppercase tracking-[0.16em] pb-1.5 border-b border-[#1e1e1e] cursor-pointer hover:text-white transition-colors flex justify-between items-center text-left"
       >
         <span>{title}</span>
-        <span aria-hidden="true" className="text-[10px] transform transition-transform duration-200" style={{ rotate: isOpen ? '0deg' : '-90deg' }}>▼</span>
+        <span aria-hidden="true" className="text-xs transform transition-transform duration-200" style={{ rotate: isOpen ? '0deg' : '-90deg' }}>▼</span>
       </button>
       <div id={sectionId} className={isOpen ? "space-y-2" : "hidden"}>
         {children}
@@ -74,7 +74,7 @@ export function ParameterInput({
 
   return (
     <div className="flex justify-between items-center gap-2">
-      <label htmlFor={id} className="text-[11px] text-gray-400 flex-1 min-w-0 leading-tight cursor-pointer hover:text-gray-200 transition-colors">
+      <label htmlFor={id} className="text-xs text-gray-400 flex-1 min-w-0 leading-tight cursor-pointer hover:text-gray-200 transition-colors">
         {label}
       </label>
       <div className="relative shrink-0">
@@ -89,11 +89,11 @@ export function ParameterInput({
           onChange={(e) => setLocalVal(e.target.value)}
           onBlur={() => flush()}
           onKeyDown={handleKeyDown}
-          className={`bg-[#0d0d0d] border text-[11px] rounded-lg px-2 py-1.5 text-white w-28 text-right pr-9 focus:outline-none transition-all ${
-            hasError ? "border-red-500/50 focus:border-red-500 focus:ring-1 focus:ring-red-500/50 text-red-100" : "border-[#252525] focus:border-ansys-yellow/60 focus:ring-1 focus:ring-ansys-yellow/50"
+          className={`bg-[#0d0d0d] border text-xs rounded-lg px-2 py-1.5 text-white w-28 text-right pr-9 focus:outline-none transition-all ${
+            hasError ? "border-red-500/50 focus:border-red-500 focus:ring-1 focus:ring-red-500/50 text-red-100" : "border-[#252525] focus:border-signal/60 focus:ring-1 focus:ring-signal/50"
           }`}
         />
-        <span aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 text-[9px] pointer-events-none ${hasError ? "text-red-400" : "text-gray-500"}`}>
+        <span aria-hidden="true" className={`absolute right-2 top-1/2 -translate-y-1/2 text-xs pointer-events-none ${hasError ? "text-red-400" : "text-zinc-400"}`}>
           {unit}
         </span>
       </div>

@@ -86,6 +86,12 @@ async def lifespan(app: FastAPI):
                     await conn.execute(_text(
                         "ALTER TABLE vehicle_profiles ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ"
                     ))
+                    await conn.execute(_text(
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS plan_source VARCHAR(32)"
+                    ))
+                    await conn.execute(_text(
+                        "ALTER TABLE users ADD COLUMN IF NOT EXISTS billing_last_event_created BIGINT"
+                    ))
         except Exception as e:
             logging.warning("Schema table initialization notice: %s", e)
 
@@ -122,11 +128,19 @@ _frontend_url = (os.environ.get("FRONTEND_URL") or "").strip()
 _cors_origins = list(settings.allow_origins_list)
 if _frontend_url and _frontend_url not in _cors_origins:
     _cors_origins.append(_frontend_url)
+# Pass B: extra production/preview origins are opt-in and explicit (comma-separated),
+# e.g. CORS_EXTRA_ORIGINS="https://suspensionlab-studio.vercel.app,https://preview-abc.vercel.app".
+_extra_origins = (os.environ.get("CORS_EXTRA_ORIGINS") or "").strip()
+for _o in [o.strip() for o in _extra_origins.split(",") if o.strip()]:
+    if _o not in _cors_origins:
+        _cors_origins.append(_o)
 
+# Pass B: no allow_origin_regex. The old `suspensionlab-*.vercel.app` regex let
+# ANY Vercel project with a matching name send credentialed requests. Only the
+# explicitly configured origins above are trusted with credentials.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,
-    allow_origin_regex=r"^https:\/\/suspensionlab(-[a-z0-9-]+)?\.vercel\.app$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

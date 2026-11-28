@@ -46,20 +46,20 @@ export default function DecisionLoopCockpit({ className = "" }: DecisionLoopCock
     id: "DEC-12",
   });
 
-  // Canonical Phase 3K Sequence: Session 381 -> Next Session 382
+  // Canonical Decision Loop Sequence: Baseline Session -> Follow-up Session
   const steps: DecisionLoopStep[] = [
-    { step: 1, stage: "TRACK SESSION", entity: "TelemetrySessionRecord", id: "TS-381", number: 381, summary: "Silverstone GP FP1: 100 Hz MoTeC DAQ trace (Turn 8 apex).", status: "COMPLETED", hash: "a1b2c3d4e5f6...7890" },
+    { step: 1, stage: "TRACK SESSION", entity: "TelemetrySessionRecord", id: "TS-BASE", number: 1, summary: "Silverstone GP FP1: 100 Hz MoTeC DAQ trace (Turn 8 apex).", status: "COMPLETED", hash: "a1b2c3d4e5f6...7890" },
     { step: 2, stage: "DETECTION", entity: "InvestigationRecord", id: "INV-91", number: 91, summary: "Front axle lateral grip deficit: 1.85 G vs 2.05 G expected (0.20 G residual).", status: "COMPLETED", hash: "b2c3d4e5f6a7...8901" },
-    { step: 3, stage: "ENGINEERING QUESTION", entity: "EngineeringQuestion", id: "Q-17", number: 17, summary: "Why did front axle lateral performance decrease in Session 381?", status: "COMPLETED", hash: "c3d4e5f6a7b8...9012" },
+    { step: 3, stage: "ENGINEERING QUESTION", entity: "EngineeringQuestion", id: "Q-17", number: 17, summary: "Why did front axle lateral performance decrease in Baseline Session?", status: "COMPLETED", hash: "c3d4e5f6a7b8...9012" },
     { step: 4, stage: "EXPERIMENT", entity: "ExperimentRecord", id: "EXP-52", number: 52, summary: "Hypothesis: Increase front roll stiffness (+32.1%) and damping (+12%).", status: "COMPLETED", hash: "d4e5f6a7b8c9...0123" },
-    { step: 5, stage: "SIMULATION", entity: "SimulationRun", id: "RUN-001844", number: 1844, summary: "scipy.integrate.solve_ivp (RK45) forward ODE executed with rtol=1e-6.", status: "COMPLETED", hash: "e5f6a7b8c9d0...1234" },
+    { step: 5, stage: "SIMULATION", entity: "SimulationRun", id: "RUN-001844", number: 1844, summary: "scipy.integrate.solve_ivp (BDF/RK45) forward ODE executed with rtol=1e-6.", status: "COMPLETED", hash: "e5f6a7b8c9d0...1234" },
     { step: 6, stage: "SETUP", entity: "VehicleSetup", id: "SETUP-92", number: 92, summary: "k_arb_f = 18,500 N/m, c = 2,464 Ns/m (baseline: 14,000 N/m, 2,200 Ns/m).", status: "COMPLETED", hash: "f6a7b8c9d0e1...2345" },
     { step: 7, stage: "COMPARISON", entity: "SetupComparisonRecord", id: "COMP-31", number: 31, summary: "Compare Setup #91 vs #92: +0.16 G lateral grip, front slip 8.2° -> 5.85°.", status: "COMPLETED", hash: "a7b8c9d0e1f2...3456" },
     { step: 8, stage: "OPTIMIZATION", entity: "OptimizationRecord", id: "OPT-18", number: 18, summary: "Evaluated 25 Pareto candidates calling genuine physics simulation engine.", status: "COMPLETED", hash: "b8c9d0e1f2a3...4567" },
     { step: 9, stage: "BLIND VALIDATION", entity: "BlindValidationRecord", id: "VAL-31", number: 31, summary: "Zero-leakage holdout cross-validation: R² = 0.938 >= 0.85 (Gate PASSED).", status: "COMPLETED", hash: "c9d0e1f2a3b4...5678" },
     { step: 10, stage: "ENGINEERING DECISION", entity: "EngineeringDecision", id: "DEC-12", number: 12, summary: "Adopt Setup #92 for Turn 8 apex lateral performance recovery.", status: "COMPLETED", hash: "d0e1f2a3b4c5...6789" },
-    { step: 11, stage: "APPROVAL", entity: "ApprovalRecord", id: "APPR-8", number: 8, summary: "HMAC-SHA256 signature verified by James Wilson (Chief Race Engineer).", status: "COMPLETED", hash: "e1f2a3b4c5d6...789a" },
-    { step: 12, stage: "NEXT TRACK SESSION", entity: "TelemetrySessionRecord", id: "TS-382", number: 382, summary: "FP2 telemetry confirms 2.03 G apex lateral grip (+0.18 G). Loop closed.", status: "COMPLETED", hash: "f2a3b4c5d6e7...89ab" },
+    { step: 11, stage: "APPROVAL", entity: "ApprovalRecord", id: "APPR-8", number: 8, summary: "HMAC-SHA256 signature verified by Lead Race Engineer.", status: "COMPLETED", hash: "e1f2a3b4c5d6...789a" },
+    { step: 12, stage: "NEXT TRACK SESSION", entity: "TelemetrySessionRecord", id: "TS-FOLLOWUP", number: 2, summary: "Follow-up Session telemetry confirms 2.03 G apex lateral grip (+0.18 G). Loop closed.", status: "COMPLETED", hash: "f2a3b4c5d6e7...89ab" },
   ];
 
   const failureModes: Record<string, {
@@ -200,9 +200,9 @@ export default function DecisionLoopCockpit({ className = "" }: DecisionLoopCock
                 className="p-4 rounded-xl bg-neutral-950/50 border border-neutral-800/80 hover:border-neutral-700 transition-all flex flex-col justify-between"
               >
                 <div>
-                  <div className="flex items-center justify-between text-[11px] font-mono text-neutral-400 mb-1.5">
+                  <div className="flex items-center justify-between text-xs font-mono text-neutral-400 mb-1.5">
                     <span className="text-rose-400 font-bold">STAGE {st.step}</span>
-                    <span className="px-1.5 py-0.5 rounded bg-neutral-800 text-[10px] text-neutral-300">
+                    <span className="px-1.5 py-0.5 rounded bg-neutral-800 text-xs text-neutral-300">
                       {st.id}
                     </span>
                   </div>
@@ -213,7 +213,7 @@ export default function DecisionLoopCockpit({ className = "" }: DecisionLoopCock
                     {st.summary}
                   </p>
                 </div>
-                <div className="pt-3 mt-3 border-t border-neutral-800/60 flex items-center justify-between text-[10px] font-mono text-neutral-400">
+                <div className="pt-3 mt-3 border-t border-neutral-800/60 flex items-center justify-between text-xs font-mono text-neutral-400">
                   <span>Entity: {st.entity}</span>
                   <div className="flex items-center gap-2">
                     <button
@@ -249,7 +249,7 @@ export default function DecisionLoopCockpit({ className = "" }: DecisionLoopCock
               <span className="text-neutral-400">Jump to:</span>
               <button
                 onClick={() => setSelectedGraphRoot({ type: "EngineeringDecision", id: "DEC-12" })}
-                className={`px-2 py-1 rounded text-[11px] transition-colors ${
+                className={`px-2 py-1 rounded text-xs transition-colors ${
                   selectedGraphRoot.id === "DEC-12"
                     ? "bg-rose-500 text-white font-bold"
                     : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
@@ -259,7 +259,7 @@ export default function DecisionLoopCockpit({ className = "" }: DecisionLoopCock
               </button>
               <button
                 onClick={() => setSelectedGraphRoot({ type: "ExperimentRecord", id: "EXP-52" })}
-                className={`px-2 py-1 rounded text-[11px] transition-colors ${
+                className={`px-2 py-1 rounded text-xs transition-colors ${
                   selectedGraphRoot.id === "EXP-52"
                     ? "bg-rose-500 text-white font-bold"
                     : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
@@ -269,7 +269,7 @@ export default function DecisionLoopCockpit({ className = "" }: DecisionLoopCock
               </button>
               <button
                 onClick={() => setSelectedGraphRoot({ type: "BlindValidationRecord", id: "VAL-31" })}
-                className={`px-2 py-1 rounded text-[11px] transition-colors ${
+                className={`px-2 py-1 rounded text-xs transition-colors ${
                   selectedGraphRoot.id === "VAL-31"
                     ? "bg-rose-500 text-white font-bold"
                     : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
@@ -279,7 +279,7 @@ export default function DecisionLoopCockpit({ className = "" }: DecisionLoopCock
               </button>
               <button
                 onClick={() => setSelectedGraphRoot({ type: "TelemetrySessionRecord", id: "TS-381" })}
-                className={`px-2 py-1 rounded text-[11px] transition-colors ${
+                className={`px-2 py-1 rounded text-xs transition-colors ${
                   selectedGraphRoot.id === "TS-381"
                     ? "bg-rose-500 text-white font-bold"
                     : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"

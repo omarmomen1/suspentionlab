@@ -120,7 +120,7 @@ async def saml_acs(
             org = (await db.execute(select(Organization).where(Organization.id == uuid.UUID(org_id_str)))).scalar_one_or_none()
         except Exception as e:
             logger.warning("RelayState validation error in ACS: %s", e)
-            raise HTTPException(status_code=400, detail=f"Invalid RelayState token: {e}")
+            raise HTTPException(status_code=400, detail="Invalid RelayState token.")
 
     if not org and org_slug:
         org = (await db.execute(select(Organization).where(Organization.slug == org_slug.lower()))).scalar_one_or_none()
@@ -143,7 +143,7 @@ async def saml_acs(
         )
     except Exception as exc:
         logger.error("SAML assertion validation error: %s", exc)
-        raise HTTPException(status_code=401, detail=f"SAML Assertion validation failed: {exc}")
+        raise HTTPException(status_code=401, detail="SAML Assertion validation failed.")
 
     email = validated_assertion["email"].lower()
     name = validated_assertion["name"]

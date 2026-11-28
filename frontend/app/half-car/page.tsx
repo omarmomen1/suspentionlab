@@ -22,6 +22,8 @@ import VehiclePresets from "../../components/VehiclePresets";
 import SimHistory, { saveSimulationToHistory } from "../../components/SimHistory";
 import DamperLUTInput from "../../components/DamperLUTInput";
 import { useAuth } from "../../contexts/AuthContext";
+import { apiFetch } from "../../lib/api";
+import { formatApiError } from "../../lib/api_client";
 
 import Plot from "../../components/sim/Plot";
 import KPICard from "../../components/sim/KPICard";
@@ -148,15 +150,23 @@ function HalfCarDashboard() {
     if (!name) return;
     setIsSaving(true);
     try {
-      const r = await fetchWithAuth("/api/v1/profiles/", {
+      const r = await apiFetch("/api/v1/profiles/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, vehicle_type: "HALF_CAR", params })
       });
-      if (r.ok) showToast("Setup saved to Garage!", "success");
-      else showToast("Failed to save", "error");
-    } catch { showToast("Failed to save profile", "error"); }
-    finally { setIsSaving(false); }
+      if (r.ok) {
+        showToast("Setup saved to Garage!", "success");
+      } else {
+        const errBody = await r.json().catch(() => null);
+        const msg = errBody?.detail ? String(errBody.detail) : formatApiError(errBody, `Failed to save (${r.status})`);
+        showToast(msg, "error");
+      }
+    } catch (err) {
+      showToast(formatApiError(err, "Failed to save profile"), "error");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // P0-PERF-01: O(N log N) FFT (lib/fft) replaces the O(N^2) DFT that froze
@@ -196,7 +206,7 @@ function HalfCarDashboard() {
 
       <div className="flex items-center justify-between shrink-0 pb-3 border-b border-[#1e1e1e]">
         <div className="flex flex-col">
-          <span className="text-[9px] font-bold tracking-[0.25em] text-ansys-yellow uppercase">4-DOF Pitch Plane · RK45 ODE</span>
+          <span className="text-xs font-bold tracking-[0.25em] text-signal uppercase">4-DOF Pitch Plane · RK45 ODE</span>
           <h1 className="text-2xl font-semibold tracking-tight text-white leading-tight">Half Car</h1>
         </div>
 
@@ -235,13 +245,13 @@ function HalfCarDashboard() {
             </button>
           </div>
           <button onClick={saveProfile} disabled={isSaving} className="px-3 py-1.5 bg-[#141416] border border-[#252525] hover:bg-[#1e1e20] rounded-lg text-xs font-medium flex items-center gap-1.5 transition-colors disabled:opacity-40">
-            <Save size={13} className="text-ansys-yellow" /> Save Setup
+            <Save size={13} className="text-signal" /> Save Setup
           </button>
           <PDFExport captureId="sim-report" fileName={`HCar_${params.m_s}`} />
           <DataExport results={results} fileName={`HCar_${params.m_s}`} />
 
           <button id="btn-run" onClick={runSimulation} disabled={isRunning}
-            className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${isRunning ? "bg-[#222] text-gray-500 cursor-not-allowed" : "bg-signal text-carbon border border-signal hover:bg-[#d6f56e]"}`}>
+            className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${isRunning ? "bg-[#222] text-zinc-400 cursor-not-allowed" : "bg-signal text-carbon border border-signal hover:bg-[#d6f56e]"}`}>
             {isRunning ? <><div className="w-3 h-3 border border-gray-600 border-t-gray-300 rounded-full animate-spin" />Solving…</> : <><Play size={13} fill="currentColor" /> Run Solver</>}
           </button>
         </div>
@@ -258,7 +268,7 @@ function HalfCarDashboard() {
 
       <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
         <div className="w-60 shrink-0 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-y-auto custom-scrollbar">
-          <div className="px-4 py-3 border-b border-[#1e1e1e] sticky top-0 bg-[#0d0d0f] z-10"><h2 className="text-xs font-semibold text-gray-300 flex items-center gap-2"><Settings2 size={13} className="text-ansys-yellow" /> Parameters</h2></div>
+          <div className="px-4 py-3 border-b border-[#1e1e1e] sticky top-0 bg-[#0d0d0f] z-10"><h2 className="text-xs font-semibold text-gray-300 flex items-center gap-2"><Settings2 size={13} className="text-signal" /> Parameters</h2></div>
           <div className="p-4 space-y-5">
             <VehiclePresets onSelect={(p) => setParams(prev => ({ ...prev, ...p.params, road_profile: p.road_profile.profile_type, amplitude: p.road_profile.amplitude, frequency: p.road_profile.frequency, duration: p.road_profile.duration }))} />
             <ParamSection title="Sprung Mass">
@@ -283,9 +293,9 @@ function HalfCarDashboard() {
             </ParamSection>
             <ParamSection title="Road Profile">
               <div className="flex justify-between items-center gap-2">
-                <label htmlFor="half-car-road-profile" className="text-[11px] text-gray-400 flex-1">Profile Type</label>
+                <label htmlFor="half-car-road-profile" className="text-xs text-gray-400 flex-1">Profile Type</label>
                 <select id="half-car-road-profile" aria-label="Road profile type" value={params.road_profile} onChange={(e) => setParams({ ...params, road_profile: e.target.value })}
-                  className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white w-28 focus:outline-none focus:border-ansys-yellow/60">
+                  className="bg-[#0d0d0d] border border-[#252525] text-xs rounded-lg px-2 py-1.5 text-white w-28 focus:outline-none focus:border-signal/60">
                   <option value="step">Step</option>
                   <option value="sine">Sine Wave</option>
                   {/* canonical Wave 5A enum for the single half-sine bump */}
@@ -304,14 +314,14 @@ function HalfCarDashboard() {
         <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-hidden">
           {!results && !isRunning && (
             <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl flex flex-col items-center justify-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-ansys-yellow/5 border border-ansys-yellow/10 flex items-center justify-center"><Activity size={32} strokeWidth={1} className="text-ansys-yellow/40" /></div>
-              <div className="text-center"><p className="text-sm font-semibold text-gray-400 mb-1">Configure parameters and click <span className="text-ansys-yellow">Run Solver</span></p><p className="text-xs text-gray-400">4-DOF half car · RK45 ODE · Pitch & Heave coupling</p></div>
+              <div className="w-16 h-16 rounded-2xl bg-signal/5 border border-signal/10 flex items-center justify-center"><Activity size={32} strokeWidth={1} className="text-signal/40" /></div>
+              <div className="text-center"><p className="text-sm font-semibold text-gray-400 mb-1">Configure parameters and click <span className="text-signal">Run Solver</span></p><p className="text-xs text-gray-400">4-DOF half car · RK45 ODE · Pitch & Heave coupling</p></div>
             </div>
           )}
 
           {isRunning && (
             <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl flex flex-col items-center justify-center gap-4">
-              <div className="w-10 h-10 border-2 border-ansys-yellow/20 border-t-ansys-yellow rounded-full animate-spin" />
+              <div className="w-10 h-10 border-2 border-signal/20 border-t-signal rounded-full animate-spin" />
               <div className="text-center"><p className="text-sm font-medium text-gray-400 mb-1">Running RK45 ODE solver…</p></div>
             </div>
           )}
@@ -349,7 +359,7 @@ function HalfCarDashboard() {
                       onClick={() => setActiveTab(i)}
                       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
                         activeTab === i
-                          ? "bg-ansys-yellow text-black shadow-[0_0_12px_rgba(242,169,0,0.2)]"
+                          ? "bg-signal text-carbon shadow-[0_0_12px_rgba(242,169,0,0.2)]"
                           : "bg-[#111113] border border-[#1e1e1e] text-gray-400 hover:text-white hover:border-[#2a2a2a]"
                       }`}
                     >
@@ -366,7 +376,7 @@ function HalfCarDashboard() {
                     <PlotBox>
                       <Plot
                         data={[
-                          { x: r.time, y: r.z_s?.map((v: number) => v * 1000), type: "scatter" as any, mode: "lines" as any, name: "CG Heave z_s", line: { color: "#f2a900", width: 2 } },
+                          { x: r.time, y: r.z_s?.map((v: number) => v * 1000), type: "scatter" as any, mode: "lines" as any, name: "CG Heave z_s", line: { color: "#C8F04B", width: 2 } },
                           { x: r.time, y: r.z_uf?.map((v: number) => v * 1000), type: "scatter" as any, mode: "lines" as any, name: "Front z_uf", line: { color: "#00aeff", width: 1.5 } },
                           { x: r.time, y: r.z_ur?.map((v: number) => v * 1000), type: "scatter" as any, mode: "lines" as any, name: "Rear z_ur", line: { color: "#ff2d55", width: 1.5 } },
                           { x: r.time, y: r.z_rf?.map((v: number) => v * 1000), type: "scatter" as any, mode: "lines" as any, name: "Road Front", line: { color: "#555", width: 1, dash: "dash" as any } },
@@ -405,7 +415,7 @@ function HalfCarDashboard() {
                   <div className="grid grid-cols-1 lg:grid-cols-2 auto-rows-[350px] gap-px bg-[#181818] overflow-y-auto custom-scrollbar h-full">
                     <PlotBox>
                       <Plot
-                        data={[ { x: r.z_s?.map((v: number) => v * 1000), y: r.theta?.map((v: number) => v * 180 / Math.PI), type: "scatter" as any, mode: "lines" as any, name: "Coupling", line: { color: "#f2a900", width: 1.5 } } ]}
+                        data={[ { x: r.z_s?.map((v: number) => v * 1000), y: r.theta?.map((v: number) => v * 180 / Math.PI), type: "scatter" as any, mode: "lines" as any, name: "Coupling", line: { color: "#C8F04B", width: 1.5 } } ]}
                         layout={darkLayout({ title: { text: "Heave vs Pitch Coupling", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Heave z_s (mm)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "Pitch θ (°)", font: { color: "#444", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
                       />
@@ -432,12 +442,12 @@ function HalfCarDashboard() {
                     </PlotBox>
                     <PlotBox>
                       <div className="h-full p-5 flex flex-col justify-center gap-4">
-                        <p className="text-[10px] font-bold tracking-widest text-gray-700 uppercase">Pitch Center Geometry</p>
+                        <p className="text-xs font-bold tracking-widest text-zinc-300 uppercase">Pitch Center Geometry</p>
                         <div className="space-y-3 font-mono text-xs">
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Static Pitch Center</span><span className="text-[#00ff87]">Analytic</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Wheelbase (L)</span><span className="text-white">{params.L} m</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Front weight bias</span><span className="text-[#f2a900]">{params.weight_dist}%</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Olcott Bounce Ratio</span><span className="text-gray-400">{((params.k_sf * (params.L - params.L * params.weight_dist / 100.0) ** 2) / (params.k_sr * (params.L * params.weight_dist / 100.0) ** 2)).toFixed(2)}</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Static Pitch Center</span><span className="text-[#00ff87]">Analytic</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Wheelbase (L)</span><span className="text-white">{params.L} m</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Front weight bias</span><span className="text-[#C8F04B]">{params.weight_dist}%</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Olcott Bounce Ratio</span><span className="text-gray-400">{((params.k_sf * (params.L - params.L * params.weight_dist / 100.0) ** 2) / (params.k_sr * (params.L * params.weight_dist / 100.0) ** 2)).toFixed(2)}</span></div>
                         </div>
                       </div>
                     </PlotBox>
@@ -449,7 +459,7 @@ function HalfCarDashboard() {
                   <div className="grid grid-cols-1 lg:grid-cols-2 auto-rows-[350px] gap-px bg-[#181818] overflow-y-auto custom-scrollbar h-full">
                     <PlotBox>
                       <Plot
-                        data={[ { x: r.z_s?.map((v: number) => v * 1000), y: r.dz_s?.map((v: number) => v * 1000), type: "scatter" as any, mode: "lines" as any, name: "Heave Phase", line: { color: "#f2a900", width: 1.5 } } ]}
+                        data={[ { x: r.z_s?.map((v: number) => v * 1000), y: r.dz_s?.map((v: number) => v * 1000), type: "scatter" as any, mode: "lines" as any, name: "Heave Phase", line: { color: "#C8F04B", width: 1.5 } } ]}
                         layout={darkLayout({ title: { text: "Heave Phase Portrait", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "z_s (mm)", font: { color: "#444", size: 10 } } }, yaxis: { ...DARK_BASE.yaxis, title: { text: "ż_s (mm/s)", font: { color: "#444", size: 10 } } } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
                       />
@@ -470,12 +480,12 @@ function HalfCarDashboard() {
                     </PlotBox>
                     <PlotBox>
                       <div className="h-full p-5 flex flex-col justify-center gap-4">
-                        <p className="text-[10px] font-bold tracking-widest text-gray-700 uppercase">State-Space Eigenvalues</p>
+                        <p className="text-xs font-bold tracking-widest text-zinc-300 uppercase">State-Space Eigenvalues</p>
                         <div className="space-y-3 font-mono text-xs">
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Heave Mode</span><span className="text-[#f2a900]">{r.f_n_heave.toFixed(2)} Hz</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Pitch Mode</span><span className="text-[#00ff87]">{r.f_n_pitch.toFixed(2)} Hz</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Front Hop</span><span className="text-[#00aeff]">{r.f_n_uf.toFixed(2)} Hz</span></div>
-                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-gray-600">Rear Hop</span><span className="text-[#ff2d55]">{r.f_n_ur.toFixed(2)} Hz</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Heave Mode</span><span className="text-[#C8F04B]">{r.f_n_heave.toFixed(2)} Hz</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Pitch Mode</span><span className="text-[#00ff87]">{r.f_n_pitch.toFixed(2)} Hz</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Front Hop</span><span className="text-[#00aeff]">{r.f_n_uf.toFixed(2)} Hz</span></div>
+                          <div className="flex justify-between items-center border-b border-[#1a1a1a] pb-2"><span className="text-zinc-300">Rear Hop</span><span className="text-[#ff2d55]">{r.f_n_ur.toFixed(2)} Hz</span></div>
                         </div>
                       </div>
                     </PlotBox>
@@ -487,7 +497,7 @@ function HalfCarDashboard() {
                   <div className="grid grid-cols-2 grid-rows-1 h-full gap-px bg-[#181818]">
                     <PlotBox>
                       <Plot
-                        data={[ { x: psdData.freqs, y: psdData.psd, type: "scatter" as any, mode: "lines" as any, name: "PSD Heave", fill: "tozeroy", fillcolor: "rgba(242,169,0,0.06)", line: { color: "#f2a900", width: 2 } } ]}
+                        data={[ { x: psdData.freqs, y: psdData.psd, type: "scatter" as any, mode: "lines" as any, name: "PSD Heave", fill: "tozeroy", fillcolor: "rgba(242,169,0,0.06)", line: { color: "#C8F04B", width: 2 } } ]}
                         layout={darkLayout({ title: { text: "PSD — Heave Acceleration", font: { color: "#888", size: 11 } }, xaxis: { ...DARK_BASE.xaxis, title: { text: "Frequency (Hz)", font: { color: "#444", size: 10 } }, type: "log", range: [Math.log10(0.1), Math.log10(50)] }, yaxis: { ...DARK_BASE.yaxis, title: { text: "PSD ((m/s²)²/Hz)", font: { color: "#444", size: 10 } }, type: "log" } })}
                         useResizeHandler style={{ width: "100%", height: "100%" }} config={{ responsive: true, displayModeBar: true }}
                       />
@@ -512,7 +522,7 @@ function HalfCarDashboard() {
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-600 text-sm">Loading simulation environment…</div>}>
+    <Suspense fallback={<div className="h-full flex items-center justify-center text-zinc-300 text-sm">Loading simulation environment…</div>}>
       <HalfCarDashboard />
     </Suspense>
   );

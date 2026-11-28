@@ -221,7 +221,7 @@ export default function AuditPage() {
         {/* Header Breadcrumb & Actions */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-white/[0.08]">
           <div>
-            <div className="flex items-center gap-2 text-xs font-semibold text-ansys-yellow tracking-wider uppercase mb-1">
+            <div className="flex items-center gap-2 text-xs font-semibold text-signal tracking-wider uppercase mb-1">
               <ShieldCheck size={14} />
               <span>Tamper-Evident Engineering Governance</span>
             </div>
@@ -240,7 +240,7 @@ export default function AuditPage() {
               disabled={verifying}
               className="flex items-center gap-2 px-3.5 py-2 bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 rounded-xl text-xs font-semibold text-white transition-all disabled:opacity-50"
             >
-              <RefreshCw size={13} className={verifying ? "animate-spin text-ansys-yellow" : "text-gray-400"} />
+              <RefreshCw size={13} className={verifying ? "animate-spin text-signal" : "text-gray-400"} />
               <span>{verifying ? "Verifying Hash Chain..." : "Verify Chain"}</span>
             </button>
 
@@ -248,7 +248,7 @@ export default function AuditPage() {
               onClick={() => handleExport("csv")}
               className="flex items-center gap-2 px-3.5 py-2 bg-white/[0.06] hover:bg-white/[0.1] border border-white/10 rounded-xl text-xs font-semibold text-white transition-all"
             >
-              <Download size={13} className="text-ansys-yellow" />
+              <Download size={13} className="text-signal" />
               <span>Export CSV</span>
             </button>
 
@@ -290,7 +290,7 @@ export default function AuditPage() {
             <div className={`text-xl font-bold mt-2 ${verifyError ? "text-amber-400" : verification === null ? "text-zinc-400" : verification.is_valid ? "text-emerald-400" : "text-red-400"}`}>
               {verifyError ? "UNVERIFIED" : verification === null ? "VERIFYING..." : verification.chain_integrity || (verification.is_valid ? "VALID" : "BROKEN")}
             </div>
-            <p className="text-[11px] text-gray-400 mt-1">
+            <p className="text-xs text-gray-400 mt-1">
               {verifyError
                 ? verifyError
                 : verification === null
@@ -305,12 +305,12 @@ export default function AuditPage() {
           <div className="p-5 rounded-2xl bg-[#111113] border border-white/[0.08]">
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold uppercase tracking-wider text-gray-400">Ledger Depth</span>
-              <Layers size={16} className="text-ansys-yellow" />
+              <Layers size={16} className="text-signal" />
             </div>
             <div className="text-xl font-bold text-white mt-2">
               {verification?.total_records ?? logs.length} Blocks
             </div>
-            <p className="text-[11px] text-gray-400 mt-1">
+            <p className="text-xs text-gray-400 mt-1">
               Strictly monotonic sequence numbers.
             </p>
           </div>
@@ -325,7 +325,7 @@ export default function AuditPage() {
               <span className="truncate">{verification?.head_hash || (logs[0]?.hash ?? "GENESIS")}</span>
               <button
                 onClick={() => handleCopy(verification?.head_hash || (logs[0]?.hash ?? "GENESIS"))}
-                className="text-gray-500 hover:text-white shrink-0"
+                className="text-zinc-400 hover:text-white shrink-0"
               >
                 {copiedHash === (verification?.head_hash || logs[0]?.hash) ? (
                   <CheckCircle2 size={12} className="text-emerald-400" />
@@ -334,7 +334,7 @@ export default function AuditPage() {
                 )}
               </button>
             </div>
-            <p className="text-[11px] text-gray-400 mt-1">
+            <p className="text-xs text-gray-400 mt-1">
               H_n = SHA256(H_n-1 || Canonical)
             </p>
           </div>
@@ -348,7 +348,7 @@ export default function AuditPage() {
             <div className="text-sm font-semibold text-white mt-2 truncate">
               {verification?.verified_at ? new Date(verification.verified_at).toLocaleTimeString() : "Just now"}
             </div>
-            <p className="text-[11px] text-gray-400 mt-1 truncate">
+            <p className="text-xs text-gray-400 mt-1 truncate">
               {verification?.verified_at ? new Date(verification.verified_at).toLocaleDateString("en-GB") : "Current Session"}
             </p>
           </div>
@@ -360,23 +360,23 @@ export default function AuditPage() {
           
           {/* Search Input */}
           <div className="flex-1 min-w-[240px] relative">
-            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-500" />
+            <Search size={14} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
             <input
               type="text"
               placeholder="Search by event, artifact, IP, hash, or actor..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-[#0b0b0d] border border-white/10 rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder:text-gray-600 focus:outline-none focus:border-ansys-yellow/60 transition-all"
+              className="w-full bg-[#0b0b0d] border border-white/10 rounded-xl pl-9 pr-3.5 py-2 text-xs text-white placeholder:text-zinc-300 focus:outline-none focus:border-signal/60 transition-all"
             />
           </div>
 
           {/* Event Category Dropdown */}
           <div className="flex items-center gap-2">
-            <Filter size={13} className="text-gray-500" />
+            <Filter size={13} className="text-zinc-400" />
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="bg-[#0b0b0d] border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-ansys-yellow/60"
+              className="bg-[#0b0b0d] border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-signal/60"
             >
               <option value="ALL">All Categories</option>
               <option value="SIMULATION">Simulations</option>
@@ -396,11 +396,11 @@ export default function AuditPage() {
 
           {/* Time Range Selector */}
           <div className="flex items-center gap-2">
-            <Calendar size={13} className="text-gray-500" />
+            <Calendar size={13} className="text-zinc-400" />
             <select
               value={timeRange}
               onChange={(e) => setTimeRange(e.target.value)}
-              className="bg-[#0b0b0d] border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-ansys-yellow/60"
+              className="bg-[#0b0b0d] border border-white/10 rounded-xl px-3 py-2 text-xs text-gray-300 focus:outline-none focus:border-signal/60"
             >
               <option value="ALL">All Time</option>
               <option value="24H">Last 24 Hours</option>
@@ -415,7 +415,7 @@ export default function AuditPage() {
             placeholder="Filter artifact (e.g. RUN-000183)..."
             value={artifactFilter}
             onChange={(e) => setArtifactFilter(e.target.value)}
-            className="w-48 bg-[#0b0b0d] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-gray-600 focus:outline-none focus:border-ansys-yellow/60 transition-all"
+            className="w-48 bg-[#0b0b0d] border border-white/10 rounded-xl px-3 py-2 text-xs text-white placeholder:text-zinc-300 focus:outline-none focus:border-signal/60 transition-all"
           />
 
           {(searchQuery || selectedCategory !== "ALL" || timeRange !== "ALL" || artifactFilter) && (
@@ -426,7 +426,7 @@ export default function AuditPage() {
                 setTimeRange("ALL");
                 setArtifactFilter("");
               }}
-              className="text-xs text-gray-500 hover:text-white underline px-1"
+              className="text-xs text-zinc-400 hover:text-white underline px-1"
             >
               Reset
             </button>
@@ -440,7 +440,7 @@ export default function AuditPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead>
-                <tr className="border-b border-white/[0.08] bg-white/[0.02] text-gray-400 font-semibold uppercase tracking-wider text-[10px]">
+                <tr className="border-b border-white/[0.08] bg-white/[0.02] text-gray-400 font-semibold uppercase tracking-wider text-xs">
                   <th className="py-3 px-4 w-16 text-center">Seq #</th>
                   <th className="py-3 px-4">Timestamp (UTC)</th>
                   <th className="py-3 px-4">Event Type</th>
@@ -455,14 +455,14 @@ export default function AuditPage() {
               <tbody className="divide-y divide-white/[0.04]">
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center text-gray-500">
-                      <RefreshCw size={20} className="animate-spin mx-auto text-ansys-yellow mb-2" />
+                    <td colSpan={9} className="py-12 text-center text-zinc-400">
+                      <RefreshCw size={20} className="animate-spin mx-auto text-signal mb-2" />
                       Loading tamper-evident ledger...
                     </td>
                   </tr>
                 ) : filteredLogs.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-12 text-center text-gray-500">
+                    <td colSpan={9} className="py-12 text-center text-zinc-400">
                       No matching audit records found.
                     </td>
                   </tr>
@@ -478,41 +478,41 @@ export default function AuditPage() {
                         </td>
 
                         {/* Timestamp */}
-                        <td className="py-3.5 px-4 font-mono text-gray-300 text-[11px] whitespace-nowrap">
+                        <td className="py-3.5 px-4 font-mono text-gray-300 text-xs whitespace-nowrap">
                           {entry.timestamp ? new Date(entry.timestamp).toISOString().replace("T", " ").replace("Z", "") : "—"}
                         </td>
 
                         {/* Event Category Badge */}
                         <td className="py-3.5 px-4 whitespace-nowrap">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold border ${cat.bg} ${cat.color} ${cat.border}`}>
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold border ${cat.bg} ${cat.color} ${cat.border}`}>
                             {entry.event}
                           </span>
                         </td>
 
                         {/* Actor */}
-                        <td className="py-3.5 px-4 font-mono text-gray-300 text-[11px] max-w-[140px] truncate">
+                        <td className="py-3.5 px-4 font-mono text-gray-300 text-xs max-w-[140px] truncate">
                           <div className="truncate text-white font-medium">{entry.user_id || "system"}</div>
-                          <div className="text-[10px] text-gray-500">{entry.ip || "127.0.0.1"}</div>
+                          <div className="text-xs text-zinc-400">{entry.ip || "127.0.0.1"}</div>
                         </td>
 
                         {/* Artifact */}
-                        <td className="py-3.5 px-4 font-mono text-gray-300 text-[11px] max-w-[150px] truncate">
+                        <td className="py-3.5 px-4 font-mono text-gray-300 text-xs max-w-[150px] truncate">
                           {entry.artifact_id ? (
-                            <span className="text-ansys-yellow bg-ansys-yellow/10 px-1.5 py-0.5 rounded border border-ansys-yellow/20">
+                            <span className="text-signal bg-signal/10 px-1.5 py-0.5 rounded border border-signal/20">
                               {entry.artifact_id}
                             </span>
                           ) : (
-                            <span className="text-gray-600">—</span>
+                            <span className="text-zinc-300">—</span>
                           )}
                         </td>
 
                         {/* Previous Hash */}
-                        <td className="py-3.5 px-4 font-mono text-[10px] text-gray-500 max-w-[120px] truncate">
+                        <td className="py-3.5 px-4 font-mono text-xs text-zinc-400 max-w-[120px] truncate">
                           <div className="flex items-center gap-1.5">
                             <span className="truncate">{entry.previous_hash || "GENESIS"}</span>
                             <button
                               onClick={() => handleCopy(entry.previous_hash || "GENESIS")}
-                              className="text-gray-600 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                              className="text-zinc-300 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
                             >
                               <Copy size={10} />
                             </button>
@@ -520,12 +520,12 @@ export default function AuditPage() {
                         </td>
 
                         {/* Record Hash */}
-                        <td className="py-3.5 px-4 font-mono text-[10px] text-gray-300 max-w-[120px] truncate">
+                        <td className="py-3.5 px-4 font-mono text-xs text-gray-300 max-w-[120px] truncate">
                           <div className="flex items-center gap-1.5">
                             <span className="truncate">{entry.hash}</span>
                             <button
                               onClick={() => handleCopy(entry.hash)}
-                              className="text-gray-600 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
+                              className="text-zinc-300 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity"
                             >
                               <Copy size={10} />
                             </button>
@@ -534,7 +534,7 @@ export default function AuditPage() {
 
                         {/* Integrity Badge */}
                         <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-400 bg-emerald-950/30 px-2 py-0.5 rounded-full border border-emerald-800/30">
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-emerald-400 bg-emerald-950/30 px-2 py-0.5 rounded-full border border-emerald-800/30">
                             <ShieldCheck size={11} /> VALID
                           </span>
                         </td>
@@ -543,7 +543,7 @@ export default function AuditPage() {
                         <td className="py-3.5 px-4 text-right whitespace-nowrap">
                           <button
                             onClick={() => setSelectedEntry(entry)}
-                            className="px-2.5 py-1 text-[11px] font-semibold text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors inline-flex items-center gap-1"
+                            className="px-2.5 py-1 text-xs font-semibold text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors inline-flex items-center gap-1"
                           >
                             <span>Inspect</span>
                             <ChevronRight size={12} />
@@ -559,7 +559,7 @@ export default function AuditPage() {
           </div>
 
           {/* Table Footer */}
-          <div className="py-3 px-6 border-t border-white/[0.08] bg-white/[0.01] flex items-center justify-between text-xs text-gray-500">
+          <div className="py-3 px-6 border-t border-white/[0.08] bg-white/[0.01] flex items-center justify-between text-xs text-zinc-400">
             <span>Showing {filteredLogs.length} of {logs.length} audit entries</span>
             <span>Tamper-Evident Hash Chain Architecture &middot; RFC 8785 Canonical JSON</span>
           </div>
@@ -574,12 +574,12 @@ export default function AuditPage() {
               {/* Modal Header */}
               <div className="p-5 border-b border-white/10 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-lg bg-ansys-yellow/10 border border-ansys-yellow/30 flex items-center justify-center text-ansys-yellow font-bold text-xs">
+                  <div className="w-8 h-8 rounded-lg bg-signal/10 border border-signal/30 flex items-center justify-center text-signal font-bold text-xs">
                     #{selectedEntry.sequence_number}
                   </div>
                   <div>
                     <h3 className="text-sm font-bold text-white">{selectedEntry.event}</h3>
-                    <p className="text-[11px] text-gray-400">{selectedEntry.timestamp}</p>
+                    <p className="text-xs text-gray-400">{selectedEntry.timestamp}</p>
                   </div>
                 </div>
                 <button
@@ -595,16 +595,16 @@ export default function AuditPage() {
                 
                 {/* Cryptographic Linkage Block */}
                 <div className="p-4 bg-black/40 border border-white/5 rounded-xl space-y-2 font-mono">
-                  <div className="text-gray-400 text-[10px] uppercase tracking-wider font-bold">Cryptographic Linkage</div>
-                  <div className="text-[11px]">
-                    <span className="text-gray-500">Previous Hash (H_{selectedEntry.sequence_number - 1}):</span>
+                  <div className="text-gray-400 text-xs uppercase tracking-wider font-bold">Cryptographic Linkage</div>
+                  <div className="text-xs">
+                    <span className="text-zinc-400">Previous Hash (H_{selectedEntry.sequence_number - 1}):</span>
                     <div className="text-gray-300 truncate mt-0.5">{selectedEntry.previous_hash || "GENESIS"}</div>
                   </div>
-                  <div className="text-[11px] pt-1">
-                    <span className="text-gray-500">Block Hash (H_{selectedEntry.sequence_number}):</span>
+                  <div className="text-xs pt-1">
+                    <span className="text-zinc-400">Block Hash (H_{selectedEntry.sequence_number}):</span>
                     <div className="text-emerald-400 truncate mt-0.5 font-bold">{selectedEntry.hash}</div>
                   </div>
-                  <div className="text-[10px] text-gray-500 pt-1 border-t border-white/5">
+                  <div className="text-xs text-zinc-400 pt-1 border-t border-white/5">
                     H_{selectedEntry.sequence_number} = SHA256(H_{selectedEntry.sequence_number - 1} || Canonical(Event_{selectedEntry.sequence_number}))
                   </div>
                 </div>
@@ -615,12 +615,12 @@ export default function AuditPage() {
                     <span className="font-bold text-gray-300">Canonical Event Envelope (RFC 8785)</span>
                     <button
                       onClick={() => handleCopy(selectedEntry.canonical_event || JSON.stringify(selectedEntry, null, 2))}
-                      className="text-gray-400 hover:text-white text-[11px] flex items-center gap-1"
+                      className="text-gray-400 hover:text-white text-xs flex items-center gap-1"
                     >
                       <Copy size={11} /> Copy Envelope
                     </button>
                   </div>
-                  <pre className="bg-black/60 border border-white/5 rounded-xl p-3 font-mono text-[11px] text-gray-300 overflow-x-auto max-h-48 custom-scrollbar">
+                  <pre className="bg-black/60 border border-white/5 rounded-xl p-3 font-mono text-xs text-gray-300 overflow-x-auto max-h-48 custom-scrollbar">
                     {selectedEntry.canonical_event || JSON.stringify(selectedEntry, null, 2)}
                   </pre>
                 </div>
@@ -628,27 +628,27 @@ export default function AuditPage() {
                 {/* Event Metadata */}
                 <div>
                   <span className="font-bold text-gray-300 block mb-1.5">Event Metadata</span>
-                  <pre className="bg-black/60 border border-white/5 rounded-xl p-3 font-mono text-[11px] text-gray-300 overflow-x-auto max-h-48 custom-scrollbar">
+                  <pre className="bg-black/60 border border-white/5 rounded-xl p-3 font-mono text-xs text-gray-300 overflow-x-auto max-h-48 custom-scrollbar">
                     {JSON.stringify(selectedEntry.metadata, null, 2)}
                   </pre>
                 </div>
 
                 {/* Context Details */}
-                <div className="grid grid-cols-2 gap-3 pt-2 text-[11px]">
+                <div className="grid grid-cols-2 gap-3 pt-2 text-xs">
                   <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
-                    <span className="text-gray-500 block">User ID</span>
+                    <span className="text-zinc-400 block">User ID</span>
                     <span className="text-white font-mono truncate block mt-0.5">{selectedEntry.user_id}</span>
                   </div>
                   <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
-                    <span className="text-gray-500 block">Artifact Reference</span>
-                    <span className="text-ansys-yellow font-mono truncate block mt-0.5">{selectedEntry.artifact_id || "None"}</span>
+                    <span className="text-zinc-400 block">Artifact Reference</span>
+                    <span className="text-signal font-mono truncate block mt-0.5">{selectedEntry.artifact_id || "None"}</span>
                   </div>
                   <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
-                    <span className="text-gray-500 block">IP Address</span>
+                    <span className="text-zinc-400 block">IP Address</span>
                     <span className="text-white font-mono block mt-0.5">{selectedEntry.ip}</span>
                   </div>
                   <div className="p-3 rounded-lg bg-white/[0.02] border border-white/5">
-                    <span className="text-gray-500 block">Team ID</span>
+                    <span className="text-zinc-400 block">Team ID</span>
                     <span className="text-white font-mono truncate block mt-0.5">{selectedEntry.team_id || "None (Personal)"}</span>
                   </div>
                 </div>

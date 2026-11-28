@@ -30,7 +30,7 @@ const DARK_BASE = {
 function ParamSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <h3 className="text-[9px] font-bold text-gray-700 uppercase tracking-[0.16em] pb-1.5 border-b border-[#1e1e1e]">
+      <h3 className="text-xs font-bold text-zinc-300 uppercase tracking-[0.16em] pb-1.5 border-b border-[#1e1e1e]">
         {title}
       </h3>
       {children}
@@ -120,13 +120,13 @@ function SensitivitySweepDashboard() {
     <div className="h-full flex flex-col p-5 pt-3 gap-3 min-h-0">
       <div className="flex items-center justify-between shrink-0 pb-3 border-b border-[#1e1e1e]">
         <div className="flex flex-col">
-          <span className="text-[9px] font-bold tracking-[0.25em] text-ansys-yellow uppercase">Parameter Grid Optimization</span>
+          <span className="text-xs font-bold tracking-[0.25em] text-signal uppercase">Parameter Grid Optimization</span>
           <h1 className="text-2xl font-semibold tracking-tight text-white leading-tight">Sensitivity Sweep</h1>
         </div>
 
         <div className="flex items-center gap-2">
           <button onClick={runSimulation} disabled={isRunning}
-            className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${isRunning ? "bg-[#222] text-gray-500 cursor-not-allowed" : "bg-signal text-carbon border border-signal hover:bg-[#d6f56e]"}`}>
+            className={`px-5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors ${isRunning ? "bg-[#222] text-zinc-400 cursor-not-allowed" : "bg-signal text-carbon border border-signal hover:bg-[#d6f56e]"}`}>
             {isRunning ? <><div className="w-3 h-3 border border-gray-600 border-t-gray-300 rounded-full animate-spin" />Computing {params.grid_res * params.grid_res} points…</> : <><Play size={13} fill="currentColor" /> Generate Surface</>}
           </button>
         </div>
@@ -134,28 +134,28 @@ function SensitivitySweepDashboard() {
 
       <div className="flex flex-1 gap-4 overflow-hidden min-h-0">
         <div className="w-60 shrink-0 bg-[#111113] border border-[#1e1e1e] rounded-xl overflow-y-auto custom-scrollbar">
-          <div className="px-4 py-3 border-b border-[#1e1e1e] sticky top-0 bg-[#0d0d0f] z-10"><h2 className="text-xs font-semibold text-gray-300 flex items-center gap-2"><Settings2 size={13} className="text-ansys-yellow" /> Grid Setup</h2></div>
+          <div className="px-4 py-3 border-b border-[#1e1e1e] sticky top-0 bg-[#0d0d0f] z-10"><h2 className="text-xs font-semibold text-gray-300 flex items-center gap-2"><Settings2 size={13} className="text-signal" /> Grid Setup</h2></div>
           <div className="p-4 space-y-5">
             <ParamSection title="Axis Mapping">
               <div className="flex flex-col gap-1.5 mb-2">
-                <label htmlFor="sensitivity-var-x" className="text-[11px] text-gray-400">X-Axis Variable</label>
-                <select id="sensitivity-var-x" aria-label="X-Axis Variable" value={params.var_x} onChange={(e) => setParams({ ...params, var_x: e.target.value })} className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-ansys-yellow/60 w-full">
+                <label htmlFor="sensitivity-var-x" className="text-xs text-gray-400">X-Axis Variable</label>
+                <select id="sensitivity-var-x" aria-label="X-Axis Variable" value={params.var_x} onChange={(e) => setParams({ ...params, var_x: e.target.value })} className="bg-[#0d0d0d] border border-[#252525] text-xs rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-signal/60 w-full">
                   <option>Spring Rate (ks)</option>
                   <option>Damping (c)</option>
                   <option>Tire Stiffness (kt)</option>
                 </select>
               </div>
               <div className="flex flex-col gap-1.5 mb-2">
-                <label htmlFor="sensitivity-var-y" className="text-[11px] text-gray-400">Y-Axis Variable</label>
-                <select id="sensitivity-var-y" aria-label="Y-Axis Variable" value={params.var_y} onChange={(e) => setParams({ ...params, var_y: e.target.value })} className="bg-[#0d0d0d] border border-[#252525] text-[11px] rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-ansys-yellow/60 w-full">
+                <label htmlFor="sensitivity-var-y" className="text-xs text-gray-400">Y-Axis Variable</label>
+                <select id="sensitivity-var-y" aria-label="Y-Axis Variable" value={params.var_y} onChange={(e) => setParams({ ...params, var_y: e.target.value })} className="bg-[#0d0d0d] border border-[#252525] text-xs rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-signal/60 w-full">
                   <option>Spring Rate (ks)</option>
                   <option>Damping (c)</option>
                   <option>Tire Stiffness (kt)</option>
                 </select>
               </div>
               <div className="flex flex-col gap-1.5 mb-2">
-                <label htmlFor="sensitivity-objective" className="text-[11px] font-bold text-[#00aeff]">Z-Axis Objective</label>
-                <select id="sensitivity-objective" aria-label="Z-Axis Objective" value={params.objective} onChange={(e) => setParams({ ...params, objective: e.target.value })} className="bg-[#0d0d0d] border border-[#00aeff]/40 text-[11px] rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-[#00aeff]/80 w-full">
+                <label htmlFor="sensitivity-objective" className="text-xs font-bold text-[#00aeff]">Z-Axis Objective</label>
+                <select id="sensitivity-objective" aria-label="Z-Axis Objective" value={params.objective} onChange={(e) => setParams({ ...params, objective: e.target.value })} className="bg-[#0d0d0d] border border-[#00aeff]/40 text-xs rounded-lg px-2 py-1.5 text-white focus:outline-none focus:border-[#00aeff]/80 w-full">
                   <option>Balanced (Comfort + Grip)</option>
                   <option>Ride Comfort (ISO RMS)</option>
                   <option>Grip (Tire RMS)</option>
@@ -166,11 +166,11 @@ function SensitivitySweepDashboard() {
             <ParamSection title="Resolution">
               <div className="pt-2">
                 <div className="flex justify-between items-center mb-1">
-                  <span className="text-[11px] text-gray-500">Grid Density</span>
-                  <span className="text-[11px] font-mono text-ansys-yellow">{params.grid_res}×{params.grid_res}</span>
+                  <span className="text-xs text-zinc-400">Grid Density</span>
+                  <span className="text-xs font-mono text-signal">{params.grid_res}×{params.grid_res}</span>
                 </div>
-                <input type="range" min="10" max="40" step="1" value={params.grid_res} onChange={(e) => setParams({ ...params, grid_res: Number(e.target.value) })} className="w-full accent-ansys-yellow" />
-                <p className="text-[9px] text-gray-600 mt-2 leading-tight">Higher resolution increases solve time exponentially as {params.grid_res * params.grid_res} ODE simulations are executed concurrently.</p>
+                <input type="range" min="10" max="40" step="1" value={params.grid_res} onChange={(e) => setParams({ ...params, grid_res: Number(e.target.value) })} className="w-full accent-signal" />
+                <p className="text-xs text-zinc-300 mt-2 leading-tight">Higher resolution increases solve time exponentially as {params.grid_res * params.grid_res} ODE simulations are executed concurrently.</p>
               </div>
             </ParamSection>
           </div>
@@ -179,14 +179,14 @@ function SensitivitySweepDashboard() {
         <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-hidden">
           {!results && !isRunning && (
             <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl flex flex-col items-center justify-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-ansys-yellow/5 border border-ansys-yellow/10 flex items-center justify-center"><Activity size={32} strokeWidth={1} className="text-ansys-yellow/40" /></div>
-              <div className="text-center"><p className="text-sm font-semibold text-gray-400 mb-1">Select parameters and click <span className="text-ansys-yellow">Generate Surface</span></p><p className="text-xs text-gray-700">Explores design space topography for optimal performance</p></div>
+              <div className="w-16 h-16 rounded-2xl bg-signal/5 border border-signal/10 flex items-center justify-center"><Activity size={32} strokeWidth={1} className="text-signal/40" /></div>
+              <div className="text-center"><p className="text-sm font-semibold text-gray-400 mb-1">Select parameters and click <span className="text-signal">Generate Surface</span></p><p className="text-xs text-zinc-300">Explores design space topography for optimal performance</p></div>
             </div>
           )}
 
           {isRunning && (
             <div className="flex-1 bg-[#111113] border border-[#1e1e1e] rounded-xl flex flex-col items-center justify-center gap-4">
-              <div className="w-10 h-10 border-2 border-ansys-yellow/20 border-t-ansys-yellow rounded-full animate-spin" />
+              <div className="w-10 h-10 border-2 border-signal/20 border-t-signal rounded-full animate-spin" />
               <div className="text-center"><p className="text-sm font-medium text-gray-400 mb-1">Running parameter sweep…</p></div>
             </div>
           )}
@@ -204,14 +204,14 @@ function SensitivitySweepDashboard() {
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-[#00ff87]/20 flex items-center justify-center"><Layers size={14} className="text-[#00ff87]" /></div>
                   <div className="flex flex-col">
-                    <span className="text-[10px] font-bold text-[#00ff87] uppercase tracking-wider">Optimal Setup Located</span>
+                    <span className="text-xs font-bold text-[#00ff87] uppercase tracking-wider">Optimal Setup Located</span>
                     <span className="text-xs text-gray-300">Minimum valley coordinate found on objective surface.</span>
                   </div>
                 </div>
                 <div className="flex gap-4 font-mono text-sm">
-                  <div className="flex flex-col items-end"><span className="text-[9px] text-gray-500 uppercase">{params.var_x}</span><span className="text-white">{r.min_x?.toFixed(0) ?? 0}</span></div>
-                  <div className="flex flex-col items-end"><span className="text-[9px] text-gray-500 uppercase">{params.var_y}</span><span className="text-white">{r.min_y?.toFixed(0) ?? 0}</span></div>
-                  <div className="flex flex-col items-end"><span className="text-[9px] text-[#00aeff] uppercase">Objective Score</span><span className="text-[#00aeff] font-bold">{r.min_z?.toFixed(4) ?? 0}</span></div>
+                  <div className="flex flex-col items-end"><span className="text-xs text-zinc-400 uppercase">{params.var_x}</span><span className="text-white">{r.min_x?.toFixed(0) ?? 0}</span></div>
+                  <div className="flex flex-col items-end"><span className="text-xs text-zinc-400 uppercase">{params.var_y}</span><span className="text-white">{r.min_y?.toFixed(0) ?? 0}</span></div>
+                  <div className="flex flex-col items-end"><span className="text-xs text-[#00aeff] uppercase">Objective Score</span><span className="text-[#00aeff] font-bold">{r.min_z?.toFixed(4) ?? 0}</span></div>
                 </div>
               </div>
 
@@ -248,7 +248,7 @@ function SensitivitySweepDashboard() {
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="h-full flex items-center justify-center text-gray-600 text-sm">Loading environment…</div>}>
+    <Suspense fallback={<div className="h-full flex items-center justify-center text-zinc-300 text-sm">Loading environment…</div>}>
       <SensitivitySweepDashboard />
     </Suspense>
   );

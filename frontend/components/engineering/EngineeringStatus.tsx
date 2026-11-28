@@ -77,7 +77,7 @@ const STATUS_CONFIG: Record<
   UNAVAILABLE: {
     bg: "bg-zinc-900",
     border: "border-zinc-700",
-    text: "text-zinc-500",
+    text: "text-zinc-400",
     dot: "bg-zinc-600",
     icon: HelpCircle,
     defaultLabel: "UNAVAILABLE",
@@ -85,7 +85,7 @@ const STATUS_CONFIG: Record<
   DATA_UNAVAILABLE: {
     bg: "bg-zinc-900",
     border: "border-zinc-700",
-    text: "text-zinc-500",
+    text: "text-zinc-400",
     dot: "bg-zinc-600",
     icon: HelpCircle,
     defaultLabel: "UNAVAILABLE",
@@ -128,7 +128,7 @@ export default function EngineeringStatus({
   const Icon = cfg.icon;
 
   const sizeClasses = {
-    sm: "px-2 py-0.5 text-[10px] gap-1.5",
+    sm: "px-2 py-0.5 text-xs gap-1.5",
     md: "px-3 py-1 text-xs gap-2",
   }[size];
 

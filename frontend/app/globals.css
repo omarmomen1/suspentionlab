@@ -176,9 +176,9 @@
   :root {
     --font-inter: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     --font-jetbrains-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    --background: #090B10;
-    --foreground: #E2E8F0;
-    --surface-base: #090B10;
+    --background: #0C0F12;
+    --foreground: #F3F4F6;
+    --surface-base: #0C0F12;
     --surface-plot: #0D1017;
     --surface-card: #11151F;
     --border-hairline: rgba(255, 255, 255, 0.08);
@@ -259,7 +259,7 @@
 
 /* Accessibility: WCAG 2.4.7 & 2.4.11 Focus Visible & Focus Not Obscured */
 :focus-visible {
-  outline: 2px solid var(--color-ansys-yellow) !important;
+  outline: 2px solid #C8F04B !important;
   outline-offset: 2px !important;
 }
 
@@ -288,15 +288,15 @@
   }
 }
 
-/* Accessibility: WCAG 1.4.3 Contrast Remediation (≥4.5:1 normal text on #090B10 / #11151F) */
-.text-gray-500, .text-slate-500, .text-zinc-500 {
-  color: #94A3B8;
+/* Accessibility: WCAG 1.4.3 Contrast Remediation (≥4.5:1 normal text on #0C0F12 / #13181D) */
+.text-gray-500, .text-slate-500, .text-zinc-500, .text-neutral-500 {
+  color: #A1A1AA;
 }
-.text-gray-600, .text-slate-600, .text-zinc-600 {
-  color: #A8B3C5;
+.text-gray-600, .text-slate-600, .text-zinc-600, .text-neutral-600 {
+  color: #D4D4D8;
 }
 .text-gray-700, .text-slate-700, .text-zinc-700 {
-  color: #BCC6D6;
+  color: #E4E4E7;
 }
 
 /* ── Unified Carbon Surface, Border & Telemetry Amber Remaps ───────────────── */
@@ -514,57 +514,58 @@
       border-color: rgba(255, 255, 255, 0.16);
     }
 
-    /* 5. Motorsport Telemetry Amber Accent (#F59E0B, hover #D97706, ink #090A0F) */
+    /* 5. Single Brand Lime Signal Accent (#C8F04B, hover #D6F56E, ink #0C0F12) */
     .bg-\[\#f2a900\] {
-      background-color: #F59E0B;
+      background-color: #C8F04B;
     }
     .bg-\[\#f2a900\]\/10 {
-      background-color: color-mix(in oklab, #F59E0B 10%, transparent);
+      background-color: color-mix(in oklab, #C8F04B 10%, transparent);
     }
     .bg-\[\#f2a900\]\/15 {
-      background-color: color-mix(in oklab, #F59E0B 15%, transparent);
+      background-color: color-mix(in oklab, #C8F04B 15%, transparent);
     }
     .text-\[\#f2a900\] {
-      color: #F59E0B;
+      color: #C8F04B;
     }
     .text-\[\#f2a900\]\/90 {
-      color: color-mix(in oklab, #F59E0B 90%, transparent);
+      color: color-mix(in oklab, #C8F04B 90%, transparent);
     }
     .border-\[\#f2a900\] {
-      border-color: #F59E0B;
+      border-color: #C8F04B;
     }
     .border-\[\#f2a900\]\/25 {
-      border-color: color-mix(in oklab, #F59E0B 25%, transparent);
+      border-color: color-mix(in oklab, #C8F04B 25%, transparent);
     }
     .border-\[\#f2a900\]\/30 {
-      border-color: color-mix(in oklab, #F59E0B 30%, transparent);
+      border-color: color-mix(in oklab, #C8F04B 30%, transparent);
     }
     .border-\[\#f2a900\]\/40 {
-      border-color: color-mix(in oklab, #F59E0B 40%, transparent);
+      border-color: color-mix(in oklab, #C8F04B 40%, transparent);
     }
     .hover\:bg-\[\#ffb914\]:hover {
-      background-color: #D97706;
+      background-color: #D6F56E;
     }
     .group:hover .group-hover\:fill-\[\#f2a900\] {
-      fill: #F59E0B;
+      fill: #C8F04B;
     }
 
-    /* Crisp dark-carbon ink (#090A0F) and unified #D97706 hover on primary Amber CTAs */
-    :is(.bg-ansys-yellow, .bg-ansys-gold, .bg-amber-500, .bg-amber-400, .bg-\[\#f2a900\]).text-black {
-      color: #090A0F;
+    /* Crisp dark-carbon ink (#0C0F12) on primary Signal Lime CTAs */
+    :is(.bg-ansys-yellow, .bg-ansys-gold, .bg-signal, .bg-\[\#f2a900\]).text-black {
+      color: #0C0F12;
     }
-    :is(button, a, [role="button"], [role="tab"], input[type="submit"], .cursor-pointer):is(.bg-ansys-yellow, .bg-ansys-gold, .bg-amber-500, .bg-\[\#f2a900\]) {
-      color: #090A0F;
+    :is(button, a, [role="button"], [role="tab"], input[type="submit"], .cursor-pointer):is(.bg-ansys-yellow, .bg-ansys-gold, .bg-signal, .bg-\[\#f2a900\]) {
+      color: #0C0F12;
     }
-    :is(button, a, [role="button"], [role="tab"], input[type="submit"], .cursor-pointer):is(.bg-ansys-yellow, .bg-ansys-gold, .bg-amber-500, .bg-\[\#f2a900\]):not(:disabled):hover {
-      background-color: #D97706;
-      color: #090A0F;
+    :is(button, a, [role="button"], [role="tab"], input[type="submit"], .cursor-pointer):is(.bg-ansys-yellow, .bg-ansys-gold, .bg-signal, .bg-\[\#f2a900\]):not(:disabled):hover {
+      background-color: #D6F56E;
+      color: #0C0F12;
       filter: none;
     }
 
-    .selection\:bg-ansys-yellow::selection {
-      background-color: #F59E0B;
-      color: #090A0F;
+    .selection\:bg-ansys-yellow::selection,
+    .selection\:bg-signal::selection {
+      background-color: #C8F04B;
+      color: #0C0F12;
     }
 
     /* Soften legacy hardcoded neon emerald/purple arbitrary overrides */

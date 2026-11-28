@@ -56,7 +56,7 @@ export default function FourFootprintsSVG({ result, params, index }: FourFootpri
           Rear L-R {Math.round(c.rearLeftMinusRightN)} N
         </text>
       </svg>
-      <figcaption className="text-[11px] text-[#8a909a] leading-snug">
+      <figcaption className="text-xs text-[#8a909a] leading-snug">
         Vertical load Fz = max(0, static + k_t (z_road - z_unsprung)), as in full_car.py. Static per corner: front {Math.round(c.staticFrontN)} N, rear {Math.round(c.staticRearN)} N.
         Bar height is linear against the run maximum ({Math.round(scale)} N). Slip angle and lateral force: not modeled.
         {c.liftedCorners.length > 0 ? ` Contact lost (Fz = 0): ${c.liftedCorners.map((k) => LABEL[k]).join(", ")}.` : ""}

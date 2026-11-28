@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 from fastapi import APIRouter, HTTPException
 from suspensionlab.shared.models import RaceEngineerRequest, VerdictRequest, QuarterCarKPIs, RaceEngineerResponse, VerdictResponse, RecommendationSchema
 from suspensionlab.physics.quarter_car import QuarterCarParams, QuarterCarResult
@@ -33,7 +35,8 @@ async def analyze_report(payload: RaceEngineerRequest):
         ]
         return RaceEngineerResponse(critical_flags=report.has_critical, recommendations=recs)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.exception("analytics request failed: %s", e)
+        raise HTTPException(status_code=400, detail="The request could not be processed. Check the submitted parameters and try again.")
 
 @router.post("/analyze/verdict", response_model=VerdictResponse)
 async def analyze_verdict(payload: VerdictRequest):
@@ -50,4 +53,5 @@ async def analyze_verdict(payload: VerdictRequest):
         verdict = generate_setup_verdict(result, optimizer_output, params)
         return VerdictResponse(**verdict)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.exception("analytics request failed: %s", e)
+        raise HTTPException(status_code=400, detail="The request could not be processed. Check the submitted parameters and try again.")

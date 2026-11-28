@@ -142,14 +142,14 @@ export default function KinematicsTargetBandsModal({
                   <span className="text-xs font-semibold text-slate-200">
                     {def.label} <span className="text-slate-400 font-normal font-mono">({def.unit})</span>
                   </span>
-                  <span className="text-[11px] font-mono text-indigo-300 font-medium">
+                  <span className="text-xs font-mono text-indigo-300 font-medium">
                     Target: [{pair[0].toFixed(2)}, {pair[1].toFixed(2)}] {def.unit}
                   </span>
                 </div>
-                <div className="text-[11px] text-slate-400">{def.description}</div>
+                <div className="text-xs text-slate-400">{def.description}</div>
                 <div className="grid grid-cols-2 gap-3 pt-1">
                   <div>
-                    <label className="text-[10px] text-slate-400 block mb-1">Lower Limit ({def.unit})</label>
+                    <label className="text-xs text-slate-400 block mb-1">Lower Limit ({def.unit})</label>
                     <input
                       type="number"
                       step={def.step}
@@ -159,7 +159,7 @@ export default function KinematicsTargetBandsModal({
                     />
                   </div>
                   <div>
-                    <label className="text-[10px] text-slate-400 block mb-1">Upper Limit ({def.unit})</label>
+                    <label className="text-xs text-slate-400 block mb-1">Upper Limit ({def.unit})</label>
                     <input
                       type="number"
                       step={def.step}

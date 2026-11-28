@@ -12,7 +12,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         {/* Brand */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-3">
-            <svg viewBox="0 0 24 24" fill="none" height="20" width="20" className="text-ansys-yellow">
+            <svg viewBox="0 0 24 24" fill="none" height="20" width="20" className="text-signal">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
                 stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
             </svg>

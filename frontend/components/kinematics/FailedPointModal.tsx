@@ -72,7 +72,7 @@ export default function FailedPointModal({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-900/80 text-rose-300 border border-rose-700/50">
+                <span className="text-xs font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-rose-900/80 text-rose-300 border border-rose-700/50">
                   {diagnostic.convergence_status}
                 </span>
                 <span className="text-xs font-mono text-gray-400">
@@ -98,19 +98,19 @@ export default function FailedPointModal({
           {/* Numerical Diagnostics Quick Strip */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-xl bg-[#13151f] border border-[#222535] text-xs font-mono">
             <div>
-              <span className="text-[10px] text-gray-500 uppercase block">Travel</span>
+              <span className="text-xs text-zinc-400 uppercase block">Travel</span>
               <span className="font-bold text-gray-200">{travelMm >= 0 ? `+${travelMm.toFixed(1)}` : travelMm.toFixed(1)} mm</span>
             </div>
             <div>
-              <span className="text-[10px] text-gray-500 uppercase block">Iterations</span>
+              <span className="text-xs text-zinc-400 uppercase block">Iterations</span>
               <span className="font-bold text-rose-300">{iters} / {diagnostic.max_iterations}</span>
             </div>
             <div>
-              <span className="text-[10px] text-gray-500 uppercase block">Residual Norm</span>
+              <span className="text-xs text-zinc-400 uppercase block">Residual Norm</span>
               <span className="font-bold text-rose-300">{resNorm.toExponential(2)}</span>
             </div>
             <div>
-              <span className="text-[10px] text-gray-500 uppercase block">Condition #</span>
+              <span className="text-xs text-zinc-400 uppercase block">Condition #</span>
               <span className="font-bold text-amber-300">{condNum ? condNum.toExponential(1) : "N/A"}</span>
             </div>
           </div>
@@ -137,7 +137,7 @@ export default function FailedPointModal({
               <p className="text-xs text-gray-300 leading-relaxed font-sans">
                 {whyFailed}
               </p>
-              <div className="mt-2 text-[11px] font-mono text-gray-400 bg-black/40 p-2 rounded border border-white/5">
+              <div className="mt-2 text-xs font-mono text-gray-400 bg-black/40 p-2 rounded border border-white/5">
                 {failureReason}
               </div>
             </div>
@@ -179,7 +179,7 @@ export default function FailedPointModal({
 
         {/* Footer */}
         <div className="px-6 py-3 bg-[#0a0b0e] border-t border-[#1e2230] flex items-center justify-between">
-          <span className="text-[11px] font-mono text-gray-500">
+          <span className="text-xs font-mono text-zinc-400">
             Continuation state: {diagnostic.continuation_state} | Fallback: {diagnostic.fallback_state}
           </span>
           <button

@@ -202,9 +202,9 @@ export default function TelemetrySyncView() {
         {/* Synchronized Hover Telemetry Values */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-            <Crosshair size={16} className="text-ansys-yellow shrink-0" />
+            <Crosshair size={16} className="text-signal shrink-0" />
             <div>
-              <div className="text-[10px] font-mono text-gray-400 uppercase">Synchronized Cursor</div>
+              <div className="text-xs font-mono text-gray-400 uppercase">Synchronized Cursor</div>
               <div className="text-sm font-mono font-bold text-white">
                 T = {hoverTime !== null ? hoverTime.toFixed(2) : "0.00"} s
               </div>
@@ -215,7 +215,7 @@ export default function TelemetrySyncView() {
 
           {/* Active Corner Phase */}
           <div>
-            <div className="text-[10px] font-mono text-gray-400 uppercase">Corner Phase</div>
+            <div className="text-xs font-mono text-gray-400 uppercase">Corner Phase</div>
             <div className="flex flex-wrap items-center gap-2 mt-0.5">
               <span className={`px-2.5 py-0.5 rounded-full border text-xs font-mono font-bold inline-block ${currentCornerPhase.color}`}>
                 {currentCornerPhase.label}
@@ -234,7 +234,7 @@ export default function TelemetrySyncView() {
               onClick={() => setLodLevel(level)}
               className={`px-3 py-1 rounded-lg text-xs font-mono font-bold border transition-all ${
                 lodLevel === level
-                  ? "bg-ansys-yellow text-black border-ansys-yellow"
+                  ? "bg-signal text-carbon border-signal"
                   : "bg-white/5 border-white/10 text-gray-400 hover:text-white"
               }`}
             >
@@ -271,7 +271,7 @@ export default function TelemetrySyncView() {
                 <path
                   d="M 20 20 L 140 20 Q 170 20 180 50 L 190 80 Q 200 110 230 110 L 280 110"
                   fill="none"
-                  stroke="#f2a900"
+                  stroke="#C8F04B"
                   strokeWidth="2"
                   strokeDasharray="4 4"
                 />
@@ -290,13 +290,13 @@ export default function TelemetrySyncView() {
                   return (
                     <g transform={`translate(${cx}, ${cy})`}>
                       <circle r="8" fill="#22d3ee" fillOpacity="0.3" className="animate-ping" />
-                      <circle r="5" fill="#f2a900" stroke="#ffffff" strokeWidth="1.5" />
+                      <circle r="5" fill="#C8F04B" stroke="#ffffff" strokeWidth="1.5" />
                     </g>
                   );
                 })()}
               </svg>
 
-              <div className="absolute bottom-2 left-3 text-[10px] font-mono text-gray-500">
+              <div className="absolute bottom-2 left-3 text-xs font-mono text-zinc-400">
                 Turn 5 / 6 (Les Combes)
               </div>
             </div>
@@ -305,7 +305,7 @@ export default function TelemetrySyncView() {
           {/* Channel Selector */}
           <div className="p-4 rounded-2xl bg-[#111116] border border-white/[0.08] space-y-3">
             <div className="text-xs font-mono font-bold text-white uppercase tracking-wider flex items-center gap-1.5">
-              <Sliders size={14} className="text-ansys-yellow" />
+              <Sliders size={14} className="text-signal" />
               Active Channels ({activeChannels.length}/{AVAILABLE_CHANNELS.length})
             </div>
 
@@ -323,7 +323,7 @@ export default function TelemetrySyncView() {
                     className={`w-full flex items-center justify-between p-2.5 rounded-xl border text-xs font-mono transition-all ${
                       isSelected
                         ? "bg-white/[0.04] border-white/20 text-white"
-                        : "bg-black/20 border-white/5 text-gray-500 hover:text-gray-300"
+                        : "bg-black/20 border-white/5 text-zinc-400 hover:text-gray-300"
                     }`}
                   >
                     <div className="flex items-center gap-2">
@@ -354,7 +354,7 @@ export default function TelemetrySyncView() {
 
             <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar">
               {allEvents.length === 0 ? (
-                <div className="text-xs font-mono text-gray-500 py-3 text-center">
+                <div className="text-xs font-mono text-zinc-400 py-3 text-center">
                   No abnormal spikes or lockups detected in current window.
                 </div>
               ) : (
@@ -368,7 +368,7 @@ export default function TelemetrySyncView() {
                       <span>{evt.type}</span>
                       <span>t = {evt.time_s.toFixed(2)}s</span>
                     </div>
-                    <div className="text-[11px] text-gray-400 mt-0.5">{evt.desc}</div>
+                    <div className="text-xs text-gray-400 mt-0.5">{evt.desc}</div>
                   </div>
                 ))
               )}
@@ -395,7 +395,7 @@ export default function TelemetrySyncView() {
                   <div className="flex items-center gap-2">
                     <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: chDef.color }} />
                     <span className="text-xs font-mono font-bold text-white">{chDef.name}</span>
-                    <span className="text-[10px] font-mono text-gray-500">[{chDef.unit}]</span>
+                    <span className="text-xs font-mono text-zinc-400">[{chDef.unit}]</span>
                   </div>
 
                   <div className="text-xs font-mono font-bold text-white">
@@ -440,7 +440,7 @@ export default function TelemetrySyncView() {
                           y0: 0,
                           y1: 1,
                           yref: "paper",
-                          line: { color: "#f2a900", width: 1.5, dash: "dot" },
+                          line: { color: "#C8F04B", width: 1.5, dash: "dot" },
                         },
                       ] : [],
                       margin: { l: 45, r: 15, t: 10, b: 35 },

@@ -33,7 +33,7 @@ export default function RunBadge({ solverVersion, runId, inputSha256, outputSha2
       data-testid="run-badge"
       title={title}
       tabIndex={0}
-      className={`inline-flex items-center gap-2 rounded border border-hairline bg-panel px-2 py-0.5 text-[10px] text-gray-400 v2-num ${className}`}
+      className={`inline-flex items-center gap-2 rounded border border-hairline bg-panel px-2 py-0.5 text-xs text-gray-400 v2-num ${className}`}
     >
       {sv && <span>{sv}</span>}
       {rid && <span>run {short(rid, 12)}</span>}

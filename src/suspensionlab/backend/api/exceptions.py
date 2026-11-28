@@ -38,6 +38,10 @@ def register_exception_handlers(app):
         cleaned_errors = []
         for err in exc.errors():
             err_copy = dict(err)
+            # Pass B: never echo the raw submitted payload values back to the
+            # caller — validation errors are reachable pre-auth on some routes.
+            err_copy.pop("input", None)
+            err_copy.pop("url", None)
             if "ctx" in err_copy and isinstance(err_copy["ctx"], dict):
                 ctx_copy = dict(err_copy["ctx"])
                 for k, v in ctx_copy.items():

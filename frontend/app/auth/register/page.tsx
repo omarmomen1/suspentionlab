@@ -74,8 +74,8 @@ export default function RegisterPage() {
             onChange={(e) => setName(e.target.value)}
             placeholder="James Hunt"
             className="w-full bg-[#0d0d0f] border border-[#252525] rounded-xl px-3.5 py-2.5 text-sm text-white
-              placeholder:text-gray-500 focus:outline-none focus:border-ansys-yellow/60 focus:ring-1
-              focus:ring-ansys-yellow/15 transition-all"
+              placeholder:text-zinc-400 focus:outline-none focus:border-signal/60 focus:ring-1
+              focus:ring-signal/15 transition-all"
           />
         </div>
 
@@ -89,8 +89,8 @@ export default function RegisterPage() {
             onChange={(e) => setEmail(e.target.value)}
             placeholder="you@company.com"
             className="w-full bg-[#0d0d0f] border border-[#252525] rounded-xl px-3.5 py-2.5 text-sm text-white
-              placeholder:text-gray-500 focus:outline-none focus:border-ansys-yellow/60 focus:ring-1
-              focus:ring-ansys-yellow/15 transition-all"
+              placeholder:text-zinc-400 focus:outline-none focus:border-signal/60 focus:ring-1
+              focus:ring-signal/15 transition-all"
           />
         </div>
 
@@ -108,8 +108,8 @@ export default function RegisterPage() {
               placeholder="Min 12 characters"
               aria-describedby="pwd-criteria"
               className="w-full bg-[#0d0d0f] border border-[#252525] rounded-xl px-3.5 py-2.5 text-sm text-white
-                placeholder:text-gray-400 focus:outline-none focus:border-ansys-yellow/60 focus:ring-1
-                focus:ring-ansys-yellow/15 transition-all pr-12"
+                placeholder:text-gray-400 focus:outline-none focus:border-signal/60 focus:ring-1
+                focus:ring-signal/15 transition-all pr-12"
             />
             <button
               type="button"
@@ -130,7 +130,7 @@ export default function RegisterPage() {
                   }`} />
                 ))}
               </div>
-              <div className="grid grid-cols-2 gap-1 text-[10px]" role="status">
+              <div className="grid grid-cols-2 gap-1 text-xs" role="status">
                 <span className={checks.length ? "text-emerald-400" : "text-gray-400"}>
                   {checks.length ? "✓" : "○"} 12+ characters
                 </span>
@@ -168,7 +168,7 @@ export default function RegisterPage() {
           {loading ? <><Loader2 size={14} className="animate-spin" /> Creating account…</> : "Create Account"}
         </button>
 
-        <p className="text-[10px] text-gray-400 text-center">
+        <p className="text-xs text-gray-400 text-center">
           By registering you agree to our{" "}
           <Link href="/legal/terms" className="text-gray-300 hover:text-white underline">Terms of Service</Link>
           {" "}and{" "}
@@ -178,7 +178,7 @@ export default function RegisterPage() {
 
       <p className="text-center text-xs text-gray-400 mt-5">
         Already have an account?{" "}
-        <Link href="/auth/login" className="text-ansys-yellow hover:underline font-semibold inline-flex items-center min-h-[24px]">Sign In</Link>
+        <Link href="/auth/login" className="text-signal hover:underline font-semibold inline-flex items-center min-h-[24px]">Sign In</Link>
       </p>
     </div>
   );

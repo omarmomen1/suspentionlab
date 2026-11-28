@@ -99,14 +99,14 @@ export default function ApprovalState({
             </>
           ) : (
             <>
-              <Clock size={15} className="text-ansys-yellow" />
-              <span className="text-ansys-yellow font-extrabold">PENDING SIGN-OFF</span>
+              <Clock size={15} className="text-signal" />
+              <span className="text-signal font-extrabold">PENDING SIGN-OFF</span>
             </>
           )}
         </div>
 
         {approvedByRole && (
-          <div className="flex items-center gap-1 text-[11px] text-gray-400">
+          <div className="flex items-center gap-1 text-xs text-gray-400">
             <UserCheck size={12} />
             <span>Role: {approvedByRole}</span>
           </div>
@@ -114,21 +114,21 @@ export default function ApprovalState({
       </div>
 
       {/* Signature & Timestamp */}
-      <div className="space-y-1 text-[11px] text-gray-400">
+      <div className="space-y-1 text-xs text-gray-400">
         {approvedAt && (
           <div>
             Signed-off: <span className="text-white">{new Date(approvedAt).toLocaleString()}</span>
           </div>
         )}
         {sig && (
-          <div className="flex items-center gap-1 text-[10px] text-gray-500 truncate" data-testid="approval-hmac-signature">
+          <div className="flex items-center gap-1 text-xs text-zinc-400 truncate" data-testid="approval-hmac-signature">
             <ShieldCheck size={11} className="text-emerald-400 shrink-0" />
             <span>HMAC Sig:</span>
             <span className="font-mono text-gray-400 truncate">{sig}</span>
           </div>
         )}
         {proposalHash && (
-          <div className="flex items-center gap-1 text-[10px] text-gray-500 truncate">
+          <div className="flex items-center gap-1 text-xs text-zinc-400 truncate">
             <Hash size={11} className="shrink-0" />
             <span>Hash:</span>
             <span className="font-mono text-gray-400 truncate">{proposalHash}</span>
@@ -139,7 +139,7 @@ export default function ApprovalState({
       {/* Decision Actions for Pending Proposals */}
       {!isApproved && !isRejected && (
         <div className="mt-3 pt-3 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div className="text-[10px] text-gray-400 flex items-center gap-1">
+          <div className="text-xs text-gray-400 flex items-center gap-1">
             {!canApprove && (
               <span className="text-amber-400 font-sans flex items-center gap-1">
                 <ShieldAlert size={12} /> Requires &apos;setup:approve&apos; capability
@@ -159,7 +159,7 @@ export default function ApprovalState({
               data-testid="btn-approve-signoff"
               onClick={() => handleAction("APPROVED")}
               disabled={loading}
-              className="px-4 py-1.5 rounded-lg bg-ansys-yellow text-black font-bold hover:brightness-110 transition-all disabled:opacity-50 shadow-[0_0_12px_rgba(242,169,0,0.2)]"
+              className="px-4 py-1.5 rounded-lg bg-signal text-carbon font-bold hover:brightness-110 transition-all disabled:opacity-50 shadow-[0_0_12px_rgba(242,169,0,0.2)]"
             >
               Approve & Sign-Off
             </button>

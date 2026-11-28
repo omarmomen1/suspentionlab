@@ -137,9 +137,10 @@ def _parse_iso_datetime(dt_str: Optional[str]) -> Optional[datetime]:
     try:
         return datetime.fromisoformat(dt_str)
     except Exception as e:
+        logger.warning("Invalid ISO datetime format '%s': %s", dt_str, e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid ISO datetime format '{dt_str}': {e}",
+            detail="Invalid ISO datetime format.",
         )
 
 
@@ -169,7 +170,7 @@ async def get_my_summary(
         )
     except Exception as e:
         logger.error("Failed to fetch user calibration summary: %s", e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.get("/me/curve", response_model=CalibrationCurveResponse)
@@ -189,7 +190,7 @@ async def get_my_curve(
         )
     except Exception as e:
         logger.error("Failed to fetch user calibration curve: %s", e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.get("/me/history", response_model=CalibrationHistoryResponse)
@@ -213,7 +214,7 @@ async def get_my_history(
         )
     except Exception as e:
         logger.error("Failed to fetch user calibration history: %s", e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error. The details have been logged server-side.")
 
 
 @router.get("/team/{team_id}", response_model=CalibrationSummaryResponse)
@@ -245,4 +246,4 @@ async def get_team_summary(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         logger.error("Failed to fetch team calibration summary: %s", e)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal server error. The details have been logged server-side.")

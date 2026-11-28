@@ -653,7 +653,7 @@ export function SolverInteropWorkspace() {
             <Terminal className="w-4 h-4 text-indigo-400" />
             Detected CAE Solver Runtimes
           </h2>
-          <span className="text-[11px] text-slate-400">Audited via host sandbox discovery</span>
+          <span className="text-xs text-slate-400">Audited via host sandbox discovery</span>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {runtimes.map((rt) => (
@@ -669,7 +669,7 @@ export function SolverInteropWorkspace() {
                 <div className="flex items-center justify-between mb-1">
                   <span className="font-semibold text-slate-200">{rt.solver_name}</span>
                   <span
-                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                    className={`px-1.5 py-0.5 rounded text-xs font-bold ${
                       rt.is_available
                         ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
                         : "bg-rose-950 text-rose-300 border border-rose-800"
@@ -678,9 +678,9 @@ export function SolverInteropWorkspace() {
                     {rt.is_available ? "AVAILABLE" : "UNAVAILABLE"}
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-400 line-clamp-2">{rt.notes}</p>
+                <p className="text-xs text-slate-400 line-clamp-2">{rt.notes}</p>
               </div>
-              <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[10px] text-slate-500 font-mono">
+              <div className="mt-2 pt-2 border-t border-slate-800/80 flex items-center justify-between text-xs text-zinc-400 font-mono">
                 <span>{rt.licensing_model}</span>
                 <span>{rt.is_sandboxed ? "SANDBOXED" : "UNRESTRICTED"}</span>
               </div>
@@ -764,12 +764,12 @@ export function SolverInteropWorkspace() {
                   <div className="flex flex-wrap gap-1">
                     {selectedAdapter.supported_import_formats.length > 0 ? (
                       selectedAdapter.supported_import_formats.map((fmt) => (
-                        <span key={fmt} className="px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 font-mono text-[10px]">
+                        <span key={fmt} className="px-1.5 py-0.5 rounded bg-slate-800 text-indigo-300 font-mono text-xs">
                           {fmt}
                         </span>
                       ))
                     ) : (
-                      <span className="text-slate-500 italic">None (Export-only)</span>
+                      <span className="text-zinc-400 italic">None (Export-only)</span>
                     )}
                   </div>
                 </div>
@@ -777,7 +777,7 @@ export function SolverInteropWorkspace() {
                   <span className="text-slate-400 block mb-1">Supported Export Formats</span>
                   <div className="flex flex-wrap gap-1">
                     {selectedAdapter.supported_export_formats.map((fmt) => (
-                      <span key={fmt} className="px-1.5 py-0.5 rounded bg-slate-800 text-emerald-300 font-mono text-[10px]">
+                      <span key={fmt} className="px-1.5 py-0.5 rounded bg-slate-800 text-emerald-300 font-mono text-xs">
                         {fmt}
                       </span>
                     ))}
@@ -791,10 +791,10 @@ export function SolverInteropWorkspace() {
                     <div key={dep.name} className="flex items-center justify-between py-1 bg-slate-950/60 px-2 rounded mt-1">
                       <div>
                         <span className="text-slate-300 font-medium block">{dep.name}</span>
-                        <span className="text-[10px] text-slate-500">{dep.description}</span>
+                        <span className="text-xs text-zinc-400">{dep.description}</span>
                       </div>
                       <span
-                        className={`px-1.5 py-0.5 text-[10px] rounded font-semibold ${
+                        className={`px-1.5 py-0.5 text-xs rounded font-semibold ${
                           dep.is_available
                             ? "bg-emerald-950 text-emerald-300 border border-emerald-800"
                             : "bg-rose-950 text-rose-300 border border-rose-800"
@@ -810,7 +810,7 @@ export function SolverInteropWorkspace() {
                 {selectedAdapter.known_limitations.length > 0 && (
                   <div className="pt-1">
                     <span className="text-slate-400 block mb-1 font-semibold">Technical Limitations</span>
-                    <ul className="list-disc list-inside space-y-1 text-slate-400 text-[11px]">
+                    <ul className="list-disc list-inside space-y-1 text-slate-400 text-xs">
                       {selectedAdapter.known_limitations.map((lim, idx) => (
                         <li key={idx}>{lim}</li>
                       ))}
@@ -1000,13 +1000,13 @@ export function SolverInteropWorkspace() {
                     Preflight: {preflightResult.solver_name} ({preflightResult.licensing_model})
                   </div>
                   {preflightResult.warnings.length > 0 ? (
-                    <ul className="list-disc list-inside space-y-0.5 text-[11px] text-amber-200">
+                    <ul className="list-disc list-inside space-y-0.5 text-xs text-amber-200">
                       {preflightResult.warnings.map((w, idx) => (
                         <li key={idx}>{w}</li>
                       ))}
                     </ul>
                   ) : (
-                    <p className="text-[11px] text-emerald-300">
+                    <p className="text-xs text-emerald-300">
                       Executable verified on host. Sandboxed working directory and input deck are valid.
                     </p>
                   )}
@@ -1066,7 +1066,7 @@ export function SolverInteropWorkspace() {
                 </div>
 
                 {jobs.length === 0 ? (
-                  <p className="text-xs text-slate-500 italic py-4 text-center">
+                  <p className="text-xs text-zinc-400 italic py-4 text-center">
                     No execution jobs found in this workspace. Launch a job from the &quot;Run External Solver&quot; tab.
                   </p>
                 ) : (
@@ -1087,11 +1087,11 @@ export function SolverInteropWorkspace() {
                             <span className="font-mono text-xs font-semibold text-slate-200">
                               #{j.id.substring(0, 8)}
                             </span>
-                            <span className="text-[11px] px-1.5 py-0.2 rounded bg-slate-800 text-indigo-300 font-mono">
+                            <span className="text-xs px-1.5 py-0.2 rounded bg-slate-800 text-indigo-300 font-mono">
                               {j.solver_name}
                             </span>
                           </div>
-                          <div className="text-[11px] text-slate-400">
+                          <div className="text-xs text-slate-400">
                             Created: {j.created_at ? new Date(j.created_at).toLocaleTimeString() : "N/A"} | PID: {j.pid || "N/A"}
                           </div>
                         </div>
@@ -1178,7 +1178,7 @@ export function SolverInteropWorkspace() {
                   {/* Epistemic Badges Grid (Phase 7.3 & 7.4) */}
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
                     <div className="bg-slate-950 p-2 rounded border border-slate-800">
-                      <span className="text-slate-500 block text-[10px] mb-0.5">Execution Status</span>
+                      <span className="text-zinc-400 block text-xs mb-0.5">Execution Status</span>
                       <span
                         className={`font-semibold text-xs ${
                           selectedJob.is_executed ? "text-emerald-400" : "text-amber-400"
@@ -1188,30 +1188,30 @@ export function SolverInteropWorkspace() {
                       </span>
                     </div>
                     <div className="bg-slate-950 p-2 rounded border border-slate-800">
-                      <span className="text-slate-500 block text-[10px] mb-0.5">Physical Validation</span>
+                      <span className="text-zinc-400 block text-xs mb-0.5">Physical Validation</span>
                       <span className="font-semibold text-xs text-rose-400">FALSE (IMMUTABLE)</span>
                     </div>
                     <div className="bg-slate-950 p-2 rounded border border-slate-800">
-                      <span className="text-slate-500 block text-[10px] mb-0.5">Execution Mode</span>
+                      <span className="text-zinc-400 block text-xs mb-0.5">Execution Mode</span>
                       <span className="font-semibold text-xs text-indigo-300">
                         {selectedJob.execution_mode || "TRUSTED_ALLOWLIST"}
                       </span>
                     </div>
                     <div className="bg-slate-950 p-2 rounded border border-slate-800">
-                      <span className="text-slate-500 block text-[10px] mb-0.5">Benchmark Ref</span>
+                      <span className="text-zinc-400 block text-xs mb-0.5">Benchmark Ref</span>
                       <span className="font-semibold text-xs text-sky-300 truncate block">
                         {selectedJob.benchmark_reference_type || "ANALYTICAL_RK4"}
                       </span>
                     </div>
                     <div className="bg-slate-950 p-2 rounded border border-slate-800">
-                      <span className="text-slate-500 block text-[10px] mb-0.5">Artifact SHA-256</span>
-                      <span className="font-mono text-[11px] text-slate-300 truncate block">
+                      <span className="text-zinc-400 block text-xs mb-0.5">Artifact SHA-256</span>
+                      <span className="font-mono text-xs text-slate-300 truncate block">
                         {selectedJob.input_artifact_hash ? selectedJob.input_artifact_hash.substring(0, 10) + "..." : "N/A"}
                       </span>
                     </div>
                     <div className="bg-slate-950 p-2 rounded border border-slate-800">
-                      <span className="text-slate-500 block text-[10px] mb-0.5">Lease Status</span>
-                      <span className="font-mono text-[11px] text-slate-300 truncate block">
+                      <span className="text-zinc-400 block text-xs mb-0.5">Lease Status</span>
+                      <span className="font-mono text-xs text-slate-300 truncate block">
                         {selectedJob.lease_expires_at ? new Date(selectedJob.lease_expires_at).toLocaleTimeString() : "N/A"}
                       </span>
                     </div>
@@ -1223,7 +1223,7 @@ export function SolverInteropWorkspace() {
                       <Terminal className="w-3.5 h-3.5 text-indigo-400" />
                       Execution Process Standard Output
                     </h4>
-                    <div className="bg-slate-950 p-3 rounded border border-slate-800 font-mono text-[11px] overflow-x-auto max-h-40 text-slate-300">
+                    <div className="bg-slate-950 p-3 rounded border border-slate-800 font-mono text-xs overflow-x-auto max-h-40 text-slate-300">
                       <pre>{selectedJob.stdout_excerpt || "(No stdout emitted)"}</pre>
                     </div>
                   </div>
@@ -1234,7 +1234,7 @@ export function SolverInteropWorkspace() {
                         <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
                         Standard Error Logs
                       </h4>
-                      <div className="bg-rose-950/20 p-3 rounded border border-rose-900/60 font-mono text-[11px] overflow-x-auto max-h-32 text-rose-300">
+                      <div className="bg-rose-950/20 p-3 rounded border border-rose-900/60 font-mono text-xs overflow-x-auto max-h-32 text-rose-300">
                         <pre>{selectedJob.stderr_excerpt}</pre>
                       </div>
                     </div>
@@ -1279,7 +1279,7 @@ export function SolverInteropWorkspace() {
                       <div className="overflow-x-auto">
                         <table className="w-full text-left text-xs border-collapse">
                           <thead>
-                            <tr className="border-b border-slate-800 text-slate-400 text-[11px]">
+                            <tr className="border-b border-slate-800 text-slate-400 text-xs">
                               <th className="py-2 px-2">Signal Channel</th>
                               <th className="py-2 px-2">Peak Ext.</th>
                               <th className="py-2 px-2">Peak Ref.</th>
@@ -1289,7 +1289,7 @@ export function SolverInteropWorkspace() {
                               <th className="py-2 px-2">Verdict</th>
                             </tr>
                           </thead>
-                          <tbody className="divide-y divide-slate-800/60 font-mono text-[11px]">
+                          <tbody className="divide-y divide-slate-800/60 font-mono text-xs">
                             {Object.entries(reconciliationReport.signals).map(([sigKey, sig]) => (
                               <tr key={sigKey} className="hover:bg-slate-900/50">
                                 <td className="py-2 px-2 font-semibold text-slate-300">{sig.channel_name}</td>
@@ -1300,7 +1300,7 @@ export function SolverInteropWorkspace() {
                                 <td className="py-2 px-2 text-slate-300">{sig.peak_phase_delay_ms.toFixed(1)} ms</td>
                                 <td className="py-2 px-2">
                                   <span
-                                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                    className={`px-1.5 py-0.5 rounded text-xs font-bold ${
                                       sig.passed_tolerance
                                         ? "bg-emerald-950 text-emerald-300"
                                         : "bg-amber-950 text-amber-300"
@@ -1349,7 +1349,7 @@ export function SolverInteropWorkspace() {
                     </div>
                     <div>
                       <label className="text-xs text-slate-400 block mb-1">
-                        Expected SHA-256 Hash <span className="text-slate-500">(Optional tamper check)</span>
+                        Expected SHA-256 Hash <span className="text-zinc-400">(Optional tamper check)</span>
                       </label>
                       <input
                         type="text"
@@ -1469,32 +1469,32 @@ export function SolverInteropWorkspace() {
                       Multi-Domain Co-Simulation Interface & FMI Capabilities
                     </h3>
                   </div>
-                  <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800">
+                  <span className="text-xs font-mono px-2 py-0.5 rounded bg-cyan-950/80 text-cyan-300 border border-cyan-800">
                     Phase 7.5 Verified
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                   <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
-                    <span className="text-slate-500 block mb-0.5">Real Coupled Execution</span>
+                    <span className="text-zinc-400 block mb-0.5">Real Coupled Execution</span>
                     <span className="font-semibold text-emerald-400 flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5" /> VERIFIED
                     </span>
                   </div>
                   <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
-                    <span className="text-slate-500 block mb-0.5">Two-FMU Co-Simulation</span>
+                    <span className="text-zinc-400 block mb-0.5">Two-FMU Co-Simulation</span>
                     <span className="font-semibold text-emerald-400 flex items-center gap-1">
                       <CheckCircle2 className="w-3.5 h-3.5" /> VERIFIED (Instanced)
                     </span>
                   </div>
                   <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
-                    <span className="text-slate-500 block mb-0.5">FMU State Rollback</span>
+                    <span className="text-zinc-400 block mb-0.5">FMU State Rollback</span>
                     <span className="font-semibold text-rose-400 flex items-center gap-1">
                       <XCircle className="w-3.5 h-3.5" /> NOT SUPPORTED
                     </span>
                   </div>
                   <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
-                    <span className="text-slate-500 block mb-0.5">Worker Fencing</span>
+                    <span className="text-zinc-400 block mb-0.5">Worker Fencing</span>
                     <span className="font-semibold text-cyan-400 flex items-center gap-1">
                       <ShieldCheck className="w-3.5 h-3.5" /> MONOTONIC LEASE
                     </span>
@@ -1507,9 +1507,9 @@ export function SolverInteropWorkspace() {
                       <span className="text-slate-300 font-medium">
                         Audited FMU: <span className="font-mono text-cyan-300">{fmiReport.model_name}</span> (FMI {fmiReport.fmi_version})
                       </span>
-                      <span className="text-slate-500 font-mono text-[10px]">GUID: {fmiReport.guid.substring(0, 16)}...</span>
+                      <span className="text-zinc-400 font-mono text-xs">GUID: {fmiReport.guid.substring(0, 16)}...</span>
                     </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px] text-slate-400">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-slate-400">
                       <div>Can Interpolate: <span className="text-slate-200">{fmiReport.can_interpolate_inputs ? "Yes" : "No"}</span></div>
                       <div>Variable Step: <span className="text-slate-200">{fmiReport.can_handle_variable_communication_step_size ? "Yes" : "No"}</span></div>
                       <div>Get/Set State: <span className="text-rose-400 font-semibold">{fmiReport.can_get_and_set_fmu_state ? "Yes" : "No (Fail-Closed)"}</span></div>
@@ -1552,7 +1552,7 @@ export function SolverInteropWorkspace() {
                     <div className="p-3 bg-slate-950 rounded border border-slate-800 flex items-center justify-between">
                       <div>
                         <div className="font-semibold text-slate-200">{selectedContract.contract_name}</div>
-                        <div className="text-slate-400 font-mono text-[11px]">
+                        <div className="text-slate-400 font-mono text-xs">
                           ID: {selectedContract.id} | Ver: {selectedContract.contract_version} | Status:{" "}
                           <span
                             className={`font-semibold ${
@@ -1590,7 +1590,7 @@ export function SolverInteropWorkspace() {
                     <div>
                       <span className="text-slate-400 font-semibold block mb-1.5">Coupling Topology & Signals</span>
                       <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse border border-slate-800 text-[11px]">
+                        <table className="w-full text-left border-collapse border border-slate-800 text-xs">
                           <thead>
                             <tr className="bg-slate-950 text-slate-400 border-b border-slate-800">
                               <th className="p-2">Source Component</th>
@@ -1607,7 +1607,7 @@ export function SolverInteropWorkspace() {
                               <tr key={idx} className="border-b border-slate-800/60 font-mono text-slate-300">
                                 <td className="p-2 text-cyan-400">{sig.source_component}</td>
                                 <td className="p-2">{sig.source_variable}</td>
-                                <td className="p-2 text-slate-500">{"->"}</td>
+                                <td className="p-2 text-zinc-400">{"->"}</td>
                                 <td className="p-2 text-indigo-400">{sig.target_component}</td>
                                 <td className="p-2">{sig.target_variable}</td>
                                 <td className="p-2">{sig.source_unit}</td>
@@ -1620,25 +1620,25 @@ export function SolverInteropWorkspace() {
                     </div>
 
                     {/* Time Sync Settings */}
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-[11px]">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                       <div className="bg-slate-950 p-2 rounded border border-slate-800">
-                        <span className="text-slate-500 block">Sync Policy</span>
+                        <span className="text-zinc-400 block">Sync Policy</span>
                         <span className="font-semibold text-slate-200">{selectedContract.time_sync_config.policy}</span>
                       </div>
                       <div className="bg-slate-950 p-2 rounded border border-slate-800">
-                        <span className="text-slate-500 block">Step Size (Hc)</span>
+                        <span className="text-zinc-400 block">Step Size (Hc)</span>
                         <span className="font-semibold text-cyan-300 font-mono">
                           {selectedContract.time_sync_config.communication_step_size} s
                         </span>
                       </div>
                       <div className="bg-slate-950 p-2 rounded border border-slate-800">
-                        <span className="text-slate-500 block">Interpolation</span>
+                        <span className="text-zinc-400 block">Interpolation</span>
                         <span className="font-semibold text-slate-200">
                           {selectedContract.time_sync_config.interpolation_mode}
                         </span>
                       </div>
                       <div className="bg-slate-950 p-2 rounded border border-slate-800">
-                        <span className="text-slate-500 block">Failure Policy</span>
+                        <span className="text-zinc-400 block">Failure Policy</span>
                         <span className="font-semibold text-slate-200">
                           {selectedContract.failure_propagation_policy}
                         </span>
@@ -1692,19 +1692,19 @@ export function SolverInteropWorkspace() {
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
                     <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
-                      <span className="text-slate-500 block mb-0.5">Algebraic Loops</span>
+                      <span className="text-zinc-400 block mb-0.5">Algebraic Loops</span>
                       <span className="font-medium text-slate-200">
                         {cosimPreflight.algebraic_loops.length === 0 ? "None Detected (Pass)" : "Loops Detected"}
                       </span>
                     </div>
                     <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
-                      <span className="text-slate-500 block mb-0.5">Causality Check</span>
+                      <span className="text-zinc-400 block mb-0.5">Causality Check</span>
                       <span className="font-medium text-slate-200">
                         {cosimPreflight.causality_violations.length === 0 ? "Strict Output->Input (Pass)" : "Violations"}
                       </span>
                     </div>
                     <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
-                      <span className="text-slate-500 block mb-0.5">Unit Consistency</span>
+                      <span className="text-zinc-400 block mb-0.5">Unit Consistency</span>
                       <span className="font-medium text-slate-200">
                         {cosimPreflight.unit_mismatches.length === 0 ? "Dimensional Match (Pass)" : "Unit Mismatch"}
                       </span>
@@ -1734,22 +1734,22 @@ export function SolverInteropWorkspace() {
                         Coupled Execution Diagnostics & Physical Consistency
                       </h4>
                     </div>
-                    <span className="text-[11px] font-mono text-slate-400">
+                    <span className="text-xs font-mono text-slate-400">
                       Sync Policy: {cosimJobDiagnostics.policy || "GAUSS_SEIDEL"}
                     </span>
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                     <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
-                      <span className="text-slate-500 block mb-0.5">Macro Steps</span>
+                      <span className="text-zinc-400 block mb-0.5">Macro Steps</span>
                       <span className="font-mono text-slate-200">{cosimJobDiagnostics.steps_completed}</span>
                     </div>
                     <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
-                      <span className="text-slate-500 block mb-0.5">Coupling Step Size (Hc)</span>
+                      <span className="text-zinc-400 block mb-0.5">Coupling Step Size (Hc)</span>
                       <span className="font-mono text-cyan-300">{cosimJobDiagnostics.communication_step_size} s</span>
                     </div>
                     <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
-                      <span className="text-slate-500 block mb-0.5">Energy Conservation Ratio</span>
+                      <span className="text-zinc-400 block mb-0.5">Energy Conservation Ratio</span>
                       <span className="font-mono text-emerald-400">
                         {cosimJobDiagnostics.final_energy_ratio !== undefined
                           ? Number(cosimJobDiagnostics.final_energy_ratio).toFixed(4)
@@ -1757,7 +1757,7 @@ export function SolverInteropWorkspace() {
                       </span>
                     </div>
                     <div className="bg-slate-950 p-2.5 rounded border border-slate-800">
-                      <span className="text-slate-500 block mb-0.5">Wallclock Time</span>
+                      <span className="text-zinc-400 block mb-0.5">Wallclock Time</span>
                       <span className="font-mono text-slate-200">
                         {cosimJobDiagnostics.wallclock_duration_seconds !== undefined
                           ? `${Number(cosimJobDiagnostics.wallclock_duration_seconds).toFixed(3)} s`
@@ -1773,13 +1773,13 @@ export function SolverInteropWorkspace() {
                           <CheckCircle2 className="w-3.5 h-3.5 text-cyan-400" />
                           Phase 7.6 Genuine Feedback Coupling & Actuator Work Balance
                         </span>
-                        <span className="text-[11px] font-mono text-emerald-400">
+                        <span className="text-xs font-mono text-emerald-400">
                           {cosimJobDiagnostics.feedback_metrics.is_feedback_coupled ? "CLOSED-LOOP FEEDBACK" : "FEEDFORWARD"}
                         </span>
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
                         <div className="bg-slate-900 p-2 rounded">
-                          <span className="text-slate-500 block text-[10px]">Actuator Work (W_act)</span>
+                          <span className="text-zinc-400 block text-xs">Actuator Work (W_act)</span>
                           <span className="font-mono text-cyan-300 font-medium">
                             {cosimJobDiagnostics.feedback_metrics.accumulated_actuator_work_joules !== undefined
                               ? `${Number(cosimJobDiagnostics.feedback_metrics.accumulated_actuator_work_joules).toFixed(3)} J`
@@ -1787,7 +1787,7 @@ export function SolverInteropWorkspace() {
                           </span>
                         </div>
                         <div className="bg-slate-900 p-2 rounded">
-                          <span className="text-slate-500 block text-[10px]">Damper Dissipation (E_diss)</span>
+                          <span className="text-zinc-400 block text-xs">Damper Dissipation (E_diss)</span>
                           <span className="font-mono text-emerald-400 font-medium">
                             {cosimJobDiagnostics.feedback_metrics.accumulated_dissipated_energy_joules !== undefined
                               ? `${Number(cosimJobDiagnostics.feedback_metrics.accumulated_dissipated_energy_joules).toFixed(3)} J`
@@ -1795,7 +1795,7 @@ export function SolverInteropWorkspace() {
                           </span>
                         </div>
                         <div className="bg-slate-900 p-2 rounded">
-                          <span className="text-slate-500 block text-[10px]">Energy Residual (ΔE/E_ref)</span>
+                          <span className="text-zinc-400 block text-xs">Energy Residual (ΔE/E_ref)</span>
                           <span className="font-mono text-emerald-400 font-medium">
                             {cosimJobDiagnostics.feedback_metrics.energy_residual_relative !== undefined
                               ? `${(Number(cosimJobDiagnostics.feedback_metrics.energy_residual_relative) * 100).toFixed(4)} %`
@@ -1803,8 +1803,8 @@ export function SolverInteropWorkspace() {
                           </span>
                         </div>
                         <div className="bg-slate-900 p-2 rounded">
-                          <span className="text-slate-500 block text-[10px]">Execution Order</span>
-                          <span className="font-mono text-slate-300 text-[11px]">
+                          <span className="text-zinc-400 block text-xs">Execution Order</span>
+                          <span className="font-mono text-slate-300 text-xs">
                             {Array.isArray(cosimJobDiagnostics.feedback_metrics.staggered_execution_order)
                               ? cosimJobDiagnostics.feedback_metrics.staggered_execution_order.join(" → ")
                               : "ctrl → plant"}
@@ -1876,21 +1876,21 @@ export function SolverInteropWorkspace() {
               {/* Provenance Metadata Grid */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                 <div className="bg-slate-950 p-2.5 rounded border border-slate-800/80">
-                  <span className="text-slate-500 block mb-0.5">Adapter</span>
+                  <span className="text-zinc-400 block mb-0.5">Adapter</span>
                   <span className="font-mono text-slate-300">{currentOperation.adapter_id}</span>
                 </div>
                 <div className="bg-slate-950 p-2.5 rounded border border-slate-800/80">
-                  <span className="text-slate-500 block mb-0.5">Solver</span>
+                  <span className="text-zinc-400 block mb-0.5">Solver</span>
                   <span className="font-mono text-slate-300">{currentOperation.solver_name}</span>
                 </div>
                 <div className="bg-slate-950 p-2.5 rounded border border-slate-800/80">
-                  <span className="text-slate-500 block mb-0.5">Manifest Hash</span>
+                  <span className="text-zinc-400 block mb-0.5">Manifest Hash</span>
                   <span className="font-mono text-slate-300 truncate block">
                     {currentOperation.manifest_hash ? currentOperation.manifest_hash.substring(0, 12) + "..." : "N/A"}
                   </span>
                 </div>
                 <div className="bg-slate-950 p-2.5 rounded border border-slate-800/80">
-                  <span className="text-slate-500 block mb-0.5">Execution Status</span>
+                  <span className="text-zinc-400 block mb-0.5">Execution Status</span>
                   <span className="font-semibold text-rose-400">NOT EXECUTED</span>
                 </div>
               </div>
@@ -1910,7 +1910,7 @@ export function SolverInteropWorkspace() {
                     <FileText className="w-3.5 h-3.5 text-indigo-400" />
                     Diagnostics & Parameter Lineage
                   </h4>
-                  <div className="bg-slate-950 p-3 rounded border border-slate-800 font-mono text-[11px] overflow-x-auto max-h-48 text-slate-300">
+                  <div className="bg-slate-950 p-3 rounded border border-slate-800 font-mono text-xs overflow-x-auto max-h-48 text-slate-300">
                     <pre>{JSON.stringify(diagnostics.mapping_diagnostics, null, 2)}</pre>
                   </div>
                 </div>

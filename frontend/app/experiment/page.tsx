@@ -57,11 +57,11 @@ interface PresetQuestion {
 const PRESET_QUESTIONS: PresetQuestion[] = [
   {
     id: "q1",
-    title: "What happens if I increase front roll stiffness by 10%?",
-    subsystem: "Front Suspension / Anti-Roll Bar",
+    title: "What happens if I increase front spring rate (k_s) by 10%?",
+    subsystem: "Front Suspension / Main Coil Spring",
     param: "k_s",
     deltaPct: 10.0,
-    expectedHypothesis: "Stiffening front spring rate reduces dynamic body roll and improves turn-in sharpness, but increases high-frequency curb impact harshness.",
+    expectedHypothesis: "Stiffening front coil spring rate raises wheel frequency, reducing heave deflection while increasing high-frequency kerb impact harshness.",
   },
   {
     id: "q2",
@@ -114,7 +114,7 @@ function ExperimentBuilderContent() {
   } | null>(null);
 
   // Builder state
-  const [question, setQuestion] = useState("What happens if I increase front roll stiffness by 10%?");
+  const [question, setQuestion] = useState("What happens if I increase front spring rate (k_s) by 10%?");
   const [selectedParamKey, setSelectedParamKey] = useState("k_s");
   const [deltaMode, setDeltaMode] = useState<"pct" | "absolute">("pct");
   const [deltaPct, setDeltaPct] = useState(10.0);
@@ -319,7 +319,7 @@ function ExperimentBuilderContent() {
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white flex items-center gap-3">
               One-Click Experiment Builder
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/30 text-amber-400 font-mono font-normal">
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-signal/10 border border-signal/30 text-signal font-mono font-normal">
                 TEST HYPOTHESIS
               </span>
             </h1>
@@ -353,25 +353,25 @@ function ExperimentBuilderContent() {
         {clonedCandidate && (
           <div
             data-testid="cloned-candidate-banner"
-            className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/40 text-amber-300 font-mono text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg mb-6"
+            className="p-4 rounded-xl bg-signal/10 border border-signal/40 text-signal font-mono text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-lg mb-6"
           >
             <div className="flex items-center gap-2.5">
               <div className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse shrink-0" />
               <div>
                 <div className="font-bold text-sm tracking-wide text-white font-sans flex items-center gap-2">
                   <span>[ CLONED OPTIMIZATION CANDIDATE: {clonedCandidate.id} ]</span>
-                  <span className="px-2 py-0.5 rounded text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold uppercase">
+                  <span className="px-2 py-0.5 rounded text-xs bg-signal/20 text-signal border border-signal/30 font-bold uppercase">
                     PROVENANCE LINKED
                   </span>
                 </div>
-                <div className="text-[11px] text-zinc-400 mt-0.5 font-mono">
+                <div className="text-xs text-zinc-400 mt-0.5 font-mono">
                   Source: <span className="text-zinc-200">{clonedCandidate.optimizationId || "Active Pareto Optimization Run"}</span>
                   {clonedCandidate.k_s ? ` • Spring Rate k_s = ${clonedCandidate.k_s} N/m` : ""}
                   {clonedCandidate.c ? ` • Damping c = ${clonedCandidate.c} Ns/m` : ""}
                 </div>
               </div>
             </div>
-            <div className="text-[11px] text-zinc-400 font-mono">
+            <div className="text-xs text-zinc-400 font-mono">
               Parameters mapped to experiment pipeline
             </div>
           </div>
@@ -384,7 +384,7 @@ function ExperimentBuilderContent() {
               <Sparkles size={13} className="text-amber-400" />
               1. Engineering Question
             </label>
-            <span className="text-[11px] text-zinc-500 font-mono">
+            <span className="text-xs text-zinc-400 font-mono">
               Natural language hypothesis formulation
             </span>
           </div>
@@ -401,7 +401,7 @@ function ExperimentBuilderContent() {
               type="button"
               onClick={handleRunExperiment}
               disabled={isExecuting}
-              className="px-5 py-2.5 bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-zinc-950 font-semibold text-sm rounded-lg flex items-center justify-center gap-2 transition-colors shrink-0 shadow-sm shadow-amber-500/10"
+              className="px-5 py-2.5 bg-signal hover:bg-[#d6f56e] disabled:bg-zinc-800 disabled:text-zinc-300 text-zinc-950 font-semibold text-sm rounded-lg flex items-center justify-center gap-2 transition-colors shrink-0 shadow-sm shadow-amber-500/10"
             >
               {isExecuting ? (
                 <>
@@ -419,7 +419,7 @@ function ExperimentBuilderContent() {
 
           {/* Preset question chips */}
           <div className="flex flex-wrap gap-2 pt-1">
-            <span className="text-xs text-zinc-500 self-center">Quick launch:</span>
+            <span className="text-xs text-zinc-400 self-center">Quick launch:</span>
             {PRESET_QUESTIONS.map((q) => (
               <button
                 key={q.id}
@@ -427,7 +427,7 @@ function ExperimentBuilderContent() {
                 onClick={() => handleSelectPresetQuestion(q)}
                 className={`text-xs px-3 py-1 rounded-full border transition-all ${
                   question === q.title
-                    ? "bg-amber-500/15 border-amber-500/50 text-amber-300 font-medium"
+                    ? "bg-signal/15 border-signal/50 text-signal font-medium"
                     : "bg-zinc-950/60 border-zinc-800 hover:border-zinc-700 text-zinc-400 hover:text-zinc-200"
                 }`}
               >
@@ -443,7 +443,7 @@ function ExperimentBuilderContent() {
           <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 space-y-2">
             <div className="text-xs font-mono text-zinc-400 uppercase tracking-wider flex items-center justify-between">
               <span>Step 1: Baseline Setup</span>
-              <span className="text-emerald-400 text-[11px]">ACTIVE</span>
+              <span className="text-emerald-400 text-xs">ACTIVE</span>
             </div>
             <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3">
               <div className="font-semibold text-sm text-zinc-100">{activeVehicleContext.setup}</div>
@@ -453,7 +453,7 @@ function ExperimentBuilderContent() {
                 <span>Track: {activeVehicleContext.track}</span>
               </div>
             </div>
-            <p className="text-[11px] text-zinc-500">
+            <p className="text-xs text-zinc-400">
               Cloned automatically into candidate version on experiment execution.
             </p>
           </div>
@@ -462,7 +462,7 @@ function ExperimentBuilderContent() {
           <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 space-y-2">
             <div className="text-xs font-mono text-zinc-400 uppercase tracking-wider flex items-center justify-between">
               <span>Step 2: Parameter to Test</span>
-              <Sliders size={13} className="text-zinc-500" />
+              <Sliders size={13} className="text-zinc-400" />
             </div>
             <select
               value={selectedParamKey}
@@ -481,7 +481,7 @@ function ExperimentBuilderContent() {
                 </option>
               ))}
             </select>
-            <div className="text-[11px] text-zinc-500 flex justify-between font-mono">
+            <div className="text-xs text-zinc-400 flex justify-between font-mono">
               <span>Baseline: {selectedParamConfig.defaultVal.toLocaleString()} {selectedParamConfig.unit}</span>
               <span>Step: {selectedParamConfig.step}</span>
             </div>
@@ -491,18 +491,18 @@ function ExperimentBuilderContent() {
           <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 space-y-2">
             <div className="text-xs font-mono text-zinc-400 uppercase tracking-wider flex items-center justify-between">
               <span>Step 3: Define Change</span>
-              <div className="flex gap-1 text-[11px]">
+              <div className="flex gap-1 text-xs">
                 <button
                   type="button"
                   onClick={() => setDeltaMode("pct")}
-                  className={`px-1.5 py-0.5 rounded font-mono ${deltaMode === "pct" ? "bg-amber-500/20 text-amber-300 font-bold" : "text-zinc-500 hover:text-zinc-300"}`}
+                  className={`px-1.5 py-0.5 rounded font-mono ${deltaMode === "pct" ? "bg-signal/20 text-amber-300 font-bold" : "text-zinc-400 hover:text-zinc-300"}`}
                 >
                   %
                 </button>
                 <button
                   type="button"
                   onClick={() => setDeltaMode("absolute")}
-                  className={`px-1.5 py-0.5 rounded font-mono ${deltaMode === "absolute" ? "bg-amber-500/20 text-amber-300 font-bold" : "text-zinc-500 hover:text-zinc-300"}`}
+                  className={`px-1.5 py-0.5 rounded font-mono ${deltaMode === "absolute" ? "bg-signal/20 text-amber-300 font-bold" : "text-zinc-400 hover:text-zinc-300"}`}
                 >
                   Val
                 </button>
@@ -529,7 +529,7 @@ function ExperimentBuilderContent() {
                     {deltaPct > 0 ? `+${deltaPct}%` : `${deltaPct}%`}
                   </span>
                 </div>
-                <div className="flex justify-between text-[11px] text-zinc-500 font-mono">
+                <div className="flex justify-between text-xs text-zinc-400 font-mono">
                   <span>Target: {Math.round(selectedParamConfig.defaultVal * (1.0 + deltaPct / 100.0)).toLocaleString()} {selectedParamConfig.unit}</span>
                   <span>Δ: {Math.round(selectedParamConfig.defaultVal * (deltaPct / 100.0)).toLocaleString()}</span>
                 </div>
@@ -550,7 +550,7 @@ function ExperimentBuilderContent() {
                   }}
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-lg p-2.5 text-sm font-mono text-zinc-100"
                 />
-                <span className="text-xs font-mono text-zinc-500 shrink-0">{selectedParamConfig.unit}</span>
+                <span className="text-xs font-mono text-zinc-400 shrink-0">{selectedParamConfig.unit}</span>
               </div>
             )}
           </div>
@@ -558,7 +558,7 @@ function ExperimentBuilderContent() {
 
         {/* 3. AUTOMATED PIPELINE VISUALIZER */}
         <div className="bg-zinc-950/80 border border-zinc-800/80 rounded-xl p-4">
-          <div className="text-xs font-mono text-zinc-500 uppercase tracking-wider mb-2 flex items-center justify-between">
+          <div className="text-xs font-mono text-zinc-400 uppercase tracking-wider mb-2 flex items-center justify-between">
             <span>Automated Hypothesis Pipeline</span>
             {isExecuting && (
               <span className="text-amber-400 flex items-center gap-1">
@@ -583,18 +583,18 @@ function ExperimentBuilderContent() {
                   key={step.num}
                   className={`p-2.5 rounded-lg border transition-all ${
                     isCurrent
-                      ? "bg-amber-500/10 border-amber-500 text-amber-300 shadow-sm"
+                      ? "bg-signal/10 border-amber-500 text-signal shadow-sm"
                       : isDone
                       ? "bg-zinc-900 border-emerald-500/40 text-emerald-400"
-                      : "bg-zinc-950 border-zinc-800/60 text-zinc-600"
+                      : "bg-zinc-950 border-zinc-800/60 text-zinc-300"
                   }`}
                 >
-                  <div className="flex items-center justify-between font-mono text-[10px] mb-1">
+                  <div className="flex items-center justify-between font-mono text-xs mb-1">
                     <span>STEP {step.num}</span>
                     {isDone ? <Check size={11} className="text-emerald-400" /> : null}
                   </div>
                   <div className="font-semibold text-zinc-200">{step.label}</div>
-                  <div className="text-[10px] text-zinc-500 truncate">{step.desc}</div>
+                  <div className="text-xs text-zinc-400 truncate">{step.desc}</div>
                 </div>
               );
             })}
@@ -608,7 +608,7 @@ function ExperimentBuilderContent() {
             <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-zinc-800/80 pb-3">
                 <div>
-                  <div className="text-xs font-mono text-zinc-500 uppercase tracking-wider">
+                  <div className="text-xs font-mono text-zinc-400 uppercase tracking-wider">
                     Experiment Result Object: {experimentResult.simulation_id || `RUN-EXP-${experimentResult.id.slice(0, 8)}`}
                   </div>
                   <h2 className="text-xl font-bold text-white mt-0.5 flex items-center gap-2">
@@ -632,7 +632,7 @@ function ExperimentBuilderContent() {
                 <p className="text-sm text-zinc-200 leading-relaxed font-medium">
                   {experimentResult.recommendation}
                 </p>
-                <div className="text-[11px] text-zinc-400 font-mono flex items-center gap-2">
+                <div className="text-xs text-zinc-400 font-mono flex items-center gap-2">
                   <span>Result Hash:</span>
                   <span className="text-zinc-300">{experimentResult.result_hash}</span>
                   <span>•</span>
@@ -643,7 +643,7 @@ function ExperimentBuilderContent() {
               {/* Quick Summary Metrics Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800">
-                  <div className="text-[11px] font-mono text-zinc-500">RIDE ACCEL (RMS)</div>
+                  <div className="text-xs font-mono text-zinc-400">RIDE ACCEL (RMS)</div>
                   <div className="text-xl font-bold text-zinc-100 mt-1 font-mono">
                     {experimentResult.candidate_metrics.rms_body_accel.toFixed(3)}{" "}
                     <span className="text-xs font-normal text-zinc-400">m/s²</span>
@@ -654,7 +654,7 @@ function ExperimentBuilderContent() {
                 </div>
 
                 <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800">
-                  <div className="text-[11px] font-mono text-zinc-500">SUSPENSION TRAVEL</div>
+                  <div className="text-xs font-mono text-zinc-400">SUSPENSION TRAVEL</div>
                   <div className="text-xl font-bold text-zinc-100 mt-1 font-mono">
                     {experimentResult.candidate_metrics.peak_susp_travel_mm.toFixed(1)}{" "}
                     <span className="text-xs font-normal text-zinc-400">mm</span>
@@ -665,7 +665,7 @@ function ExperimentBuilderContent() {
                 </div>
 
                 <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800">
-                  <div className="text-[11px] font-mono text-zinc-500">TIRE LOAD VARIATION</div>
+                  <div className="text-xs font-mono text-zinc-400">TIRE LOAD VARIATION</div>
                   <div className="text-xl font-bold text-zinc-100 mt-1 font-mono">
                     {Math.round(experimentResult.candidate_metrics.tire_load_variation_n)}{" "}
                     <span className="text-xs font-normal text-zinc-400">N</span>
@@ -676,7 +676,7 @@ function ExperimentBuilderContent() {
                 </div>
 
                 <div className="p-3 rounded-lg bg-zinc-950 border border-zinc-800">
-                  <div className="text-[11px] font-mono text-zinc-500">CONSTRAINT STATUS</div>
+                  <div className="text-xs font-mono text-zinc-400">CONSTRAINT STATUS</div>
                   <div className="text-xl font-bold text-zinc-100 mt-1 flex items-center gap-2 font-mono">
                     {experimentResult.constraints_passed ? (
                       <>
@@ -706,7 +706,7 @@ function ExperimentBuilderContent() {
                     <Sliders size={14} className="text-amber-400" />
                     What Changed
                   </h3>
-                  <span className="text-xs font-mono text-zinc-500">Engineering units</span>
+                  <span className="text-xs font-mono text-zinc-400">Engineering units</span>
                 </div>
 
                 <div className="space-y-3">
@@ -714,8 +714,8 @@ function ExperimentBuilderContent() {
                     <div key={pc.parameter} className="bg-zinc-950 p-3 rounded-lg border border-zinc-800 space-y-1 font-mono">
                       <div className="text-xs text-zinc-400 font-semibold">{pc.parameter.toUpperCase()}</div>
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-zinc-500">{pc.baseline.toLocaleString()} {pc.unit}</span>
-                        <ArrowRight size={13} className="text-zinc-600" />
+                        <span className="text-zinc-400">{pc.baseline.toLocaleString()} {pc.unit}</span>
+                        <ArrowRight size={13} className="text-zinc-300" />
                         <span className="text-zinc-100 font-bold">{pc.candidate.toLocaleString()} {pc.unit}</span>
                       </div>
                       <div className="text-xs text-right font-medium text-amber-400">
@@ -724,7 +724,7 @@ function ExperimentBuilderContent() {
                     </div>
                   ))}
 
-                  <div className="text-xs text-zinc-500 space-y-1 pt-2 border-t border-zinc-800/80">
+                  <div className="text-xs text-zinc-400 space-y-1 pt-2 border-t border-zinc-800/80">
                     <div>Solver: <span className="text-zinc-400 font-mono">{experimentResult.solver}</span></div>
                     <div>Backend: <span className="text-zinc-400 font-mono">{experimentResult.backend}</span></div>
                     <div>Model: <span className="text-zinc-400 font-mono">{experimentResult.model_version}</span></div>
@@ -749,7 +749,7 @@ function ExperimentBuilderContent() {
                     What Improved
                   </div>
                   {experimentResult.improvements.length === 0 ? (
-                    <div className="p-3 bg-zinc-950 rounded-lg text-xs text-zinc-500">No decisive metric gains observed.</div>
+                    <div className="p-3 bg-zinc-950 rounded-lg text-xs text-zinc-400">No decisive metric gains observed.</div>
                   ) : (
                     experimentResult.improvements.map((imp) => (
                       <div key={imp.key} className="p-3 rounded-lg bg-emerald-500/5 border border-emerald-500/20 space-y-1">
@@ -757,10 +757,10 @@ function ExperimentBuilderContent() {
                           <span className="text-xs font-bold text-zinc-200">{imp.metric}</span>
                           <span className="text-xs font-mono font-bold text-emerald-400">{imp.delta_pct}%</span>
                         </div>
-                        <div className="text-[11px] text-zinc-400 font-mono">
+                        <div className="text-xs text-zinc-400 font-mono">
                           {imp.baseline} → {imp.candidate} {imp.unit}
                         </div>
-                        <p className="text-[11px] text-zinc-400 italic mt-0.5">{imp.reason}</p>
+                        <p className="text-xs text-zinc-400 italic mt-0.5">{imp.reason}</p>
                       </div>
                     ))
                   )}
@@ -773,7 +773,7 @@ function ExperimentBuilderContent() {
                     What Got Worse (Tradeoffs)
                   </div>
                   {experimentResult.regressions.length === 0 ? (
-                    <div className="p-3 bg-zinc-950 rounded-lg text-xs text-zinc-500">No significant penalty detected.</div>
+                    <div className="p-3 bg-zinc-950 rounded-lg text-xs text-zinc-400">No significant penalty detected.</div>
                   ) : (
                     experimentResult.regressions.map((reg) => (
                       <div key={reg.key} className="p-3 rounded-lg bg-rose-500/5 border border-rose-500/20 space-y-1">
@@ -781,10 +781,10 @@ function ExperimentBuilderContent() {
                           <span className="text-xs font-bold text-zinc-200">{reg.metric}</span>
                           <span className="text-xs font-mono font-bold text-rose-400">+{Math.abs(reg.delta_pct)}%</span>
                         </div>
-                        <div className="text-[11px] text-zinc-400 font-mono">
+                        <div className="text-xs text-zinc-400 font-mono">
                           {reg.baseline} → {reg.candidate} {reg.unit}
                         </div>
-                        <p className="text-[11px] text-zinc-400 italic mt-0.5">{reg.reason}</p>
+                        <p className="text-xs text-zinc-400 italic mt-0.5">{reg.reason}</p>
                       </div>
                     ))
                   )}
@@ -798,13 +798,13 @@ function ExperimentBuilderContent() {
                     <GitBranch size={14} className="text-amber-400" />
                     Engineering Causality Chain
                   </h3>
-                  <span className="text-xs font-mono text-zinc-500">Physical mechanics</span>
+                  <span className="text-xs font-mono text-zinc-400">Physical mechanics</span>
                 </div>
 
                 <div className="space-y-3">
                   {experimentResult.causal_chain.map((step, idx) => (
                     <div key={idx} className="flex gap-2.5 items-start">
-                      <div className="w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-[10px] font-mono text-amber-400 shrink-0 mt-0.5">
+                      <div className="w-5 h-5 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-mono text-amber-400 shrink-0 mt-0.5">
                         {idx + 1}
                       </div>
                       <p className="text-xs text-zinc-300 leading-relaxed">{step}</p>
@@ -821,7 +821,7 @@ function ExperimentBuilderContent() {
                     <div key={idx} className="p-2.5 rounded bg-zinc-950 border border-zinc-800 flex items-center justify-between text-xs font-mono">
                       <div>
                         <div className="text-zinc-200">{cd.constraint}</div>
-                        <div className="text-[10px] text-zinc-500">Limit: {cd.limit} | Actual: {cd.actual}</div>
+                        <div className="text-xs text-zinc-400">Limit: {cd.limit} | Actual: {cd.actual}</div>
                       </div>
                       {cd.passed ? (
                         <span className="text-emerald-400 font-bold">PASS</span>

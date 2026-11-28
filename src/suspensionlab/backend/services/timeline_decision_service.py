@@ -41,6 +41,12 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def compute_decision_content_hash_from_fields(payload: Dict[str, Any]) -> str:
+    """Canonical SHA-256 over the full decision content (used by signing and verification)."""
+    canonical_str = json.dumps(payload, sort_keys=True, default=str)
+    return hashlib.sha256(canonical_str.encode("utf-8")).hexdigest()
+
+
 class TimelineDecisionService:
     """
     Manages the lifecycle of Engineering Decision Records and
@@ -149,6 +155,53 @@ class TimelineDecisionService:
         return TimelineDecisionService._decision_to_dict(dec)
 
     @staticmethod
+    def compute_decision_content_hash(dec) -> str:
+        """SHA-256 over the decision's full current content: what the approval binds."""
+        payload = {
+            "decision_id": dec.decision_id,
+            "question": dec.question,
+            "context": dec.context,
+            "candidates": dec.candidates,
+            "selected_option": dec.selected_option,
+            "reason": dec.reason,
+            "tradeoffs": dec.tradeoffs,
+            "risks": dec.risks,
+            "simulation_evidence": dec.simulation_evidence,
+            "telemetry_evidence": dec.telemetry_evidence,
+            "validation_evidence": dec.validation_evidence,
+        }
+        return compute_decision_content_hash_from_fields(payload)
+
+    @staticmethod
+    def verify_approval_signature(dec) -> bool:
+        """
+        Independently recompute the approval HMAC from the CURRENT record.
+        False when the decision content, approver, or approval time was altered
+        after sign-off (or when the record was never signed).
+        """
+        if not (dec.approval_signature and dec.approver and dec.approved_at):
+            return False
+        approver_raw = dec.approver
+        if " (" in approver_raw and approver_raw.endswith(")"):
+            approver_name = approver_raw.rsplit(" (", 1)[0]
+            approver_role = approver_raw.rsplit(" (", 1)[1][:-1]
+        else:
+            approver_name = approver_raw
+            approver_role = ""
+        content_hash = TimelineDecisionService.compute_decision_content_hash(dec)
+        sign_time = dec.approved_at
+        if sign_time.tzinfo is None:
+            sign_time = sign_time.replace(tzinfo=timezone.utc)
+        sign_payload = f"{dec.decision_id}:{content_hash}:{approver_name}:{approver_role}:{sign_time.isoformat()}"
+        signing_secret = _get_decision_hmac_secret()
+        expected = hmac.new(
+            signing_secret.encode("utf-8"),
+            sign_payload.encode("utf-8"),
+            hashlib.sha256,
+        ).hexdigest()
+        return hmac.compare_digest(expected, dec.approval_signature)
+
+    @staticmethod
     async def approve_decision(
         db: AsyncSession,
         decision_id: str,
@@ -181,9 +234,13 @@ class TimelineDecisionService:
         if dec.status == "APPROVED":
             return TimelineDecisionService._decision_to_dict(dec)
 
-        # Compute HMAC-SHA256 signature
+        # Compute HMAC-SHA256 signature. Pass B: the signature covers a hash of
+        # the actual approved payload computed from the CURRENT record content
+        # (not just the record ID or a creation-time hash), so any post-approval
+        # tampering with the decision content invalidates the signature.
         sign_time = _utcnow()
-        sign_payload = f"{dec.decision_id}:{dec.artifact_hashes.get('decision_hash')}:{approver_name}:{approver_role}:{sign_time.isoformat()}"
+        content_hash = TimelineDecisionService.compute_decision_content_hash(dec)
+        sign_payload = f"{dec.decision_id}:{content_hash}:{approver_name}:{approver_role}:{sign_time.isoformat()}"
         signing_secret = _get_decision_hmac_secret()
         signature = hmac.new(
             signing_secret.encode("utf-8"),

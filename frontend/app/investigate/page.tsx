@@ -257,7 +257,7 @@ function InvestigateContent() {
     return (
       <div className="min-h-screen bg-[#08080a] text-zinc-400 p-8 pt-24 font-mono flex items-center justify-center">
         <div className="flex items-center gap-2">
-          <RefreshCw size={18} className="animate-spin text-ansys-yellow" />
+          <RefreshCw size={18} className="animate-spin text-signal" />
           <span>Retrieving Engineering Question Artifact ({qId})...</span>
         </div>
       </div>
@@ -298,7 +298,7 @@ function InvestigateContent() {
   }
 
   return (
-    <div className="w-full bg-[#08080a] text-white selection:bg-ansys-yellow selection:text-black min-h-screen pt-20 pb-16 px-4 sm:px-6 font-sans">
+    <div className="w-full bg-[#08080a] text-white selection:bg-signal selection:text-black min-h-screen pt-20 pb-16 px-4 sm:px-6 font-sans">
       <div className="max-w-[1520px] mx-auto">
         {/* Navigation Breadcrumb & Back Link */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
@@ -335,9 +335,9 @@ function InvestigateContent() {
                 <span className="text-amber-400 font-bold uppercase tracking-wider">
                   ENGINEERING INVESTIGATION ACTIVE
                 </span>
-                <span className="text-gray-500">•</span>
+                <span className="text-zinc-400">•</span>
                 <span className="text-gray-400">ID: {question.question_id}</span>
-                <span className="text-gray-500">•</span>
+                <span className="text-zinc-400">•</span>
                 <span className="text-gray-400">STATUS: {question.status}</span>
               </div>
               <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
@@ -347,7 +347,7 @@ function InvestigateContent() {
               <p className="text-xs text-gray-300 mt-1 max-w-2xl leading-relaxed font-sans">
                 {question.question_text}
               </p>
-              <div className="text-[11px] text-gray-500 font-mono mt-2">
+              <div className="text-xs text-zinc-400 font-mono mt-2">
                 Subsystem: <span className="text-zinc-300">{question.context?.subsystem || question.vehicle_id}</span> • Author: <span className="text-zinc-300">{question.author_name}</span>
               </div>
             </div>
@@ -359,7 +359,7 @@ function InvestigateContent() {
                 return typeof qConf === "number" && qConf > 0 ? (
                   <ConfidenceIndicator confidence={qConf} sourceTag="Backend Correlation Confidence" size="sm" />
                 ) : (
-                  <span className="px-2 py-1 rounded border border-amber-500/40 bg-amber-500/10 text-amber-300 text-[10px] font-mono uppercase">
+                  <span className="px-2 py-1 rounded border border-amber-500/40 bg-amber-500/10 text-amber-300 text-xs font-mono uppercase">
                     SAMPLE / UNVALIDATED
                   </span>
                 );
@@ -384,9 +384,9 @@ function InvestigateContent() {
                     : "bg-white/[0.02] border-white/[0.06] text-gray-400 hover:border-white/20 hover:text-white"
                 }`}
               >
-                <div className="text-[10px] font-bold text-ansys-yellow mb-0.5">STAGE {st.step}</div>
+                <div className="text-xs font-bold text-signal mb-0.5">STAGE {st.step}</div>
                 <div className="text-xs font-bold text-white font-sans">{st.title}</div>
-                <div className="text-[10px] text-gray-400 truncate mt-0.5 font-sans">{st.desc}</div>
+                <div className="text-xs text-gray-400 truncate mt-0.5 font-sans">{st.desc}</div>
               </button>
             ))}
           </div>
@@ -404,7 +404,7 @@ function InvestigateContent() {
                 >
                   &larr; Previous Stage
                 </button>
-                <span className="text-[10px] font-mono text-gray-500">Stage {idx + 1} of {order.length}</span>
+                <span className="text-xs font-mono text-zinc-400">Stage {idx + 1} of {order.length}</span>
                 <button
                   onClick={() => idx < order.length - 1 && setActiveStage(order[idx + 1])}
                   disabled={idx === order.length - 1}
@@ -459,18 +459,18 @@ function InvestigateContent() {
               <div className="space-y-4 font-mono text-xs">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="p-4 rounded-xl bg-black/40 border border-white/5 space-y-2">
-                    <div className="text-gray-400 font-bold uppercase text-[11px]">Operating Conditions:</div>
-                    <div><span className="text-gray-500">Target Vehicle:</span> {question.vehicle_id}</div>
-                    <div><span className="text-gray-500">Base Setup:</span> {question.setup_id}</div>
-                    <div><span className="text-gray-500">Severity Level:</span> {question.severity}</div>
-                    <div><span className="text-gray-500">Source Category:</span> {question.source}</div>
+                    <div className="text-gray-400 font-bold uppercase text-xs">Operating Conditions:</div>
+                    <div><span className="text-zinc-400">Target Vehicle:</span> {question.vehicle_id}</div>
+                    <div><span className="text-zinc-400">Base Setup:</span> {question.setup_id}</div>
+                    <div><span className="text-zinc-400">Severity Level:</span> {question.severity}</div>
+                    <div><span className="text-zinc-400">Source Category:</span> {question.source}</div>
                   </div>
 
                   <div className="p-4 rounded-xl bg-black/40 border border-white/5 space-y-2">
-                    <div className="text-gray-400 font-bold uppercase text-[11px]">Subsystem Symptoms:</div>
-                    <div><span className="text-gray-500">Subsystem:</span> {question.context?.subsystem || "Chassis"}</div>
-                    <div><span className="text-gray-500">Observed Divergence:</span> {question.question_text}</div>
-                    <div><span className="text-gray-500">Status:</span> {question.status}</div>
+                    <div className="text-gray-400 font-bold uppercase text-xs">Subsystem Symptoms:</div>
+                    <div><span className="text-zinc-400">Subsystem:</span> {question.context?.subsystem || "Chassis"}</div>
+                    <div><span className="text-zinc-400">Observed Divergence:</span> {question.question_text}</div>
+                    <div><span className="text-zinc-400">Status:</span> {question.status}</div>
                   </div>
                 </div>
 
@@ -505,9 +505,9 @@ function InvestigateContent() {
                   /* Tire Saturation Causal Chain */
                   <div className="space-y-3">
                     <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                      <div className="flex items-center justify-between text-ansys-yellow font-bold mb-1">
+                      <div className="flex items-center justify-between text-signal font-bold mb-1">
                         <span>STEP 1: LATERAL WEIGHT TRANSFER & TIRE SLIP ANGLE SATURATION</span>
-                        <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded">High-G Corner Apex</span>
+                        <span className="text-xs bg-white/5 px-2 py-0.5 rounded">High-G Corner Apex</span>
                       </div>
                       <p className="text-gray-300 font-sans text-xs leading-relaxed">
                         Under high lateral acceleration (ay &gt; 3.0 G), lateral load transfer [dFz = m * ay * (hcg / t)] shifts normal load outward. The front axle slip angle approaches critical threshold alpha_peak, causing non-linear tire saturation under Pacejka MF5.2 modeling.
@@ -515,9 +515,9 @@ function InvestigateContent() {
                     </div>
 
                     <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                      <div className="flex items-center justify-between text-ansys-yellow font-bold mb-1">
+                      <div className="flex items-center justify-between text-signal font-bold mb-1">
                         <span>STEP 2: CORNERING STIFFNESS LOSS & CONTACT PATCH TEARING</span>
-                        <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded">Non-Linear Regime</span>
+                        <span className="text-xs bg-white/5 px-2 py-0.5 rounded">Non-Linear Regime</span>
                       </div>
                       <p className="text-gray-300 font-sans text-xs leading-relaxed">
                         As slip angle alpha exceeds 7.8 deg, the normalized cornering stiffness drops sharply. Lateral force capacity saturates, preventing the vehicle from following steering input and inducing high-speed understeer.
@@ -525,9 +525,9 @@ function InvestigateContent() {
                     </div>
 
                     <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                      <div className="flex items-center justify-between text-ansys-yellow font-bold mb-1">
+                      <div className="flex items-center justify-between text-signal font-bold mb-1">
                         <span>STEP 3: LOAD DISTRIBUTION REDRESS VIA ARB STIFFNESS</span>
-                        <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded">Remediation Mechanism</span>
+                        <span className="text-xs bg-white/5 px-2 py-0.5 rounded">Remediation Mechanism</span>
                       </div>
                       <p className="text-gray-300 font-sans text-xs leading-relaxed">
                         Reducing front anti-roll bar stiffness (k_arb_front) shifts roll resistance rearward, unloading the front outer tire and recovering front slip angle margin below alpha_peak.
@@ -538,9 +538,9 @@ function InvestigateContent() {
                   /* Aerodynamic Causal Chain */
                   <div className="space-y-3">
                     <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                      <div className="flex items-center justify-between text-ansys-yellow font-bold mb-1">
+                      <div className="flex items-center justify-between text-signal font-bold mb-1">
                         <span>STEP 1: DYNAMIC RIDE HEIGHT & PITCH OSCILLATION</span>
-                        <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded">Aero Platform Variance</span>
+                        <span className="text-xs bg-white/5 px-2 py-0.5 rounded">Aero Platform Variance</span>
                       </div>
                       <p className="text-gray-300 font-sans text-xs leading-relaxed">
                         Coupled vertical heave and pitch excitation causes ride height variance (sigma_rh &gt; 2.0 mm). The front splitter and rear diffuser ground clearance oscillate dynamically during combined braking and yawing.
@@ -548,9 +548,9 @@ function InvestigateContent() {
                     </div>
 
                     <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                      <div className="flex items-center justify-between text-ansys-yellow font-bold mb-1">
+                      <div className="flex items-center justify-between text-signal font-bold mb-1">
                         <span>STEP 2: DIFFUSER EXPANSION RATIO SEPARATION</span>
-                        <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded">Ground Effect Boundary Layer</span>
+                        <span className="text-xs bg-white/5 px-2 py-0.5 rounded">Ground Effect Boundary Layer</span>
                       </div>
                       <p className="text-gray-300 font-sans text-xs leading-relaxed">
                         When rear ride height rises unexpectedly, the diffuser area expansion ratio exceeds the adverse pressure gradient limit, triggering transient boundary layer separation and sudden downforce reduction.
@@ -558,9 +558,9 @@ function InvestigateContent() {
                     </div>
 
                     <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                      <div className="flex items-center justify-between text-ansys-yellow font-bold mb-1">
+                      <div className="flex items-center justify-between text-signal font-bold mb-1">
                         <span>STEP 3: CENTER OF PRESSURE MIGRATION & UNSTABLE BALANCE</span>
-                        <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded">Aero Balance Shift</span>
+                        <span className="text-xs bg-white/5 px-2 py-0.5 rounded">Aero Balance Shift</span>
                       </div>
                       <p className="text-gray-300 font-sans text-xs leading-relaxed">
                         Aerodynamic center of pressure shifts abruptly, destabilizing the chassis entry platform and deteriorating driver confidence in medium-to-high-speed turns.
@@ -571,9 +571,9 @@ function InvestigateContent() {
                   /* Damper & Heave Platform Causal Chain */
                   <div className="space-y-3">
                     <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                      <div className="flex items-center justify-between text-ansys-yellow font-bold mb-1">
+                      <div className="flex items-center justify-between text-signal font-bold mb-1">
                         <span>STEP 1: DYNAMIC WEIGHT TRANSFER & DAMPER VELOCITY</span>
-                        <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded">Δt = 0 to 0.4s</span>
+                        <span className="text-xs bg-white/5 px-2 py-0.5 rounded">Δt = 0 to 0.4s</span>
                       </div>
                       <p className="text-gray-300 font-sans text-xs leading-relaxed">
                         During corner entry trail-braking, forward longitudinal weight transfer [dFz = m * ax * (hcg / L)] unloads the rear axle. The rear suspension extension velocity reaches +42 mm/s, operating in the Low-Speed Rebound (LSR) damper quadrant.
@@ -581,9 +581,9 @@ function InvestigateContent() {
                     </div>
 
                     <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                      <div className="flex items-center justify-between text-ansys-yellow font-bold mb-1">
+                      <div className="flex items-center justify-between text-signal font-bold mb-1">
                         <span>STEP 2: DEFICIT IN LOW-SPEED REBOUND DAMPING FORCE</span>
-                        <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded">Δt = 0.4 to 1.1s</span>
+                        <span className="text-xs bg-white/5 px-2 py-0.5 rounded">Δt = 0.4 to 1.1s</span>
                       </div>
                       <p className="text-gray-300 font-sans text-xs leading-relaxed">
                         The active rear damper setup is underdamped [damping ratio zeta_s = c / (2 * sqrt(ks * ms)) &lt; 0.25]. Consequently, the rear chassis lifts excessively rather than maintaining flat platform stability.
@@ -591,9 +591,9 @@ function InvestigateContent() {
                     </div>
 
                     <div className="p-4 rounded-xl bg-white/[0.03] border border-white/[0.08]">
-                      <div className="flex items-center justify-between text-ansys-yellow font-bold mb-1">
+                      <div className="flex items-center justify-between text-signal font-bold mb-1">
                         <span>STEP 3: DIFFUSER PLATFORM DISTURBANCE & LAP TIME LOSS</span>
-                        <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded">Δt = 1.1 to 2.2s</span>
+                        <span className="text-xs bg-white/5 px-2 py-0.5 rounded">Δt = 1.1 to 2.2s</span>
                       </div>
                       <p className="text-gray-300 font-sans text-xs leading-relaxed">
                         Under-floor ground effects are sensitive to ride height elevation. Rear extension increases the diffuser throat area beyond optimum, reducing rear downforce and inducing corner entry instability.
@@ -604,22 +604,22 @@ function InvestigateContent() {
 
                 {/* Attribution Sensitivities */}
                 <div className="p-4 rounded-xl bg-black/40 border border-white/5 space-y-2">
-                  <div className="text-gray-400 font-bold uppercase text-[11px]">Parameter Sensitivities (dJ / dTheta):</div>
+                  <div className="text-gray-400 font-bold uppercase text-xs">Parameter Sensitivities (dJ / dTheta):</div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/5">
-                      <div className="text-gray-500 text-[10px]">Rear Low-Speed Comp (c_r)</div>
-                      <div className="text-base font-bold text-ansys-yellow font-mono">+0.68</div>
-                      <div className="text-[10px] text-gray-400">High sensitivity on platform pitch</div>
+                      <div className="text-zinc-400 text-xs">Rear Low-Speed Comp (c_r)</div>
+                      <div className="text-base font-bold text-signal font-mono">+0.68</div>
+                      <div className="text-xs text-gray-400">High sensitivity on platform pitch</div>
                     </div>
                     <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/5">
-                      <div className="text-gray-500 text-[10px]">Rear Spring Rate (k_sr)</div>
-                      <div className="text-base font-bold text-ansys-yellow font-mono">-0.42</div>
-                      <div className="text-[10px] text-gray-400">Moderate sensitivity on ride height</div>
+                      <div className="text-zinc-400 text-xs">Rear Spring Rate (k_sr)</div>
+                      <div className="text-base font-bold text-signal font-mono">-0.42</div>
+                      <div className="text-xs text-gray-400">Moderate sensitivity on ride height</div>
                     </div>
                     <div className="p-2.5 rounded-lg bg-white/[0.02] border border-white/5">
-                      <div className="text-gray-500 text-[10px]">Front ARB (k_arb_f)</div>
+                      <div className="text-zinc-400 text-xs">Front ARB (k_arb_f)</div>
                       <div className="text-base font-bold text-cyan-400 font-mono">+0.12</div>
-                      <div className="text-[10px] text-gray-400">Low sensitivity on pitch transient</div>
+                      <div className="text-xs text-gray-400">Low sensitivity on pitch transient</div>
                     </div>
                   </div>
                 </div>
@@ -656,7 +656,7 @@ function InvestigateContent() {
             >
               <div className="overflow-x-auto">
                 <table className="w-full text-xs font-mono text-left">
-                  <thead className="text-gray-500 uppercase border-b border-white/10 text-[10px]">
+                  <thead className="text-zinc-400 uppercase border-b border-white/10 text-xs">
                     <tr>
                       <th className="py-2.5 px-3">Channel Name</th>
                       <th className="py-2.5 px-3">Measured (Telemetry)</th>
@@ -671,7 +671,7 @@ function InvestigateContent() {
                         <tr key={i}>
                           <td className="py-3 px-3 font-bold text-white">{ev.label || `Channel ${i + 1}`}</td>
                           <td className="py-3 px-3 text-cyan-400">{ev.value ?? "—"}</td>
-                          <td className="py-3 px-3 text-ansys-yellow">{ev.simulated ?? "—"}</td>
+                          <td className="py-3 px-3 text-signal">{ev.simulated ?? "—"}</td>
                           <td className="py-3 px-3 text-amber-400 font-bold">{ev.residual ?? "—"}</td>
                           <td className="py-3 px-3">
                             <EvidenceBadge state={ev.state || "UNAVAILABLE"} size="xs" />
@@ -680,7 +680,7 @@ function InvestigateContent() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={5} className="py-6 px-3 text-center text-gray-500 italic">
+                        <td colSpan={5} className="py-6 px-3 text-center text-zinc-400 italic">
                           No linked evidence available. Attach telemetry or simulation evidence to this investigation.
                         </td>
                       </tr>
@@ -710,7 +710,7 @@ function InvestigateContent() {
               <div className="lg:col-span-6 space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-base font-bold text-white flex items-center gap-2 font-mono">
-                    <Sliders size={16} className="text-ansys-yellow" />
+                    <Sliders size={16} className="text-signal" />
                     Candidate Setup Parameters
                   </h3>
                   <button
@@ -764,7 +764,7 @@ function InvestigateContent() {
                     <div className="text-xs font-bold text-purple-300 font-mono">
                       SLSQP / RK45 Verification Run
                     </div>
-                    <div className="text-[10px] text-gray-400 mt-0.5">
+                    <div className="text-xs text-gray-400 mt-0.5">
                       Simulate ODE trajectory with candidate setup modifications
                     </div>
                   </div>
@@ -789,19 +789,19 @@ function InvestigateContent() {
                 {/* Predicted Effects Card - values derived from the live quarter-car result;
                     nothing hardcoded: unavailable quantities are labelled N/A honestly */}
                 <div className="p-5 rounded-2xl bg-[#111116] border border-white/[0.08] space-y-3 font-mono text-xs">
-                  <div className="text-xs font-bold text-ansys-yellow uppercase tracking-wider">
+                  <div className="text-xs font-bold text-signal uppercase tracking-wider">
                     Predicted Physical Consequences:
                   </div>
 
                   <div className="space-y-2">
                     <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
                       <span className="text-gray-300">Predicted Lap Time Delta:</span>
-                      <span className="text-gray-500 font-bold text-sm">N/A - requires lap simulation</span>
+                      <span className="text-zinc-400 font-bold text-sm">N/A - requires lap simulation</span>
                     </div>
 
                     <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
                       <span className="text-gray-300">Rear Turn-In Yaw Damping:</span>
-                      <span className="text-gray-500 font-bold">N/A - not a quarter-car output</span>
+                      <span className="text-zinc-400 font-bold">N/A - not a quarter-car output</span>
                     </div>
 
                     <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/[0.06] flex items-center justify-between">
@@ -864,7 +864,7 @@ function InvestigateContent() {
                         <Clock size={16} />
                         <span>NO ACTIVE PROPOSAL</span>
                       </div>
-                      <span className="text-[10px] px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase">
+                      <span className="text-xs px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase">
                         UNBOUND TWIN
                       </span>
                     </div>

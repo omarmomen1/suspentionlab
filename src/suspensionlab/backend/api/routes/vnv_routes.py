@@ -15,7 +15,7 @@ from typing import Any
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse
 
-from suspensionlab.backend.security.auth import verify_api_key, optional_verify_api_key, UserContext
+from suspensionlab.backend.security.auth import verify_api_key, UserContext
 from suspensionlab.shared.models import PlanTier
 from suspensionlab.physics.vnv.framework import run_vnv_suite, render_vnv_markdown
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,12 +39,11 @@ def _require_enterprise(user: Any) -> None:
 @router.get("/run")
 async def vnv_run(
     model: str | None = None,
-    user: UserContext | None = Depends(optional_verify_api_key),
+    user: UserContext = Depends(verify_api_key),
     db: AsyncSession = Depends(get_db_dependency),
 ):
     """Run the V&V suite and return the graded case table (JSON)."""
-    if user:
-        _require_enterprise(user)
+    _require_enterprise(user)
     results = run_vnv_suite(model_filter=model)
     n_pass = sum(1 for r in results if r.status == "PASS")
 
@@ -83,10 +82,9 @@ async def vnv_run(
 @router.get("/report", response_class=PlainTextResponse)
 async def vnv_report(
     model: str | None = None,
-    user: UserContext | None = Depends(optional_verify_api_key),
+    user: UserContext = Depends(verify_api_key),
 ):
     """V&V evidence table as a Markdown document (for proposals/procurement)."""
-    if user:
-        _require_enterprise(user)
+    _require_enterprise(user)
     results = run_vnv_suite(model_filter=model)
     return render_vnv_markdown(results)

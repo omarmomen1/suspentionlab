@@ -194,7 +194,7 @@ export default function EngineeringQuestionModal({
                   }`}
                 >
                   <div className="font-medium text-xs text-white mb-1">{p.title}</div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                  <div className="flex items-center justify-between text-xs text-slate-400 font-mono">
                     <span>Obj: {p.objective}</span>
                     <span className="text-amber-400/80">{p.constraint}</span>
                   </div>
@@ -240,7 +240,7 @@ export default function EngineeringQuestionModal({
                       onClick={() => setCustomDirection("minimize")}
                       className={`flex-1 py-2 rounded-lg text-xs font-semibold transition ${
                         customDirection === "minimize"
-                          ? "bg-amber-600 text-white"
+                          ? "bg-signal text-white"
                           : "bg-slate-800 text-slate-300 hover:bg-slate-700"
                       }`}
                     >
@@ -278,7 +278,7 @@ export default function EngineeringQuestionModal({
                 <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                 <div>
                   <div className="font-semibold">Applied directly to Scientific Experiment!</div>
-                  <div className="text-[11px] text-emerald-300/80">
+                  <div className="text-xs text-emerald-300/80">
                     Experiment ID: {experimentCreated.experiment_id} — Provenance & hardpoint deltas recorded.
                   </div>
                 </div>
@@ -303,7 +303,7 @@ export default function EngineeringQuestionModal({
                     ({results.evaluated_candidates.length} candidates evaluated)
                   </span>
                 </h4>
-                <span className="text-[11px] font-mono text-cyan-400 bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-800">
+                <span className="text-xs font-mono text-cyan-400 bg-cyan-950/50 px-2 py-0.5 rounded border border-cyan-800">
                   Objective: {results.objective_metric} ({results.direction})
                 </span>
               </div>
@@ -311,7 +311,7 @@ export default function EngineeringQuestionModal({
               {/* Best Candidate Card */}
               {results.best_candidate && (
                 <div className="p-4 bg-gradient-to-br from-slate-900 to-slate-800 border-2 border-amber-500/60 rounded-xl shadow-xl space-y-3 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 bg-amber-500 text-slate-950 text-[10px] font-bold uppercase tracking-wider px-3 py-0.5 rounded-bl-lg flex items-center gap-1 shadow">
+                  <div className="absolute top-0 right-0 bg-signal text-carbon text-xs font-bold uppercase tracking-wider px-3 py-0.5 rounded-bl-lg flex items-center gap-1 shadow">
                     <Award className="w-3 h-3" /> Best Sensitivity Candidate
                   </div>
 
@@ -332,16 +332,16 @@ export default function EngineeringQuestionModal({
                   {/* 5-Point Explanation Report */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs bg-slate-950/50 p-3 rounded-lg border border-slate-800">
                     <div className="space-y-1">
-                      <span className="text-[10px] font-semibold uppercase text-slate-500 tracking-wider">
+                      <span className="text-xs font-semibold uppercase text-zinc-400 tracking-wider">
                         1. What Changed
                       </span>
-                      <p className="text-slate-300 font-mono">
+                      <p className="text-slate-300 font-sans leading-relaxed">
                         Shifted {results.best_candidate.hardpoint} by {results.best_candidate.delta_mm > 0 ? `+${results.best_candidate.delta_mm}` : results.best_candidate.delta_mm} mm along {results.best_candidate.axis}-axis.
                       </p>
                     </div>
 
                     <div className="space-y-1">
-                      <span className="text-[10px] font-semibold uppercase text-slate-500 tracking-wider">
+                      <span className="text-xs font-semibold uppercase text-zinc-400 tracking-wider">
                         2. Why It Was Chosen (Physical Mechanism)
                       </span>
                       <p className="text-slate-300">
@@ -350,7 +350,7 @@ export default function EngineeringQuestionModal({
                     </div>
 
                     <div className="space-y-1">
-                      <span className="text-[10px] font-semibold uppercase text-emerald-500 tracking-wider">
+                      <span className="text-xs font-semibold uppercase text-emerald-500 tracking-wider">
                         3. What Improved
                       </span>
                       <ul className="list-disc list-inside text-emerald-300/90 space-y-0.5">
@@ -361,7 +361,7 @@ export default function EngineeringQuestionModal({
                     </div>
 
                     <div className="space-y-1">
-                      <span className="text-[10px] font-semibold uppercase text-amber-500 tracking-wider">
+                      <span className="text-xs font-semibold uppercase text-amber-500 tracking-wider">
                         4. What Got Worse
                       </span>
                       {results.best_candidate.what_got_worse.length > 0 ? (
@@ -379,7 +379,7 @@ export default function EngineeringQuestionModal({
                   <div className="flex items-center justify-between pt-2 border-t border-slate-800/80">
                     <div className="flex items-center gap-2 text-xs">
                       <span className="text-slate-400">Constraint Status:</span>
-                      <span className={`px-2 py-0.5 rounded font-mono font-bold text-[11px] ${
+                      <span className={`px-2 py-0.5 rounded font-mono font-bold text-xs ${
                         results.best_candidate.constraint_status === "PASS"
                           ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                           : "bg-red-500/20 text-red-300 border border-red-500/40"
@@ -427,12 +427,12 @@ export default function EngineeringQuestionModal({
                     className="p-3 bg-slate-800/30 hover:bg-slate-800/60 border border-slate-800 rounded-xl flex items-center justify-between gap-4 text-xs transition"
                   >
                     <div className="flex items-center gap-3">
-                      <span className="text-slate-500 font-mono font-bold">#{idx + 2}</span>
+                      <span className="text-zinc-400 font-mono font-bold">#{idx + 2}</span>
                       <div>
                         <div className="font-bold text-slate-200 font-mono">
                           {cand.hardpoint} Δ{cand.axis} ({cand.delta_mm > 0 ? `+${cand.delta_mm}` : cand.delta_mm} mm)
                         </div>
-                        <div className="text-[11px] text-slate-400 max-w-md line-clamp-1">
+                        <div className="text-xs text-slate-400 max-w-md line-clamp-1">
                           {cand.why_chosen}
                         </div>
                       </div>
@@ -441,12 +441,12 @@ export default function EngineeringQuestionModal({
                     <div className="flex items-center gap-4">
                       <div className="text-right font-mono">
                         <div className="text-slate-200 font-semibold">{((cand.objective_value ?? (cand as any).candidate_val ?? 0)).toFixed(4)}</div>
-                        <div className={`text-[10px] ${(cand.delta_obj ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                        <div className={`text-xs ${(cand.delta_obj ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
                           {(cand.delta_obj ?? 0) >= 0 ? `+${(cand.delta_obj ?? 0).toFixed(4)}` : (cand.delta_obj ?? 0).toFixed(4)}
                         </div>
                       </div>
 
-                      <span className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-bold ${
+                      <span className={`px-1.5 py-0.5 rounded font-mono text-xs font-bold ${
                         cand.constraint_status === "PASS"
                           ? "bg-emerald-500/20 text-emerald-400"
                           : "bg-red-500/20 text-red-400"
