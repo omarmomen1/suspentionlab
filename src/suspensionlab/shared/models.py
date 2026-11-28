@@ -264,7 +264,8 @@ class FullCarParamsSchema(BaseModel):
     speed_mps: float = Field(default=20.0, ge=0.0, le=150.0)
     c_tf: float = Field(default=0.0, ge=0.0, le=50000.0)
     c_tr: float = Field(default=0.0, ge=0.0, le=50000.0)
-    road_asymmetry: float = Field(default=0.3, ge=0.0, le=1.0, description="Fraction of left-side amplitude applied to right side")
+    # Wave 11: a default run must be symmetric. 1.0 = right road equals left road.
+    road_asymmetry: float = Field(default=1.0, ge=0.0, le=1.0, description="Fraction of left-side amplitude applied to right side")
     MR_f: float = Field(default=0.85, gt=0.1, le=1.5)
     MR_r: float = Field(default=0.85, gt=0.1, le=1.5)
     cg_height_mm: float = Field(default=350.0, gt=50.0, le=2000.0, description="CG height [mm]")

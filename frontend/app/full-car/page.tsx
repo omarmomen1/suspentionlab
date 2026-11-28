@@ -564,6 +564,12 @@ function FullCarDashboard() {
                 <KPICard label="LLT Front" value={maxOf(r.lateral_load_transfer_f as number[])} unit="N" status="neutral" />
               </div>
 
+              {/* Wave 11 item 2: say where roll and load transfer come from. */}
+              <p className="text-[10px] leading-relaxed text-gray-500" data-testid="lateral-g-model-note">
+                Ride-and-attitude model: roll and load transfer are computed from the lateral g you enter
+                here, not solved.
+              </p>
+
               <div className="flex gap-1.5 shrink-0" role="tablist" aria-label="Full-car simulation views">
                 {TABS.map((tab, i) => {
                   const Icon = tab.icon;
