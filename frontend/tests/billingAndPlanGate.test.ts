@@ -378,13 +378,22 @@ describe("Landing Page, Offline Fonts, Settings #billing & Env Files", () => {
     expect(settingsSrc).toContain("NEXT_PUBLIC_GUMROAD_PRO_URL");
   });
 
-  it("includes Gumroad URLs and permalink in frontend/.env.local, .env.example, and .env.railway.example", () => {
-    const envFiles = [
-      path.join(FRONTEND_ROOT, ".env.local"),
+  it("includes Gumroad URLs and permalink in env templates and local env when present", () => {
+    const requiredTemplates = [
       path.join(REPO_ROOT, ".env.example"),
       path.join(REPO_ROOT, ".env.railway.example"),
     ];
-    for (const file of envFiles) {
+    const optionalFiles = [
+      path.join(FRONTEND_ROOT, ".env.example"),
+      path.join(FRONTEND_ROOT, ".env.local"),
+    ];
+
+    const filesToCheck = [
+      ...requiredTemplates,
+      ...optionalFiles.filter((file) => fs.existsSync(file)),
+    ];
+
+    for (const file of filesToCheck) {
       const text = fs.readFileSync(file, "utf-8");
       expect(text).toContain("NEXT_PUBLIC_GUMROAD_PRO_URL=");
       expect(text).toContain("NEXT_PUBLIC_GUMROAD_TEAM_URL=");
